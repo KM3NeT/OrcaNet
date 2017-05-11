@@ -41,6 +41,8 @@ print 'Finished! Submitted a job to convert the .root files to .hdf5 files as fo
 # tohdf5 -o /sps/km3net/users/mmoser/Data/ORCA_JTE_NEMOWATER/hdf5/muon-CC/3-100GeV/test1 JTE.KM3Sim.gseagen.muon-CC.3-100GeV-9.1E7-1bin-3.0gspec.ORCA115_9m_2016.1.root
 # qsub -P P_km3net -V -l ct=24:00:00 -l vmem=2G -l fsize=8G -l sps=1 -o /sps/km3net/users/mmoser -e /sps/km3net/users/mmoser RootToHdf5.sh
 
+# tohdf5 -o /sps/km3net/users/mmoser/Data/ORCA_JTE_NEMOWATER/hdf5/tau-CC/3-100GeV/JTE.KM3Sim.gseagen.tau-CC.3.4-100GeV-7.0E8-1bin-3.0gspec.ORCA115_9m_2016.99.hdf5 /sps/km3net/users/kmcprod/JTE_NEMOWATER/tau-CC/3-100GeV/JTE.KM3Sim.gseagen.tau-CC.3.4-100GeV-7.0E8-1bin-3.0gspec.ORCA115_9m_2016.99.root
+
 
 
 
