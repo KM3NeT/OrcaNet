@@ -8,28 +8,40 @@ from matplotlib.backends.backend_pdf import PdfPages
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 __author__ = 'Michael Moser'
+__license__ = 'AGPL'
+__version__= '0.1'
+__maintainer__ = 'Michael Moser'
+__email__ = 'michael.m.moser@fau.de'
+__status__ = 'first draft'
+# Heavily based on code from sgeisselsoeder: https://github.com/sgeisselsoeder/km3netHdf5ToHistograms/
 
 
 def parse_file(fname, fname_geo, do_mc_hits):
     """
     Reads the raw .hdf5 neutrino MC file and returns the hit arrays (event_id [pos_xyz] dom_id time).
-    :param str fname: filepath of parsed inputfile
-    :param str fname_geo: filepath of used ORCA geometry file
+    :param str fname: filepath of parsed inputfile.
+    :param str fname_geo: filepath of used ORCA geometry file.
     :param bool do_mc_hits: tells the function of the hits (mc_hits + BG) or the mc_hits only should be parsed. 
                             In the case of mc_hits, the dom_id needs to be calculated thanks to the jpp output.
-    :return: ndarray(ndim=2) hits, hits_xyz: 2D arrays containing (event_id [pos_xyz] dom_id time)
+    :return: ndarray(ndim=2) tracks: 2D array containing important MC information for each event_id. [event_id, particle_type, energy, isCC]
+    :return: ndarray(ndim=2) hits, hits_xyz: 2D arrays containing (event_id [pos_xyz] dom_id time).
+    :return (ndarray(ndim=1), ndarray(ndim=1)) geo_limits: tuple that contains the min and max geometry values for each dimension. 
+    ([first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax])
     """
 
     print "Extracting hits from hdf5 file " + fname
     print "Reading detector geometry from file " + fname_geo
     geo = np.loadtxt(fname_geo)
 
+    # derive maximum and minimum x,y,z coordinates of the geometry input [[first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax]]
+    geo_limits = np.nanmin(geo, axis = 0), np.nanmax(geo, axis = 0)
+
     print "Reading tracks"
     tracks_full = np.array(pd.read_hdf(fname, 'mc_tracks'))
     print "Filtering primary tracks"
     tracks_primary = tracks_full[np.where(tracks_full[:, 0] != 0.0)[0]]
     # keep the relevant info from the track: event_id particle_type energy isCC
-    tracks = extractRelevantTrackInfo(tracks_primary)
+    tracks = extract_relevant_track_info(tracks_primary)
 
     print "Reading triggered hits"
     if do_mc_hits is True:
@@ -45,7 +57,7 @@ def parse_file(fname, fname_geo, do_mc_hits):
     hits_xyz = convert_hits_xyz(hits, geo)
 
     print "Done converting."
-    return tracks, hits, hits_xyz
+    return tracks, hits, hits_xyz, geo_limits
 
 
 def mc_hits_get_dom_id(hits_group):
@@ -54,7 +66,7 @@ def mc_hits_get_dom_id(hits_group):
     After this, the appropriate dom_id is inserted into the hits_group 2D array for each event.
     pmt_id = (dom_id - 1) * 31 + channel_id + 1
     dom_id = (pmt_id-1)/31 + 1
-    :param ndarray(ndim=2) hits_group: 2D arrays that contains the full mc_hit information
+    :param ndarray(ndim=2) hits_group: 2D arrays that contains the full mc_hit information.
     """
     for hit in hits_group:
 
@@ -63,7 +75,12 @@ def mc_hits_get_dom_id(hits_group):
         hit[4] = dom_id
 
 
-def extractRelevantTrackInfo(tracks):
+def extract_relevant_track_info(tracks):
+    """
+    Returns the relevant MC information for all tracks. [event_id, particle_type, energy, isCC]
+    :param ndarray(ndim=2) tracks: 2D array of the primary mc_tracks info.
+    :return: ndarray(ndim=2): returns a 2D array with the relevant mc_tracks info for each event.
+    """
     # keep the relevant info from the track: event_id particle_type energy isCC
     return np.array(np.concatenate([tracks[:, 14:15], tracks[:, 13:14], tracks[:, 4:5], tracks[:, 7:8]], axis=1), np.float32)
 
@@ -71,9 +88,9 @@ def extractRelevantTrackInfo(tracks):
 def convert_hits_xyz(hits, geo):
     """
     Reads the hits array with dom_id's and returns the hits_xyz array with according xyz positions.
-    :param ndarray(ndim=2) hits: 2D hits array that contain event_id dom_id time
-    :param  ndarray(ndim=2) geo: 2D geo array that contains the xyz position for each dom_id
-    :return: ndarray(ndim=2) hits_xyz: 2D hits array with xyz position information
+    :param ndarray(ndim=2) hits: 2D hits array that contain event_id dom_id time.
+    :param  ndarray(ndim=2) geo: 2D geo array that contains the xyz position for each dom_id.
+    :return: ndarray(ndim=2) hits_xyz: 2D hits array with xyz position information.
     """
     # write the hits with xyz geometry
     hits_xyz_list = []
@@ -84,17 +101,35 @@ def convert_hits_xyz(hits, geo):
     return np.array(hits_xyz_list)
 
 
-# Output related stuff
-def compute_4d_to_2d_histograms(event_hits, n_binsx, n_binsy, n_binsz, all_4d_to_2d_hists, event_track):
+def calculate_bin_edges(n_bins, geo_limits):
     """
-    Computes 2D numpy histogram 'images' from the 4D data
-    :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyz) data for a certain eventID (event_id positions_xyz time dom_id)
-    :param int n_binsx: number of bins in X
-    :param int n_binsy: number of bins in Y
-    :param int n_binsz: number of bins in Z
-    :param list all_4d_to_2d_hists: contains all 2D histogram projections
-    :param ndarray(ndim=2) event_track: TODO
-    :return: appends the 2D histograms to the all_4d_to_2d_hists list
+    Calculates the bin edges for the later np.histogramdd actions based on the number of specified bins. 
+    This is performed in order to get the same bin size for each event regardless of the fact if all bins have a hit or not.
+    :param list n_bins: contains the desired number of bins for each dimension. [n_binsx, n_binsy, nbins_z]
+    :param geo_limits: contains the min and max values of each geometry dimension. [[first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax]]
+    :return: ndarray(ndim=1) x_bin_edges, y_bin_edges, z_bin_edges: contains the resulting bin edges for each dimension.
+    """
+    n_binsx, n_binsy, n_binsz = n_bins[0], n_bins[1], n_bins[2]  # number of bins in x,y,z
+
+    # geometry input [[first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax]]
+    x_bin_edges = np.linspace(geo_limits[0][1], geo_limits[1][1], num=n_binsx + 1)
+    y_bin_edges = np.linspace(geo_limits[0][2], geo_limits[1][2], num=n_binsy + 1)
+    z_bin_edges = np.linspace(geo_limits[0][3], geo_limits[1][3], num=n_binsz + 1)
+
+    return x_bin_edges, y_bin_edges, z_bin_edges
+
+# Output related stuff
+def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, all_4d_to_2d_hists, event_track, do2d_pdf):
+    """
+    Computes 2D numpy histogram 'images' from the 4D data.
+    :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyz) data for a certain eventID. (event_id positions_xyz time dom_id)
+    :param ndarray(ndim=1) x_bin_edges: bin edges for the X-direction.
+    :param ndarray(ndim=1) y_bin_edges: bin edges for the Y-direction.
+    :param ndarray(ndim=1) z_bin_edges: bin edges for the Z-direction.
+    :param list all_4d_to_2d_hists: contains all 2D histogram projections.
+    :param ndarray(ndim=2) event_track: contains the relevant mc_track info for the event in order to get a nice title for the pdf histos.
+    :param bool do2d_pdf: if True, generate 2D matplotlib pdf histograms.
+    :return: appends the 2D histograms to the all_4d_to_2d_hists list.
     """
     #np.set_printoptions(threshold='nan')
     #print event_hits
@@ -106,24 +141,28 @@ def compute_4d_to_2d_histograms(event_hits, n_binsx, n_binsy, n_binsz, all_4d_to
     z = np.array(event_hits[:, 3], np.float32)
 
     # create histograms for this event
-    hist_xy = np.histogram2d(y, x, [n_binsy, n_binsx])  # already transposed , hist[0] = H, hist[1] = yedges, hist[2] = xedges
-    hist_xz = np.histogram2d(z, x, [n_binsz, n_binsx])
-    hist_yz = np.histogram2d(z, y, [n_binsz, n_binsy])
+    hist_xy = np.histogram2d(y, x, bins=(y_bin_edges, x_bin_edges))  # already transposed , hist[0] = H, hist[1] = yedges, hist[2] = xedges
+    hist_xz = np.histogram2d(z, x, bins=(z_bin_edges, x_bin_edges))
+    hist_yz = np.histogram2d(z, y, bins=(z_bin_edges, y_bin_edges))
+
+    #hist_xy = np.histogram2d(y, x, [n_binsy, n_binsx])  # already transposed , hist[0] = H, hist[1] = yedges, hist[2] = xedges
+    #hist_xz = np.histogram2d(z, x, [n_binsz, n_binsx])
+    #hist_yz = np.histogram2d(z, y, [n_binsz, n_binsy])
 
     all_4d_to_2d_hists.append([hist_xy[0], hist_xz[0], hist_yz[0]])
 
-    convert_2d_numpy_hists_to_pdf_image(hist_xy, hist_xz, hist_yz, event_track=event_track) # slow! takes about 1s per event
+    if do2d_pdf:
+        convert_2d_numpy_hists_to_pdf_image(hist_xy, hist_xz, hist_yz, event_track=event_track) # slow! takes about 1s per event
 
 
 def convert_2d_numpy_hists_to_pdf_image(hist_xy, hist_xz, hist_yz, event_track=None):
     """
-    
-    :param hist_xy: 
-    :param hist_xz: 
-    :param hist_yz: 
-    :return: 
+    Creates matplotlib 2D histos based on the numpy histogram2D objects and saves them to a pdf file.
+    :param ndarray(ndim=2) hist_xy: x-y np.histogram2d 
+    :param ndarray(ndim=2) hist_xz: x-z np.histogram2d
+    :param ndarray(ndim=2) hist_yz: y-z np.histogram2d
+    :param ndarray(ndim=2) event_track: contains the relevant mc_track info for the event in order to get a nice title for the pdf histos.
     """
-
     # Create human viewable 2D matplotlib output
 
     fig = plt.figure(figsize=(10, 10))
@@ -164,8 +203,9 @@ def convert_2d_numpy_hists_to_pdf_image(hist_xy, hist_xz, hist_yz, event_track=N
     pdf_2d_plots.savefig(fig)
     plt.close()
 
-
+# deprecated
 def store_2d_hist_as_pgm(hist, filename):
+    # deprecated
     # BUG!!! SAME PGM FOR ALL EVENTIDs
 
     pgm_file = open(filename, 'w')
@@ -183,29 +223,55 @@ def store_2d_hist_as_pgm(hist, filename):
     pgm_file.close()
 
 
-def main(do2d=True, do_mc_hits=False):
+def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, all_4d_to_3d_hists):
     """
-    Main code. 
+    Computes 3D numpy histogram 'images' from the 4D data.
+    :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyz) data for a certain eventID. (event_id positions_xyz time dom_id)
+    :param ndarray(ndim=1) x_bin_edges: bin edges for the X-direction. 
+    :param ndarray(ndim=1) y_bin_edges: bin edges for the Y-direction.
+    :param ndarray(ndim=1) z_bin_edges: bin edges for the Z-direction. 
+    :param list all_4d_to_3d_hists: contains all 3D histogram projections.
+    :return: appends the 3D histograms to the all_4d_to_3d_hists list.
+    """
+    # Correct order? 2D was y,x for xy hist
+    hist_xyz = np.histogramdd(np.array(event_hits[:, 1:4], np.float32), bins=(x_bin_edges, y_bin_edges, z_bin_edges))
+
+    all_4d_to_3d_hists.append([hist_xyz[0]])
+
+def store_3d_histogram_as_hdf5(filename_output):
+
+
+
+
+
+
+def main(n_bins=list(), do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
+    """
+    Main code. Reads raw .hdf5 files and creates 2D/3D histogram projections that can be used for a CNN
+    :param list n_bins:
     :param bool do2d: Declares if 2D histograms should be created.
+    :param bool do2d_pdf:
+    :param bool do3d: Declares if 3D histograms should be created.
     :param bool do_mc_hits: Declares if hits (False, mc_hits + BG) or mc_hits (False) should be processed
     """
     do_mc_hits = do_mc_hits
 
     do2d = do2d
+    do3d = do3d
+    do2d_pdf = do2d_pdf
 
     filename_input = '/sps/km3net/users/mmoser/Data/ORCA_JTE_NEMOWATER/hdf5/muon-CC/3-100GeV/' \
                      'JTE.KM3Sim.gseagen.muon-CC.3-100GeV-9.1E7-1bin-3.0gspec.ORCA115_9m_2016.99.hdf5'
     filename_output = 'testImage'
     filename_geometry = 'ORCA_Geo_115lines.txt'
 
-    tracks, hits, hits_xyz = parse_file(filename_input, filename_geometry, do_mc_hits)
+    tracks, hits, hits_xyz, geo_limits = parse_file(filename_input, filename_geometry, do_mc_hits)
     all_event_numbers = set(hits[:, 0])
 
-    n_binsx = 20  # number of bins in x
-    n_binsy = 20  # number of bins in y
-    n_binsz = 20  # number of bins in z
+    x_bin_edges, y_bin_edges, z_bin_edges = calculate_bin_edges(n_bins, geo_limits)
 
     all_4d_to_2d_hists = []
+    all_4d_to_3d_hists = []
 
     print "Generating histograms from the hits in XYZT format for files based on " + filename_input
     global pdf_2d_plots
@@ -217,13 +283,15 @@ def main(do2d=True, do_mc_hits=False):
         i+=1
         # filter all hits belonging to this event
         event_hits = hits_xyz[np.where(hits_xyz[:, 0] == eventID)[0]]
-        #print event_hits
         event_track = tracks[np.where(tracks[:, 0] == eventID)[0]][0]
 
         if do2d:
-            # computed the 2D histograms
-            compute_4d_to_2d_histograms(event_hits, n_binsx, n_binsy, n_binsz, all_4d_to_2d_hists, event_track)
+            # compute the 2D histograms
+            compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, all_4d_to_2d_hists, event_track, do2d_pdf)
             #store_2d_hist_as_pgm(all_4d_to_2d_hists[0], "Results/4dTo2d/xy/hist_" + filename_output + "_event"+str(eventID)+"_XvsY.pgm")
+
+        if do3d:
+            compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, all_4d_to_3d_hists)
 
         if i == 50:
 
@@ -232,4 +300,4 @@ def main(do2d=True, do_mc_hits=False):
 
 
 if __name__ == '__main__':
-    main(do2d=True, do_mc_hits=True)
+    main(n_bins=[20,20,20], do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=True)
