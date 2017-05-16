@@ -14,10 +14,10 @@ def store_3d_histogram_as_hdf5(all_4d_to_3d_hists, tracks, filename_output):
     :param filename_output: placeholder filename till production
     """
 
-    hists_3D_xyz = np.array(all_4d_to_3d_hists)[:, 0]
+    hists_3d_xyz = np.array(all_4d_to_3d_hists)[:, 0]
 
     h5f = h5py.File('Results/4dTo3d/h5/' + filename_output + '_xyz.h5', 'w')
     dset_tracks = h5f.create_dataset('tracks', data=tracks)
-    dset_xyz = h5f.create_dataset('xyz', data=hists_3D_xyz)
+    dset_xyz = h5f.create_dataset('xyz', data=hists_3d_xyz)
 
     h5f.close()
