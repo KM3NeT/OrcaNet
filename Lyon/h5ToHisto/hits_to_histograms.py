@@ -6,6 +6,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
+import glob
+
 
 def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, all_4d_to_2d_hists, event_track, do2d_pdf):
     """
@@ -82,7 +84,7 @@ def convert_2d_numpy_hists_to_pdf_image(hist_xy, hist_xz, hist_yz, event_track=N
     plot_yz = fill_subplot(hist_yz, axes_yz)
 
     fig.tight_layout(rect=[0, 0.02, 1, 0.95])
-    pdf_2d_plots.savefig(fig) #TODO: remove global variable, but how? Need to close pdf object outside of this function (-> as last step of the 2D eventID loop)
+    glob.pdf_2d_plots.savefig(fig) #TODO: remove global variable, but how? Need to close pdf object outside of this function (-> as last step of the 2D eventID loop)
     plt.close()
 
 # deprecated
