@@ -70,7 +70,6 @@ def main(n_bins=list(), do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
 
     print "Generating histograms from the hits in XYZT format for files based on " + filename_input
     if do2d_pdf:
-        #global pdf_2d_plots
         glob.pdf_2d_plots = PdfPages('Results/4dTo2d/' + filename_output + '_plots.pdf')
 
     i=0
@@ -94,10 +93,14 @@ def main(n_bins=list(), do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
             if do2d_pdf:
                 glob.pdf_2d_plots.close()
             break
+    #if do2d_pdf:
+     #   glob.pdf_2d_plots.close()
+
+    #TODO save 2d histos as h5
 
     if do3d:
         store_3d_histogram_as_hdf5(all_4d_to_3d_hists, tracks, filename_output)
 
 
 if __name__ == '__main__':
-    main(n_bins=[20,20,20], do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False)
+    main(n_bins=[20,20,20], do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=True)
