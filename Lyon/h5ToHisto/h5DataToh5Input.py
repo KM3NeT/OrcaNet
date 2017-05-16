@@ -1,6 +1,10 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
+"""This code takes raw simulated .hdf5 files as input in order to generate 2D/3D histograms ('images') that can be used for CNNs."""
+
 import sys
 import pandas as pd
+import h5py
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -10,9 +14,8 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 __author__ = 'Michael Moser'
 __license__ = 'AGPL'
 __version__= '0.1'
-__maintainer__ = 'Michael Moser'
 __email__ = 'michael.m.moser@fau.de'
-__status__ = 'first draft'
+__status__ = 'Prototype'
 # Heavily based on code from sgeisselsoeder: https://github.com/sgeisselsoeder/km3netHdf5ToHistograms/
 
 
@@ -131,9 +134,6 @@ def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     :param bool do2d_pdf: if True, generate 2D matplotlib pdf histograms.
     :return: appends the 2D histograms to the all_4d_to_2d_hists list.
     """
-    #np.set_printoptions(threshold='nan')
-    #print event_hits
-    #print event_hits[0]
 
     # slice out the coordinates of the current hits
     x = np.array(event_hits[:, 1], np.float32)
@@ -141,15 +141,12 @@ def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     z = np.array(event_hits[:, 3], np.float32)
 
     # create histograms for this event
-    hist_xy = np.histogram2d(y, x, bins=(y_bin_edges, x_bin_edges))  # already transposed , hist[0] = H, hist[1] = yedges, hist[2] = xedges
+    hist_xy = np.histogram2d(y, x, bins=(y_bin_edges, x_bin_edges))  # already transposed for later .pdf file, hist[0] = H, hist[1] = yedges, hist[2] = xedges
     hist_xz = np.histogram2d(z, x, bins=(z_bin_edges, x_bin_edges))
     hist_yz = np.histogram2d(z, y, bins=(z_bin_edges, y_bin_edges))
 
-    #hist_xy = np.histogram2d(y, x, [n_binsy, n_binsx])  # already transposed , hist[0] = H, hist[1] = yedges, hist[2] = xedges
-    #hist_xz = np.histogram2d(z, x, [n_binsz, n_binsx])
-    #hist_yz = np.histogram2d(z, y, [n_binsz, n_binsy])
-
-    all_4d_to_2d_hists.append([hist_xy[0], hist_xz[0], hist_yz[0]])
+    # transpose back to get classic numpy convention again: x along first dim (vertical), y along second dim (horizontal)
+    all_4d_to_2d_hists.append([hist_xy[0].T, hist_xz[0].T, hist_yz[0].T])
 
     if do2d_pdf:
         convert_2d_numpy_hists_to_pdf_image(hist_xy, hist_xz, hist_yz, event_track=event_track) # slow! takes about 1s per event
@@ -238,22 +235,35 @@ def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
 
     all_4d_to_3d_hists.append([hist_xyz[0]])
 
-def store_3d_histogram_as_hdf5(filename_output):
+def store_3d_histogram_as_hdf5(all_4d_to_3d_hists, tracks, filename_output):
+    """
+    Takes the 3D np histograms ('images') as well as the mc_info ('tracks') and saves them to a h5 file. 
+    :param list all_4d_to_3d_hists: contains all 3D np histograms (ndarrays(ndim=2))
+    :param ndarray(ndim=2) tracks: 2D array containing important MC information for each event_id. [event_id, particle_type, energy, isCC]
+    :param filename_output: placeholder filename till production
+    """
 
+    hists_3D_xyz = np.array(all_4d_to_3d_hists)[:, 0]
 
+    h5f = h5py.File('Results/4dTo3d/h5/' + filename_output + '_xyz.h5', 'w')
+    dset_tracks = h5f.create_dataset('tracks', data=tracks)
+    dset_xyz = h5f.create_dataset('xyz', data=hists_3D_xyz)
 
-
-
+    h5f.close()
 
 def main(n_bins=list(), do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
     """
     Main code. Reads raw .hdf5 files and creates 2D/3D histogram projections that can be used for a CNN
-    :param list n_bins:
+    :param list n_bins: Declares the number of bins that should be used for each dimension (x,y,z).
     :param bool do2d: Declares if 2D histograms should be created.
-    :param bool do2d_pdf:
+    :param bool do2d_pdf: Declares if pdf visualizations of the 2D histograms should be created. Cannot be called if do2d=False.
     :param bool do3d: Declares if 3D histograms should be created.
     :param bool do_mc_hits: Declares if hits (False, mc_hits + BG) or mc_hits (False) should be processed
     """
+    if do2d==False and do2d_pdf==True:
+        print 'The 2D pdf images cannot be created if do2d==False. Please try again.'
+        sys.exit()
+
     do_mc_hits = do_mc_hits
 
     do2d = do2d
@@ -262,7 +272,7 @@ def main(n_bins=list(), do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
 
     filename_input = '/sps/km3net/users/mmoser/Data/ORCA_JTE_NEMOWATER/hdf5/muon-CC/3-100GeV/' \
                      'JTE.KM3Sim.gseagen.muon-CC.3-100GeV-9.1E7-1bin-3.0gspec.ORCA115_9m_2016.99.hdf5'
-    filename_output = 'testImage'
+    filename_output = 'test'
     filename_geometry = 'ORCA_Geo_115lines.txt'
 
     tracks, hits, hits_xyz, geo_limits = parse_file(filename_input, filename_geometry, do_mc_hits)
@@ -274,8 +284,9 @@ def main(n_bins=list(), do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
     all_4d_to_3d_hists = []
 
     print "Generating histograms from the hits in XYZT format for files based on " + filename_input
-    global pdf_2d_plots
-    pdf_2d_plots = PdfPages('Results/4dTo2d/xy/' + filename_output + '_plots.pdf')
+    if do2d_pdf:
+        global pdf_2d_plots
+        pdf_2d_plots = PdfPages('Results/4dTo2d/' + filename_output + '_plots.pdf')
 
     i=0
     for eventID in all_event_numbers:
@@ -294,10 +305,16 @@ def main(n_bins=list(), do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
             compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, all_4d_to_3d_hists)
 
         if i == 50:
-
-            pdf_2d_plots.close()
+            # only for testing
+            if do2d_pdf:
+                pdf_2d_plots.close()
             break
+
+    if do3d:
+        store_3d_histogram_as_hdf5(all_4d_to_3d_hists, tracks, filename_output)
+
+
 
 
 if __name__ == '__main__':
-    main(n_bins=[20,20,20], do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=True)
+    main(n_bins=[20,20,20], do2d=False, do2d_pdf=False, do3d=True, do_mc_hits=False)
