@@ -27,6 +27,7 @@ def parse_file(fname, fname_geo, do_mc_hits):
 
     # derive maximum and minimum x,y,z coordinates of the geometry input [[first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax]]
     geo_limits = np.nanmin(geo, axis = 0), np.nanmax(geo, axis = 0)
+    print 'Detector dimensions [[first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax]]: ' + str(geo_limits)
 
     print "Reading tracks"
     tracks_full = np.array(pd.read_hdf(fname, 'mc_tracks'))
@@ -35,11 +36,12 @@ def parse_file(fname, fname_geo, do_mc_hits):
     # keep the relevant info from the track: event_id particle_type energy isCC
     tracks = extract_relevant_track_info(tracks_primary)
 
-    print "Reading triggered hits"
     if do_mc_hits is True:
+        print "Reading mc-hits"
         hits_group = np.array(pd.read_hdf(fname, 'mc_hits'))
         mc_hits_get_dom_id(hits_group)
     else:
+        print "Reading triggered hits"
         hits_group = np.array(pd.read_hdf(fname, 'hits'))
 
     # keep the relevant info from each hit: event_id dom_id time

@@ -89,18 +89,21 @@ def main(n_bins=list(), do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
             compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, all_4d_to_3d_hists)
 
         if i == 50:
-            # only for testing
+           #  only for testing
             if do2d_pdf:
                 glob.pdf_2d_plots.close()
             break
     #if do2d_pdf:
      #   glob.pdf_2d_plots.close()
 
-    #TODO save 2d histos as h5
+    if do2d:
+        store_histograms_as_hdf5(np.array(all_4d_to_2d_hists)[:, 0], tracks, 'Results/4dTo2d/h5/xy/' + filename_output + '_xy.h5', projection='xy')
+        store_histograms_as_hdf5(np.array(all_4d_to_2d_hists)[:, 1], tracks, 'Results/4dTo2d/h5/xz/' + filename_output + '_xz.h5', projection='xz')
+        store_histograms_as_hdf5(np.array(all_4d_to_2d_hists)[:, 2], tracks, 'Results/4dTo2d/h5/yz/' + filename_output + '_yz.h5', projection='yz')
 
     if do3d:
-        store_3d_histogram_as_hdf5(all_4d_to_3d_hists, tracks, filename_output)
+        store_histograms_as_hdf5(np.array(all_4d_to_3d_hists)[:, 0], tracks, 'Results/4dTo3d/h5/xyz/' + filename_output + '_xyz.h5', projection='xyz')
 
 
 if __name__ == '__main__':
-    main(n_bins=[20,20,20], do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=True)
+    main(n_bins=[100,100,100], do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False)
