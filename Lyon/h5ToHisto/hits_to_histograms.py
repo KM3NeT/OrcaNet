@@ -11,7 +11,7 @@ import glob
 def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, all_4d_to_2d_hists, event_track, do2d_pdf):
     """
     Computes 2D numpy histogram 'images' from the 4D data.
-    :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyz) data for a certain eventID. (event_id positions_xyz time dom_id)
+    :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyz) data for a certain eventID. [event_id, positions_xyz, time, dom_id]
     :param ndarray(ndim=1) x_bin_edges: bin edges for the X-direction.
     :param ndarray(ndim=1) y_bin_edges: bin edges for the Y-direction.
     :param ndarray(ndim=1) z_bin_edges: bin edges for the Z-direction.
@@ -20,7 +20,6 @@ def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     :param bool do2d_pdf: if True, generate 2D matplotlib pdf histograms.
     :return: appends the 2D histograms to the all_4d_to_2d_hists list.
     """
-
     # slice out the coordinates of the current hits
     x = np.array(event_hits[:, 1], np.float32)
     y = np.array(event_hits[:, 2], np.float32)
@@ -44,13 +43,10 @@ def convert_2d_numpy_hists_to_pdf_image(hist_xy, hist_xz, hist_yz, event_track=N
     :param ndarray(ndim=2) hist_xy: x-y np.histogram2d 
     :param ndarray(ndim=2) hist_xz: x-z np.histogram2d
     :param ndarray(ndim=2) hist_yz: y-z np.histogram2d
-    :param ndarray(ndim=2) event_track: contains the relevant mc_track info for the event in order to get a nice title for the pdf histos.
+    :param ndarray(ndim=2) event_track: contains the relevant mc_track info for the event in order to get a nice title for the pdf histos. [event_id, particle_type, energy, isCC]
     """
-    # Create human viewable 2D matplotlib output
-
     fig = plt.figure(figsize=(10, 10))
     if event_track is not None:
-        # event_id particle_type energy isCC
         particle_type = {16: 'Tau', -16: 'Anti-Tau', 14: 'Muon', -14: 'Anti-Muon', 12: 'Electron', -16: 'Anti-Electron', 'isCC': ['NC', 'CC']}
         event_info = {'event_id': str(int(event_track[0])), 'energy': str(event_track[2]),
                       'particle_type': particle_type[int(event_track[1])], 'interaction_type': particle_type['isCC'][int(event_track[3])]}
@@ -116,7 +112,6 @@ def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     :param list all_4d_to_3d_hists: contains all 3D histogram projections.
     :return: appends the 3D histograms to the all_4d_to_3d_hists list.
     """
-    # Correct order? 2D was y,x for xy hist
     hist_xyz = np.histogramdd(np.array(event_hits[:, 1:4], np.float32), bins=(x_bin_edges, y_bin_edges, z_bin_edges))
 
     all_4d_to_3d_hists.append([hist_xyz[0]])

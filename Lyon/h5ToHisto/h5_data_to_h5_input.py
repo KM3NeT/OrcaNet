@@ -23,16 +23,13 @@ def calculate_bin_edges(n_bins, geo_limits):
     """
     Calculates the bin edges for the later np.histogramdd actions based on the number of specified bins. 
     This is performed in order to get the same bin size for each event regardless of the fact if all bins have a hit or not.
-    :param list n_bins: contains the desired number of bins for each dimension. [n_binsx, n_binsy, nbins_z]
+    :param list n_bins: contains the desired number of bins for each dimension. [n_bins_x, n_bins_y, n_bins_z]
     :param geo_limits: contains the min and max values of each geometry dimension. [[first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax]]
     :return: ndarray(ndim=1) x_bin_edges, y_bin_edges, z_bin_edges: contains the resulting bin edges for each dimension.
     """
-    n_binsx, n_binsy, n_binsz = n_bins[0], n_bins[1], n_bins[2]  # number of bins in x,y,z
-
-    # geometry input [[first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax]]
-    x_bin_edges = np.linspace(geo_limits[0][1] -9.95, geo_limits[1][1]+9.95, num=n_binsx + 1) #try to get the lines in the bin center 9.95*2 = average x-separation of two lines
-    y_bin_edges = np.linspace(geo_limits[0][2], geo_limits[1][2], num=n_binsy + 1) #+- 9.75
-    z_bin_edges = np.linspace(geo_limits[0][3], geo_limits[1][3], num=n_binsz + 1)
+    x_bin_edges = np.linspace(geo_limits[0][1] -9.95, geo_limits[1][1]+9.95, num=n_bins[0] + 1) #try to get the lines in the bin center 9.95*2 = average x-separation of two lines
+    y_bin_edges = np.linspace(geo_limits[0][2], geo_limits[1][2], num=n_bins[1] + 1) #+- 9.75
+    z_bin_edges = np.linspace(geo_limits[0][3], geo_limits[1][3], num=n_bins[2] + 1)
 
     return x_bin_edges, y_bin_edges, z_bin_edges
 

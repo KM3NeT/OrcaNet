@@ -12,7 +12,6 @@ def store_histograms_as_hdf5(hists, tracks, filepath_output, projection='None'):
     :param str filepath_output: complete filepath of the created h5 file.
     :param str projection: specifies the projection type in order to get a named label for the created histogram dataset.
     """
-
     h5f = h5py.File(filepath_output, 'w')
     dset_tracks = h5f.create_dataset('tracks', data=tracks)
     dset_hists = h5f.create_dataset(projection, data=hists, dtype='uint8')

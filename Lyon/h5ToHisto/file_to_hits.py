@@ -20,7 +20,6 @@ def parse_file(fname, fname_geo, do_mc_hits):
     :return (ndarray(ndim=1), ndarray(ndim=1)) geo_limits: tuple that contains the min and max geometry values for each dimension. 
     ([first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax])
     """
-
     print "Extracting hits from hdf5 file " + fname
     print "Reading detector geometry from file " + fname_geo
     geo = np.loadtxt(fname_geo)
@@ -33,7 +32,7 @@ def parse_file(fname, fname_geo, do_mc_hits):
     tracks_full = np.array(pd.read_hdf(fname, 'mc_tracks'))
     print "Filtering primary tracks"
     tracks_primary = tracks_full[np.where(tracks_full[:, 0] != 0.0)[0]]
-    # keep the relevant info from the track: event_id particle_type energy isCC
+    # keep the relevant info from the track: [event_id, particle_type, energy, isCC]
     tracks = extract_relevant_track_info(tracks_primary)
 
     if do_mc_hits is True:
@@ -44,7 +43,7 @@ def parse_file(fname, fname_geo, do_mc_hits):
         print "Reading triggered hits"
         hits_group = np.array(pd.read_hdf(fname, 'hits'))
 
-    # keep the relevant info from each hit: event_id dom_id time
+    # keep the relevant info from each hit: [event_id, dom_id, time]
     hits = np.array(np.concatenate([hits_group[:, 14:15], hits_group[:, 4:5], hits_group[:, 11:12]], axis=1), np.float32)
 
     print "Converting hits omid -> XYZ"
@@ -75,22 +74,20 @@ def extract_relevant_track_info(tracks):
     :param ndarray(ndim=2) tracks: 2D array of the primary mc_tracks info.
     :return: ndarray(ndim=2): returns a 2D array with the relevant mc_tracks info for each event.
     """
-    # keep the relevant info from the track: event_id particle_type energy isCC
     return np.array(np.concatenate([tracks[:, 14:15], tracks[:, 13:14], tracks[:, 4:5], tracks[:, 7:8]], axis=1), np.float32)
 
 
 def convert_hits_xyz(hits, geo):
     """
     Reads the hits array with dom_id's and returns the hits_xyz array with according xyz positions.
-    :param ndarray(ndim=2) hits: 2D hits array that contain event_id dom_id time.
+    :param ndarray(ndim=2) hits: 2D hits array that contain [event_id, dom_id, time].
     :param  ndarray(ndim=2) geo: 2D geo array that contains the xyz position for each dom_id.
     :return: ndarray(ndim=2) hits_xyz: 2D hits array with xyz position information.
     """
-    # write the hits with xyz geometry
     hits_xyz_list = []
     for hit in hits:
             position = geo[int(hit[1])-1]
-            # event_id positions_xyz dom_id time
+            # hits_xyz_list: [event_id, positions_xyz, dom_id, time]
             hits_xyz_list.append([int(hit[0]), position[1], position[2], position[3], int(hit[1]), hit[2]])
     return np.array(hits_xyz_list)
 
