@@ -33,6 +33,24 @@ def calculate_bin_edges(n_bins, geo_limits):
 
     return x_bin_edges, y_bin_edges, z_bin_edges
 
+def convert_class_to_categorical(particle_type, is_cc, num_classes=4):
+    """
+    Converts the possible particle types (elec/muon/tau , NC/CC) to a categorical type that can be used as tensorflow input y
+    :param int particle_type: Specifies the particle type, i.e. elec/muon/tau (12, 14, 16). Negative values for antiparticles.
+    :param int is_cc: Specifies the interaction channel. 0 = NC, 1 = CC.
+    :param int num_classes: Specifies the total number of classes that will be discriminated later on by the CNN. I.e. 2 = elec_NC, muon_CC.
+    :return: ndarray(ndim=1) categorical: returns the categorical event type. I.e. (particle_type=14, is_cc=1) -> [0,0,1,0] for num_classes=4.
+    """
+    if num_classes == 2:
+        particle_type_dict = {(12, 0): 0, (14, 1): 1}  # 0: elec_NC, 1: elec_CC, 2: muon_CC, 3: tau_CC
+    else:
+        particle_type_dict = {(12, 0): 0, (12, 1): 1, (14, 1): 2, (16, 1): 3}  # 0: elec_NC, 1: elec_CC, 2: muon_CC, 3: tau_CC
+
+    category = int(particle_type_dict[(abs(particle_type), is_cc)]) # 2
+    categorical = np.zeros(num_classes, dtype='int') # (0,0,0,0)
+    categorical[category] = 1 # (0,0,1,0)
+    return categorical
+
 
 def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
     """
@@ -41,7 +59,7 @@ def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
     :param bool do2d: Declares if 2D histograms should be created.
     :param bool do2d_pdf: Declares if pdf visualizations of the 2D histograms should be created. Cannot be called if do2d=False.
     :param bool do3d: Declares if 3D histograms should be created.
-    :param bool do_mc_hits: Declares if hits (False, mc_hits + BG) or mc_hits (False) should be processed
+    :param bool do_mc_hits: Declares if hits (False, mc_hits + BG) or mc_hits (True) should be processed
     """
     if len(sys.argv) < 2 or str(sys.argv[1]) == "-h":
         print "Usage: python " + str(sys.argv[0]) + " file.h5"
@@ -69,6 +87,7 @@ def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
     if do2d_pdf:
         glob.pdf_2d_plots = PdfPages('Results/4dTo2d/' + filename_output + '_plots.pdf')
 
+    mc_infos = []
     i=0
     for eventID in all_event_numbers:
         print i
@@ -76,6 +95,11 @@ def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
         # filter all hits belonging to this event
         event_hits = hits_xyz[np.where(hits_xyz[:, 0] == eventID)[0]]
         event_track = tracks[np.where(tracks[:, 0] == eventID)[0]][0]
+
+        # get categorical event types and save all MC information to mc_infos
+        event_categorical_type = convert_class_to_categorical(event_track[1], event_track[3], num_classes=2)
+        all_mc_info = np.concatenate([event_track, event_categorical_type]) # [event_id, particle_type, energy, isCC, categorical types]
+        mc_infos.append(all_mc_info)
 
         if do2d:
             compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, all_4d_to_2d_hists, event_track, do2d_pdf)
@@ -92,14 +116,14 @@ def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
      #   glob.pdf_2d_plots.close()
 
     if do2d:
-        store_histograms_as_hdf5(np.stack([hist_tuple[0] for hist_tuple in all_4d_to_2d_hists]), tracks, 'Results/4dTo2d/h5/xy/' + filename_output + '_xy.h5', projection='xy')
-        store_histograms_as_hdf5(np.stack([hist_tuple[1] for hist_tuple in all_4d_to_2d_hists]), tracks, 'Results/4dTo2d/h5/xz/' + filename_output + '_xz.h5', projection='xz')
-        store_histograms_as_hdf5(np.stack([hist_tuple[2] for hist_tuple in all_4d_to_2d_hists]), tracks, 'Results/4dTo2d/h5/yz/' + filename_output + '_yz.h5', projection='yz')
+        store_histograms_as_hdf5(np.stack([hist_tuple[0] for hist_tuple in all_4d_to_2d_hists]), np.array(mc_infos), 'Results/4dTo2d/h5/xy/' + filename_output + '_xy.h5', projection='xy')
+        store_histograms_as_hdf5(np.stack([hist_tuple[1] for hist_tuple in all_4d_to_2d_hists]), np.array(mc_infos), 'Results/4dTo2d/h5/xz/' + filename_output + '_xz.h5', projection='xz')
+        store_histograms_as_hdf5(np.stack([hist_tuple[2] for hist_tuple in all_4d_to_2d_hists]), np.array(mc_infos), 'Results/4dTo2d/h5/yz/' + filename_output + '_yz.h5', projection='yz')
 
     if do3d:
-        store_histograms_as_hdf5(np.stack([hist_tuple[0] for hist_tuple in all_4d_to_3d_hists]), tracks, 'Results/4dTo3d/h5/xyz/' + filename_output + '_xyz.h5', projection='xyz')
+        store_histograms_as_hdf5(np.stack([hist_tuple[0] for hist_tuple in all_4d_to_3d_hists]), np.array(mc_infos), 'Results/4dTo3d/h5/xyz/' + filename_output + '_xyz.h5', projection='xyz')
 
 
 if __name__ == '__main__':
-    main(n_bins=[11,13,18], do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False)
+    main(n_bins=[11,13,18], do2d=True, do2d_pdf=False, do3d=True, do_mc_hits=False)
 

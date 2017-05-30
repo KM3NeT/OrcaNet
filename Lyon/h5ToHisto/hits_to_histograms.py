@@ -47,7 +47,7 @@ def convert_2d_numpy_hists_to_pdf_image(hist_xy, hist_xz, hist_yz, event_track=N
     """
     fig = plt.figure(figsize=(10, 10))
     if event_track is not None:
-        particle_type = {16: 'Tau', -16: 'Anti-Tau', 14: 'Muon', -14: 'Anti-Muon', 12: 'Electron', -16: 'Anti-Electron', 'isCC': ['NC', 'CC']}
+        particle_type = {16: 'Tau', -16: 'Anti-Tau', 14: 'Muon', -14: 'Anti-Muon', 12: 'Electron', -12: 'Anti-Electron', 'isCC': ['NC', 'CC']}
         event_info = {'event_id': str(int(event_track[0])), 'energy': str(event_track[2]),
                       'particle_type': particle_type[int(event_track[1])], 'interaction_type': particle_type['isCC'][int(event_track[3])]}
         title = event_info['particle_type'] + '-' + event_info['interaction_type'] + ', Event ID: ' + event_info['event_id'] + ', Energy: ' + event_info['energy'] + ' GeV'
@@ -105,7 +105,7 @@ def store_2d_hist_as_pgm(hist, filename):
 def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, all_4d_to_3d_hists):
     """
     Computes 3D numpy histogram 'images' from the 4D data.
-    :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyz) data for a certain eventID. (event_id positions_xyz time dom_id)
+    :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyz) data for a certain eventID. [event_id, positions_xyz, time, dom_id]
     :param ndarray(ndim=1) x_bin_edges: bin edges for the X-direction. 
     :param ndarray(ndim=1) y_bin_edges: bin edges for the Y-direction.
     :param ndarray(ndim=1) z_bin_edges: bin edges for the Z-direction. 
