@@ -2,14 +2,15 @@
 # -*- coding: utf-8 -*-
 """This main code takes raw simulated .hdf5 files as input in order to generate 2D/3D histograms ('images') that can be used for CNNs."""
 
-import sys
 import os
+import sys
+
 from matplotlib.backends.backend_pdf import PdfPages
 
-from file_to_hits import *
-from hits_to_histograms import *
-from histograms_to_files import *
 import glob
+from file_to_hits import *
+from histograms_to_files import *
+from hits_to_histograms import *
 
 __author__ = 'Michael Moser'
 __license__ = 'AGPL'
@@ -69,6 +70,10 @@ def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
         print 'The 2D pdf images cannot be created if do2d==False. Please try again.'
         sys.exit(1)
 
+    if not os.path.isfile(str(sys.argv[1])):
+        print 'The file -' + str(sys.argv[1]) + '- does not exist. Exiting.'
+        sys.exit(1)
+
     filename_input = str(sys.argv[1])
     filename = os.path.basename(os.path.splitext(filename_input)[0])
     filename_output = filename.replace(".","_")
@@ -107,11 +112,11 @@ def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
         if do3d:
             compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, all_4d_to_3d_hists)
 
-        if i == 10:
+        #if i == 10:
            #  only for testing
-            if do2d_pdf:
-                glob.pdf_2d_plots.close()
-            break
+         #   if do2d_pdf:
+          #      glob.pdf_2d_plots.close()
+           # break
     #if do2d_pdf:
      #   glob.pdf_2d_plots.close()
 

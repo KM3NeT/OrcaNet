@@ -2,11 +2,12 @@
 # -*- coding: utf-8 -*-
 """This utility code contains functions that computes 2D/3D histograms based on the file_to_hits.py output"""
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 import glob
+
 
 def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, all_4d_to_2d_hists, event_track, do2d_pdf):
     """
