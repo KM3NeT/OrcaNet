@@ -13,7 +13,7 @@ def store_histograms_as_hdf5(hists, mc_infos, filepath_output, projection='None'
     :param str projection: specifies the projection type in order to get a named label for the created histogram dataset.
     """
     h5f = h5py.File(filepath_output, 'w')
-    dset_mc_infos = h5f.create_dataset('mc_infos', data=mc_infos)
+    dset_mc_infos = h5f.create_dataset('mc_infos', data=mc_infos, dtype='float32')
     dset_hists = h5f.create_dataset(projection, data=hists, dtype='uint8')
 
     h5f.close()

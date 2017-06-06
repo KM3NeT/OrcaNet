@@ -4,6 +4,7 @@
 
 import os
 import sys
+#from memory_profiler import profile # for memory profiling, call with @profile; myfunc()
 
 from matplotlib.backends.backend_pdf import PdfPages
 
@@ -33,6 +34,7 @@ def calculate_bin_edges(n_bins, geo_limits):
     z_bin_edges = np.linspace(geo_limits[0][3], geo_limits[1][3], num=n_bins[2] + 1)
 
     return x_bin_edges, y_bin_edges, z_bin_edges
+
 
 def convert_class_to_categorical(particle_type, is_cc, num_classes=4):
     """
@@ -78,10 +80,10 @@ def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
     filename = os.path.basename(os.path.splitext(filename_input)[0])
     filename_output = filename.replace(".","_")
     filename_geometry = 'ORCA_Geo_115lines.txt'
-    #filename_input = '/sps/km3net/users/mmoser/Data/ORCA_JTE_NEMOWATER/hdf5/muon-CC/3-100GeV/JTE.KM3Sim.gseagen.muon-CC.3-100GeV-9.1E7-1bin-3.0gspec.ORCA115_9m_2016.99.hdf5'
+    #filename_input = '/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/raw_data/h5/elec-NC/3-100GeV/JTE.KM3Sim.gseagen.elec-NC.3-100GeV-3.4E6-1bin-3.0gspec.ORCA115_9m_2016.81.hdf5'
 
-    tracks, hits, hits_xyz, geo_limits = parse_file(filename_input, filename_geometry, do_mc_hits)
-    all_event_numbers = set(hits[:, 0])
+    tracks, hits_xyz, geo_limits = parse_file(filename_input, filename_geometry, do_mc_hits)
+    all_event_numbers = set(hits_xyz[:, 0])
 
     x_bin_edges, y_bin_edges, z_bin_edges = calculate_bin_edges(n_bins, geo_limits)
 
@@ -95,7 +97,8 @@ def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
     mc_infos = []
     i=0
     for eventID in all_event_numbers:
-        print i
+        if i % 10 == 0:
+            print 'Event No. ' + str(i)
         i+=1
         # filter all hits belonging to this event
         event_hits = hits_xyz[np.where(hits_xyz[:, 0] == eventID)[0]]
