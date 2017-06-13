@@ -7,7 +7,7 @@ import numpy as np
 import math
 import argparse
 import sys
-from memory_profiler import profile # for memory profiling, call with @profile; myfunc()
+#from memory_profiler import profile # for memory profiling, call with @profile; myfunc()
 
 __author__ = 'Michael Moser'
 __license__ = 'AGPL'
@@ -15,7 +15,6 @@ __version__ = '1.0'
 __email__ = 'michael.m.moser@fau.de'
 __status__ = 'Production'
 
-@profile
 def get_cum_number_of_rows(file_list):
     """
     Returns the cumulative number of rows (axis_0) in a list based on the specified input .h5 files.
@@ -41,6 +40,7 @@ def get_cum_number_of_rows(file_list):
 
     mean_number_of_rows = math.ceil(np.mean(number_of_rows_list))
     return cum_number_of_rows_list, mean_number_of_rows
+
 
 def parse_input():
     """
@@ -91,7 +91,6 @@ def parse_input():
     return file_list, output_filepath, custom_chunksize
 
 
-@profile
 def concatenate_h5_files():
     """
     Main code. Concatenates .h5 files with multiple datasets, where each dataset in one file needs to have the same number of rows (axis_0).
