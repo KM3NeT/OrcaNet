@@ -11,7 +11,7 @@ from memory_profiler import profile # for memory profiling, call with @profile; 
 
 __author__ = 'Michael Moser'
 __license__ = 'AGPL'
-__version__= '1.0'
+__version__ = '1.0'
 __email__ = 'michael.m.moser@fau.de'
 __status__ = 'Production'
 
