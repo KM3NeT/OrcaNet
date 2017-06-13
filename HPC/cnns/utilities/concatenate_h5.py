@@ -21,7 +21,7 @@ def get_cum_number_of_rows(file_list):
     This information is needed for concatenating the .h5 files later on.
     Additionally, the average number of rows for all the input files is calculated, in order to derive a sensible chunksize (optimized for diskspace).
     :param list file_list: list that contains all filepaths of the input files.
-    :return: list cum_number_of_rows_list: list that contains the cumulative number of rows (i.e. [0,100,200,300,...] if each file has 100 rows)
+    :return: list cum_number_of_rows_list: list that contains the cumulative number of rows (i.e. [0,100,200,300,...] if each file has 100 rows).
     :return: int mean_number_of_rows: specifies the average number of rows (rounded up to int) for the files in the file_list.
     """
     total_number_of_rows = 0
@@ -45,7 +45,7 @@ def get_cum_number_of_rows(file_list):
 def parse_input():
     """
     Parses the user input in order to return the most important information:
-    1) list of files that should be concatenated 2) the filepath of the output .h5 file 3) use custom chunksize or not
+    1) list of files that should be concatenated 2) the filepath of the output .h5 file 3) use custom chunksize or not.
     :return: list file_list: list that contains all filepaths of the input files.
     :return: str output_filepath: specifies the filepath (path+name) of the output .h5 file.
     :return: (bool, int) custom_chunksize: specifies if a custom_chunksize should be used and if yes, which chunksize has been specified. I.e. (True, 1000).
@@ -94,7 +94,7 @@ def parse_input():
 def concatenate_h5_files():
     """
     Main code. Concatenates .h5 files with multiple datasets, where each dataset in one file needs to have the same number of rows (axis_0).
-    Gets user input with aid of the parse_input() function. By default, the chunksize for the output .h5 file is automatically computed
+    Gets user input with aid of the parse_input() function. By default, the chunksize for the output .h5 file is automatically computed.
     based on the average number of rows per file, in order to eliminate padding (wastes disk space).
     For faster I/O, the chunksize should be set by the user depending on the use case.
     In deep learning applications for example, the chunksize should be equal to the batch size that is used later on for reading the data.
