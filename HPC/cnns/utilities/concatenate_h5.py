@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Placeholder"""
-# Works only for files where each dataset has the same number of rows, but can be easily modified to do so
+"""Concatenates .h5 files. Works only for files where each dataset has the same number of rows."""
 
 import h5py
 import numpy as np
@@ -9,6 +8,12 @@ import math
 import argparse
 import sys
 from memory_profiler import profile # for memory profiling, call with @profile; myfunc()
+
+__author__ = 'Michael Moser'
+__license__ = 'AGPL'
+__version__= '1.0'
+__email__ = 'michael.m.moser@fau.de'
+__status__ = 'Production'
 
 @profile
 def get_cum_number_of_rows(file_list):
