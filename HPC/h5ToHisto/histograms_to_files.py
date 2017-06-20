@@ -4,17 +4,16 @@
 
 import h5py
 
-def store_histograms_as_hdf5(hists, mc_infos, filepath_output, projection='None'):
+def store_histograms_as_hdf5(hists, mc_infos, filepath_output):
     """
     Takes numpy histograms ('images') for a certain projection as well as the mc_info ('tracks') and saves them to a h5 file. 
     :param ndarray(ndim=2) hists: array that contains all histograms for a certain projection.
     :param ndarray(ndim=2) mc_infos: 2D array containing important MC information for each event_id. [event_id, particle_type, energy, isCC, categorical event types]
     :param str filepath_output: complete filepath of the created h5 file.
-    :param str projection: specifies the projection type in order to get a named label for the created histogram dataset.
     """
     h5f = h5py.File(filepath_output, 'w')
-    dset_mc_infos = h5f.create_dataset('mc_infos', data=mc_infos, dtype='float32')
-    dset_hists = h5f.create_dataset(projection, data=hists, dtype='uint8')
+    dset_mc_infos = h5f.create_dataset('y', data=mc_infos, dtype='float32')
+    dset_hists = h5f.create_dataset('x', data=hists, dtype='uint8')
 
     h5f.close()
 
