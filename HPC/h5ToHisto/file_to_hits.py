@@ -13,8 +13,9 @@ def parse_file(fname, fname_geo, do_mc_hits):
     :param str fname_geo: filepath of used ORCA geometry file.
     :param bool do_mc_hits: tells the function of the hits (mc_hits + BG) or the mc_hits only should be parsed. 
                             In the case of mc_hits, the dom_id needs to be calculated thanks to the jpp output.
-    :return: ndarray(ndim=2) tracks: 2D array containing important MC information for each event_id. [event_id, particle_type, energy, isCC]
-    :return: ndarray(ndim=2) hits_xyz: 2D array containing (event_id pos_xyz dom_id time).
+    :return: ndarray(ndim=2) tracks: 2D array containing important MC information for each event_id.
+                                     [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z]
+    :return: ndarray(ndim=2) hits_xyz: 2D array containing [event_id pos_xyz dom_id time].
     :return (ndarray(ndim=1), ndarray(ndim=1)) geo_limits: tuple that contains the min and max geometry values for each dimension. 
     ([first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax])
     """
@@ -75,11 +76,11 @@ def mc_hits_get_dom_id(hits_group):
 
 def extract_relevant_track_info(tracks):
     """
-    Returns the relevant MC information for all tracks. [event_id, particle_type, energy, isCC]
+    Returns the relevant MC information for all tracks. [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z]
     :param ndarray(ndim=2) tracks: 2D array of the primary mc_tracks info.
     :return: ndarray(ndim=2): returns a 2D array with the relevant mc_tracks info for each event.
     """
-    return np.array(np.concatenate([tracks[:, 14:15], tracks[:, 13:14], tracks[:, 4:5], tracks[:, 7:8]], axis=1), np.float32)
+    return np.array(np.concatenate([tracks[:, 14:15], tracks[:, 13:14], tracks[:, 4:5], tracks[:, 7:8], tracks[:, 0:1], tracks[:, 1:4]], axis=1), np.float32)
 
 
 def convert_hits_xyz(hits, geo):

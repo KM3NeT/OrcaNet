@@ -35,7 +35,22 @@ def calculate_bin_edges(n_bins, geo_limits):
     return x_bin_edges, y_bin_edges, z_bin_edges
 
 
-def convert_class_to_categorical(particle_type, is_cc, num_classes=4):
+def get_class_up_down(dir_z):
+    """
+    Converts the zenith information (dir_z) to a binary up/down value.
+    :param float32 dir_z: z-direction of the event_track (which contains dir_z).
+    :return: ndarray(ndim=1) up_down_class_value_array: binary up/down class for the event_track.
+    """
+    # analyze the track info to determine the class number
+    up_down_class_value = int(np.sign(dir_z))
+    if up_down_class_value == -1:
+        up_down_class_value = 0
+    up_down_class_value_array = np.array([up_down_class_value], dtype='float32')
+
+    return up_down_class_value_array
+
+
+def convert_particle_class_to_categorical(particle_type, is_cc, num_classes=4):
     """
     Converts the possible particle types (elec/muon/tau , NC/CC) to a categorical type that can be used as tensorflow input y
     :param int particle_type: Specifies the particle type, i.e. elec/muon/tau (12, 14, 16). Negative values for antiparticles.
@@ -48,9 +63,9 @@ def convert_class_to_categorical(particle_type, is_cc, num_classes=4):
     else:
         particle_type_dict = {(12, 0): 0, (12, 1): 1, (14, 1): 2, (16, 1): 3}  # 0: elec_NC, 1: elec_CC, 2: muon_CC, 3: tau_CC
 
-    category = int(particle_type_dict[(abs(particle_type), is_cc)]) # 2
-    categorical = np.zeros(num_classes, dtype='int') # (0,0,0,0)
-    categorical[category] = 1 # (0,0,1,0)
+    category = int(particle_type_dict[(abs(particle_type), is_cc)])
+    categorical = np.zeros(num_classes, dtype='int')
+    categorical[category] = 1
     return categorical
 
 
@@ -103,9 +118,12 @@ def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
         event_hits = hits_xyz[np.where(hits_xyz[:, 0] == eventID)[0]]
         event_track = tracks[np.where(tracks[:, 0] == eventID)[0]][0]
 
+        # get up/down information
+        up_down_class = get_class_up_down(event_track[7])
         # get categorical event types and save all MC information to mc_infos
-        event_categorical_type = convert_class_to_categorical(event_track[1], event_track[3], num_classes=2)
-        all_mc_info = np.concatenate([event_track, event_categorical_type]) # [event_id, particle_type, energy, isCC, categorical types]
+        event_categorical_type = convert_particle_class_to_categorical(event_track[1], event_track[3], num_classes=4)
+        # all_mc_info: [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z, up/down, categorical particle_types]
+        all_mc_info = np.concatenate([event_track, up_down_class, event_categorical_type])
         mc_infos.append(all_mc_info)
 
         if do2d:

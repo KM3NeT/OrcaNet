@@ -44,7 +44,8 @@ def convert_2d_numpy_hists_to_pdf_image(hist_xy, hist_xz, hist_yz, event_track=N
     :param ndarray(ndim=2) hist_xy: x-y np.histogram2d 
     :param ndarray(ndim=2) hist_xz: x-z np.histogram2d
     :param ndarray(ndim=2) hist_yz: y-z np.histogram2d
-    :param ndarray(ndim=2) event_track: contains the relevant mc_track info for the event in order to get a nice title for the pdf histos. [event_id, particle_type, energy, isCC]
+    :param ndarray(ndim=2) event_track: contains the relevant mc_track info for the event in order to get a nice title for the pdf histos.
+                                        [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z]
     """
     fig = plt.figure(figsize=(10, 10))
     if event_track is not None:
