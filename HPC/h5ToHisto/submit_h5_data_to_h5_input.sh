@@ -13,11 +13,12 @@ n=${PBS_ARRAYID}
 i=$((1+((${n}-1) * 4)))
 
 CodeFolder=/home/woody/capn/mppi033h/Code/HPC/h5ToHisto
-HDFFOLDER=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/raw_data/h5/muon-CC/3-100GeV
+HDFFOLDER=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/raw_data/h5/elec-NC/3-100GeV
 cd ${CodeFolder}
 
-ParticleType=muon-CC
-FileName=JTE.KM3Sim.gseagen.${ParticleType}.3-100GeV-9.1E7-1bin-3.0gspec.ORCA115_9m_2016
+ParticleType=elec-NC
+#FileName=JTE.KM3Sim.gseagen.${ParticleType}.3-100GeV-9.1E7-1bin-3.0gspec.ORCA115_9m_2016 #muon-CC
+FileName=JTE.KM3Sim.gseagen.${ParticleType}.3-100GeV-3.4E6-1bin-3.0gspec.ORCA115_9m_2016 #elec-NC
 
 # run
 

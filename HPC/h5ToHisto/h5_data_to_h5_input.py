@@ -59,7 +59,7 @@ def convert_particle_class_to_categorical(particle_type, is_cc, num_classes=4):
     :return: ndarray(ndim=1) categorical: returns the categorical event type. I.e. (particle_type=14, is_cc=1) -> [0,0,1,0] for num_classes=4.
     """
     if num_classes == 2:
-        particle_type_dict = {(12, 0): 0, (14, 1): 1}  # 0: elec_NC, 1: elec_CC, 2: muon_CC, 3: tau_CC
+        particle_type_dict = {(12, 0): 0, (14, 1): 1}  # 0: elec_NC, 1: elec_CC, 2: muon_CC, 3: tau_CC #TODO old, clean up
     else:
         particle_type_dict = {(12, 0): 0, (12, 1): 1, (14, 1): 2, (16, 1): 3}  # 0: elec_NC, 1: elec_CC, 2: muon_CC, 3: tau_CC
 
@@ -150,5 +150,5 @@ def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
 
 
 if __name__ == '__main__':
-    main(n_bins=[11,13,18], do2d=True, do2d_pdf=False, do3d=True, do_mc_hits=False)
+    main(n_bins=[11,13,18], do2d=False, do2d_pdf=False, do3d=True, do_mc_hits=False)
 

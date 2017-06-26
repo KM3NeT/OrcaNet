@@ -62,14 +62,14 @@ def parse_input():
     return file_list, delete_flag, chunking
 
 
-def shuffle_h5(filepath, delete_flag=True, chunking=(False, None)):
+def shuffle_h5(filepath, delete_flag=True, chunking=(False, None), tool=False):
     """
     Shuffles a .h5 file where each dataset needs to have the same number of rows (axis_0).
     The shuffled data is saved to a new .h5 file with the suffix < _shuffled.h5 >.
     :param str filepath: filepath of the unshuffled input file.
     :param bool delete_flag: specifies if the old, unshuffled file should be deleted after extracting the data.
     :param (bool, int) chunking: specifies if chunks should be used and if yes which size the chunks should have.
-    :return: h5py.File output_file_shuffled: returns the shuffled .h5 file object.
+    :return: h5py.File output_file_shuffled: returns the shuffled .h5 file object if it is called from the tool.
     """
 
     input_file = h5py.File(filepath, 'r')
@@ -109,8 +109,10 @@ def shuffle_h5(filepath, delete_flag=True, chunking=(False, None)):
         else:
             dset_shuffled = output_file_shuffled.create_dataset(dataset_key,
                                                                 data=dataset, dtype=dataset.dtype)
-
-    return output_file_shuffled
+    if tool is True:
+        return output_file_shuffled
+    else:
+        output_file_shuffled.close()
 
 
 def shuffle_h5_tool():

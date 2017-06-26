@@ -8,6 +8,7 @@ import keras as ks
 
 from models.cnn_models import *
 from utilities.cnn_utilities import *
+from utilities.shuffle_h5 import shuffle_h5
 
 
 def parse_input():
@@ -72,6 +73,7 @@ def execute_cnn(n_bins):
     Runs a convolutional neural network.
     :param list n_bins: Declares the number of bins for each dimension (x,y,z) in the train- and testfiles.
     """
+    #TODO copy input file to ssd
 
     train_files, test_files = parse_input()
 
@@ -101,9 +103,14 @@ def execute_cnn(n_bins):
 
     #trainsize = 100000
 
+    epoch = 0
     while 1:
+        epoch +=1
         # process all hdf5 files, full epoch
         for (f, f_size) in train_files:
+            if epoch > 1: # just for convenience, we don't want to wait before the first epoch each time
+                shuffle_h5(f, delete_flag=True)
+
             i += 1
             print "Training ", i, " on file ", f
             model.fit_generator(generate_batches_from_hdf5_file(f, batchsize, n_bins_x, n_bins_y, n_bins_z, n_bins_t, number_of_classes),
