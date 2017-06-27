@@ -69,6 +69,8 @@ def shuffle_h5(filepath, delete_flag=True, chunking=(False, None), tool=False):
     :param str filepath: filepath of the unshuffled input file.
     :param bool delete_flag: specifies if the old, unshuffled file should be deleted after extracting the data.
     :param (bool, int) chunking: specifies if chunks should be used and if yes which size the chunks should have.
+    :param bool tool: specifies if the function is accessed from the shuffle_h5_tool.
+                      In this case, the shuffled .h5 file is returned instead of closed.
     :return: h5py.File output_file_shuffled: returns the shuffled .h5 file object if it is called from the tool.
     """
 
@@ -126,7 +128,7 @@ def shuffle_h5_tool():
 
     for filepath in file_list:
         print 'Shuffling file ' + filepath
-        output_file_shuffled = shuffle_h5(filepath, delete_flag=delete_flag, chunking=chunking)
+        output_file_shuffled = shuffle_h5(filepath, delete_flag=delete_flag, chunking=chunking, tool=True)
 
         print 'Finished shuffling. Output information:'
         print '---------------------------------------'
