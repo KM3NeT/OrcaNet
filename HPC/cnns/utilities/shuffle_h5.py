@@ -36,7 +36,7 @@ def parse_input():
                                      formatter_class=argparse.RawTextHelpFormatter)
 
     parser.add_argument('files', metavar='file', type=str, nargs='+', help = 'a file that should be shuffled, can be more than one argument.')
-    parser.add_argument('-d', '--delete',
+    parser.add_argument('-d', '--delete', action='store_true',
                         help = 'deletes the original input file after the shuffled .h5 is created.')
     parser.add_argument('-c', '--chunksize', dest='chunksize', type=int,
                         help = 'specify a chunksize value in order to use chunked storage for the shuffled .h5 file (default: not chunked).')
