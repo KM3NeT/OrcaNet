@@ -85,8 +85,6 @@ def convert_2d_numpy_hists_to_pdf_image(hist_xy, hist_xz, hist_yz, event_track=N
     plt.close()
 
 
-
-
 def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_3d_hists):
     """
     Computes 3D numpy histogram 'images' from the 4D data.
@@ -127,8 +125,4 @@ def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     rzt = np.array(np.concatenate([r, zt], axis=1), np.float32)
     hist_rzt = np.histogramdd(rzt, bins=(n_bins[0], n_bins[2], n_bins[3]), range=((min(r), max(r)), (min(z), max(z)), (t_mean - t_start * t_diff, t_mean + t_end * t_diff)))
 
-    all_4d_to_3d_hists.append([hist_xyz[0]])
-    all_4d_to_3d_hists.append([hist_xyt[0]])
-    all_4d_to_3d_hists.append([hist_xzt[0]])
-    all_4d_to_3d_hists.append([hist_yzt[0]])
-    all_4d_to_3d_hists.append([hist_rzt[0]])
+    all_4d_to_3d_hists.append([hist_xyz[0], hist_xyt[0], hist_xzt[0], hist_yzt[0], hist_rzt[0]])

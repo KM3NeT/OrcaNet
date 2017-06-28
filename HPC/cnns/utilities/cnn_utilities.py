@@ -29,7 +29,7 @@ def generate_batches_from_hdf5_file(filename, batchsize, n_bins_x, n_bins_y, n_b
             # start the next batch at index 0
             # create numpy arrays of input data (features)
             xs = f['x'][n_entries : n_entries + batchsize]
-            xs = np.reshape(xs, dimensions).astype(float) #float32?
+            xs = np.reshape(xs, dimensions).astype('float32')
 
             # and mc info (labels)
             y_values = f['y'][n_entries:n_entries+batchsize]
@@ -43,8 +43,8 @@ def generate_batches_from_hdf5_file(filename, batchsize, n_bins_x, n_bins_y, n_b
             # we have read one batch more from this file
             n_entries += batchsize
             #np.set_printoptions(threshold=np.inf)
-            #print ys
-            #print xs
+            #print 'ys', ys.shape
+            #print 'xs', xs.shape
             yield (xs, ys)
         f.close()
 
@@ -107,7 +107,25 @@ def encode_targets(y_val, number_of_classes):
         train_y[0] = y_val[9]
         train_y[1] = y_val[11]
 
+        #print y_val
+        #print train_y
         return train_y
+
+    if number_of_classes == 1: # muon-CC to elec-NC
+        train_y = np.zeros(1, dtype='float32')
+
+        if y_val[9]!=0:
+            train_y[0] = y_val[9]
+        #print y_val
+        #print train_y
+        return train_y
+
+    # if number_of_classes == 1: #up down
+    #     train_y = np.zeros(1, dtype='float32')
+    #     train_y[0] = y_val[8]
+    #
+    #     return train_y
+
 
     # if number_of_classes == 16:
     #     # everything at once:

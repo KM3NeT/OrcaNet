@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-#PBS -l nodes=1:ppn=4,walltime=02:00:00
-#PBS -o /home/woody/capn/mppi033h/logs/submit_h5_to_histo_$PBS_ARRAYID.out -e /home/woody/capn/mppi033h/logs/submit_h5_to_histo_$PBS_ARRAYID.err
+#PBS -l nodes=1:ppn=4,walltime=03:00:00
+#PBS -o /home/woody/capn/mppi033h/logs/submit_h5_to_histo_$PBS_JOBID_$PBS_ARRAYID.out -e /home/woody/capn/mppi033h/logs/submit_h5_to_histo_$PBS_JOBID_$PBS_ARRAYID.err
 # first non-empty non-comment line ends PBS options
 
 # Submit with 'qsub -t 1-10 submit_h5_data_to_h5_input.sh'
@@ -13,13 +13,18 @@ n=${PBS_ARRAYID}
 i=$((1+((${n}-1) * 4)))
 
 CodeFolder=/home/woody/capn/mppi033h/Code/HPC/h5ToHisto
-HDFFOLDER=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/raw_data/h5/elec-NC/3-100GeV
-cd ${CodeFolder}
 
-ParticleType=elec-NC
+#ParticleType=muon-CC #muon-CC
 #FileName=JTE.KM3Sim.gseagen.${ParticleType}.3-100GeV-9.1E7-1bin-3.0gspec.ORCA115_9m_2016 #muon-CC
-FileName=JTE.KM3Sim.gseagen.${ParticleType}.3-100GeV-3.4E6-1bin-3.0gspec.ORCA115_9m_2016 #elec-NC
+#HDFFOLDER=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/raw_data/h5/muon-CC/3-100GeV #muon-CC
+#ParticleType=elec-NC #elec-NC
+#FileName=JTE.KM3Sim.gseagen.${ParticleType}.3-100GeV-3.4E6-1bin-3.0gspec.ORCA115_9m_2016 #elec-NC
+#HDFFOLDER=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/raw_data/h5/elec-NC/3-100GeV #elec-NC
+ParticleType=elec-CC #elec-NC
+FileName=JTE.KM3Sim.gseagen.${ParticleType}.3-100GeV-1.1E6-1bin-3.0gspec.ORCA115_9m_2016 #elec-CC
+HDFFOLDER=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/raw_data/h5/elec-CC/3-100GeV #elec-CC
 
+cd ${CodeFolder}
 # run
 
 files_per_job=60 # total number of files per job

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-#PBS -o /home/woody/capn/mppi033h/logs/submit_concatenate_h5.out -e /home/woody/capn/mppi033h/logs/submit_concatenate_h5.err
+#PBS -o /home/woody/capn/mppi033h/logs/submit_concatenate_h5_$PBS_JOBID.out -e /home/woody/capn/mppi033h/logs/submit_concatenate_h5_$PBS_JOBID.err
 
 # submit script for the concatenate_h5 tool.
 # submit with ' qsub -l nodes=1:ppn=4,walltime=01:00:00 submit_concatenate_h5.sh'
