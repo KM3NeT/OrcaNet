@@ -84,36 +84,51 @@ def convert_2d_numpy_hists_to_pdf_image(hist_xy, hist_xz, hist_yz, event_track=N
     glob.pdf_2d_plots.savefig(fig) #TODO: remove global variable, but how? Need to close pdf object outside of this function (-> as last step of the 2D eventID loop)
     plt.close()
 
-# deprecated
-def store_2d_hist_as_pgm(hist, filename):
-    # deprecated
-    # BUG!!! SAME PGM FOR ALL EVENTIDs
-
-    pgm_file = open(filename, 'w')
-    max_hist_value = np.amax(hist[0])
-
-    # write a valid header for a pgm image file
-    pgm_file.write("P2\n" + str(hist[0].shape[1]) + " " + str(hist[0].shape[0]) + "\n" + str(int(max_hist_value)) + "\n")
-    # write the actual data
-    for row in hist[0]:
-        for entry in row:
-            # write the actual values
-            pgm_file.write(str(int(entry)) + " ")
-
-    pgm_file.write("\n")
-    pgm_file.close()
 
 
-def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, all_4d_to_3d_hists):
+
+def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_3d_hists):
     """
     Computes 3D numpy histogram 'images' from the 4D data.
     :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyz) data for a certain eventID. [event_id, positions_xyz, time, dom_id]
     :param ndarray(ndim=1) x_bin_edges: bin edges for the X-direction. 
     :param ndarray(ndim=1) y_bin_edges: bin edges for the Y-direction.
-    :param ndarray(ndim=1) z_bin_edges: bin edges for the Z-direction. 
+    :param ndarray(ndim=1) z_bin_edges: bin edges for the Z-direction.
+    :param list n_bins: Declares the number of bins that should be used for each dimension (x,y,z,t).
     :param list all_4d_to_3d_hists: contains all 3D histogram projections.
-    :return: appends the 3D histograms to the all_4d_to_3d_hists list.
+    :return: appends the 3D histograms to the all_4d_to_3d_hists list. [xyz, xyt, xzt, yzt, rzt]
     """
+    x = event_hits[:, 1:2]
+    y = event_hits[:, 2:3]
+    z = event_hits[:, 3:4]
+    t = event_hits[:, 4:5]
+    t_min = min(t)
+    t_max = max(t)
+    t_start = 0.15
+    t_end = t_start
+
+    t_diff = t_max - t_min
+    t_mean = t_min + 0.5 * t_diff
+
     hist_xyz = np.histogramdd(np.array(event_hits[:, 1:4], np.float32), bins=(x_bin_edges, y_bin_edges, z_bin_edges))
 
+    hist_xyt = np.histogramdd(np.array(np.concatenate([x, y, t], axis=1), np.float32), bins=(x_bin_edges, y_bin_edges, n_bins[3]),
+                              range=((min(x), max(x)), (min(y), max(y)), (t_mean - t_start * t_diff, t_mean + t_end * t_diff)))
+    hist_xzt = np.histogramdd(np.array(np.concatenate([x, z, t], axis=1), np.float32), bins=(x_bin_edges, z_bin_edges, n_bins[3]),
+                              range=((min(x), max(x)), (min(z), max(z)), (t_mean - t_start * t_diff, t_mean + t_end * t_diff)))
+    hist_yzt = np.histogramdd(np.array(event_hits[:, 2:5], np.float32), bins=(y_bin_edges, z_bin_edges, n_bins[3]),
+                              range=((min(y), max(y)), (min(z), max(z)), (t_mean - t_start * t_diff, t_mean + t_end * t_diff)))
+
+    # add a rotation-symmetric 3d hist
+    x = np.array(event_hits[:, 1:2], np.float32)
+    y = np.array(event_hits[:, 2:3], np.float32)
+    r = np.sqrt(x * x + y * y)
+    zt = np.array(event_hits[:, 3:5], np.float32)
+    rzt = np.array(np.concatenate([r, zt], axis=1), np.float32)
+    hist_rzt = np.histogramdd(rzt, bins=(n_bins[0], n_bins[2], n_bins[3]), range=((min(r), max(r)), (min(z), max(z)), (t_mean - t_start * t_diff, t_mean + t_end * t_diff)))
+
     all_4d_to_3d_hists.append([hist_xyz[0]])
+    all_4d_to_3d_hists.append([hist_xyt[0]])
+    all_4d_to_3d_hists.append([hist_xzt[0]])
+    all_4d_to_3d_hists.append([hist_yzt[0]])
+    all_4d_to_3d_hists.append([hist_rzt[0]])

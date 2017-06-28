@@ -72,7 +72,7 @@ def convert_particle_class_to_categorical(particle_type, is_cc, num_classes=4):
 def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
     """
     Main code. Reads raw .hdf5 files and creates 2D/3D histogram projections that can be used for a CNN
-    :param list n_bins: Declares the number of bins that should be used for each dimension (x,y,z).
+    :param list n_bins: Declares the number of bins that should be used for each dimension (x,y,z,t).
     :param bool do2d: Declares if 2D histograms should be created.
     :param bool do2d_pdf: Declares if pdf visualizations of the 2D histograms should be created. Cannot be called if do2d=False.
     :param bool do3d: Declares if 3D histograms should be created.
@@ -130,7 +130,7 @@ def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
             compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, all_4d_to_2d_hists, event_track, do2d_pdf)
 
         if do3d:
-            compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, all_4d_to_3d_hists)
+            compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_3d_hists)
 
         #if i == 10:
            #  only for testing
@@ -147,8 +147,12 @@ def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
 
     if do3d:
         store_histograms_as_hdf5(np.stack([hist_tuple[0] for hist_tuple in all_4d_to_3d_hists]), np.array(mc_infos), 'Results/4dTo3d/h5/xyz/' + filename_output + '_xyz.h5')
+        store_histograms_as_hdf5(np.stack([hist_tuple[1] for hist_tuple in all_4d_to_3d_hists]), np.array(mc_infos), 'Results/4dTo3d/h5/xyt/' + filename_output + '_xyt.h5')
+        store_histograms_as_hdf5(np.stack([hist_tuple[2] for hist_tuple in all_4d_to_3d_hists]), np.array(mc_infos), 'Results/4dTo3d/h5/xzt/' + filename_output + '_xzt.h5')
+        store_histograms_as_hdf5(np.stack([hist_tuple[3] for hist_tuple in all_4d_to_3d_hists]), np.array(mc_infos), 'Results/4dTo3d/h5/yzt/' + filename_output + '_yzt.h5')
+        store_histograms_as_hdf5(np.stack([hist_tuple[4] for hist_tuple in all_4d_to_3d_hists]), np.array(mc_infos), 'Results/4dTo3d/h5/rzt/' + filename_output + '_rzt.h5')
 
 
 if __name__ == '__main__':
-    main(n_bins=[11,13,18], do2d=False, do2d_pdf=False, do3d=True, do_mc_hits=False)
+    main(n_bins=[11,13,18,50], do2d=False, do2d_pdf=False, do3d=True, do_mc_hits=False)
 
