@@ -49,6 +49,7 @@ def parse_file(fname, fname_geo, do_mc_hits):
 
     # keep the relevant info from each hit: [event_id, dom_id, time]
     hits = np.array(np.concatenate([hits_group[:, 14:15], hits_group[:, 4:5], hits_group[:, 11:12]], axis=1), np.float32)
+    # hits = np.array(np.concatenate([hits_group[:, 5:6], hits_group[:, 1:2], hits_group[:, 2:3]], axis=1), np.float32) # new km3pipe version
     del hits_group
 
     print "Converting hits omid -> XYZ"
