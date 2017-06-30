@@ -109,9 +109,17 @@ def get_dimensions_encoding(batchsize, n_bins):
 
 
 def encode_targets(y_val, class_type):
-    # [event_id -> 0, particle_type -> 1, energy -> 2, isCC -> 3, bjorkeny -> 4, dir_x/y/z -> 5/6/7,
-    #  up/down -> 8, categorical particle_types -> 9/10/11/12 (9: elec_NC, 10: elec_CC, 11: muon_CC, 12: tau_CC)]
-
+    """
+    Encodes the labels (classes) of the images.
+    :param ndarray(ndim=1) y_val: Array that contains ALL event class information for one event.
+           ---------------------------------------------------------------------------------------------------------------------------
+           Current content: [event_id -> 0, particle_type -> 1, energy -> 2, isCC -> 3, bjorkeny -> 4, dir_x/y/z -> 5/6/7,
+                            up/down -> 8, categorical particle_types -> 9/10/11/12 (9: elec_NC, 10: elec_CC, 11: muon_CC, 12: tau_CC)]
+           ---------------------------------------------------------------------------------------------------------------------------
+    :param (int, str) class_type: Tuple with the umber of output classes and a string identifier to specify the exact output classes.
+                                  I.e. (2, 'muon-CC_to_elec-CC')
+    :return: ndarray(ndim=1) train_y: Array that contains the encoded class label information of the input event.
+    """
     if class_type == (2, 'muon-CC_to_elec-NC'):
         train_y = np.zeros(2, dtype='float32')
         train_y[0] = y_val[9]
