@@ -9,17 +9,23 @@ import h5py
 
 # generator that returns arrays of batchsize events
 # from hdf5 file
-def generate_batches_from_hdf5_file(filename, batchsize, n_bins_x, n_bins_y, n_bins_z, n_bins_t, number_of_classes):
+def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type):
+    """
+    Generator that returns batches of images ('xs') and labels ('ys') from a h5 file.
+    :param string filepath: Full filepath of the input h5 file, e.g. '/path/to/file/file.h5'.
+    :param int batchsize: Size of the batches that should be generated. Ideally same as the chunksize in the h5 file.
+    :param list n_bins: Number of bins for each dimension (x,y,z) in the h5 file.
+    :param (int, str) class_type: Tuple with the umber of output classes and a string identifier to specify the exact output classes.
+                                  I.e. (2, 'muon-CC_to_elec-CC')
+    :return: (ndarray, ndarray) (xs, ys): Yields a tuple which contains a full batch of images and labels.
+    """
+    dimensions = get_dimensions_encoding(batchsize, n_bins)
 
-    dimensions = get_dimensions_encoding(batchsize, n_bins_x, n_bins_y, n_bins_z, n_bins_t)
-
-    xs = np.array(np.zeros(dimensions))
-    ys = np.array(np.zeros((batchsize, number_of_classes)))
+    xs = np.array(np.zeros(dimensions)) # TODO redundant or better for performance?
+    ys = np.array(np.zeros((batchsize, class_type[0])))
 
     while 1:
-        # Open the file
-        f = h5py.File(filename, "r")
-        # Check how many entries there are
+        f = h5py.File(filepath, "r")
         filesize = len(f['y'])
         print "filesize = ", filesize
         # count how many entries we have read
@@ -37,7 +43,7 @@ def generate_batches_from_hdf5_file(filename, batchsize, n_bins_x, n_bins_y, n_b
             # encode the labels such that they are all within the same range (and filter the ones we don't want for now)
             c = 0
             for y_val in y_values:
-                ys[c] = encode_targets(y_val, number_of_classes)
+                ys[c] = encode_targets(y_val, class_type)
                 c += 1
 
             # we have read one batch more from this file
@@ -49,165 +55,102 @@ def generate_batches_from_hdf5_file(filename, batchsize, n_bins_x, n_bins_y, n_b
         f.close()
 
 
-# returns the dimensions tuple for 2,3 and 4 dimensional data
-# we don't have to write separate functions with different argument lists for different dimensions but can always use numx, numy, numz, numt
-def get_dimensions_encoding(batchsize, numx, numy, numz, numt):
-
-    if numx == 1:
-        if numy == 1:
-            print "2D case without dimensions x and y"
-            dimensions = (batchsize,numz,numt,1)
-        elif numz == 1:
-            print "2D case without dimensions x and z"
-            dimensions = (batchsize,numy,numt,1)
-        elif numt == 1:
-            print "2D case without dimensions x and t"
-            dimensions = (batchsize,numy,numz,1)
+def get_dimensions_encoding(batchsize, n_bins):
+    """
+    Returns a dimensions tuple for 2,3 and 4 dimensional data.
+    :param int batchsize: Batchsize that is used in generate_batches_from_hdf5_file().
+    :param list n_bins: Declares the number of bins for each dimension (x,y,z).
+                        If a dimension is equal to 1, it means that the dimension should be left out.
+    :return: tuple dimensions: 2D, 3D or 4D dimensions tuple (integers).
+    """
+    n_bins_x, n_bins_y, n_bins_z, n_bins_t = n_bins[0], n_bins[1], n_bins[2], n_bins[3]
+    if n_bins_x == 1:
+        if n_bins_y == 1:
+            print 'Using 2D projected data without dimensions x and y'
+            dimensions = (batchsize, n_bins_z, n_bins_t, 1)
+        elif n_bins_z == 1:
+            print 'Using 2D projected data without dimensions x and z'
+            dimensions = (batchsize, n_bins_y, n_bins_t, 1)
+        elif n_bins_t == 1:
+            print 'Using 2D projected data without dimensions x and t'
+            dimensions = (batchsize, n_bins_y, n_bins_z, 1)
         else:
-            print "3D case without dimension x"
-            dimensions = (batchsize,numy,numz,numt,1)
+            print 'Using 3D projected data without dimension x'
+            dimensions = (batchsize, n_bins_y, n_bins_z, n_bins_t, 1)
 
-    elif numy == 1:
-        if numz == 1:
-            print "2D case without dimensions y and z"
-            dimensions = (batchsize,numx,numt,1)
-        elif numt == 1:
-            print "2D case without dimensions y and t"
-            dimensions = (batchsize,numx,numz,1)
+    elif n_bins_y == 1:
+        if n_bins_z == 1:
+            print 'Using 2D projected data without dimensions y and z'
+            dimensions = (batchsize, n_bins_x, n_bins_t, 1)
+        elif n_bins_t == 1:
+            print 'Using 2D projected data without dimensions y and t'
+            dimensions = (batchsize, n_bins_x, n_bins_z, 1)
         else:
-            print "3D case without dimension y"
-            dimensions = (batchsize,numx,numz,numt,1)
+            print 'Using 3D projected data without dimension y'
+            dimensions = (batchsize, n_bins_x, n_bins_z, n_bins_t, 1)
 
-    elif numz == 1:
-        if numt == 1:
-            print "2D case without dimensions z and t"
-            dimensions = (batchsize,numx,numy,1)
+    elif n_bins_z == 1:
+        if n_bins_t == 1:
+            print 'Using 2D projected data without dimensions z and t'
+            dimensions = (batchsize, n_bins_x, n_bins_y, 1)
         else:
-            print "3D case without dimension z"
-            dimensions = (batchsize,numx,numy,numt,1)
+            print 'Using 3D projected data without dimension z'
+            dimensions = (batchsize, n_bins_x, n_bins_y, n_bins_t, 1)
 
-    elif numt == 1:
-        print "3D case without dimension t"
-        dimensions = (batchsize,numx,numy,numz,1)
+    elif n_bins_t == 1:
+        print 'Using 3D projected data without dimension t'
+        dimensions = (batchsize, n_bins_x, n_bins_y, n_bins_z, 1)
 
-    else:	# 4 dimensional
-        print "4D case"
-        dimensions = (batchsize,numx,numy,numz,numt)
+    else:
+        print 'Using full 4D data'
+        dimensions = (batchsize, n_bins_x, n_bins_y, n_bins_z, n_bins_t)
 
     return dimensions
 
 
-def encode_targets(y_val, number_of_classes):
+def encode_targets(y_val, class_type):
+    # [event_id -> 0, particle_type -> 1, energy -> 2, isCC -> 3, bjorkeny -> 4, dir_x/y/z -> 5/6/7,
+    #  up/down -> 8, categorical particle_types -> 9/10/11/12 (9: elec_NC, 10: elec_CC, 11: muon_CC, 12: tau_CC)]
 
-    if number_of_classes == 2:
-        # [event_id -> 0, particle_type -> 1, energy -> 2, isCC -> 3, bjorkeny -> 4, dir_x/y/z -> 5/6/7,
-        #  up/down -> 8, categorical particle_types -> 9/10/11/12 (9: elec_NC, 10: elec_CC, 11: muon_CC, 12: tau_CC)]
-        # particle type, only two types:muon-CC and elec-NC
+    if class_type == (2, 'muon-CC_to_elec-NC'):
         train_y = np.zeros(2, dtype='float32')
         train_y[0] = y_val[9]
         train_y[1] = y_val[11]
 
-        #print y_val
-        #print train_y
         return train_y
 
-    if number_of_classes == 1: # muon-CC to elec-NC
+    if class_type == (1, 'muon-CC_to_elec-NC'): # only one neuron at the end of the cnn instead of two
         train_y = np.zeros(1, dtype='float32')
-
         if y_val[9]!=0:
             train_y[0] = y_val[9]
-        #print y_val
-        #print train_y
+
         return train_y
 
-    # if number_of_classes == 1: #up down
-    #     train_y = np.zeros(1, dtype='float32')
-    #     train_y[0] = y_val[8]
-    #
-    #     return train_y
+    if class_type == (2, 'muon-CC_to_elec-CC'):
+        train_y = np.zeros(2, dtype='float32')
+        train_y[0] = y_val[10]
+        train_y[1] = y_val[11]
 
+        return train_y
 
-    # if number_of_classes == 16:
-    #     # everything at once:
-    #     temp = y_val
-    #     temp[5] = np.log10(y_val[5]) / 10.0
-    #
-    #     temp[2] = 0.5 * (y_val[2] + 1.0)
-    #     temp[3] = 0.5 * (y_val[3] + 1.0)
-    #     temp[4] = 0.5 * (y_val[4] + 1.0)
-    #
-    #     numPids = 9
-    #     pids = np.zeros(numPids)
-    #
-    #     pid = y_val[1]
-    #     # just hardcode the mapping
-    #     if pid == -12:  # a nu e
-    #         pids[1] = 1.0
-    #     elif pid == 12:  # nu e
-    #         pids[2] = 1.0
-    #     elif pid == -14:  # a nu mu
-    #         pids[3] = 1.0
-    #     elif pid == 14:  # nu mu
-    #         pids[4] = 1.0
-    #     elif pid == -16:  # a nu tau
-    #         pids[5] = 1.0
-    #     elif pid == 16:  # nu tau
-    #         pids[6] = 1.0
-    #     elif pid == -13:  # a mu
-    #         pids[7] = 1.0
-    #     elif pid == 13:  # mu
-    #         pids[8] = 1.0
-    #     else:  # if it's nothing else we know: we don't know what it is ;-)
-    #         pids[0] = 1.0
-    #     # TODO: Probably pid and isCC work better if there are classes e.g. for numuCC and numuNC and nueCC and nueNC
-    #     # instead of single classes for numu and nue but a combined flag is_CC_or_NC for all flavour
-    #     # especially for numuCC and numuNC
-    #
-    #     train_y = np.concatenate([np.reshape(temp[2:9], len(temp[2:9]), 1), np.reshape(pids, numPids, 1)])
-    #     # 0 1 2 3 4  5  6  7          8    9   10    11   12     13    14  15
-    #     # x y z E cc by ud unknownPid anue nue anumu numu anutau nutau amu mu
-    #     return train_y
-    #
-    # elif number_of_classes == 6:
-    #     # direction, energy and iscc and bjorken-y:
-    #     temp = y_val
-    #     # energy
-    #     temp[5] = np.log10(y_val[5]) / 10.0
-    #     # direction
-    #     temp[2] = 0.5 * (y_val[2] + 1.0)
-    #     temp[3] = 0.5 * (y_val[3] + 1.0)
-    #     temp[4] = 0.5 * (y_val[4] + 1.0)
-    #
-    #     train_y = np.reshape(temp[2:8], number_of_classes, 1)
-    #     # 0 1 2 3 4  5
-    #     # x y z E cc by
-    #     return train_y
-    #
-    # elif number_of_classes == 4:
-    #     # direction and energy:
-    #     temp = y_val
-    #     temp[5] = np.log10(y_val[5]) / 10.0
-    #
-    #     temp[2] = 0.5 * (y_val[2] + 1.0)
-    #     temp[3] = 0.5 * (y_val[3] + 1.0)
-    #     temp[4] = 0.5 * (y_val[4] + 1.0)
-    #
-    #     train_y = np.reshape(temp[2:6], number_of_classes, 1)
-    #     # 0 1 2 3
-    #     # x y z E
-    #     return train_y
-    #
-    # elif number_of_classes == 1:
-    #     # energy:
-    #     temp = y_val
-    #     temp[5] = np.log10(y_val[5]) / 10.0
-    #     return np.reshape(temp[5:6], number_of_classes, 1)
+    if class_type == (1, 'muon-CC_to_elec-CC'): # only one neuron at the end of the cnn instead of two
+        train_y = np.zeros(1, dtype='float32')
+        if y_val[10]!=0:
+            train_y[0] = y_val[10]
+
+        return train_y
+
+    if class_type == (1, 'up_down'): # up down, one neuron at the cnn end
+        train_y = np.zeros(1, dtype='float32')
+        train_y[0] = y_val[8]
+
+        return train_y
 
     else:
-        print "Number of targets (" + str(number_of_classes) + ") not supported!"
+        print "Class type " + str(class_type) + " not supported!"
         return y_val
 
-
+#unfinished
 def predictAndPrintSome(model, testFile, printSize, numx, numy, numz, numt, nTargets):
     mySmallR = batchReaderHdf5()
 
@@ -230,7 +173,7 @@ def predictAndPrintSome(model, testFile, printSize, numx, numy, numz, numt, nTar
         print yTrue[0:numberForPrint]
         print yPred[0:numberForPrint]
 
-
+#unfinished
 def doTheEvaluation(model, number_of_classes, testFile, testSize, printSize, n_bins_x, n_bins_y, n_bins_z, n_bins_t, batchSize):
     if printSize > 0:
         predictAndPrintSome(model, testFile, printSize, n_bins_x, n_bins_y, n_bins_z, n_bins_t, number_of_classes)
