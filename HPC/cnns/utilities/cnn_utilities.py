@@ -6,7 +6,6 @@ import numpy as np
 import h5py
 
 
-
 # generator that returns arrays of batchsize events
 # from hdf5 file
 def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type):
@@ -139,6 +138,8 @@ def encode_targets(y_val, class_type):
         train_y[0] = y_val[10]
         train_y[1] = y_val[11]
 
+        #print y_val
+        #print train_y
         return train_y
 
     if class_type == (1, 'muon-CC_to_elec-CC'): # only one neuron at the end of the cnn instead of two
@@ -184,6 +185,7 @@ def predictAndPrintSome(model, testFile, printSize, numx, numy, numz, numt, nTar
 #unfinished
 def doTheEvaluation(model, number_of_classes, testFile, testSize, printSize, n_bins_x, n_bins_y, n_bins_z, n_bins_t, batchSize):
     if printSize > 0:
+        # doesn't give any kind of accuracy
         predictAndPrintSome(model, testFile, printSize, n_bins_x, n_bins_y, n_bins_z, n_bins_t, number_of_classes)
 
     accuracy = 0.0
