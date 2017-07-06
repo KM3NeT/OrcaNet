@@ -14,7 +14,7 @@ def parse_file(fname, fname_geo, do_mc_hits):
     :param bool do_mc_hits: tells the function of the hits (mc_hits + BG) or the mc_hits only should be parsed. 
                             In the case of mc_hits, the dom_id needs to be calculated thanks to the jpp output.
     :return: ndarray(ndim=2) tracks: 2D array containing important MC information for each event_id.
-                                     [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z]
+                                     [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z, time]
     :return: ndarray(ndim=2) hits_xyz: 2D array containing [event_id pos_xyz dom_id time].
     :return (ndarray(ndim=1), ndarray(ndim=1)) geo_limits: tuple that contains the min and max geometry values for each dimension. 
     ([first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax])
@@ -37,19 +37,17 @@ def parse_file(fname, fname_geo, do_mc_hits):
     if do_mc_hits is True:
         print "Reading mc-hits"
         hits_group = np.array(pd.read_hdf(fname, 'mc_hits'), np.float32)
+        #hits_group = np.array(h5py.File(fname, 'r')['hits'][()], np.float32)
         mc_hits_get_dom_id(hits_group)
     else:
         print "Reading triggered hits"
-        # TODO fix datatypes of tohdf5 output, e.g. not float64 for NaN
-        #hits_group_dataframe=pd.read_hdf(fname, 'hits', dtype={'channel_id': np.uint8, 'dir_x': np.nan, 'dir_y': np.nan, 'dir_z': np.nan,'dom_id': np.uint16,
-         #                                                      'id': np.uint8, 'pmt_id': np.uint32, 'pos_x': np.nan, 'pos_y': np.nan, 'pos_z': np.nan,
-          #                                                     't0': np.uint8, 'time': np.uint32, 'tot': np.uint16, 'triggered': np.uint8, 'event_id': np.uint32})
-        #print hits_group_dataframe.dtypes
         hits_group = np.array(pd.read_hdf(fname, 'hits'), np.float32)
+        # hits_group = np.array(h5py.File(fname, 'r')['hits'][()], np.float32)
+        # hits_group = np.array(h5py.File(fname, 'r')['hits'][:], np.float32)
 
     # keep the relevant info from each hit: [event_id, dom_id, time]
-    hits = np.array(np.concatenate([hits_group[:, 14:15], hits_group[:, 4:5], hits_group[:, 11:12]], axis=1), np.float32)
-    # hits = np.array(np.concatenate([hits_group[:, 5:6], hits_group[:, 1:2], hits_group[:, 2:3]], axis=1), np.float32) # new km3pipe version
+    #hits = np.array(np.concatenate([hits_group[:, 14], hits_group[:, 4], hits_group[:, 11]], axis=1), np.float32) # old km3pipe version
+    hits = np.array(np.concatenate([hits_group[:, 5:6], hits_group[:, 1:2], hits_group[:, 2:3]], axis=1), np.float32) # new km3pipe version 6.9.1
     del hits_group
 
     print "Converting hits omid -> XYZ"
@@ -58,6 +56,15 @@ def parse_file(fname, fname_geo, do_mc_hits):
 
     print "Done converting."
     return tracks, hits_xyz, geo_limits
+
+
+def extract_relevant_track_info(tracks):
+    """
+    Returns the relevant MC information for all tracks. [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z, time]
+    :param ndarray(ndim=2) tracks: 2D array of the primary mc_tracks info.
+    :return: ndarray(ndim=2): returns a 2D array with the relevant mc_tracks info for each event.
+    """
+    return np.array(np.concatenate([tracks[:, 14:15], tracks[:, 13:14], tracks[:, 4:5], tracks[:, 7:8], tracks[:, 0:1], tracks[:, 1:4]], tracks[:, 12:13], axis=1), np.float32)
 
 
 def mc_hits_get_dom_id(hits_group):
@@ -69,19 +76,10 @@ def mc_hits_get_dom_id(hits_group):
     :param ndarray(ndim=2) hits_group: 2D arrays that contains the full mc_hit information.
     """
     for hit in hits_group:
-
+        print hit
         pmt_id = int(hit[6])
         dom_id = int((pmt_id-int(1))/int(31)) + 1
         hit[4] = dom_id
-
-
-def extract_relevant_track_info(tracks):
-    """
-    Returns the relevant MC information for all tracks. [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z]
-    :param ndarray(ndim=2) tracks: 2D array of the primary mc_tracks info.
-    :return: ndarray(ndim=2): returns a 2D array with the relevant mc_tracks info for each event.
-    """
-    return np.array(np.concatenate([tracks[:, 14:15], tracks[:, 13:14], tracks[:, 4:5], tracks[:, 7:8], tracks[:, 0:1], tracks[:, 1:4]], axis=1), np.float32)
 
 
 def convert_hits_xyz(hits, geo):
@@ -89,12 +87,12 @@ def convert_hits_xyz(hits, geo):
     Reads the hits array with dom_id's and returns the hits_xyz array with according xyz positions.
     :param ndarray(ndim=2) hits: 2D hits array that contain [event_id, dom_id, time].
     :param  ndarray(ndim=2) geo: 2D geo array that contains the xyz position for each dom_id.
-    :return: ndarray(ndim=2) hits_xyz: 2D hits array with xyz position information.
+    :return: ndarray(ndim=2) hits_xyz: 2D hits array with xyz position information [event_id, pos_x/y/z, time, dom_id].
     """
     hits_xyz_list = []
     for hit in hits:
             position = geo[int(hit[1])-1]
             # hits_xyz_list: [event_id, positions_xyz, dom_id, time]
-            hits_xyz_list.append([int(hit[0]), position[1], position[2], position[3], int(hit[1]), hit[2]])
+            hits_xyz_list.append([int(hit[0]), position[1], position[2], position[3], hit[2], int(hit[1])])
     return np.array(hits_xyz_list, np.float32)
 

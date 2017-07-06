@@ -122,22 +122,22 @@ def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
         up_down_class = get_class_up_down(event_track[7])
         # get categorical event types and save all MC information to mc_infos
         event_categorical_type = convert_particle_class_to_categorical(event_track[1], event_track[3], num_classes=4)
-        # all_mc_info: [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z, up/down, categorical particle_types]
+        # all_mc_info: [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z, time, up/down, categorical particle_types]
         all_mc_info = np.concatenate([event_track, up_down_class, event_categorical_type])
         mc_infos.append(all_mc_info)
 
         if do2d:
-            compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, all_4d_to_2d_hists, event_track, do2d_pdf)
+            compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_2d_hists, event_track, do2d_pdf)
 
         if do3d:
             compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_3d_hists)
 
-        #if i == 10:
+        if i == 50:
            #  only for testing
-         #   if do2d_pdf:
-          #      glob.pdf_2d_plots.close()
-           # break
-    #if do2d_pdf:
+            if do2d_pdf:
+                glob.pdf_2d_plots.close()
+            break
+    #if do2d_pdf: # enabled if the if cause above (for testing) is commented out
      #   glob.pdf_2d_plots.close()
 
     if do2d:
@@ -154,5 +154,5 @@ def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
 
 
 if __name__ == '__main__':
-    main(n_bins=[11,13,18,50], do2d=False, do2d_pdf=False, do3d=True, do_mc_hits=False)
+    main(n_bins=[11,13,18,50], do2d=True, do2d_pdf=True, do3d=False, do_mc_hits=False)
 
