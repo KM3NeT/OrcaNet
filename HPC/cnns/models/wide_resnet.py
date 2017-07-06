@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Wide Residual Network models for Keras.
 from https://github.com/farizrahman4u/keras-contrib/blob/master/keras_contrib/applications/wide_resnet.py
+removed pretrained code option
 
 # Reference
 - [Wide Residual Networks](https://arxiv.org/abs/1605.07146)
