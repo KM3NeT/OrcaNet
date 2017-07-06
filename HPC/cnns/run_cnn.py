@@ -120,16 +120,16 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, use_scratch_ssd=F
     modelname = 'model_3d_xzt_' + class_type[1]
 
     if epoch == 0:
-        model = define_3d_model_xzt(class_type[0], n_bins)
+        model = define_3d_model_xyz_test(class_type[0], n_bins)
     else:
         model = ks.models.load_model('models/trained/trained_' + modelname + str(epoch) + '.h5')
 
-    #model.compile(loss='mean_absolute_error', optimizer='sgd', metrics=['mean_squared_error'])
-    model.compile(loss='mean_absolute_error', optimizer='adam', metrics=['mean_squared_error'])
+    model.compile(loss='mean_absolute_error', optimizer='sgd', metrics=['mean_squared_error'])
+    #model.compile(loss='mean_absolute_error', optimizer='adam', metrics=['mean_squared_error'])
     #model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
     model.summary()
 
-    printSize = 5
+    #printSize = 5
 
     while 1:
         epoch +=1
@@ -140,20 +140,29 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, use_scratch_ssd=F
             #if epoch > 1: # just for convenience, we don't want to wait before the first epoch each time
              #   shuffle_h5(f, chunking=(True, batchsize), delete_flag=True)
             print 'Training in epoch', epoch, 'on file ', i, ',', f
-            #f_size = 70000 # for testing
+            f_size = 70000 # for testing
             model.fit_generator(generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type),
                                 steps_per_epoch=int(f_size / batchsize), epochs=1, verbose=1, max_q_size=1)
             # store the trained model
-            model.save("models/trained/trained_" + modelname + '_f' + str(i) + '_epoch' + str(epoch) + '.h5')
+            #model.save("models/trained/trained_" + modelname + '_f' + str(i) + '_epoch' + str(epoch) + '.h5')
             # delete old model?
-            #if testfile != "":
-             #   results = doTheEvaluation(model, number_of_classes, testfile, testsize, printSize, n_bins_x, n_bins_y, n_bins_z, n_bins_t, batchsize)
+
+        for (f, f_size) in test_files:
+            # probably one test file is enough
+            f_size = 70000 # for testing
+            evaluation = model.evaluate_generator(generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type),
+                                                  steps=int(f_size / batchsize), max_q_size=1)
+            print evaluation
+            print model.metrics_names
+
+            # if testfile != "":
+            #    results = doTheEvaluation(model, number_of_classes, testfile, testsize, printSize, n_bins_x, n_bins_y, n_bins_z, n_bins_t, batchsize)
 
 
 if __name__ == '__main__':
     # still need to change some stuff in execute_cnn() directly like modelname and optimizers
-    execute_cnn(n_bins=[11,1,18,50], class_type = (2, 'muon-CC_to_elec-CC'),
-                batchsize = 32, epoch= 0, use_scratch_ssd=True) # standard 4D case: n_bins=[11,13,18,50]
+    execute_cnn(n_bins=[11,13,18,1], class_type = (2, 'muon-CC_to_elec-NC'),
+                batchsize = 32, epoch= 0, use_scratch_ssd=False) # standard 4D case: n_bins=[11,13,18,50]
 
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/train_muon-CC_and_elec-NC_each_480_xyz_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/test_muon-CC_and_elec-NC_each_120_xyz_shuffled.h5
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/train_muon-CC_and_elec-CC_each_480_xzt_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/test_muon-CC_and_elec-CC_each_120_xzt_shuffled.h5
