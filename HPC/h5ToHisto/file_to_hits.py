@@ -4,7 +4,47 @@
 
 import pandas as pd
 import numpy as np
+import h5py
+import km3pipe as kp
 # Heavily based on code from sgeisselsoeder: https://github.com/sgeisselsoeder/km3netHdf5ToHistograms/
+
+
+def get_event_data(event_blob, geo, do_mc_hits):
+
+
+    # parse tracks [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z, time]
+    event_id = event_blob['EventInfo'].event_id.astype('float32')
+    particle_type = event_blob['McTracks'][1].type.astype('float32') # [1] is always primary -> bjorkeny != 0?
+    energy = event_blob['McTracks'][1].energy.astype('float32')
+    isCC = event_blob['McTracks'][1].is_cc.astype('float32')
+    bjorkeny = event_blob['McTracks'][1].bjorkeny.astype('float32')
+    dir_x = event_blob['McTracks'][1].dir_x.astype('float32')
+    dir_y = event_blob['McTracks'][1].dir_y.astype('float32')
+    dir_z = event_blob['McTracks'][1].dir_z.astype('float32')
+    time = event_blob['McTracks'][1].time.astype('float32')
+
+    event_track = np.concatenate([event_id, particle_type, energy, isCC, bjorkeny, dir_x, dir_y, dir_z, time], axis=0)
+
+    # parse hits
+    if do_mc_hits is True:
+        hits = event_blob["McHits"]
+    else:
+        hits = event_blob["Hits"]
+
+    c_hits = geo.apply(hits)
+    pos_x = c_hits.pos_x.astype('float32')
+    pos_y = c_hits.pos_y.astype('float32')
+    pos_z = c_hits.pos_z.astype('float32')
+    time = c_hits.time.astype('float32')
+
+    ax = np.newaxis
+    event_hits = np.concatenate([pos_x[:, ax], pos_y[:, ax], pos_z[:, ax], time[:, ax]], axis=1)
+    print event_hits
+    print event_track
+
+    # event_hits: 2D hits array for one event, event_track: 1D track array containing event information
+    return event_hits, event_track
+
 
 def parse_file(fname, fname_geo, do_mc_hits):
     """
@@ -37,16 +77,25 @@ def parse_file(fname, fname_geo, do_mc_hits):
     if do_mc_hits is True:
         print "Reading mc-hits"
         hits_group = np.array(pd.read_hdf(fname, 'mc_hits'), np.float32)
-        #hits_group = np.array(h5py.File(fname, 'r')['hits'][()], np.float32)
         mc_hits_get_dom_id(hits_group)
     else:
         print "Reading triggered hits"
+
+        km3pipe_v7 = True
+        if km3pipe_v7 is True:
+            hits_group = h5py.File(fname, 'r')['hits']
+            hits_event_id = hits_group['event_id'].astype('float32')
+            hits_dom_id = hits_group['dom_id'].astype('float32')
+            hits_time = hits_group['time'].astype('float32')
+
+            hits = np.concatenate([hits_event_id[:, np.newaxis], hits_dom_id[:, np.newaxis], hits_time[:, np.newaxis]], axis=1)
+
+
         hits_group = np.array(pd.read_hdf(fname, 'hits'), np.float32)
         # hits_group = np.array(h5py.File(fname, 'r')['hits'][()], np.float32)
         # hits_group = np.array(h5py.File(fname, 'r')['hits'][:], np.float32)
 
     # keep the relevant info from each hit: [event_id, dom_id, time]
-    #hits = np.array(np.concatenate([hits_group[:, 14], hits_group[:, 4], hits_group[:, 11]], axis=1), np.float32) # old km3pipe version
     hits = np.array(np.concatenate([hits_group[:, 5:6], hits_group[:, 1:2], hits_group[:, 2:3]], axis=1), np.float32) # new km3pipe version 6.9.1
     del hits_group
 
@@ -92,7 +141,7 @@ def convert_hits_xyz(hits, geo):
     hits_xyz_list = []
     for hit in hits:
             position = geo[int(hit[1])-1]
-            # hits_xyz_list: [event_id, positions_xyz, dom_id, time]
+            # hits_xyz_list: [event_id, positions_xyz, time, dom_id]
             hits_xyz_list.append([int(hit[0]), position[1], position[2], position[3], hit[2], int(hit[1])])
     return np.array(hits_xyz_list, np.float32)
 

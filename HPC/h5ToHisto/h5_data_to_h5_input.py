@@ -93,10 +93,9 @@ def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
     filename_input = str(sys.argv[1])
     filename = os.path.basename(os.path.splitext(filename_input)[0])
     filename_output = filename.replace(".","_")
-    filename_geometry = 'ORCA_Geo_115lines.txt'
-    #filename_input = '/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/raw_data/h5/elec-NC/3-100GeV/JTE.KM3Sim.gseagen.elec-NC.3-100GeV-3.4E6-1bin-3.0gspec.ORCA115_9m_2016.81.hdf5'
+    filename_geo_limits = 'ORCA_Geo_115lines.txt'
 
-    tracks, hits_xyz, geo_limits = parse_file(filename_input, filename_geometry, do_mc_hits)
+    tracks, hits_xyz, geo_limits = parse_file(filename_input, filename_geo_limits, do_mc_hits)
     all_event_numbers = set(hits_xyz[:, 0])
 
     x_bin_edges, y_bin_edges, z_bin_edges = calculate_bin_edges(n_bins, geo_limits)
@@ -155,4 +154,29 @@ def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
 
 if __name__ == '__main__':
     main(n_bins=[11,13,18,50], do2d=True, do2d_pdf=True, do3d=False, do_mc_hits=False)
+
+
+def get_km3pipe_geometry(filename_geometry):
+
+    if os.path.isfile(filename_geometry) is True:
+        geo = kp.Geometry(filename=filename_geometry)
+
+    else:
+        det = kp.Detector(filename='/afs/in2p3.fr/throng/km3net/detectors/' + filename_geometry)
+        det.write(filename_geometry)
+        geo = kp.Geometry(filename=filename_geometry)
+
+
+filename_geometry = 'orca_115strings_av23min20mhorizontal_18OMs_alt9mvertical_v1.detx'
+pump = kp.io.hdf5.HDF5Pump(filename=filename_input)
+geo = get_km3pipe_geometry(filename_geometry)
+
+for event_blob in pump:
+    event_hits, event_track = get_event_data(event_blob, geo, do_mc_hits)
+
+
+
+
+
+
 
