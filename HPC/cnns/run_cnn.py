@@ -142,7 +142,7 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, use_scratch_ssd=F
             print 'Training in epoch', epoch, 'on file ', i, ',', f
             f_size = 70000 # for testing
             model.fit_generator(generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type),
-                                steps_per_epoch=int(f_size / batchsize), epochs=1, verbose=1, max_q_size=1)
+                                steps_per_epoch=int(f_size / batchsize), epochs=1, verbose=1)
             # store the trained model
             #model.save("models/trained/trained_" + modelname + '_f' + str(i) + '_epoch' + str(epoch) + '.h5')
             # delete old model?
@@ -151,7 +151,7 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, use_scratch_ssd=F
             # probably one test file is enough
             f_size = 70000 # for testing
             evaluation = model.evaluate_generator(generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type),
-                                                  steps=int(f_size / batchsize), max_q_size=1)
+                                                  steps=int(f_size / batchsize))
             print evaluation
             print model.metrics_names
 
@@ -160,7 +160,7 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, use_scratch_ssd=F
 
 
 if __name__ == '__main__':
-    # still need to change some stuff in execute_cnn() directly like modelname and optimizers
+    # TODO still need to change some stuff in execute_cnn() directly like modelname and optimizers
     execute_cnn(n_bins=[11,13,18,1], class_type = (2, 'muon-CC_to_elec-NC'),
                 batchsize = 32, epoch= 0, use_scratch_ssd=False) # standard 4D case: n_bins=[11,13,18,50]
 
