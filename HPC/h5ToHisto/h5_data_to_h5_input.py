@@ -36,25 +36,6 @@ def calculate_bin_edges(n_bins, geo_limits):
     return x_bin_edges, y_bin_edges, z_bin_edges
 
 
-def convert_particle_class_to_categorical(particle_type, is_cc, num_classes=4):
-    """
-    Converts the possible particle types (elec/muon/tau , NC/CC) to a categorical type that can be used as tensorflow input y
-    :param int particle_type: Specifies the particle type, i.e. elec/muon/tau (12, 14, 16). Negative values for antiparticles.
-    :param int is_cc: Specifies the interaction channel. 0 = NC, 1 = CC.
-    :param int num_classes: Specifies the total number of classes that will be discriminated later on by the CNN. I.e. 2 = elec_NC, muon_CC.
-    :return: ndarray(ndim=1) categorical: returns the categorical event type. I.e. (particle_type=14, is_cc=1) -> [0,0,1,0] for num_classes=4.
-    """
-    if num_classes == 2:
-        particle_type_dict = {(12, 0): 0, (14, 1): 1}  # 0: elec_NC, 1: elec_CC, 2: muon_CC, 3: tau_CC #TODO old, clean up
-    else:
-        particle_type_dict = {(12, 0): 0, (12, 1): 1, (14, 1): 2, (16, 1): 3}  # 0: elec_NC, 1: elec_CC, 2: muon_CC, 3: tau_CC
-
-    category = int(particle_type_dict[(abs(particle_type), is_cc)])
-    categorical = np.zeros(num_classes, dtype='int')
-    categorical[category] = 1
-    return categorical
-
-@profile
 def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
     """
     Main code. Reads raw .hdf5 files and creates 2D/3D histogram projections that can be used for a CNN
@@ -80,7 +61,7 @@ def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
     filename = os.path.basename(os.path.splitext(filename_input)[0])
     filename_output = filename.replace(".","_")
     filename_geometry = 'orca_115strings_av23min20mhorizontal_18OMs_alt9mvertical_v1.detx' # used for x/y/z calibration
-    filename_geo_limits = 'ORCA_Geo_115lines.txt' # used for calculating the dimensions of the ORCA can
+    filename_geo_limits = 'ORCA_Geo_115lines.txt' # used for calculating the dimensions of the ORCA can #TODO not completely true anymore since single PMTs
 
     geo, geo_limits = get_geometry(filename_geometry, filename_geo_limits)
 
@@ -103,13 +84,7 @@ def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
         # filter out all hit and track information belonging that to this event
         event_hits, event_track = get_event_data(event_blob, geo, do_mc_hits)
 
-        # get up/down information
-        #up_down_class = get_class_up_down(event_track[7])
-        # get categorical event types and save all MC information to mc_infos
-        #event_categorical_type = convert_particle_class_to_categorical(event_track[1], event_track[3], num_classes=4)
-        # all_mc_info: [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z, time, up/down, categorical particle_types]
-        #all_mc_info = np.concatenate([event_track, up_down_class, event_categorical_type])
-        #mc_infos.append(all_mc_info)
+        # event_track: [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z, time]
         mc_infos.append(event_track)
 
         if do2d:

@@ -75,7 +75,7 @@ def get_event_data(event_blob, geo, do_mc_hits):
 
     # parse tracks [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z, time]
     event_id = event_blob['EventInfo'].event_id[0]
-    particle_type = event_blob['McTracks'][p].type # [0] is always primary -> bjorkeny != 0?
+    particle_type = event_blob['McTracks'][p].type
     energy = event_blob['McTracks'][p].energy
     is_cc = event_blob['McTracks'][p].is_cc
     bjorkeny = event_blob['McTracks'][p].bjorkeny
@@ -86,7 +86,7 @@ def get_event_data(event_blob, geo, do_mc_hits):
 
     event_track = np.array([event_id, particle_type, energy, is_cc, bjorkeny, dir_x, dir_y, dir_z, time], dtype=np.float32)
 
-    # parse hits
+    # parse hits [x, y, z, time]
     if do_mc_hits is True:
         hits = event_blob["McHits"]
     else:
@@ -100,9 +100,6 @@ def get_event_data(event_blob, geo, do_mc_hits):
 
     ax = np.newaxis
     event_hits = np.concatenate([pos_x[:, ax], pos_y[:, ax], pos_z[:, ax], time[:, ax]], axis=1)
-    #print event_hits.shape
-    #print event_track
-    #print event_hits
 
     # event_hits: 2D hits array for one event, event_track: 1D track array containing event information
     return event_hits, event_track
