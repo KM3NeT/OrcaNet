@@ -101,6 +101,6 @@ def define_3d_model_xzt(number_of_classes, n_bins):
     model.add(Flatten())
     model.add(Dense(256, activation="relu"))
     model.add(Dense(16, activation="relu"))
-    model.add(Dense(number_of_classes)) #activation=sigmoid
+    model.add(Dense(number_of_classes)) #activation='sigmoid'
 
     return model
