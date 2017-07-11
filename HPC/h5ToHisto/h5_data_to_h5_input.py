@@ -5,6 +5,7 @@
 import os
 import sys
 #from memory_profiler import profile # for memory profiling, call with @profile; myfunc()
+import line_profiler # call with kernprof file.py args
 from matplotlib.backends.backend_pdf import PdfPages
 
 import glob
@@ -31,23 +32,8 @@ def calculate_bin_edges(n_bins, geo_limits):
     x_bin_edges = np.linspace(geo_limits[0][1] -9.95, geo_limits[1][1]+9.95, num=n_bins[0] + 1) #try to get the lines in the bin center 9.95*2 = average x-separation of two lines
     y_bin_edges = np.linspace(geo_limits[0][2], geo_limits[1][2], num=n_bins[1] + 1) #+- 9.75
     z_bin_edges = np.linspace(geo_limits[0][3], geo_limits[1][3], num=n_bins[2] + 1)
-
+    #TODO rethink bin centers due to new km3pipe geo
     return x_bin_edges, y_bin_edges, z_bin_edges
-
-
-def get_class_up_down(dir_z):
-    """
-    Converts the zenith information (dir_z) to a binary up/down value.
-    :param float32 dir_z: z-direction of the event_track (which contains dir_z).
-    :return: ndarray(ndim=1) up_down_class_value_array: binary up/down class for the event_track.
-    """
-    # analyze the track info to determine the class number
-    up_down_class_value = int(np.sign(dir_z))
-    if up_down_class_value == -1:
-        up_down_class_value = 0
-    up_down_class_value_array = np.array([up_down_class_value], dtype='float32')
-
-    return up_down_class_value_array
 
 
 def convert_particle_class_to_categorical(particle_type, is_cc, num_classes=4):
@@ -68,7 +54,7 @@ def convert_particle_class_to_categorical(particle_type, is_cc, num_classes=4):
     categorical[category] = 1
     return categorical
 
-
+@profile
 def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
     """
     Main code. Reads raw .hdf5 files and creates 2D/3D histogram projections that can be used for a CNN
@@ -93,37 +79,38 @@ def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
     filename_input = str(sys.argv[1])
     filename = os.path.basename(os.path.splitext(filename_input)[0])
     filename_output = filename.replace(".","_")
-    filename_geo_limits = 'ORCA_Geo_115lines.txt'
+    filename_geometry = 'orca_115strings_av23min20mhorizontal_18OMs_alt9mvertical_v1.detx' # used for x/y/z calibration
+    filename_geo_limits = 'ORCA_Geo_115lines.txt' # used for calculating the dimensions of the ORCA can
 
-    tracks, hits_xyz, geo_limits = parse_file(filename_input, filename_geo_limits, do_mc_hits)
-    all_event_numbers = set(hits_xyz[:, 0])
+    geo, geo_limits = get_geometry(filename_geometry, filename_geo_limits)
 
     x_bin_edges, y_bin_edges, z_bin_edges = calculate_bin_edges(n_bins, geo_limits)
 
-    all_4d_to_2d_hists = []
-    all_4d_to_3d_hists = []
+    all_4d_to_2d_hists, all_4d_to_3d_hists = [], []
+    mc_infos = []
 
-    print "Generating histograms from the hits in XYZT format for files based on " + filename_input
     if do2d_pdf:
         glob.pdf_2d_plots = PdfPages('Results/4dTo2d/' + filename_output + '_plots.pdf')
 
-    mc_infos = []
     i=0
-    for eventID in all_event_numbers:
+    # Initialize HDF5Pump of the input file
+    event_pump = kp.io.hdf5.HDF5Pump(filename=filename_input)
+    print "Generating histograms from the hits in XYZT format for files based on " + filename_input
+    for event_blob in event_pump:
         if i % 10 == 0:
             print 'Event No. ' + str(i)
         i+=1
-        # filter all hits belonging to this event
-        event_hits = hits_xyz[np.where(hits_xyz[:, 0] == eventID)[0]]
-        event_track = tracks[np.where(tracks[:, 0] == eventID)[0]][0]
+        # filter out all hit and track information belonging that to this event
+        event_hits, event_track = get_event_data(event_blob, geo, do_mc_hits)
 
         # get up/down information
-        up_down_class = get_class_up_down(event_track[7])
+        #up_down_class = get_class_up_down(event_track[7])
         # get categorical event types and save all MC information to mc_infos
-        event_categorical_type = convert_particle_class_to_categorical(event_track[1], event_track[3], num_classes=4)
+        #event_categorical_type = convert_particle_class_to_categorical(event_track[1], event_track[3], num_classes=4)
         # all_mc_info: [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z, time, up/down, categorical particle_types]
-        all_mc_info = np.concatenate([event_track, up_down_class, event_categorical_type])
-        mc_infos.append(all_mc_info)
+        #all_mc_info = np.concatenate([event_track, up_down_class, event_categorical_type])
+        #mc_infos.append(all_mc_info)
+        mc_infos.append(event_track)
 
         if do2d:
             compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_2d_hists, event_track, do2d_pdf)
@@ -131,11 +118,11 @@ def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
         if do3d:
             compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_3d_hists)
 
-        if i == 50:
+        #if i == 1:
            #  only for testing
-            if do2d_pdf:
-                glob.pdf_2d_plots.close()
-            break
+         #   if do2d_pdf:
+          #      glob.pdf_2d_plots.close()
+         #   break
     #if do2d_pdf: # enabled if the if cause above (for testing) is commented out
      #   glob.pdf_2d_plots.close()
 
@@ -153,26 +140,7 @@ def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
 
 
 if __name__ == '__main__':
-    main(n_bins=[11,13,18,50], do2d=True, do2d_pdf=True, do3d=False, do_mc_hits=False)
-
-
-def get_km3pipe_geometry(filename_geometry):
-
-    if os.path.isfile(filename_geometry) is True:
-        geo = kp.Geometry(filename=filename_geometry)
-
-    else:
-        det = kp.Detector(filename='/afs/in2p3.fr/throng/km3net/detectors/' + filename_geometry)
-        det.write(filename_geometry)
-        geo = kp.Geometry(filename=filename_geometry)
-
-
-filename_geometry = 'orca_115strings_av23min20mhorizontal_18OMs_alt9mvertical_v1.detx'
-pump = kp.io.hdf5.HDF5Pump(filename=filename_input)
-geo = get_km3pipe_geometry(filename_geometry)
-
-for event_blob in pump:
-    event_hits, event_track = get_event_data(event_blob, geo, do_mc_hits)
+    main(n_bins=[11,13,18,50], do2d=False, do2d_pdf=False, do3d=True, do_mc_hits=False)
 
 
 
