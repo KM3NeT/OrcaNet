@@ -6,7 +6,7 @@ import os
 import sys
 import warnings
 #from memory_profiler import profile # for memory profiling, call with @profile; myfunc()
-import line_profiler # call with kernprof file.py args
+#import line_profiler # call with kernprof file.py args
 from matplotlib.backends.backend_pdf import PdfPages
 
 import glob
@@ -22,6 +22,12 @@ __status__ = 'Prototype'
 
 
 def parse_input(do2d, do2d_pdf):
+    """
+    Handles input exceptions, warnings and helps.
+    :param bool do2d: Boolean flag for creation of 2D histograms.
+    :param (bool, int) do2d_pdf: Boolean flag for creation of 2D pdf images.
+    :return: str fname: Parsed filename.
+    """
     if len(sys.argv) < 2 or str(sys.argv[1]) == "-h":
         print "Usage: python " + str(sys.argv[0]) + " file.h5"
         sys.exit(1)
@@ -36,8 +42,9 @@ def parse_input(do2d, do2d_pdf):
     if not os.path.isfile(str(sys.argv[1])):
         raise IOError('The file -' + str(sys.argv[1]) + '- does not exist.')
 
+    fname = str(sys.argv[1])
+    return fname
 
-    return str(sys.argv[1])
 
 def calculate_bin_edges_test(geo, y_bin_edge, z_bin_edge):
     """
@@ -102,7 +109,7 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do_mc_hits=False, u
     filename_input = parse_input(do2d, do2d_pdf)
     filename = os.path.basename(os.path.splitext(filename_input)[0])
     filename_output = filename.replace(".","_")
-    filename_geo_limits = 'ORCA_Geo_115lines.txt' # used for calculating the dimensions of the ORCA can #TODO not completely true anymore since single PMTs
+    filename_geo_limits = 'ORCA_Geo_115lines.txt' # used for calculating the dimensions of the ORCA can
 
     geo = None
     if use_calibrated_file is False:
