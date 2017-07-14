@@ -11,39 +11,6 @@ import km3pipe as kp
 import line_profiler # call with kernprof file.py args
 
 
-def get_geometry(filename_geometry, fname_geo_limits):
-    """
-    Gets fundamental geometry information of the ORCA detector that is used in the simulation.
-    At first, the geometry stored in a .txt is used in order to calculate the dimensions of the ORCA can.
-    This information is used in the bin calculation later on -> calculate_bin_edges().
-    After that, the geometry .detx file is read with km3pipel.
-    Later on in the HDF5Pump loop, the kp.Geometry instance will be used in order to convert hits to hits_x/y/z.
-    :param str filename_geometry: filepath of the ORCA .detx file.
-    :param str fname_geo_limits: filepath of the .txt ORCA geometry file.
-    :return: kp.Geometry geo: km3pipe.Geometry instance.
-    :return (ndarray(ndim=1), ndarray(ndim=1)) geo_limits: tuple that contains the min and max geometry values for each dimension.
-    ([first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax])
-    """
-
-    print "Reading detector geometry in order to calculate the detector dimensions from file " + fname_geo_limits
-    geo = np.loadtxt(fname_geo_limits)
-
-    # derive maximum and minimum x,y,z coordinates of the geometry input [[first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax]]
-    geo_limits = np.nanmin(geo, axis = 0), np.nanmax(geo, axis = 0)
-    print 'Detector dimensions [[first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax]]: ' + str(geo_limits)
-
-
-    if os.path.isfile(filename_geometry) is True:
-        geo = kp.Geometry(filename='/home/woody/capn/mppi033h/misc/orca_detectors/fixed/' + filename_geometry)
-
-    #else: #use only if the .detx is not fixed yet by km3pipe
-     #   det = kp.hardware.Detector(filename='/home/woody/capn/mppi033h/misc/orca_detectors/' + filename_geometry)
-      #  det.write(filename_geometry)
-       # geo = kp.hardware.Geometry(filename=filename_geometry)
-
-    return geo, geo_limits
-
-
 def get_primary_track_index(event_blob):
     """
     Gets the index of the primary (neutrino) track.
@@ -51,26 +18,26 @@ def get_primary_track_index(event_blob):
     :param kp.io.HDF5Pump.blob event_blob: HDF5Pump event blob.
     :return: int primary index: Index of the primary track (=neutrino) in the 'McTracks' branch.
     """
-
     bjorken_y_array = event_blob['McTracks'].bjorkeny
     primary_index = np.where(bjorken_y_array != 0.0)[0][0]
     return primary_index
 
-@profile
-def get_event_data(event_blob, geo, do_mc_hits):
+
+def get_event_data(event_blob, geo, do_mc_hits, use_calibrated_file):
     """
     Reads a km3pipe blob which contains the information for one event.
     Returns a hit array and a track array that contains all relevant information of the event.
     :param kp.io.HDF5Pump.blob event_blob: Event blob of the HDF5Pump which contains all information for one event.
     :param kp.Geometry geo: km3pipe Geometry instance that contains the geometry information of the detector.
+                            Only used if the event_blob is from a non-calibrated file!
     :param bool do_mc_hits: tells the function of the hits (mc_hits + BG) or the mc_hits only should be parsed.
                             In the case of mc_hits, the dom_id needs to be calculated thanks to the jpp output.
-
+    :param bool use_calibrated_file: specifies if a calibrated file is used as an input for the event_blob.
+                                     If False, the hits of the event_blob are calibrated based on the geo parameter.
     :return: ndarray(ndim=2) hits_xyz: 2D array containing the hit information of the event [pos_xyz time].
     :return: ndarray(ndim=1) event_track: 1D array containing important MC information of the event.
                                           [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z, time]
     """
-
     p = get_primary_track_index(event_blob)
 
     # parse tracks [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z, time]
@@ -92,7 +59,9 @@ def get_event_data(event_blob, geo, do_mc_hits):
     else:
         hits = event_blob["Hits"]
 
-    #c_hits = geo.apply(hits)
+    if use_calibrated_file is False:
+        hits = geo.apply(hits)
+
     pos_x = hits.pos_x.astype('float32')
     pos_y = hits.pos_y.astype('float32')
     pos_z = hits.pos_z.astype('float32')
@@ -104,6 +73,39 @@ def get_event_data(event_blob, geo, do_mc_hits):
     # event_hits: 2D hits array for one event, event_track: 1D track array containing event information
     return event_hits, event_track
 
+
+#-------- only legacy code from here on --------
+#Legacy code
+def get_geometry(filename_geometry, fname_geo_limits):
+    """
+    Gets fundamental geometry information of the ORCA detector that is used in the simulation.
+    At first, the geometry stored in a .txt is used in order to calculate the dimensions of the ORCA can.
+    This information is used in the bin calculation later on -> calculate_bin_edges().
+    After that, the geometry .detx file is read with km3pipel.
+    Later on in the HDF5Pump loop, the kp.Geometry instance will be used in order to convert hits to hits_x/y/z.
+    :param str filename_geometry: filepath of the ORCA .detx file.
+    :param str fname_geo_limits: filepath of the .txt ORCA geometry file.
+    :return: kp.Geometry geo: km3pipe.Geometry instance.
+    :return (ndarray(ndim=1), ndarray(ndim=1)) geo_limits: tuple that contains the min and max geometry values for each dimension.
+    ([first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax])
+    """
+    print "Reading detector geometry in order to calculate the detector dimensions from file " + fname_geo_limits
+    geo = np.loadtxt(fname_geo_limits)
+
+    # derive maximum and minimum x,y,z coordinates of the geometry input [[first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax]]
+    geo_limits = np.nanmin(geo, axis = 0), np.nanmax(geo, axis = 0)
+    print 'Detector dimensions [[first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax]]: ' + str(geo_limits)
+
+
+    if os.path.isfile(filename_geometry) is True:
+        geo = kp.Geometry(filename='/home/woody/capn/mppi033h/misc/orca_detectors/fixed/' + filename_geometry)
+
+    #else: #use only if the .detx is not fixed yet by km3pipe
+     #   det = kp.hardware.Detector(filename='/home/woody/capn/mppi033h/misc/orca_detectors/' + filename_geometry)
+      #  det.write(filename_geometry)
+       # geo = kp.Geometry(filename=filename_geometry)
+
+    return geo, geo_limits
 
 # Legacy code
 def parse_file(fname, fname_geo, do_mc_hits):
