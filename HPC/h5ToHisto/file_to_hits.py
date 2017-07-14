@@ -2,50 +2,110 @@
 # -*- coding: utf-8 -*-
 """This utility code contains functions that read the raw MC .h5 files"""
 
+import os
 import pandas as pd
 import numpy as np
 import h5py
 import km3pipe as kp
-# Heavily based on code from sgeisselsoeder: https://github.com/sgeisselsoeder/km3netHdf5ToHistograms/
+#from memory_profiler import profile
+import line_profiler # call with kernprof file.py args
 
 
+def get_geometry(filename_geometry, fname_geo_limits):
+    """
+    Gets fundamental geometry information of the ORCA detector that is used in the simulation.
+    At first, the geometry stored in a .txt is used in order to calculate the dimensions of the ORCA can.
+    This information is used in the bin calculation later on -> calculate_bin_edges().
+    After that, the geometry .detx file is read with km3pipel.
+    Later on in the HDF5Pump loop, the kp.Geometry instance will be used in order to convert hits to hits_x/y/z.
+    :param str filename_geometry: filepath of the ORCA .detx file.
+    :param str fname_geo_limits: filepath of the .txt ORCA geometry file.
+    :return: kp.Geometry geo: km3pipe.Geometry instance.
+    :return (ndarray(ndim=1), ndarray(ndim=1)) geo_limits: tuple that contains the min and max geometry values for each dimension.
+    ([first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax])
+    """
+
+    print "Reading detector geometry in order to calculate the detector dimensions from file " + fname_geo_limits
+    geo = np.loadtxt(fname_geo_limits)
+
+    # derive maximum and minimum x,y,z coordinates of the geometry input [[first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax]]
+    geo_limits = np.nanmin(geo, axis = 0), np.nanmax(geo, axis = 0)
+    print 'Detector dimensions [[first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax]]: ' + str(geo_limits)
+
+
+    if os.path.isfile(filename_geometry) is True:
+        geo = kp.Geometry(filename='/home/woody/capn/mppi033h/misc/orca_detectors/fixed/' + filename_geometry)
+
+    #else: #use only if the .detx is not fixed yet by km3pipe
+     #   det = kp.hardware.Detector(filename='/home/woody/capn/mppi033h/misc/orca_detectors/' + filename_geometry)
+      #  det.write(filename_geometry)
+       # geo = kp.hardware.Geometry(filename=filename_geometry)
+
+    return geo, geo_limits
+
+
+def get_primary_track_index(event_blob):
+    """
+    Gets the index of the primary (neutrino) track.
+    Uses bjorkeny in order to get the primary track, since bjorkeny!=0 for the initial interacting neutrino.
+    :param kp.io.HDF5Pump.blob event_blob: HDF5Pump event blob.
+    :return: int primary index: Index of the primary track (=neutrino) in the 'McTracks' branch.
+    """
+
+    bjorken_y_array = event_blob['McTracks'].bjorkeny
+    primary_index = np.where(bjorken_y_array != 0.0)[0][0]
+    return primary_index
+
+@profile
 def get_event_data(event_blob, geo, do_mc_hits):
+    """
+    Reads a km3pipe blob which contains the information for one event.
+    Returns a hit array and a track array that contains all relevant information of the event.
+    :param kp.io.HDF5Pump.blob event_blob: Event blob of the HDF5Pump which contains all information for one event.
+    :param kp.Geometry geo: km3pipe Geometry instance that contains the geometry information of the detector.
+    :param bool do_mc_hits: tells the function of the hits (mc_hits + BG) or the mc_hits only should be parsed.
+                            In the case of mc_hits, the dom_id needs to be calculated thanks to the jpp output.
 
+    :return: ndarray(ndim=2) hits_xyz: 2D array containing the hit information of the event [pos_xyz time].
+    :return: ndarray(ndim=1) event_track: 1D array containing important MC information of the event.
+                                          [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z, time]
+    """
+
+    p = get_primary_track_index(event_blob)
 
     # parse tracks [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z, time]
-    event_id = event_blob['EventInfo'].event_id.astype('float32')
-    particle_type = event_blob['McTracks'][1].type.astype('float32') # [1] is always primary -> bjorkeny != 0?
-    energy = event_blob['McTracks'][1].energy.astype('float32')
-    isCC = event_blob['McTracks'][1].is_cc.astype('float32')
-    bjorkeny = event_blob['McTracks'][1].bjorkeny.astype('float32')
-    dir_x = event_blob['McTracks'][1].dir_x.astype('float32')
-    dir_y = event_blob['McTracks'][1].dir_y.astype('float32')
-    dir_z = event_blob['McTracks'][1].dir_z.astype('float32')
-    time = event_blob['McTracks'][1].time.astype('float32')
+    event_id = event_blob['EventInfo'].event_id[0]
+    particle_type = event_blob['McTracks'][p].type
+    energy = event_blob['McTracks'][p].energy
+    is_cc = event_blob['McTracks'][p].is_cc
+    bjorkeny = event_blob['McTracks'][p].bjorkeny
+    dir_x = event_blob['McTracks'][p].dir[0]
+    dir_y = event_blob['McTracks'][p].dir[1]
+    dir_z = event_blob['McTracks'][p].dir[2]
+    time = event_blob['McTracks'][p].time
 
-    event_track = np.concatenate([event_id, particle_type, energy, isCC, bjorkeny, dir_x, dir_y, dir_z, time], axis=0)
+    event_track = np.array([event_id, particle_type, energy, is_cc, bjorkeny, dir_x, dir_y, dir_z, time], dtype=np.float32)
 
-    # parse hits
+    # parse hits [x, y, z, time]
     if do_mc_hits is True:
         hits = event_blob["McHits"]
     else:
         hits = event_blob["Hits"]
 
-    c_hits = geo.apply(hits)
-    pos_x = c_hits.pos_x.astype('float32')
-    pos_y = c_hits.pos_y.astype('float32')
-    pos_z = c_hits.pos_z.astype('float32')
-    time = c_hits.time.astype('float32')
+    #c_hits = geo.apply(hits)
+    pos_x = hits.pos_x.astype('float32')
+    pos_y = hits.pos_y.astype('float32')
+    pos_z = hits.pos_z.astype('float32')
+    time = hits.time.astype('float32')
 
     ax = np.newaxis
     event_hits = np.concatenate([pos_x[:, ax], pos_y[:, ax], pos_z[:, ax], time[:, ax]], axis=1)
-    print event_hits
-    print event_track
 
     # event_hits: 2D hits array for one event, event_track: 1D track array containing event information
     return event_hits, event_track
 
 
+# Legacy code
 def parse_file(fname, fname_geo, do_mc_hits):
     """
     Reads the raw .hdf5 neutrino MC file and returns the hit arrays (event_id [pos_xyz] dom_id time).
@@ -80,20 +140,7 @@ def parse_file(fname, fname_geo, do_mc_hits):
         mc_hits_get_dom_id(hits_group)
     else:
         print "Reading triggered hits"
-
-        km3pipe_v7 = True
-        if km3pipe_v7 is True:
-            hits_group = h5py.File(fname, 'r')['hits']
-            hits_event_id = hits_group['event_id'].astype('float32')
-            hits_dom_id = hits_group['dom_id'].astype('float32')
-            hits_time = hits_group['time'].astype('float32')
-
-            hits = np.concatenate([hits_event_id[:, np.newaxis], hits_dom_id[:, np.newaxis], hits_time[:, np.newaxis]], axis=1)
-
-
         hits_group = np.array(pd.read_hdf(fname, 'hits'), np.float32)
-        # hits_group = np.array(h5py.File(fname, 'r')['hits'][()], np.float32)
-        # hits_group = np.array(h5py.File(fname, 'r')['hits'][:], np.float32)
 
     # keep the relevant info from each hit: [event_id, dom_id, time]
     hits = np.array(np.concatenate([hits_group[:, 5:6], hits_group[:, 1:2], hits_group[:, 2:3]], axis=1), np.float32) # new km3pipe version 6.9.1
@@ -107,6 +154,7 @@ def parse_file(fname, fname_geo, do_mc_hits):
     return tracks, hits_xyz, geo_limits
 
 
+# Legacy code
 def extract_relevant_track_info(tracks):
     """
     Returns the relevant MC information for all tracks. [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z, time]
@@ -116,6 +164,7 @@ def extract_relevant_track_info(tracks):
     return np.array(np.concatenate([tracks[:, 14:15], tracks[:, 13:14], tracks[:, 4:5], tracks[:, 7:8], tracks[:, 0:1], tracks[:, 1:4]], tracks[:, 12:13], axis=1), np.float32)
 
 
+# Legacy code
 def mc_hits_get_dom_id(hits_group):
     """
     This function calculates the dom_id of each mc_hit event based on their pmt_id's. 
@@ -131,6 +180,7 @@ def mc_hits_get_dom_id(hits_group):
         hit[4] = dom_id
 
 
+# Legacy code
 def convert_hits_xyz(hits, geo):
     """
     Reads the hits array with dom_id's and returns the hits_xyz array with according xyz positions.

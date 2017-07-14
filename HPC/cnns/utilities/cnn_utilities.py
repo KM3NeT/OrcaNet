@@ -41,6 +41,7 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type):
             y_values = np.reshape(y_values, (batchsize, y_values.shape[1]))
             # encode the labels such that they are all within the same range (and filter the ones we don't want for now)
             c = 0
+            # TODO could be vectorized if performance is a bottleneck. Looping over numpy arrays is always slow (not in C anymore!).
             for y_val in y_values:
                 ys[c] = encode_targets(y_val, class_type)
                 c += 1
@@ -119,39 +120,75 @@ def encode_targets(y_val, class_type):
                                   I.e. (2, 'muon-CC_to_elec-CC')
     :return: ndarray(ndim=1) train_y: Array that contains the encoded class label information of the input event.
     """
+    def get_class_up_down(dir_z):
+        """
+        Converts the zenith information (dir_z) to a binary up/down value.
+        :param float32 dir_z: z-direction of the event_track (which contains dir_z).
+        :return: int up_down_class_value: binary up/down class value for the event_track.
+        """
+        # analyze the track info to determine the class number
+        up_down_class_value = int(np.sign(dir_z))
+        if up_down_class_value == -1:
+            up_down_class_value = 0
+
+        return up_down_class_value
+
+
+    def convert_particle_class_to_categorical(particle_type, is_cc, num_classes=4):
+        """
+        Converts the possible particle types (elec/muon/tau , NC/CC) to a categorical type that can be used as tensorflow input y
+        :param int particle_type: Specifies the particle type, i.e. elec/muon/tau (12, 14, 16). Negative values for antiparticles.
+        :param int is_cc: Specifies the interaction channel. 0 = NC, 1 = CC.
+        :param int num_classes: Specifies the total number of classes that will be discriminated later on by the CNN. I.e. 2 = elec_NC, muon_CC.
+        :return: ndarray(ndim=1) categorical: returns the categorical event type. I.e. (particle_type=14, is_cc=1) -> [0,0,1,0] for num_classes=4.
+        """
+        if num_classes == 4:
+            particle_type_dict = {(12, 0): 0, (12, 1): 1, (14, 1): 2, (16, 1): 3}  # 0: elec_NC, 1: elec_CC, 2: muon_CC, 3: tau_CC
+        else:
+            raise ValueError('A number of classes !=4 is currently not supported!')
+
+        category = int(particle_type_dict[(abs(particle_type), is_cc)])
+        categorical = np.zeros(num_classes, dtype='int')
+        categorical[category] = 1
+        return categorical
+
+
     if class_type == (2, 'muon-CC_to_elec-NC'):
+        categorical_type = convert_particle_class_to_categorical(y_val[1], y_val[3], class_type[0])
         train_y = np.zeros(2, dtype='float32')
-        train_y[0] = y_val[9]
-        train_y[1] = y_val[11]
+        train_y[0] = categorical_type[0]
+        train_y[1] = categorical_type[2]
 
         return train_y
 
     if class_type == (1, 'muon-CC_to_elec-NC'): # only one neuron at the end of the cnn instead of two
+        categorical_type = convert_particle_class_to_categorical(y_val[1], y_val[3], class_type[0])
         train_y = np.zeros(1, dtype='float32')
-        if y_val[9]!=0:
-            train_y[0] = y_val[9]
+        if categorical_type[0]!=0:
+            train_y[0] = categorical_type[0]
 
         return train_y
 
     if class_type == (2, 'muon-CC_to_elec-CC'):
+        categorical_type = convert_particle_class_to_categorical(y_val[1], y_val[3], class_type[0])
         train_y = np.zeros(2, dtype='float32')
-        train_y[0] = y_val[10]
-        train_y[1] = y_val[11]
+        train_y[0] = categorical_type[1]
+        train_y[1] = categorical_type[2]
 
-        #print y_val
-        #print train_y
         return train_y
 
     if class_type == (1, 'muon-CC_to_elec-CC'): # only one neuron at the end of the cnn instead of two
+        categorical_type = convert_particle_class_to_categorical(y_val[1], y_val[3], class_type[0])
         train_y = np.zeros(1, dtype='float32')
-        if y_val[10]!=0:
-            train_y[0] = y_val[10]
+        if categorical_type[1]!=0:
+            train_y[0] = categorical_type[1]
 
         return train_y
 
     if class_type == (1, 'up_down'): # up down, one neuron at the cnn end
+        up_down_class = get_class_up_down(y_val[7]) # returns 0 or 1
         train_y = np.zeros(1, dtype='float32')
-        train_y[0] = y_val[8]
+        train_y[0] = up_down_class
 
         return train_y
 
