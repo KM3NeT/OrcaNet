@@ -53,6 +53,7 @@ def calculate_bin_edges_test(geo, y_bin_edge, z_bin_edge):
     For y and z though, it can!
     For y, every bin should contain the number of lines per y-direction * 18 for 18 doms per line.
     For z, every bin should contain 115 entries, since every z bin contains one storey of the 115 ORCA lines.
+    Not 100% accurate, since only the dom positions are used and not the individual pmt positions for a dom.
     """
     geo_y = geo[:, 2]
     geo_z = geo[:, 3]
