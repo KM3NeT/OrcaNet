@@ -4,6 +4,7 @@
 
 import os
 import sys
+import warnings
 #from memory_profiler import profile # for memory profiling, call with @profile; myfunc()
 import line_profiler # call with kernprof file.py args
 from matplotlib.backends.backend_pdf import PdfPages
@@ -18,54 +19,101 @@ __license__ = 'AGPL'
 __version__ = '1.0'
 __email__ = 'michael.m.moser@fau.de'
 __status__ = 'Prototype'
-# Heavily based on code from sgeisselsoeder: https://github.com/sgeisselsoeder/km3netHdf5ToHistograms/
 
 
-def calculate_bin_edges(n_bins, geo_limits):
-    """
-    Calculates the bin edges for the later np.histogramdd actions based on the number of specified bins. 
-    This is performed in order to get the same bin size for each event regardless of the fact if all bins have a hit or not.
-    :param list n_bins: contains the desired number of bins for each dimension. [n_bins_x, n_bins_y, n_bins_z]
-    :param geo_limits: contains the min and max values of each geometry dimension. [[first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax]]
-    :return: ndarray(ndim=1) x_bin_edges, y_bin_edges, z_bin_edges: contains the resulting bin edges for each dimension.
-    """
-    x_bin_edges = np.linspace(geo_limits[0][1] -9.95, geo_limits[1][1]+9.95, num=n_bins[0] + 1) #try to get the lines in the bin center 9.95*2 = average x-separation of two lines
-    y_bin_edges = np.linspace(geo_limits[0][2], geo_limits[1][2], num=n_bins[1] + 1) #+- 9.75
-    z_bin_edges = np.linspace(geo_limits[0][3], geo_limits[1][3], num=n_bins[2] + 1)
-    #TODO rethink bin centers due to new km3pipe geo
-    return x_bin_edges, y_bin_edges, z_bin_edges
-
-
-def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
-    """
-    Main code. Reads raw .hdf5 files and creates 2D/3D histogram projections that can be used for a CNN
-    :param list n_bins: Declares the number of bins that should be used for each dimension (x,y,z,t).
-    :param bool do2d: Declares if 2D histograms should be created.
-    :param bool do2d_pdf: Declares if pdf visualizations of the 2D histograms should be created. Cannot be called if do2d=False.
-    :param bool do3d: Declares if 3D histograms should be created.
-    :param bool do_mc_hits: Declares if hits (False, mc_hits + BG) or mc_hits (True) should be processed
-    """
+def parse_input(do2d, do2d_pdf):
     if len(sys.argv) < 2 or str(sys.argv[1]) == "-h":
         print "Usage: python " + str(sys.argv[0]) + " file.h5"
         sys.exit(1)
 
     if do2d==False and do2d_pdf==True:
-        print 'The 2D pdf images cannot be created if do2d==False. Please try again.'
-        sys.exit(1)
+        raise ValueError('The 2D pdf images cannot be created if do2d=False. Please try again.')
+
+    if do2d_pdf[0] is True and do2d_pdf[1] > 100:
+        warnings.warn('You declared do2d_pdf=(True, int) with int > 100. This will more than two minutes.'
+                      'Do you really want to create pdfs images for so many events?')
 
     if not os.path.isfile(str(sys.argv[1])):
-        print 'The file -' + str(sys.argv[1]) + '- does not exist. Exiting.'
-        sys.exit(1)
+        raise IOError('The file -' + str(sys.argv[1]) + '- does not exist.')
 
-    filename_input = str(sys.argv[1])
+
+    return str(sys.argv[1])
+
+def calculate_bin_edges_test(geo, y_bin_edge, z_bin_edge):
+    """
+    Tests, if the bins in one direction don't accidentally have more than 'one' OM.
+    For the x-direction, an overlapping can not be avoided in an orthogonal space.
+    For y and z though, it can!
+    For y, every bin should contain the number of lines per y-direction * 18 for 18 doms per line.
+    For z, every bin should contain 115 entries, since every z bin contains one storey of the 115 ORCA lines.
+    """
+    geo_y = geo[:, 2]
+    geo_z = geo[:, 3]
+    hist_y = np.histogram(geo_y, bins=y_bin_edge)
+    hist_z = np.histogram(geo_z, bins=z_bin_edge)
+
+    print '----------------------------------------------------------------------------------------------'
+    print 'Y-axis: Bin content: ' + str(hist_y[0])
+    print 'It should be:        ' + str(np.array(
+        [4 * 18, 7 * 18, 9 * 18, 10 * 18, 9 * 18, 10 * 18, 10 * 18, 10 * 18, 11 * 18, 10 * 18, 9 * 18, 8 * 18, 8 * 18]))
+    print 'Y-axis: Bin edges: ' + str(hist_y[1])
+    print '..............................................................................................'
+    print 'Z-axis: Bin content: ' + str(hist_z[0])
+    print 'It should have 115 entries everywhere'
+    print 'Z-axis: Bin edges: ' + str(hist_z[1])
+    print '----------------------------------------------------------------------------------------------'
+
+
+def calculate_bin_edges(n_bins, fname_geo_limits):
+    """
+    Calculates the bin edges for the later np.histogramdd actions based on the number of specified bins. 
+    This is performed in order to get the same bin size for each event regardless of the fact if all bins have a hit or not.
+    :param tuple n_bins: contains the desired number of bins for each dimension. [n_bins_x, n_bins_y, n_bins_z]
+    :param str fname_geo_limits: filepath of the .txt ORCA geometry file.
+    :return: ndarray(ndim=1) x_bin_edges, y_bin_edges, z_bin_edges: contains the resulting bin edges for each dimension.
+    """
+    print "Reading detector geometry in order to calculate the detector dimensions from file " + fname_geo_limits
+    geo = np.loadtxt(fname_geo_limits)
+
+    # derive maximum and minimum x,y,z coordinates of the geometry input [[first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax]]
+    geo_limits = np.nanmin(geo, axis = 0), np.nanmax(geo, axis = 0)
+    print 'Detector dimensions [[first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax]]: ' + str(geo_limits)
+
+    x_bin_edges = np.linspace(geo_limits[0][1] - 9.95, geo_limits[1][1] + 9.95, num=n_bins[0] + 1) #try to get the lines in the bin center 9.95*2 = average x-separation of two lines
+    y_bin_edges = np.linspace(geo_limits[0][2] - 9.75, geo_limits[1][2] + 9.75, num=n_bins[1] + 1) # Delta y = 19.483
+    z_bin_edges = np.linspace(geo_limits[0][3] - 4.665, geo_limits[1][3] + 4.665, num=n_bins[2] + 1) # Delta z = 9.329
+
+    calculate_bin_edges_test(geo, y_bin_edges, z_bin_edges) # test disabled by default. Activate it, if you change the offsets in x/y/z-bin-edges
+
+    return x_bin_edges, y_bin_edges, z_bin_edges
+
+
+def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do_mc_hits=False, use_calibrated_file=False):
+    """
+    Main code. Reads raw .hdf5 files and creates 2D/3D histogram projections that can be used for a CNN
+    :param tuple(int) n_bins: Declares the number of bins that should be used for each dimension (x,y,z,t).
+    :param bool do2d: Declares if 2D histograms should be created.
+    :param (bool, int) do2d_pdf: Declares if pdf visualizations of the 2D histograms should be created. Cannot be called if do2d=False.
+                                 The event loop will be stopped after the integer specified in the second argument.
+    :param bool do3d: Declares if 3D histograms should be created.
+    :param bool do_mc_hits: Declares if hits (False, mc_hits + BG) or mc_hits (True) should be processed
+    :param bool use_calibrated_file: Declares if the input file is already calibrated (pos_x/y/z, time) or not.
+    """
+    filename_input = parse_input(do2d, do2d_pdf)
     filename = os.path.basename(os.path.splitext(filename_input)[0])
     filename_output = filename.replace(".","_")
-    filename_geometry = 'orca_115strings_av23min20mhorizontal_18OMs_alt9mvertical_v1.detx' # used for x/y/z calibration
     filename_geo_limits = 'ORCA_Geo_115lines.txt' # used for calculating the dimensions of the ORCA can #TODO not completely true anymore since single PMTs
 
-    geo, geo_limits = get_geometry(filename_geometry, filename_geo_limits)
+    geo = None
+    if use_calibrated_file is False:
+        filename_geometry = 'orca_115strings_av23min20mhorizontal_18OMs_alt9mvertical_v1.detx'  # used for x/y/z calibration
+        if os.path.isfile(filename_geometry) is True:
+            geo = kp.Geometry(filename='/home/woody/capn/mppi033h/misc/orca_detectors/fixed/' + filename_geometry)
+        else:
+            raise IOError('The .detx file does not exist in the default path /home/woody/capn/mppi033h/misc/orca_detectors/fixed/!. '
+                          'Change the path or add the .detx file to the default path.')
 
-    x_bin_edges, y_bin_edges, z_bin_edges = calculate_bin_edges(n_bins, geo_limits)
+    x_bin_edges, y_bin_edges, z_bin_edges = calculate_bin_edges(n_bins, filename_geo_limits)
 
     all_4d_to_2d_hists, all_4d_to_3d_hists = [], []
     mc_infos = []
@@ -82,24 +130,21 @@ def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
             print 'Event No. ' + str(i)
         i+=1
         # filter out all hit and track information belonging that to this event
-        event_hits, event_track = get_event_data(event_blob, geo, do_mc_hits)
+        event_hits, event_track = get_event_data(event_blob, geo, do_mc_hits, use_calibrated_file)
 
         # event_track: [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z, time]
         mc_infos.append(event_track)
 
         if do2d:
-            compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_2d_hists, event_track, do2d_pdf)
+            compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_2d_hists, event_track, do2d_pdf[0])
 
         if do3d:
             compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_3d_hists)
 
-        #if i == 1:
-           #  only for testing
-         #   if do2d_pdf:
-          #      glob.pdf_2d_plots.close()
-         #   break
-    #if do2d_pdf: # enabled if the if cause above (for testing) is commented out
-     #   glob.pdf_2d_plots.close()
+        if do2d_pdf[0] is True:
+            if i == do2d_pdf[1]:
+                glob.pdf_2d_plots.close()
+            break
 
     if do2d:
         store_histograms_as_hdf5(np.stack([hist_tuple[0] for hist_tuple in all_4d_to_2d_hists]), np.array(mc_infos), 'Results/4dTo2d/h5/xy/' + filename_output + '_xy.h5')
@@ -115,7 +160,7 @@ def main(n_bins, do2d=True, do2d_pdf=True, do3d=True, do_mc_hits=False):
 
 
 if __name__ == '__main__':
-    main(n_bins=[11,13,18,50], do2d=False, do2d_pdf=False, do3d=True, do_mc_hits=False)
+    main(n_bins=(11,13,18,50), do2d=True, do2d_pdf=(True, 10), do3d=False, do_mc_hits=False, use_calibrated_file=True)
 
 
 

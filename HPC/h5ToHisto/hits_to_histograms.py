@@ -39,7 +39,7 @@ def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     :param ndarray(ndim=1) x_bin_edges: bin edges for the X-direction.
     :param ndarray(ndim=1) y_bin_edges: bin edges for the Y-direction.
     :param ndarray(ndim=1) z_bin_edges: bin edges for the Z-direction.
-    :param list n_bins: Contains the number of bins that should be used for each dimension (x,y,z,t).
+    :param tuple n_bins: Contains the number of bins that should be used for each dimension (x,y,z,t).
     :param list all_4d_to_2d_hists: contains all 2D histogram projections.
     :param ndarray(ndim=2) event_track: contains the relevant mc_track info for the event in order to get a nice title for the pdf histos.
     :param bool do2d_pdf: if True, generate 2D matplotlib pdf histograms.
@@ -74,7 +74,7 @@ def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
         hists = [hist_xy, hist_xz, hist_yz, hist_xt, hist_yt, hist_zt]
         convert_2d_numpy_hists_to_pdf_image(hists, t_start, t_end, event_track=event_track) # slow! takes about 1s per event
 
-
+@profile
 def convert_2d_numpy_hists_to_pdf_image(hists, t_start, t_end, event_track=None):
     """
     Creates matplotlib 2D histos based on the numpy histogram2D objects and saves them to a pdf file.
@@ -133,7 +133,7 @@ def convert_2d_numpy_hists_to_pdf_image(hists, t_start, t_end, event_track=None)
     glob.pdf_2d_plots.savefig(fig) #TODO: remove global variable, but how? Need to close pdf object outside of this function (-> as last step of the 2D eventID loop)
     plt.close()
 
-@profile
+
 def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_3d_hists):
     """
     Computes 3D numpy histogram 'images' from the 4D data.
@@ -141,7 +141,7 @@ def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     :param ndarray(ndim=1) x_bin_edges: bin edges for the X-direction. 
     :param ndarray(ndim=1) y_bin_edges: bin edges for the Y-direction.
     :param ndarray(ndim=1) z_bin_edges: bin edges for the Z-direction.
-    :param list n_bins: Declares the number of bins that should be used for each dimension (x,y,z,t).
+    :param tuple n_bins: Declares the number of bins that should be used for each dimension (x,y,z,t).
     :param list all_4d_to_3d_hists: contains all 3D histogram projections.
     :return: appends the 3D histograms to the all_4d_to_3d_hists list. [xyz, xyt, xzt, yzt, rzt]
     """
