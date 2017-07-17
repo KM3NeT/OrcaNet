@@ -4,7 +4,7 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
-import line_profiler # call with kernprof file.py args
+#import line_profiler # call with kernprof file.py args
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 import glob
@@ -30,8 +30,9 @@ def get_time_parameters(t, t_start_margin=0.15, t_end_margin=0.15):
     t_end = t_mean + t_end_margin * t_diff
 
     return t_start, t_end
+    #return t_min, t_max
 
-@profile
+
 def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_2d_hists, event_track, do2d_pdf):
     """
     Computes 2D numpy histogram 'images' from the 4D data.
@@ -74,7 +75,7 @@ def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
         hists = [hist_xy, hist_xz, hist_yz, hist_xt, hist_yt, hist_zt]
         convert_2d_numpy_hists_to_pdf_image(hists, t_start, t_end, event_track=event_track) # slow! takes about 1s per event
 
-@profile
+
 def convert_2d_numpy_hists_to_pdf_image(hists, t_start, t_end, event_track=None):
     """
     Creates matplotlib 2D histos based on the numpy histogram2D objects and saves them to a pdf file.

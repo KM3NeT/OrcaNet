@@ -15,6 +15,7 @@ __version__ = '1.0'
 __email__ = 'michael.m.moser@fau.de'
 __status__ = 'Production'
 
+
 def get_cum_number_of_rows(file_list):
     """
     Returns the cumulative number of rows (axis_0) in a list based on the specified input .h5 files.

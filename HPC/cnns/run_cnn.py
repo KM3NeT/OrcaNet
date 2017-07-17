@@ -129,8 +129,6 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, use_scratch_ssd=F
     #model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
     model.summary()
 
-    #printSize = 5
-
     while 1:
         epoch +=1
         i = 0
@@ -144,11 +142,9 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, use_scratch_ssd=F
             model.fit_generator(generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type),
                                 steps_per_epoch=int(f_size / batchsize), epochs=1, verbose=1)
             # store the trained model
-            #model.save("models/trained/trained_" + modelname + '_f' + str(i) + '_epoch' + str(epoch) + '.h5')
-            # delete old model?
+            model.save("models/trained/trained_" + modelname + '_f' + str(i) + '_epoch' + str(epoch) + '.h5')
 
         for (f, f_size) in test_files:
-            # probably one test file is enough
             f_size = 70000 # for testing
             evaluation = model.evaluate_generator(generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type),
                                                   steps=int(f_size / batchsize))

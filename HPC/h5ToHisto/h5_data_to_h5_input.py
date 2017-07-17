@@ -91,7 +91,7 @@ def calculate_bin_edges(n_bins, fname_geo_limits):
     y_bin_edges = np.linspace(geo_limits[0][2] - 9.75, geo_limits[1][2] + 9.75, num=n_bins[1] + 1) # Delta y = 19.483
     z_bin_edges = np.linspace(geo_limits[0][3] - 4.665, geo_limits[1][3] + 4.665, num=n_bins[2] + 1) # Delta z = 9.329
 
-    calculate_bin_edges_test(geo, y_bin_edges, z_bin_edges) # test disabled by default. Activate it, if you change the offsets in x/y/z-bin-edges
+    #calculate_bin_edges_test(geo, y_bin_edges, z_bin_edges) # test disabled by default. Activate it, if you change the offsets in x/y/z-bin-edges
 
     return x_bin_edges, y_bin_edges, z_bin_edges
 
@@ -152,7 +152,7 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do_mc_hits=False, u
         if do2d_pdf[0] is True:
             if i == do2d_pdf[1]:
                 glob.pdf_2d_plots.close()
-            break
+                break
 
     if do2d:
         store_histograms_as_hdf5(np.stack([hist_tuple[0] for hist_tuple in all_4d_to_2d_hists]), np.array(mc_infos), 'Results/4dTo2d/h5/xy/' + filename_output + '_xy.h5')
@@ -168,7 +168,7 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do_mc_hits=False, u
 
 
 if __name__ == '__main__':
-    main(n_bins=(11,13,18,50), do2d=True, do2d_pdf=(True, 10), do3d=False, do_mc_hits=False, use_calibrated_file=True)
+    main(n_bins=(11,13,18,50), do2d=True, do2d_pdf=(True, 50), do3d=False, do_mc_hits=True, use_calibrated_file=True)
 
 
 

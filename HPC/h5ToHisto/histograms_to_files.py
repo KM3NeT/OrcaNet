@@ -16,29 +16,3 @@ def store_histograms_as_hdf5(hists, mc_infos, filepath_output):
     dset_hists = h5f.create_dataset('x', data=hists, dtype='uint8')
 
     h5f.close()
-
-
-# def store_2d_histograms_as_hdf5(hists, tracks, filepath_output, projection='None'):
-#
-#     h5f = h5py.File(filepath_output, 'w')
-#     dset_tracks = h5f.create_dataset('tracks', data=tracks)
-#     dset_hists = h5f.create_dataset(projection, data=hists, dtype='uint8')
-#
-#     h5f.close()
-#
-#
-# def store_3d_histograms_as_hdf5(hists, tracks, filename_output, projection='None'):
-#     """
-#     Takes the 3D np histograms ('images') as well as the mc_info ('tracks') and saves them to a h5 file.
-#     :param list all_4d_to_3d_hists: contains all 3D np histograms (ndarrays(ndim=2))
-#     :param ndarray(ndim=2) tracks: 2D array containing important MC information for each event_id. [event_id, particle_type, energy, isCC]
-#     :param filename_output: placeholder filename till production
-#     """
-#
-#     hists_3d_xyz = np.array(all_4d_to_3d_hists)[:, 0]
-#
-#     h5f = h5py.File('Results/4dTo3d/h5/' + filename_output + '_xyz.h5', 'w')
-#     dset_tracks = h5f.create_dataset('tracks', data=tracks)
-#     dset_xyz = h5f.create_dataset('xyz', data=hists_3d_xyz, dtype='uint8')
-#
-#     h5f.close()

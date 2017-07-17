@@ -5,10 +5,9 @@
 import os
 import pandas as pd
 import numpy as np
-import h5py
 import km3pipe as kp
 #from memory_profiler import profile
-import line_profiler # call with kernprof file.py args
+#import line_profiler # call with kernprof file.py args
 
 
 def get_primary_track_index(event_blob):
@@ -155,7 +154,6 @@ def parse_file(fname, fname_geo, do_mc_hits):
     print "Done converting."
     return tracks, hits_xyz, geo_limits
 
-
 # Legacy code
 def extract_relevant_track_info(tracks):
     """
@@ -164,7 +162,6 @@ def extract_relevant_track_info(tracks):
     :return: ndarray(ndim=2): returns a 2D array with the relevant mc_tracks info for each event.
     """
     return np.array(np.concatenate([tracks[:, 14:15], tracks[:, 13:14], tracks[:, 4:5], tracks[:, 7:8], tracks[:, 0:1], tracks[:, 1:4]], tracks[:, 12:13], axis=1), np.float32)
-
 
 # Legacy code
 def mc_hits_get_dom_id(hits_group):
@@ -180,7 +177,6 @@ def mc_hits_get_dom_id(hits_group):
         pmt_id = int(hit[6])
         dom_id = int((pmt_id-int(1))/int(31)) + 1
         hit[4] = dom_id
-
 
 # Legacy code
 def convert_hits_xyz(hits, geo):
