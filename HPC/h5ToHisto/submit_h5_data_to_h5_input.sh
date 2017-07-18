@@ -1,28 +1,30 @@
 #!/bin/bash
 #
-#PBS -l nodes=1:ppn=4,walltime=03:00:00
-#PBS -o /home/woody/capn/mppi033h/logs/submit_h5_to_histo_$PBS_JOBID_$PBS_ARRAYID.out -e /home/woody/capn/mppi033h/logs/submit_h5_to_histo_$PBS_JOBID_$PBS_ARRAYID.err
+#PBS -l nodes=1:ppn=4,walltime=01:30:00
+#PBS -o /home/woody/capn/mppi033h/logs/submit_h5_to_histo_${PBS_JOBID}_${PBS_ARRAYID}.out -e /home/woody/capn/mppi033h/logs/submit_h5_to_histo_${PBS_JOBID}_${PBS_ARRAYID}.err
 # first non-empty non-comment line ends PBS options
 
 # Submit with 'qsub -t 1-10 submit_h5_data_to_h5_input.sh'
 # This script uses the h5_data_to_h5_input.py file in order to convert all 600 (muon/elec/tau) .h5 raw files to .h5 2D/3D projection files (CNN input).
 # The total amount of simulated files for each event type in ORCA is 600 -> file 1-600
 # The files should be converted in batches of files_per_job=60 files per job
+
+# load env
+source activate /home/hpc/capn/mppi033h/.virtualenv/h5_to_histo_env/
+
 n=${PBS_ARRAYID}
-#n=1
 i=$((1+((${n}-1) * 4)))
 
 CodeFolder=/home/woody/capn/mppi033h/Code/HPC/h5ToHisto
 
 #ParticleType=muon-CC #muon-CC
-#FileName=JTE.KM3Sim.gseagen.${ParticleType}.3-100GeV-9.1E7-1bin-3.0gspec.ORCA115_9m_2016 #muon-CC
-#HDFFOLDER=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/raw_data/h5/muon-CC/3-100GeV #muon-CC
 #ParticleType=elec-NC #elec-NC
+ParticleType=elec-CC #elec-CC
+#FileName=JTE.KM3Sim.gseagen.${ParticleType}.3-100GeV-9.1E7-1bin-3.0gspec.ORCA115_9m_2016 #muon-CC
 #FileName=JTE.KM3Sim.gseagen.${ParticleType}.3-100GeV-3.4E6-1bin-3.0gspec.ORCA115_9m_2016 #elec-NC
-#HDFFOLDER=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/raw_data/h5/elec-NC/3-100GeV #elec-NC
-ParticleType=elec-CC #elec-NC
 FileName=JTE.KM3Sim.gseagen.${ParticleType}.3-100GeV-1.1E6-1bin-3.0gspec.ORCA115_9m_2016 #elec-CC
-HDFFOLDER=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/raw_data/h5/elec-CC/3-100GeV #elec-CC
+HDFFOLDER=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/raw_data/h5/calibrated/${ParticleType}/3-100GeV
+
 
 cd ${CodeFolder}
 # run
@@ -44,10 +46,10 @@ do
     #echo ${thread3}
     #echo ${thread4}
 
-    (time taskset -c 0  python ${CodeFolder}/h5_data_to_h5_input.py ${HDFFOLDER}/${FileName}.${thread1}.hdf5 > ./logs/cout/${FileName}.${thread1}.txt) &
-    (time taskset -c 1  python ${CodeFolder}/h5_data_to_h5_input.py ${HDFFOLDER}/${FileName}.${thread2}.hdf5 > ./logs/cout/${FileName}.${thread2}.txt) &
-    (time taskset -c 2  python ${CodeFolder}/h5_data_to_h5_input.py ${HDFFOLDER}/${FileName}.${thread3}.hdf5 > ./logs/cout/${FileName}.${thread3}.txt) &
-    (time taskset -c 3  python ${CodeFolder}/h5_data_to_h5_input.py ${HDFFOLDER}/${FileName}.${thread4}.hdf5 > ./logs/cout/${FileName}.${thread4}.txt) &
+    (time taskset -c 0  python ${CodeFolder}/h5_data_to_h5_input.py ${HDFFOLDER}/${FileName}.${thread1}.h5 > ./logs/cout/${FileName}.${thread1}.txt) &
+    (time taskset -c 1  python ${CodeFolder}/h5_data_to_h5_input.py ${HDFFOLDER}/${FileName}.${thread2}.h5 > ./logs/cout/${FileName}.${thread2}.txt) &
+    (time taskset -c 2  python ${CodeFolder}/h5_data_to_h5_input.py ${HDFFOLDER}/${FileName}.${thread3}.h5 > ./logs/cout/${FileName}.${thread3}.txt) &
+    (time taskset -c 3  python ${CodeFolder}/h5_data_to_h5_input.py ${HDFFOLDER}/${FileName}.${thread4}.h5 > ./logs/cout/${FileName}.${thread4}.txt) &
     wait
 done
 
