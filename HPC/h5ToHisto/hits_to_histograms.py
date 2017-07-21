@@ -36,10 +36,7 @@ def get_time_parameters(t, t_start_margin=0.15, t_end_margin=0.15):
 def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_2d_hists, event_track, do2d_pdf):
     """
     Computes 2D numpy histogram 'images' from the 4D data.
-    Careful: Currently, appending to all_4d_to_2d_hists takes quite a lot of memory (about 200MB for 3500 events).
-    In the future, the list should be changed to a numpy ndarray.
-    (Which unfortunately would make the code less readable, since an array is needed for each projection...)
-    :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyz) data for a certain eventID. [event_id, positions_xyz, time, dom_id]
+    :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyzt) data for a certain eventID. [positions_xyz, time]
     :param ndarray(ndim=1) x_bin_edges: bin edges for the X-direction.
     :param ndarray(ndim=1) y_bin_edges: bin edges for the Y-direction.
     :param ndarray(ndim=1) z_bin_edges: bin edges for the Z-direction.
@@ -149,7 +146,7 @@ def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     Careful: Currently, appending to all_4d_to_3d_hists takes quite a lot of memory (about 200MB for 3500 events).
     In the future, the list should be changed to a numpy ndarray.
     (Which unfortunately would make the code less readable, since an array is needed for each projection...)
-    :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyz) data for a certain eventID. [event_id, positions_xyz, time, dom_id]
+    :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyzt) data for a certain eventID. [positions_xyz, time]
     :param ndarray(ndim=1) x_bin_edges: bin edges for the X-direction. 
     :param ndarray(ndim=1) y_bin_edges: bin edges for the Y-direction.
     :param ndarray(ndim=1) z_bin_edges: bin edges for the Z-direction.
@@ -186,3 +183,23 @@ def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
                                np.array(hist_xzt[0], dtype=np.uint8),
                                np.array(hist_yzt[0], dtype=np.uint8),
                                np.array(hist_rzt[0], dtype=np.uint8)))
+
+
+def compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, all_4d_to_4d_hists):
+    """
+    Computes 4D numpy histogram 'images' from the 4D data.
+    :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyzt) data for a certain eventID. [positions_xyz, time]
+    :param ndarray(ndim=1) x_bin_edges: bin edges for the X-direction.
+    :param ndarray(ndim=1) y_bin_edges: bin edges for the Y-direction.
+    :param ndarray(ndim=1) z_bin_edges: bin edges for the Z-direction.
+    :param list all_4d_to_4d_hists: contains all 4D histogram projections.
+    :return: appends the 4D histogram to the all_4d_to_4d_hists list. [xyzt]
+    """
+    t = event_hits[:, 3:4]
+    t_start, t_end = get_time_parameters(t, t_start_margin=0.15, t_end_margin=0.15)
+
+    hist_xyzt = np.histogramdd(np.array(event_hits[:, 0:4], np.float32),
+                               range=( (min(x_bin_edges),max(x_bin_edges)),(min(y_bin_edges),max(y_bin_edges)),
+                                       (min(z_bin_edges),max(z_bin_edges)),(t_start, t_end)))
+
+    all_4d_to_4d_hists.append(np.array(hist_xyzt[0], dtype=np.uint8))

@@ -96,7 +96,7 @@ def calculate_bin_edges(n_bins, fname_geo_limits):
     return x_bin_edges, y_bin_edges, z_bin_edges
 
 
-def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do_mc_hits=False, use_calibrated_file=False):
+def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_hits=False, use_calibrated_file=False):
     """
     Main code. Reads raw .hdf5 files and creates 2D/3D histogram projections that can be used for a CNN
     :param tuple(int) n_bins: Declares the number of bins that should be used for each dimension (x,y,z,t).
@@ -104,6 +104,7 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do_mc_hits=False, u
     :param (bool, int) do2d_pdf: Declares if pdf visualizations of the 2D histograms should be created. Cannot be called if do2d=False.
                                  The event loop will be stopped after the integer specified in the second argument.
     :param bool do3d: Declares if 3D histograms should be created.
+    :param bool do4d: Declares if 4D histograms should be created.
     :param bool do_mc_hits: Declares if hits (False, mc_hits + BG) or mc_hits (True) should be processed
     :param bool use_calibrated_file: Declares if the input file is already calibrated (pos_x/y/z, time) or not.
     """
@@ -123,7 +124,7 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do_mc_hits=False, u
 
     x_bin_edges, y_bin_edges, z_bin_edges = calculate_bin_edges(n_bins, filename_geo_limits)
 
-    all_4d_to_2d_hists, all_4d_to_3d_hists = [], []
+    all_4d_to_2d_hists, all_4d_to_3d_hists, all_4d_to_4d_hists = [], [], []
     mc_infos = []
 
     if do2d_pdf:
@@ -149,6 +150,9 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do_mc_hits=False, u
         if do3d:
             compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_3d_hists)
 
+        if do4d:
+            compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, all_4d_to_4d_hists)
+
         if do2d_pdf[0] is True:
             if i == do2d_pdf[1]:
                 glob.pdf_2d_plots.close()
@@ -166,9 +170,12 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do_mc_hits=False, u
         store_histograms_as_hdf5(np.stack([hist_tuple[3] for hist_tuple in all_4d_to_3d_hists]), np.array(mc_infos), 'Results/4dTo3d/h5/yzt/' + filename_output + '_yzt.h5')
         store_histograms_as_hdf5(np.stack([hist_tuple[4] for hist_tuple in all_4d_to_3d_hists]), np.array(mc_infos), 'Results/4dTo3d/h5/rzt/' + filename_output + '_rzt.h5')
 
+    if do4d:
+        store_histograms_as_hdf5(np.array(all_4d_to_4d_hists), np.array(mc_infos), 'Results/4dTo4d/h5/xyzt/' + filename_output + '_xyzt.h5')
+
 
 if __name__ == '__main__':
-    main(n_bins=(11,13,18,50), do2d=True, do2d_pdf=(True, 50), do3d=False, do_mc_hits=True, use_calibrated_file=True)
+    main(n_bins=(11,13,18,50), do2d=False, do2d_pdf=(False, 50), do3d=True, do4d=False, do_mc_hits=False, use_calibrated_file=True)
 
 
 
