@@ -19,7 +19,7 @@ def create_wide_residual_network(n_bins, batchsize, nb_classes=2, N=2, k=8, drop
     Currently only working for 3D data.
     The torch implementation from the paper differs slightly (change default arguments in Conv and BatchNorm):
     - BatchNormalization(axis=channel_axis, momentum=0.1, epsilon=1e-5, gamma_initializer='uniform')(x)
-    - Convolution2D(..., kernel_initializer='he_uniform', use_bias=False) Keras default uses glorot_uniform
+    - Convolution2D(..., use_bias=False).
     :param tuple n_bins: Number of bins (x,y,z,t) of the data that will be feeded to the network.
     :param int batchsize: Batchsize of the feeded data.
     :param int nb_classes: Number of output classes.
@@ -84,7 +84,7 @@ def initial_conv(input_layer, k_size=3):
     """
     channel_axis = 1 if K.image_data_format() == "channels_first" else -1
 
-    x = Convolution3D(16, (k_size, k_size, k_size), padding='same')(input_layer)
+    x = Convolution3D(16, (k_size, k_size, k_size), padding='same', kernel_initializer='he_uniform')(input_layer) # keras default uses glorot_uniform
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
     return x
@@ -103,14 +103,14 @@ def expand_conv(init, n_filters, k=1, k_size=3, strides=(1, 1, 1)):
     """
     channel_axis = 1 if K.image_data_format() == "channels_first" else -1
 
-    x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', strides=strides)(init)
+    x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', strides=strides, kernel_initializer='he_uniform')(init)
 
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
 
     x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same')(x)
 
-    skip = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', strides=strides)(init)
+    skip = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', strides=strides, kernel_initializer='he_uniform')(init)
 
     m = Add()([x, skip])
 
