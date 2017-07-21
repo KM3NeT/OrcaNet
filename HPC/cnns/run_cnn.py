@@ -13,7 +13,7 @@ from utilities.cnn_utilities import *
 from utilities.shuffle_h5 import shuffle_h5
 
 
-def parse_input(use_scratch_ssd=True):
+def parse_input(use_scratch_ssd):
     """
     Parses the user input for running the CNN.
     :param bool use_scratch_ssd: specifies if the input files should be copied to the node-local SSD scratch space.
@@ -106,7 +106,7 @@ def use_node_local_ssd_for_input(train_files, test_files):
 def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, use_scratch_ssd=False):
     """
     Runs a convolutional neural network.
-    :param list n_bins: Declares the number of bins for each dimension (x,y,z) in the train- and testfiles.
+    :param tuple n_bins: Declares the number of bins for each dimension (x,y,z) in the train- and testfiles.
     :param (int, str) class_type: Declares the number of output classes and a string identifier to specify the exact output classes.
                                   I.e. (2, 'muon-CC_to_elec-CC')
     :param int batchsize: Batchsize that should be used for the cnn.
@@ -120,13 +120,15 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, use_scratch_ssd=F
     modelname = 'model_3d_xzt_' + class_type[1]
 
     if epoch == 0:
-        model = define_3d_model_xyz_test(class_type[0], n_bins)
+        model = define_3d_model_xzt(class_type[0], n_bins)
     else:
         model = ks.models.load_model('models/trained/trained_' + modelname + str(epoch) + '.h5')
 
-    model.compile(loss='mean_absolute_error', optimizer='sgd', metrics=['mean_squared_error'])
+    sgd = ks.optimizers.SGD(lr=0.1, momentum=0.9, decay=0.0005, nesterov=True)
+    #model.compile(loss='mean_absolute_error', optimizer='sgd', metrics=['mean_squared_error'])
     #model.compile(loss='mean_absolute_error', optimizer='adam', metrics=['mean_squared_error'])
-    #model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+    #adam = ks.optimizers.Adam(lr=0.1, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy', 'binary_accuracy'])
     model.summary()
 
     while 1:
@@ -157,8 +159,9 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, use_scratch_ssd=F
 
 if __name__ == '__main__':
     # TODO still need to change some stuff in execute_cnn() directly like modelname and optimizers
-    execute_cnn(n_bins=[11,13,18,1], class_type = (2, 'muon-CC_to_elec-NC'),
+    execute_cnn(n_bins=(11,1,18,50), class_type = (1, 'up_down'),
                 batchsize = 32, epoch= 0, use_scratch_ssd=False) # standard 4D case: n_bins=[11,13,18,50]
 
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/train_muon-CC_and_elec-NC_each_480_xyz_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/test_muon-CC_and_elec-NC_each_120_xyz_shuffled.h5
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/train_muon-CC_and_elec-CC_each_480_xzt_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/test_muon-CC_and_elec-CC_each_120_xzt_shuffled.h5
+# python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/train_muon-CC_and_elec-CC_each_240_xzt_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/test_muon-CC_and_elec-CC_each_60_xzt_shuffled.h5

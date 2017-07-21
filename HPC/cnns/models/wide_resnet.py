@@ -1,235 +1,202 @@
 # -*- coding: utf-8 -*-
 """Wide Residual Network models for Keras.
-from https://github.com/farizrahman4u/keras-contrib/blob/master/keras_contrib/applications/wide_resnet.py
-removed pretrained code option
+Forked from https://github.com/titu1994/Wide-Residual-Networks/blob/master/wide_residual_network.py
 
 # Reference
 - [Wide Residual Networks](https://arxiv.org/abs/1605.07146)
 """
-from __future__ import print_function
-from __future__ import absolute_import
-from __future__ import division
-
 from keras.models import Model
-from keras.layers.core import Dense, Dropout, Activation, Flatten
-from keras.layers.pooling import AveragePooling2D, MaxPooling2D
-from keras.layers import Input, Conv2D
-from keras.layers.merge import add
+from keras.layers import Input, Add, Activation, Dropout, Flatten, Dense
+from keras.layers.convolutional import Convolution2D, Convolution3D, MaxPooling2D, MaxPooling3D, AveragePooling2D, AveragePooling3D
 from keras.layers.normalization import BatchNormalization
-from keras.engine.topology import get_source_inputs
-from keras.applications.imagenet_utils import _obtain_input_shape
-import keras.backend as K
+from keras import backend as K
 
-def WideResidualNetwork(depth=28, width=8, dropout_rate=0.0,
-                        include_top=True, input_tensor=None, input_shape=None,
-                        classes=10):
-    """Instantiate the Wide Residual Network architecture,
-        optionally loading weights pre-trained
-        on CIFAR-10. Note that when using TensorFlow,
-        for best performance you should set
-        `image_dim_ordering="tf"` in your Keras config
-        at ~/.keras/keras.json.
+from ..utilities.cnn_utilities import get_dimensions_encoding
 
-        The model and the weights are compatible with both
-        TensorFlow and Theano. The dimension ordering
-        convention used by the model is the one
-        specified in your Keras config file.
+def create_wide_residual_network(n_bins, batchsize, nb_classes=2, N=2, k=8, dropout=0.0, k_size=3, verbose=True):
+    """
+    Creates a Wide Residual Network with specified parameters.
+    Currently only working for 3D data.
+    The torch implementation from the paper differs slightly (change default arguments in Conv and BatchNorm):
+    - BatchNormalization(axis=channel_axis, momentum=0.1, epsilon=1e-5, gamma_initializer='uniform')(x)
+    - Convolution2D(..., kernel_initializer='he_uniform', use_bias=False) Keras default uses glorot_uniform
+    :param tuple n_bins: Number of bins (x,y,z,t) of the data that will be feeded to the network.
+    :param int batchsize: Batchsize of the feeded data.
+    :param int nb_classes: Number of output classes.
+    :param int N: Depth of the network. Compute N = (n - 4) / 6.
+                  Example : For a depth of 16, n = 16, N = (16 - 4) / 6 = 2
+                  Example2: For a depth of 28, n = 28, N = (28 - 4) / 6 = 4
+                  Example3: For a depth of 40, n = 40, N = (40 - 4) / 6 = 6
+    :param int k: Width of the network (gets multiplied by the number of filters for each convolution).
+    :param float dropout: Adds dropout if value is greater than 0.0.
+    :param int k_size: Kernel size that should be used, same for each dimension.
+    :param bool verbose: Debug info to describe created WRN.
+    :return:
+    """
+    channel_axis = 1 if K.image_data_format() == "channels_first" else -1
 
-        # Arguments
-            depth: number or layers in the DenseNet
-            width: multiplier to the ResNet width (number of filters)
-            dropout_rate: dropout rate
-            include_top: whether to include the fully-connected
-                layer at the top of the network.
-            weights: one of `None` (random initialization) or
-                "cifar10" (pre-training on CIFAR-10)..
-            input_tensor: optional Keras tensor (i.e. output of `layers.Input()`)
-                to use as image input for the model.
-            input_shape: optional shape tuple, only to be specified
-                if `include_top` is False (otherwise the input shape
-                has to be `(32, 32, 3)` (with `tf` dim ordering)
-                or `(3, 32, 32)` (with `th` dim ordering).
-                It should have exactly 3 inputs channels,
-                and width and height should be no smaller than 8.
-                E.g. `(200, 200, 3)` would be one valid value.
-            classes: optional number of classes to classify images
-                into, only to be specified if `include_top` is True, and
-                if no `weights` argument is specified.
+    input_dim = get_dimensions_encoding(batchsize, n_bins) # includes batchsize
+    input_layer = Input(shape=input_dim[1:], batch_shape=input_dim, dtype=K.floatx())
 
-        # Returns
-            A Keras model instance.
-        """
+    x = initial_conv(input_layer, k_size=k_size)
+    x = expand_conv(x, 16, k=k, k_size=k_size)
+    nb_conv = 4
 
-    if (depth - 4) % 6 != 0:
-        raise ValueError('Depth of the network must be such that (depth - 4)'
-                         'should be divisible by 6.')
+    for i in range(N - 1):
+        x = conv_block(x, 16, k=k, dropout=dropout, k_size=k_size)
+        nb_conv += 2
 
-    # Determine proper input shape
-    input_shape = _obtain_input_shape(input_shape,
-                                      default_size=32,
-                                      min_size=8,
-                                      data_format=K.image_dim_ordering(),
-                                      include_top=include_top)
+    x = BatchNormalization(axis=channel_axis)(x)
+    x = Activation('relu')(x)
 
-    if input_tensor is None:
-        img_input = Input(shape=input_shape)
-    else:
-        if not K.is_keras_tensor(input_tensor):
-            img_input = Input(tensor=input_tensor, shape=input_shape)
-        else:
-            img_input = input_tensor
+    x = expand_conv(x, 32, k, strides=(2, 2, 2))
 
-    x = __create_wide_residual_network(classes, img_input, include_top, depth, width,
-                                       dropout_rate)
+    for i in range(N - 1):
+        x = conv_block(x, 32, k=k, dropout=dropout, k_size=k_size)
+        nb_conv += 2
 
-    # Ensure that the model takes into account
-    # any potential predecessors of `input_tensor`.
-    if input_tensor is not None:
-        inputs = get_source_inputs(input_tensor)
-    else:
-        inputs = img_input
-    # Create model.
-    model = Model(inputs, x, name='wide-resnet')
+    x = BatchNormalization(axis=channel_axis)(x)
+    x = Activation('relu')(x)
 
+    x = expand_conv(x, 64, k, strides=(2, 2, 2))
+
+    for i in range(N - 1):
+        x = conv_block(x, 64, k=k, dropout=dropout, k_size=k_size)
+        nb_conv += 2
+
+    x = AveragePooling3D((8, 8, 8))(x)
+    x = Flatten()(x)
+
+    x = Dense(nb_classes, activation='softmax')(x)
+
+    model = Model(input_layer, x)
+
+    if verbose: print("Wide Residual Network-%d-%d created." % (nb_conv, k))
     return model
 
 
-def __conv1_block(input):
-    x = Conv2D(16, (3, 3), padding='same')(input)
+def initial_conv(input_layer, k_size=3):
+    """
+    Initial convolution prior to the ResNet blocks. C-B-A
+    :param ks.layers.Input input_layer: Keras Input layer (tensor) that specifies the shape of the input data.
+    :param int k_size: Kernel size that should be used.
+    :return: x: Resulting output tensor (model).
+    """
+    channel_axis = 1 if K.image_data_format() == "channels_first" else -1
 
-    channel_axis = 1 if K.image_dim_ordering() == 'th' else -1
-
+    x = Convolution3D(16, (k_size, k_size, k_size), padding='same')(input_layer)
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
     return x
 
 
-def __conv2_block(input, k=1, dropout=0.0):
-    init = input
+def expand_conv(init, n_filters, k=1, k_size=3, strides=(1, 1, 1)):
+    """
+    Intermediate convolution block that expands the number of features (increase number of filters, i.e. 16->32).
+    (C-B-A-C) + (C) -> M
+    :param init: Keras functional layer instance that is used as the starting point of this convolutional block.
+    :param int n_filters: Number of filters used for each convolution.
+    :param int k: Width of the convolution, multiplicative factor to "n_filters".
+    :param int k_size: Kernel size which is used for all three dimensions.
+    :param tuple(int) strides: Strides of the convolutional layers.
+    :return: m: Keras functional layer instance where the last layer is the merging.
+    """
+    channel_axis = 1 if K.image_data_format() == "channels_first" else -1
 
-    channel_axis = 1 if K.image_dim_ordering() == 'th' else -1
+    x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', strides=strides)(init)
 
-    # Check if input number of filters is same as 16 * k, else create convolution2d for this input
-    if K.image_dim_ordering() == 'th':
-        if init._keras_shape[1] != 16 * k:
-            init = Conv2D(16 * k, (1, 1), activation='linear', padding='same')(init)
-    else:
-        if init._keras_shape[-1] != 16 * k:
-            init = Conv2D(16 * k, (1, 1), activation='linear', padding='same')(init)
-
-    x = Conv2D(16 * k, (3, 3), padding='same')(input)
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
 
-    if dropout > 0.0:
-        x = Dropout(dropout)(x)
+    x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same')(x)
 
-    x = Conv2D(16 * k, (3, 3), padding='same')(x)
-    x = BatchNormalization(axis=channel_axis)(x)
-    x = Activation('relu')(x)
+    skip = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', strides=strides)(init)
 
-    m = add([init, x])
+    m = Add()([x, skip])
+
     return m
 
 
-def __conv3_block(input, k=1, dropout=0.0):
-    init = input
+def conv_block(ip, n_filters, k=1, dropout=0.0, k_size=3):
+    """
+    ResNet block. (B-A-C-B-A-C) + (ip) = M
+    :param ip: Keras functional layer instance that is used as the starting point of this convolutional block.
+    :param int n_filters: Number of filters used for each convolution.
+    :param int k: Width of the convolution, multiplicative factor to "n_filters".
+    :param float dropout: Adds dropout if >0.
+    :param int k_size: Kernel size which is used for all three dimensions.
+    :return: m: Keras functional layer instance where the last layer is the merging.
+    """
+    init = ip # TODO useless?
 
-    channel_axis = 1 if K.image_dim_ordering() == 'th' else -1
+    channel_axis = 1 if K.image_data_format() == "channels_first" else -1
 
-    # Check if input number of filters is same as 32 * k, else create convolution2d for this input
-    if K.image_dim_ordering() == 'th':
-        if init._keras_shape[1] != 32 * k:
-            init = Conv2D(32 * k, (1, 1), activation='linear', padding='same')(init)
-    else:
-        if init._keras_shape[-1] != 32 * k:
-            init = Conv2D(32 * k, (1, 1), activation='linear', padding='same')(init)
+    x = BatchNormalization(axis=channel_axis)(ip)
+    x = Activation('relu')(x)
+    x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same')(x)
 
-    x = Conv2D(32 * k, (3, 3), padding='same')(input)
+    if dropout > 0.0: x = Dropout(dropout)(x)
+
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
+    x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same')(x)
 
-    if dropout > 0.0:
-        x = Dropout(dropout)(x)
-
-    x = Conv2D(32 * k, (3, 3), padding='same')(x)
-    x = BatchNormalization(axis=channel_axis)(x)
-    x = Activation('relu')(x)
-
-    m = add([init, x])
+    m = Add()([init, x])
     return m
 
 
-def ___conv4_block(input, k=1, dropout=0.0):
-    init = input
+#-------- only legacy code from here on --------
+#old
+def conv1_block(ip, k=1, dropout=0.0, k_size=3):
+    init = ip # TODO useless?
 
-    channel_axis = 1 if K.image_dim_ordering() == 'th' else -1
+    channel_axis = 1 if K.image_data_format() == "channels_first" else -1
 
-    # Check if input number of filters is same as 64 * k, else create convolution2d for this input
-    if K.image_dim_ordering() == 'th':
-        if init._keras_shape[1] != 64 * k:
-            init = Conv2D(64 * k, (1, 1), activation='linear', padding='same')(init)
-    else:
-        if init._keras_shape[-1] != 64 * k:
-            init = Conv2D(64 * k, (1, 1), activation='linear', padding='same')(init)
+    x = BatchNormalization(axis=channel_axis)(ip)
+    x = Activation('relu')(x)
+    x = Convolution3D(16 * k, (k_size, k_size, k_size), padding='same')(x)
 
-    x = Conv2D(64 * k, (3, 3), padding='same')(input)
+    if dropout > 0.0: x = Dropout(dropout)(x)
+
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
+    x = Convolution3D(16 * k, (k_size, k_size, k_size), padding='same')(x)
 
-    if dropout > 0.0:
-        x = Dropout(dropout)(x)
-
-    x = Conv2D(64 * k, (3, 3), padding='same')(x)
-    x = BatchNormalization(axis=channel_axis)(x)
-    x = Activation('relu')(x)
-
-    m = add([init, x])
+    m = Add()([init, x])
     return m
 
+#old
+def conv2_block(ip, k=1, dropout=0.0, k_size=3):
+    init = ip
+    channel_axis = 1 if K.image_dim_ordering() == "th" else -1
 
-def __create_wide_residual_network(nb_classes, img_input, include_top, depth=28, width=8, dropout=0.0):
-    ''' Creates a Wide Residual Network with specified parameters
+    x = BatchNormalization(axis=channel_axis)(ip)
+    x = Activation('relu')(x)
+    x = Convolution3D(32 * k, (k_size, k_size, k_size), padding='same')(x)
 
-    Args:
-        nb_classes: Number of output classes
-        img_input: Input tensor or layer
-        include_top: Flag to include the last dense layer
-        depth: Depth of the network. Compute N = (n - 4) / 6.
-               For a depth of 16, n = 16, N = (16 - 4) / 6 = 2
-               For a depth of 28, n = 28, N = (28 - 4) / 6 = 4
-               For a depth of 40, n = 40, N = (40 - 4) / 6 = 6
-        width: Width of the network.
-        dropout: Adds dropout if value is greater than 0.0
+    if dropout > 0.0: x = Dropout(dropout)(x)
 
-    Returns:a Keras Model
-    '''
+    x = BatchNormalization(axis=channel_axis)(x)
+    x = Activation('relu')(x)
+    x = Convolution3D(32 * k, (k_size, k_size, k_size), padding='same')(x)
 
-    N = (depth - 4) // 6
+    m = Add()([init, x])
+    return m
 
-    x = __conv1_block(img_input)
-    nb_conv = 4
+#old
+def conv3_block(ip, k=1, dropout=0.0, k_size=3):
+    init = ip
+    channel_axis = 1 if K.image_dim_ordering() == "th" else -1
 
-    for i in range(N):
-        x = __conv2_block(x, width, dropout)
-        nb_conv += 2
+    x = BatchNormalization(axis=channel_axis)(ip)
+    x = Activation('relu')(x)
+    x = Convolution3D(64 * k, (k_size, k_size, k_size), padding='same')(x)
 
-    x = MaxPooling2D((2, 2))(x)
+    if dropout > 0.0: x = Dropout(dropout)(x)
 
-    for i in range(N):
-        x = __conv3_block(x, width, dropout)
-        nb_conv += 2
+    x = BatchNormalization(axis=channel_axis)(x)
+    x = Activation('relu')(x)
+    x = Convolution3D(64 * k, (k_size, k_size, k_size), padding='same')(x)
 
-    x = MaxPooling2D((2, 2))(x)
-
-    for i in range(N):
-        x = ___conv4_block(x, width, dropout)
-        nb_conv += 2
-
-    x = AveragePooling2D((8, 8))(x)
-
-    if include_top:
-        x = Flatten()(x)
-        x = Dense(nb_classes, activation='softmax')(x)
-
-    return x
+    m = Add()([init, x])
+    return m

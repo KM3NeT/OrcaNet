@@ -13,7 +13,7 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type):
     Generator that returns batches of images ('xs') and labels ('ys') from a h5 file.
     :param string filepath: Full filepath of the input h5 file, e.g. '/path/to/file/file.h5'.
     :param int batchsize: Size of the batches that should be generated. Ideally same as the chunksize in the h5 file.
-    :param list n_bins: Number of bins for each dimension (x,y,z) in the h5 file.
+    :param tuple n_bins: Number of bins for each dimension (x,y,z) in the h5 file.
     :param (int, str) class_type: Tuple with the umber of output classes and a string identifier to specify the exact output classes.
                                   I.e. (2, 'muon-CC_to_elec-CC')
     :return: (ndarray, ndarray) (xs, ys): Yields a tuple which contains a full batch of images and labels.
@@ -59,7 +59,7 @@ def get_dimensions_encoding(batchsize, n_bins):
     """
     Returns a dimensions tuple for 2,3 and 4 dimensional data.
     :param int batchsize: Batchsize that is used in generate_batches_from_hdf5_file().
-    :param list n_bins: Declares the number of bins for each dimension (x,y,z).
+    :param tuple n_bins: Declares the number of bins for each dimension (x,y,z).
                         If a dimension is equal to 1, it means that the dimension should be left out.
     :return: tuple dimensions: 2D, 3D or 4D dimensions tuple (integers).
     """
@@ -154,7 +154,7 @@ def encode_targets(y_val, class_type):
 
 
     if class_type == (2, 'muon-CC_to_elec-NC'):
-        categorical_type = convert_particle_class_to_categorical(y_val[1], y_val[3], class_type[0])
+        categorical_type = convert_particle_class_to_categorical(y_val[1], y_val[3], num_classes=4)
         train_y = np.zeros(2, dtype='float32')
         train_y[0] = categorical_type[0]
         train_y[1] = categorical_type[2]
@@ -162,7 +162,7 @@ def encode_targets(y_val, class_type):
         return train_y
 
     if class_type == (1, 'muon-CC_to_elec-NC'): # only one neuron at the end of the cnn instead of two
-        categorical_type = convert_particle_class_to_categorical(y_val[1], y_val[3], class_type[0])
+        categorical_type = convert_particle_class_to_categorical(y_val[1], y_val[3], num_classes=4)
         train_y = np.zeros(1, dtype='float32')
         if categorical_type[0]!=0:
             train_y[0] = categorical_type[0]
@@ -170,18 +170,30 @@ def encode_targets(y_val, class_type):
         return train_y
 
     if class_type == (2, 'muon-CC_to_elec-CC'):
-        categorical_type = convert_particle_class_to_categorical(y_val[1], y_val[3], class_type[0])
+        categorical_type = convert_particle_class_to_categorical(y_val[1], y_val[3], num_classes=4)
         train_y = np.zeros(2, dtype='float32')
         train_y[0] = categorical_type[1]
         train_y[1] = categorical_type[2]
 
+        #print '------------------'
+        #print y_val
+        #print categorical_type
+        #print train_y
+        #print '------------------'
+
         return train_y
 
     if class_type == (1, 'muon-CC_to_elec-CC'): # only one neuron at the end of the cnn instead of two
-        categorical_type = convert_particle_class_to_categorical(y_val[1], y_val[3], class_type[0])
+        categorical_type = convert_particle_class_to_categorical(y_val[1], y_val[3], num_classes=4)
         train_y = np.zeros(1, dtype='float32')
         if categorical_type[1]!=0:
             train_y[0] = categorical_type[1]
+
+        #print '------------------'
+        #print y_val
+        #print categorical_type
+        #print train_y
+        #print '------------------'
 
         return train_y
 
