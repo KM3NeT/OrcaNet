@@ -13,6 +13,23 @@ from keras import backend as K
 
 from ..utilities.cnn_utilities import get_dimensions_encoding
 
+
+def decode_input_dimensions(batchsize, n_bins):
+
+    input_dim = get_dimensions_encoding(batchsize, n_bins) # includes batchsize
+
+    if n_bins[1] == 1:
+        print 'Using a Wide ResNet with XZT projection'
+        strides = [(1, 1, 2), (2, 2, 2)]
+        average_pooling_size = (6, 9, 13)
+
+    else:
+        raise IndexError('The projection type could not be decoded using the parameter n_bins. '
+                         'Please check if your projection is available in the function.')
+
+    return input_dim, strides, average_pooling_size
+
+
 def create_wide_residual_network(n_bins, batchsize, nb_classes=2, N=2, k=8, dropout=0.0, k_size=3, verbose=True):
     """
     Creates a Wide Residual Network with specified parameters.
@@ -35,7 +52,7 @@ def create_wide_residual_network(n_bins, batchsize, nb_classes=2, N=2, k=8, drop
     """
     channel_axis = 1 if K.image_data_format() == "channels_first" else -1
 
-    input_dim = get_dimensions_encoding(batchsize, n_bins) # includes batchsize
+    input_dim, strides, avg_pool_size = decode_input_dimensions(batchsize, n_bins) # includes batchsize
     input_layer = Input(shape=input_dim[1:], batch_shape=input_dim, dtype=K.floatx())
 
     x = initial_conv(input_layer, k_size=k_size)
@@ -49,7 +66,7 @@ def create_wide_residual_network(n_bins, batchsize, nb_classes=2, N=2, k=8, drop
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
 
-    x = expand_conv(x, 32, k, strides=(2, 2, 2))
+    x = expand_conv(x, 32, k, strides=strides[0])
 
     for i in range(N - 1):
         x = conv_block(x, 32, k=k, dropout=dropout, k_size=k_size)
@@ -58,16 +75,17 @@ def create_wide_residual_network(n_bins, batchsize, nb_classes=2, N=2, k=8, drop
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
 
-    x = expand_conv(x, 64, k, strides=(2, 2, 2))
+    x = expand_conv(x, 64, k, strides=strides[1])
 
     for i in range(N - 1):
         x = conv_block(x, 64, k=k, dropout=dropout, k_size=k_size)
         nb_conv += 2
 
-    x = AveragePooling3D((8, 8, 8))(x)
+    x = AveragePooling3D(avg_pool_size)(x) # use global average pooling instead of fully connected
     x = Flatten()(x)
 
-    x = Dense(nb_classes, activation='softmax')(x)
+    # could also be transformed to one neuron -> binary_crossentropy + sigmoid instead of 2 neurons -> cat._crossentropy + softmax
+    x = Dense(nb_classes, activation='softmax')(x) # actually linear in the paper, could also be transformed to one neuron
 
     model = Model(input_layer, x)
 
