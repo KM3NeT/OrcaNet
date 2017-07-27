@@ -1,3 +1,7 @@
+"""
+Multi-gpu code for Keras/TF.
+From https://github.com/avolkov1/keras_experiments
+"""
 from keras.legacy import interfaces
 from keras import callbacks as cbks
 
