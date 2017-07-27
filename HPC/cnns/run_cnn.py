@@ -9,7 +9,9 @@ import shutil
 import keras as ks
 
 from models.short_cnn_models import *
+from models.wide_resnet import *
 from utilities.cnn_utilities import *
+from utilities.multi_gpu import *
 from utilities.shuffle_h5 import shuffle_h5
 
 
@@ -103,7 +105,7 @@ def use_node_local_ssd_for_input(train_files, test_files):
     return train_files_ssd, test_files_ssd
 
 
-def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, use_scratch_ssd=False):
+def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, multi_gpu=1, use_scratch_ssd=False):
     """
     Runs a convolutional neural network.
     :param tuple n_bins: Declares the number of bins for each dimension (x,y,z) in the train- and testfiles.
@@ -120,15 +122,29 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, use_scratch_ssd=F
     modelname = 'model_3d_xzt_' + class_type[1]
 
     if epoch == 0:
-        model = define_3d_model_xzt(class_type[0], n_bins)
+        #model = define_3d_model_xzt(class_type[0], n_bins)
+        model = create_wide_residual_network(n_bins, batchsize, nb_classes=class_type[0], k=4, dropout=0.1, k_size=3)
     else:
         model = ks.models.load_model('models/trained/trained_' + modelname + str(epoch) + '.h5')
+
+    if multi_gpu > 1:
+        gpus_list = get_available_gpus(multi_gpu)
+        ngpus = len(gpus_list)
+        print('Using GPUs: {}'.format(', '.join(gpus_list)))
+        batchsize = batchsize * ngpus
+
+        # Data-Parallelize the model via function or class.
+        model = make_parallel(model, gpus_list, usenccl=False, initsync=True, syncopt=False, enqueue=False)
+        print_mgpu_modelsummary(model)
 
     sgd = ks.optimizers.SGD(lr=0.1, momentum=0.9, decay=0.0005, nesterov=True)
     #model.compile(loss='mean_absolute_error', optimizer='sgd', metrics=['mean_squared_error'])
     #model.compile(loss='mean_absolute_error', optimizer='adam', metrics=['mean_squared_error'])
     #adam = ks.optimizers.Adam(lr=0.1, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
-    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy', 'binary_accuracy'])
+    adam = ks.optimizers.Adam(lr=0.01, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+
+    #model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy', 'binary_accuracy'])
+    model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
     model.summary()
 
     while 1:
@@ -140,16 +156,16 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, use_scratch_ssd=F
             #if epoch > 1: # just for convenience, we don't want to wait before the first epoch each time
              #   shuffle_h5(f, chunking=(True, batchsize), delete_flag=True)
             print 'Training in epoch', epoch, 'on file ', i, ',', f
-            f_size = 70000 # for testing
+            #f_size = 70000 # for testing
             model.fit_generator(generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type),
-                                steps_per_epoch=int(f_size / batchsize), epochs=1, verbose=1)
+                                steps_per_epoch=int(f_size / batchsize)-1, epochs=1, verbose=1)
             # store the trained model
             model.save("models/trained/trained_" + modelname + '_f' + str(i) + '_epoch' + str(epoch) + '.h5')
 
         for (f, f_size) in test_files:
-            f_size = 70000 # for testing
+            #f_size = 70000 # for testing
             evaluation = model.evaluate_generator(generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type),
-                                                  steps=int(f_size / batchsize))
+                                                  steps=int(f_size / batchsize)-1)
             print evaluation
             print model.metrics_names
 
@@ -159,8 +175,8 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, use_scratch_ssd=F
 
 if __name__ == '__main__':
     # TODO still need to change some stuff in execute_cnn() directly like modelname and optimizers
-    execute_cnn(n_bins=(11,1,18,50), class_type = (1, 'up_down'),
-                batchsize = 32, epoch= 0, use_scratch_ssd=False) # standard 4D case: n_bins=[11,13,18,50]
+    execute_cnn(n_bins=(11,1,18,50), class_type = (2, 'muon-CC_to_elec-CC'),
+                batchsize = 32, epoch= 0, multi_gpu=4, use_scratch_ssd=False) # standard 4D case: n_bins=[11,13,18,50]
 
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/train_muon-CC_and_elec-NC_each_480_xyz_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/test_muon-CC_and_elec-NC_each_120_xyz_shuffled.h5
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/train_muon-CC_and_elec-CC_each_480_xzt_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/test_muon-CC_and_elec-CC_each_120_xzt_shuffled.h5

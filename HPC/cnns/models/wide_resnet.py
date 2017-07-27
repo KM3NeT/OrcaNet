@@ -11,7 +11,7 @@ from keras.layers.convolutional import Convolution2D, Convolution3D, MaxPooling2
 from keras.layers.normalization import BatchNormalization
 from keras import backend as K
 
-from ..utilities.cnn_utilities import get_dimensions_encoding
+from utilities.cnn_utilities import get_dimensions_encoding
 
 
 def decode_input_dimensions(batchsize, n_bins):
@@ -53,11 +53,11 @@ def create_wide_residual_network(n_bins, batchsize, nb_classes=2, N=2, k=8, drop
     channel_axis = 1 if K.image_data_format() == "channels_first" else -1
 
     input_dim, strides, avg_pool_size = decode_input_dimensions(batchsize, n_bins) # includes batchsize
-    input_layer = Input(shape=input_dim[1:], batch_shape=input_dim, dtype=K.floatx())
+    input_layer = Input(shape=input_dim[1:], dtype=K.floatx()) #batch_shape=input_dim
 
     x = initial_conv(input_layer, k_size=k_size)
     x = expand_conv(x, 16, k=k, k_size=k_size)
-    nb_conv = 4
+    nb_conv = 10 # 1x initial_conv + 3x expand_conv = 1x1 + 3*3 = 10
 
     for i in range(N - 1):
         x = conv_block(x, 16, k=k, dropout=dropout, k_size=k_size)
