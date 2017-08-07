@@ -102,7 +102,7 @@ def initial_conv(input_layer, k_size=3):
     """
     channel_axis = 1 if K.image_data_format() == "channels_first" else -1
 
-    x = Convolution3D(16, (k_size, k_size, k_size), padding='same', kernel_initializer='he_uniform')(input_layer) # keras default uses glorot_uniform
+    x = Convolution3D(16, (k_size, k_size, k_size), padding='same', kernel_initializer='he_normal')(input_layer) # keras default uses glorot_uniform
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
     return x
@@ -121,14 +121,14 @@ def expand_conv(init, n_filters, k=1, k_size=3, strides=(1, 1, 1)):
     """
     channel_axis = 1 if K.image_data_format() == "channels_first" else -1
 
-    x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', strides=strides, kernel_initializer='he_uniform')(init)
+    x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', strides=strides, kernel_initializer='he_normal')(init)
 
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
 
-    x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same')(x)
+    x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', kernel_initializer='he_normal')(x)
 
-    skip = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', strides=strides, kernel_initializer='he_uniform')(init)
+    skip = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', strides=strides, kernel_initializer='he_normal')(init)
 
     m = Add()([x, skip])
 
@@ -151,13 +151,13 @@ def conv_block(ip, n_filters, k=1, dropout=0.0, k_size=3):
 
     x = BatchNormalization(axis=channel_axis)(ip)
     x = Activation('relu')(x)
-    x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same')(x)
+    x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', kernel_initializer='he_normal')(x)
 
     if dropout > 0.0: x = Dropout(dropout)(x)
 
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
-    x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same')(x)
+    x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', kernel_initializer='he_normal')(x)
 
     m = Add()([init, x])
     return m
