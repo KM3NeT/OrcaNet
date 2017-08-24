@@ -63,7 +63,7 @@ def parse_input():
                                                  'I.e. if you feed the output data to a neural network in batches, you should set chunksize=batchsize.',
                                      formatter_class=argparse.RawTextHelpFormatter)
 
-    parser.add_argument('files', metavar='file', type=str, nargs='?', help = 'a file that should be concatenated, minimum of two.')
+    parser.add_argument('files', metavar='file', type=str, nargs='*', help = 'a file that should be concatenated, minimum of two.')
     parser.add_argument('output_filepath', metavar='output_filepath', type=str, nargs=1, help='filepath and name of the output .h5 file')
     parser.add_argument('-l', '--list', dest='list_file', type=str,
                         help = 'filepath of a .list file that contains all .h5 files that should be concatenated')
