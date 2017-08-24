@@ -23,6 +23,11 @@ def decode_input_dimensions(batchsize, n_bins):
         strides = [(1, 1, 2), (2, 2, 2)]
         average_pooling_size = (6, 9, 13)
 
+    if n_bins[3] == 1:
+        print 'Using a Wide ResNet with XYZ projection'
+        strides = [(1,1,1), (2,2,2)]
+        average_pooling_size = (6,7,9)
+
     else:
         raise IndexError('The projection type could not be decoded using the parameter n_bins. '
                          'Please check if your projection is available in the function.')
