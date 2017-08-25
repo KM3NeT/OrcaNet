@@ -2,7 +2,7 @@
 This repository contains contains code that is used for a Deep Learning project with 4D data (xyz,t). <br />
 The goal of the project is to identify the different neutrino particle types and interaction channels within the frame of the Tau Appearance KM3NeT project. <br />
 
-The repository is structured in two parts, code for the CCIN2P3 in Lyon and the HPC. <br />
+The repository is structured in code for two computing centers: the CCIN2P3 in Lyon and the HPC in Erlangen. <br />
 The Lyon folder just contains code to convert .root files to .h5 files, while the HPC folder contains the main code. <br />
 
 In the HPC folder, two subprojects exist:
