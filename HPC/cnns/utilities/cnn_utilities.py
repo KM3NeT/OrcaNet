@@ -4,11 +4,12 @@
 
 import numpy as np
 import h5py
+import os
 
 
 # generator that returns arrays of batchsize events
 # from hdf5 file
-def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type):
+def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, zero_center=False):
     """
     Generator that returns batches of images ('xs') and labels ('ys') from a h5 file.
     :param string filepath: Full filepath of the input h5 file, e.g. '/path/to/file/file.h5'.
@@ -16,6 +17,7 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type):
     :param tuple n_bins: Number of bins for each dimension (x,y,z) in the h5 file.
     :param (int, str) class_type: Tuple with the umber of output classes and a string identifier to specify the exact output classes.
                                   I.e. (2, 'muon-CC_to_elec-CC')
+    :param bool zero_center: Specifies, if the input data (xs) should be zero-centered.
     :return: (ndarray, ndarray) (xs, ys): Yields a tuple which contains a full batch of images and labels.
     """
     dimensions = get_dimensions_encoding(batchsize, n_bins)
@@ -27,21 +29,34 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type):
         f = h5py.File(filepath, "r")
         filesize = len(f['y'])
         print "filesize = ", filesize
+
+        if zero_center is True: xs_mean = get_mean_image(f, dimensions, filepath)
+
         # count how many entries we have read
         n_entries = 0
         # as long as we haven't read all entries from the file: keep reading
         while n_entries < (filesize - batchsize):
+        #while n_entries < batchsize*5:
             # start the next batch at index 0
             # create numpy arrays of input data (features)
             xs = f['x'][n_entries : n_entries + batchsize]
             xs = np.reshape(xs, dimensions).astype('float32')
 
+            #import sys
+            #print xs[0][1]
+            #print xs.shape # (32, 11, 18, 50, 1)
+            #np.set_printoptions(threshold=10)
+            #print np.amax(xs_mean)
+            #print xs_mean
+            #print xs_mean.shape # (11, 18, 50)
+
+            if zero_center is True: xs = np.subtract(xs, xs_mean) #TODO maybe rather xs_mean-xs for more positive values?
             # and mc info (labels)
             y_values = f['y'][n_entries:n_entries+batchsize]
             y_values = np.reshape(y_values, (batchsize, y_values.shape[1]))
             # encode the labels such that they are all within the same range (and filter the ones we don't want for now)
             c = 0
-            # TODO could be vectorized if performance is a bottleneck. Looping over numpy arrays is always slow (not in C anymore!).
+            # TODO could be vectorized if performance is a bottleneck. Or just used dataflow from tensorpack!
             for y_val in y_values:
                 ys[c] = encode_targets(y_val, class_type)
                 c += 1
@@ -51,6 +66,8 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type):
             #np.set_printoptions(threshold=np.inf)
             #print 'ys', ys.shape
             #print 'xs', xs.shape
+            #print xs[0][1]
+            #sys.exit()
             yield (xs, ys)
         f.close()
 
@@ -106,6 +123,30 @@ def get_dimensions_encoding(batchsize, n_bins):
         dimensions = (batchsize, n_bins_x, n_bins_y, n_bins_z, n_bins_t)
 
     return dimensions
+
+
+def get_mean_image(f, dimensions, filepath):
+    """
+    Returns the mean_image of a xs dataset by loading or calculating it.
+    :param h5py.File f: h5py file object that contains the x dataset.
+    :param tuple dimensions: dimensions tuple for 2D, 3D or 4D data.
+    :param filepath: filepath of the input data, used as a str for saving the xs_mean_image.
+    :return: ndarray xs_mean: mean_image of the x dataset. Can be used for zero-centering later on.
+    """
+
+    if os.path.isfile(filepath) is True:
+        print 'Loading an existing xs_mean_array in order to zero_center the data!'
+        xs_mean = np.load(filepath + '_zero_center_mean.npy')
+
+    else:
+        print 'Calculating the xs_mean_array in order to zero_center the data! Warning: Memory must be as large as the inputfile!'
+        # maybe astype np.float64 for increased precision
+        xs_mean = np.mean(f['x'], axis=0)
+        xs_mean = np.reshape(xs_mean, dimensions[1:])
+        np.save(filepath + '_zero_center_mean.npy', xs_mean)
+
+    #xs_mean = np.reshape(xs_mean, dimensions[1:])
+    return xs_mean
 
 
 def encode_targets(y_val, class_type):
@@ -194,6 +235,13 @@ def encode_targets(y_val, class_type):
         #print categorical_type
         #print train_y
         #print '------------------'
+
+        return train_y
+
+    if class_type == (2, 'up_down'): # up down, one neuron at the cnn end
+        up_down_class = get_class_up_down(y_val[7]) # returns 0 or 1
+        train_y = np.zeros(2, dtype='float32')
+        train_y[up_down_class] = 1
 
         return train_y
 

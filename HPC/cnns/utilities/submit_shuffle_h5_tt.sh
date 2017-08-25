@@ -4,16 +4,34 @@
 
 # submit script for the shuffle_h5 tool. Specific version for shuffling the train and test datasets (_tt).
 # submit with 'qsub -l nodes=1:ppn=4:sl32g,walltime=01:01:00 submit_shuffle_h5_tt.sh'
-
-
-projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated
-input_filename_train=train_muon-CC_and_elec-CC_each_240_xzt.h5
-input_filename_test=test_muon-CC_and_elec-CC_each_60_xzt.h5
-#input_filename_test=test_muon-CC_and_elec-CC_each_60_xzt_shuffled.h5
-chunksize=32
+# Don't forget to create the logs/cout folder in the projection_path (concatenated/logs/cout)!
 
 CodeFolder=/home/woody/capn/mppi033h/Code/HPC/cnns/utilities
 cd ${CodeFolder}
+
+chunksize=32
+
+
+#------ 3-100GeV ------#
+# 3d - xzt
+#projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated
+#input_filename_train=train_muon-CC_and_elec-CC_each_240_xzt.h5
+#input_filename_test=test_muon-CC_and_elec-CC_each_60_xzt.h5
+
+#------ 10-100GeV ------#
+# 2d - yz
+#projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo2d/h5/yz/concatenated
+#input_filename_train=train_muon-CC_and_elec-CC_10-100GeV_each_480_yz.h5
+#input_filename_test=test_muon-CC_and_elec-CC_10-100GeV_each_120_yz.h5
+# 3d - xyz
+#projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo3d/h5/xyz/concatenated
+#input_filename_train=train_muon-CC_and_elec-CC_10-100GeV_each_480_xyz.h5
+#input_filename_test=test_muon-CC_and_elec-CC_10-100GeV_each_120_xyz.h5
+# 3d - yzt
+projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo3d/h5/yzt/concatenated
+input_filename_train=train_muon-CC_and_elec-CC_10-100GeV_each_480_yzt.h5
+input_filename_test=test_muon-CC_and_elec-CC_10-100GeV_each_120_yzt.h5
+
 
 # no parallel shuffling, since we are limited by RAM
 time python shuffle_h5.py -d --chunksize ${chunksize} ${projection_path}/${input_filename_train} > ${projection_path}/logs/cout/${input_filename_train}.txt

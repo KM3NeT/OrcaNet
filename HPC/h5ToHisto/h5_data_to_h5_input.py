@@ -127,7 +127,7 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_h
     all_4d_to_2d_hists, all_4d_to_3d_hists, all_4d_to_4d_hists = [], [], []
     mc_infos = []
 
-    if do2d_pdf:
+    if do2d_pdf[0] is True:
         glob.pdf_2d_plots = PdfPages('Results/4dTo2d/' + filename_output + '_plots.pdf')
 
     i=0
@@ -175,7 +175,7 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_h
 
 
 if __name__ == '__main__':
-    main(n_bins=(11,13,18,50), do2d=False, do2d_pdf=(False, 50), do3d=True, do4d=False, do_mc_hits=False, use_calibrated_file=True)
+    main(n_bins=(11,13,18,50), do2d=True, do2d_pdf=(True, 50), do3d=False, do4d=False, do_mc_hits=False, use_calibrated_file=True)
 
 
 

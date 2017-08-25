@@ -11,7 +11,29 @@ from keras.layers.convolutional import Convolution2D, Convolution3D, MaxPooling2
 from keras.layers.normalization import BatchNormalization
 from keras import backend as K
 
-from ..utilities.cnn_utilities import get_dimensions_encoding
+from utilities.cnn_utilities import get_dimensions_encoding
+
+
+def decode_input_dimensions(batchsize, n_bins):
+
+    input_dim = get_dimensions_encoding(batchsize, n_bins) # includes batchsize
+
+    if n_bins[1] == 1:
+        print 'Using a Wide ResNet with XZT projection'
+        strides = [(1, 1, 2), (2, 2, 2)]
+        average_pooling_size = (6, 9, 13)
+
+    if n_bins[3] == 1:
+        print 'Using a Wide ResNet with XYZ projection'
+        strides = [(1,1,1), (2,2,2)]
+        average_pooling_size = (6,7,9)
+
+    else:
+        raise IndexError('The projection type could not be decoded using the parameter n_bins. '
+                         'Please check if your projection is available in the function.')
+
+    return input_dim, strides, average_pooling_size
+
 
 def create_wide_residual_network(n_bins, batchsize, nb_classes=2, N=2, k=8, dropout=0.0, k_size=3, verbose=True):
     """
@@ -35,12 +57,12 @@ def create_wide_residual_network(n_bins, batchsize, nb_classes=2, N=2, k=8, drop
     """
     channel_axis = 1 if K.image_data_format() == "channels_first" else -1
 
-    input_dim = get_dimensions_encoding(batchsize, n_bins) # includes batchsize
-    input_layer = Input(shape=input_dim[1:], batch_shape=input_dim, dtype=K.floatx())
+    input_dim, strides, avg_pool_size = decode_input_dimensions(batchsize, n_bins) # includes batchsize
+    input_layer = Input(shape=input_dim[1:], dtype=K.floatx()) #batch_shape=input_dim
 
     x = initial_conv(input_layer, k_size=k_size)
     x = expand_conv(x, 16, k=k, k_size=k_size)
-    nb_conv = 4
+    nb_conv = 10 # 1x initial_conv + 3x expand_conv = 1x1 + 3*3 = 10
 
     for i in range(N - 1):
         x = conv_block(x, 16, k=k, dropout=dropout, k_size=k_size)
@@ -49,7 +71,7 @@ def create_wide_residual_network(n_bins, batchsize, nb_classes=2, N=2, k=8, drop
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
 
-    x = expand_conv(x, 32, k, strides=(2, 2, 2))
+    x = expand_conv(x, 32, k, strides=strides[0])
 
     for i in range(N - 1):
         x = conv_block(x, 32, k=k, dropout=dropout, k_size=k_size)
@@ -58,16 +80,17 @@ def create_wide_residual_network(n_bins, batchsize, nb_classes=2, N=2, k=8, drop
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
 
-    x = expand_conv(x, 64, k, strides=(2, 2, 2))
+    x = expand_conv(x, 64, k, strides=strides[1])
 
     for i in range(N - 1):
         x = conv_block(x, 64, k=k, dropout=dropout, k_size=k_size)
         nb_conv += 2
 
-    x = AveragePooling3D((8, 8, 8))(x)
+    x = AveragePooling3D(avg_pool_size)(x) # use global average pooling instead of fully connected
     x = Flatten()(x)
 
-    x = Dense(nb_classes, activation='softmax')(x)
+    # could also be transformed to one neuron -> binary_crossentropy + sigmoid instead of 2 neurons -> cat._crossentropy + softmax
+    x = Dense(nb_classes, activation='softmax')(x) # actually linear in the paper, could also be transformed to one neuron
 
     model = Model(input_layer, x)
 
@@ -84,7 +107,7 @@ def initial_conv(input_layer, k_size=3):
     """
     channel_axis = 1 if K.image_data_format() == "channels_first" else -1
 
-    x = Convolution3D(16, (k_size, k_size, k_size), padding='same', kernel_initializer='he_uniform')(input_layer) # keras default uses glorot_uniform
+    x = Convolution3D(16, (k_size, k_size, k_size), padding='same', kernel_initializer='he_normal')(input_layer) # keras default uses glorot_uniform
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
     return x
@@ -103,14 +126,14 @@ def expand_conv(init, n_filters, k=1, k_size=3, strides=(1, 1, 1)):
     """
     channel_axis = 1 if K.image_data_format() == "channels_first" else -1
 
-    x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', strides=strides, kernel_initializer='he_uniform')(init)
+    x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', strides=strides, kernel_initializer='he_normal')(init)
 
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
 
-    x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same')(x)
+    x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', kernel_initializer='he_normal')(x)
 
-    skip = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', strides=strides, kernel_initializer='he_uniform')(init)
+    skip = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', strides=strides, kernel_initializer='he_normal')(init)
 
     m = Add()([x, skip])
 
@@ -133,13 +156,13 @@ def conv_block(ip, n_filters, k=1, dropout=0.0, k_size=3):
 
     x = BatchNormalization(axis=channel_axis)(ip)
     x = Activation('relu')(x)
-    x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same')(x)
+    x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', kernel_initializer='he_normal')(x)
 
     if dropout > 0.0: x = Dropout(dropout)(x)
 
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
-    x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same')(x)
+    x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', kernel_initializer='he_normal')(x)
 
     m = Add()([init, x])
     return m

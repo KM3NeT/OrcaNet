@@ -63,7 +63,7 @@ def parse_input():
                                                  'I.e. if you feed the output data to a neural network in batches, you should set chunksize=batchsize.',
                                      formatter_class=argparse.RawTextHelpFormatter)
 
-    parser.add_argument('files', metavar='file', type=str, nargs='?', help = 'a file that should be concatenated, minimum of two.')
+    parser.add_argument('files', metavar='file', type=str, nargs='*', help = 'a file that should be concatenated, minimum of two.')
     parser.add_argument('output_filepath', metavar='output_filepath', type=str, nargs=1, help='filepath and name of the output .h5 file')
     parser.add_argument('-l', '--list', dest='list_file', type=str,
                         help = 'filepath of a .list file that contains all .h5 files that should be concatenated')
@@ -123,10 +123,10 @@ def concatenate_h5_files():
 
                 if custom_chunksize[0] is True:
                     output_dataset = file_output.create_dataset(folder_name, data=folder_data, maxshape=maxshape,
-                                                                chunks=(custom_chunksize[1],)+ folder_data.shape[1:])
+                                                                chunks=(custom_chunksize[1],) + folder_data.shape[1:])
                 else:
                     output_dataset = file_output.create_dataset(folder_name, data=folder_data, maxshape=maxshape,
-                                                                chunks=(mean_number_of_rows,)+ folder_data.shape[1:])
+                                                                chunks=(mean_number_of_rows,) + folder_data.shape[1:])
                 output_dataset.resize(cum_rows_list[-1], axis=0)
 
             else:
