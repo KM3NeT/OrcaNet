@@ -1,4 +1,4 @@
-This repository contains contains code that is used for a Deep Learning project in the KM3NeT neutrino telescope.
+This repository contains contains code that is used for a Deep Learning project with 4D data (xyz,t).
 The goal of the project is to identify the different neutrino particle types and interaction channels within the frame of the Tau Appearance KM3NeT project.
 
 The repository is structured in two parts, code for the CCIN2P3 in Lyon and the HPC.
