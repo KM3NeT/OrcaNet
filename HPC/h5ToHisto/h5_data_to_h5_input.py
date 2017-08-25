@@ -141,6 +141,9 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_h
         # filter out all hit and track information belonging that to this event
         event_hits, event_track = get_event_data(event_blob, geo, do_mc_hits, use_calibrated_file)
 
+        #if event_track[2] < 10: # Selecting events with energy >= 10 GeV
+         #   continue
+
         # event_track: [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z, time]
         mc_infos.append(event_track)
 
@@ -175,7 +178,7 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_h
 
 
 if __name__ == '__main__':
-    main(n_bins=(11,13,18,50), do2d=True, do2d_pdf=(True, 50), do3d=False, do4d=False, do_mc_hits=False, use_calibrated_file=True)
+    main(n_bins=(11,13,18,50), do2d=True, do2d_pdf=(False, 50), do3d=True, do4d=False, do_mc_hits=False, use_calibrated_file=True)
 
 
 

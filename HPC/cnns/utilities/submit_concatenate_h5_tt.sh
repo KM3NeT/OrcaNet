@@ -42,7 +42,6 @@ input_list_name_test=muon-CC_and_elec-CC_10-100GeV_yzt_481_to_600.list # test
 output_name_test=test_muon-CC_and_elec-CC_10-100GeV_each_120_yzt.h5 # test
 
 
-
 (time taskset -c 0 python concatenate_h5.py --list ${projection_path}/${input_list_name_train} --chunksize ${chunksize} ${projection_path}/concatenated/${output_name_train} > ${projection_path}/logs/cout/${output_name_train}.txt) &
 (time taskset -c 1 python concatenate_h5.py --list ${projection_path}/${input_list_name_test} --chunksize ${chunksize} ${projection_path}/concatenated/${output_name_test} > ${projection_path}/logs/cout/${output_name_test}.txt)
 wait

@@ -192,4 +192,3 @@ def convert_hits_xyz(hits, geo):
             # hits_xyz_list: [event_id, positions_xyz, time, dom_id]
             hits_xyz_list.append([int(hit[0]), position[1], position[2], position[3], hit[2], int(hit[1])])
     return np.array(hits_xyz_list, np.float32)
-
