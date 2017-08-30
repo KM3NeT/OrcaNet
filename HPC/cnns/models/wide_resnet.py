@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """Wide Residual Network models for Keras.
-Forked from https://github.com/titu1994/Wide-Residual-Networks/blob/master/wide_residual_network.py
+Loosely based on https://github.com/titu1994/Wide-Residual-Networks/blob/master/wide_residual_network.py
 
 # Reference
 - [Wide Residual Networks](https://arxiv.org/abs/1605.07146)
@@ -58,8 +58,8 @@ def decode_input_dimensions(n_bins, batchsize):
     # 3d case
     elif n_bins[1] == 1 and n_bins.count(1) == 1:
         print 'Using a Wide ResNet with XZT projection'
-        strides = [(1, 1, 2), (2, 2, 2)]
-        average_pooling_size = (6, 9, 13)
+        strides = [(1,1,2), (2,2,2)]
+        average_pooling_size = (6,9,13)
 
     elif n_bins[3] == 1 and n_bins.count(1) == 1:
         print 'Using a Wide ResNet with XYZ projection'
@@ -81,6 +81,7 @@ def create_wide_residual_network(n_bins, batchsize, dim, nb_classes=2, N=2, k=8,
     - Convolution2D(..., use_bias=False).
     :param tuple n_bins: Number of bins (x,y,z,t) of the data that will be fed to the network.
     :param int batchsize: Batchsize of the fed data.
+    :param int dim: dimension of the network and the input (2D or 3D).
     :param int nb_classes: Number of output classes.
     :param int N: Depth of the network. Compute N = (n - 4) / 6.
                   Example : For a depth of 16, n = 16, N = (16 - 4) / 6 = 2
@@ -145,6 +146,7 @@ def initial_conv(input_layer, dim, k_size=3):
     Initial convolution prior to the ResNet blocks (2D/3D).
     C-B-A
     :param ks.layers.Input input_layer: Keras Input layer (tensor) that specifies the shape of the input data.
+    :param int dim: 2D or 3D block.
     :param int k_size: Kernel size that should be used.
     :return: x: Resulting output tensor (model).
     """
@@ -167,6 +169,7 @@ def expand_conv(init, n_filters, dim, k=1, k_size=3, strides=(1, 1, 1)):
     (C-B-A-C) + (C) -> M
     :param init: Keras functional layer instance that is used as the starting point of this convolutional block.
     :param int n_filters: Number of filters used for each convolution.
+    :param int dim: 2D or 3D block.
     :param int k: Width of the convolution, multiplicative factor to "n_filters".
     :param int k_size: Kernel size which is used for all three dimensions.
     :param tuple(int) strides: Strides of the convolutional layers.
@@ -201,6 +204,7 @@ def conv_block(ip, n_filters, dim, k=1, dropout=0.0, k_size=3):
     (B-A-C-B-A-C) + (ip) = M
     :param ip: Keras functional layer instance that is used as the starting point of this convolutional block.
     :param int n_filters: Number of filters used for each convolution.
+    :param int dim: 2D or 3D block.
     :param int k: Width of the convolution, multiplicative factor to "n_filters".
     :param float dropout: Adds dropout if >0.
     :param int k_size: Kernel size which is used for all three dimensions.
