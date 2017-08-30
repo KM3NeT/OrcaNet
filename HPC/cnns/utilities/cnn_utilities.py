@@ -161,7 +161,6 @@ def encode_targets(y_val, class_type):
                                   I.e. (2, 'muon-CC_to_elec-CC')
     :return: ndarray(ndim=1) train_y: Array that contains the encoded class label information of the input event.
     """
-
     def get_class_up_down(dir_z):
         """
         Converts the zenith information (dir_z) to a binary up/down value.

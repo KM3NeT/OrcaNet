@@ -15,7 +15,13 @@ from utilities.cnn_utilities import get_dimensions_encoding
 
 
 def model_wide_residual_network(n_bins, batchsize, **kwargs):
-
+    """
+    Defines a Keras WRN model. Wrapper for the create_wrn function.
+    :param tuple n_bins: Number of bins (x,y,z,t) of the data that will be fed to the network.
+    :param int batchsize: Batchsize of the fed data.
+    :param kwargs: arbitrary number of keyword arguments based on the args in create_wrn
+    :return: Model model: Keras WRN model.
+    """
     if n_bins.count(1) == 2:
         dim = 2
         model = create_wide_residual_network(n_bins, batchsize, dim, **kwargs)
@@ -31,9 +37,17 @@ def model_wide_residual_network(n_bins, batchsize, **kwargs):
     return model
 
 
-def decode_input_dimensions(batchsize, n_bins):
-
-    input_dim = get_dimensions_encoding(batchsize, n_bins) # includes batchsize
+def decode_input_dimensions(n_bins, batchsize):
+    """
+    Returns the input dimensions (e.g. batchsize x 11 x 13 x 18 x Channels for 3D)
+    and appropriate strides and avg_pooling sizes depending on the projection type.
+    :param tuple n_bins: Number of bins (x,y,z,t) of the data.
+    :param int batchsize: Batchsize of the fed data.
+    :return: tuple input_dim: 2D, 3D or 4D dimensions tuple (ints).
+    :return: [tuple, tuple] strides: Strides of the WRN.
+    :return: tuple average_pooling_size: Avg_pooling size of the WRN.
+    """
+    input_dim = get_dimensions_encoding(n_bins, batchsize) # includes batchsize
 
     # 2d case
     if n_bins[0] == 1 and n_bins[3] == 1 and n_bins.count(1) == 2:
@@ -66,7 +80,7 @@ def create_wide_residual_network(n_bins, batchsize, dim, nb_classes=2, N=2, k=8,
     - BatchNormalization(axis=channel_axis, momentum=0.1, epsilon=1e-5, gamma_initializer='uniform')(x)
     - Convolution2D(..., use_bias=False).
     :param tuple n_bins: Number of bins (x,y,z,t) of the data that will be fed to the network.
-    :param int batchsize: Batchsize of the feeded data.
+    :param int batchsize: Batchsize of the fed data.
     :param int nb_classes: Number of output classes.
     :param int N: Depth of the network. Compute N = (n - 4) / 6.
                   Example : For a depth of 16, n = 16, N = (16 - 4) / 6 = 2
@@ -76,7 +90,7 @@ def create_wide_residual_network(n_bins, batchsize, dim, nb_classes=2, N=2, k=8,
     :param float dropout: Adds dropout if value is greater than 0.0.
     :param int k_size: Kernel size that should be used, same for each dimension.
     :param bool verbose: Debug info to describe created WRN.
-    :return:
+    :return: Model model: Keras WRN model.
     """
     if dim not in (2, 3): # Sanity check
         raise IOError('Data types other than 2D or 3D are not yet supported. '
@@ -84,7 +98,7 @@ def create_wide_residual_network(n_bins, batchsize, dim, nb_classes=2, N=2, k=8,
 
     channel_axis = 1 if K.image_data_format() == "channels_first" else -1
 
-    input_dim, strides, avg_pool_size = decode_input_dimensions(batchsize, n_bins) # includes batchsize
+    input_dim, strides, avg_pool_size = decode_input_dimensions(n_bins, batchsize) # includes batchsize
     input_layer = Input(shape=input_dim[1:], dtype=K.floatx()) # batch_shape=input_dim
 
     x = initial_conv(input_layer, dim, k_size=k_size)
@@ -92,7 +106,7 @@ def create_wide_residual_network(n_bins, batchsize, dim, nb_classes=2, N=2, k=8,
     nb_conv = 10 # 1x initial_conv + 3x expand_conv = 1x1 + 3*3 = 10
 
     for i in range(N - 1):
-        x = conv_block(x, 16, k=k, dropout=dropout, k_size=k_size)
+        x = conv_block(x, 16, dim, k=k, dropout=dropout, k_size=k_size)
         nb_conv += 2
 
     x = BatchNormalization(axis=channel_axis)(x)
@@ -101,7 +115,7 @@ def create_wide_residual_network(n_bins, batchsize, dim, nb_classes=2, N=2, k=8,
     x = expand_conv(x, 32, dim, k=k, strides=strides[0])
 
     for i in range(N - 1):
-        x = conv_block(x, 32, k=k, dropout=dropout, k_size=k_size)
+        x = conv_block(x, 32, dim, k=k, dropout=dropout, k_size=k_size)
         nb_conv += 2
 
     x = BatchNormalization(axis=channel_axis)(x)
@@ -110,7 +124,7 @@ def create_wide_residual_network(n_bins, batchsize, dim, nb_classes=2, N=2, k=8,
     x = expand_conv(x, 64, dim, k=k, strides=strides[1])
 
     for i in range(N - 1):
-        x = conv_block(x, 64, k=k, dropout=dropout, k_size=k_size)
+        x = conv_block(x, 64, dim, k=k, dropout=dropout, k_size=k_size)
         nb_conv += 2
 
     if dim == 3: x = AveragePooling3D(avg_pool_size)(x) # use global average pooling instead of fully connected
@@ -128,7 +142,8 @@ def create_wide_residual_network(n_bins, batchsize, dim, nb_classes=2, N=2, k=8,
 
 def initial_conv(input_layer, dim, k_size=3):
     """
-    Initial convolution prior to the ResNet blocks. C-B-A
+    Initial convolution prior to the ResNet blocks (2D/3D).
+    C-B-A
     :param ks.layers.Input input_layer: Keras Input layer (tensor) that specifies the shape of the input data.
     :param int k_size: Kernel size that should be used.
     :return: x: Resulting output tensor (model).
@@ -148,13 +163,14 @@ def initial_conv(input_layer, dim, k_size=3):
 def expand_conv(init, n_filters, dim, k=1, k_size=3, strides=(1, 1, 1)):
     """
     Intermediate convolution block that expands the number of features (increase number of filters, i.e. 16->32).
+    2D/3D.
     (C-B-A-C) + (C) -> M
     :param init: Keras functional layer instance that is used as the starting point of this convolutional block.
     :param int n_filters: Number of filters used for each convolution.
     :param int k: Width of the convolution, multiplicative factor to "n_filters".
     :param int k_size: Kernel size which is used for all three dimensions.
     :param tuple(int) strides: Strides of the convolutional layers.
-    :return: m: Keras functional layer instance where the last layer is the merging.
+    :return: m: Keras functional layer instance where the last layer is the merge.
     """
     if dim not in (2, 3): raise ValueError('dim must be equal to 2 or 3.')
 
@@ -181,13 +197,14 @@ def expand_conv(init, n_filters, dim, k=1, k_size=3, strides=(1, 1, 1)):
 
 def conv_block(ip, n_filters, dim, k=1, dropout=0.0, k_size=3):
     """
-    ResNet block. (B-A-C-B-A-C) + (ip) = M
+    ResNet block (2D/3D).
+    (B-A-C-B-A-C) + (ip) = M
     :param ip: Keras functional layer instance that is used as the starting point of this convolutional block.
     :param int n_filters: Number of filters used for each convolution.
     :param int k: Width of the convolution, multiplicative factor to "n_filters".
     :param float dropout: Adds dropout if >0.
     :param int k_size: Kernel size which is used for all three dimensions.
-    :return: m: Keras functional layer instance where the last layer is the merging.
+    :return: m: Keras functional layer instance where the last layer is the merge.
     """
     if dim not in (2, 3): raise ValueError('dim must be equal to 2 or 3.')
 

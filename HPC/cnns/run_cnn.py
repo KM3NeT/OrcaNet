@@ -123,11 +123,11 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scra
     modelname = 'model_3d_xzt_' + class_type[1]
 
     if epoch == 0:
-        model = define_3d_model_xyz(class_type[0], n_bins)
+        #model = define_3d_model_xyz(class_type[0], n_bins)
         #model = define_3d_model_xzt(class_type[0], n_bins)
         #model = create_wide_residual_network(n_bins, batchsize, dim=3, nb_classes=class_type[0], k=4, dropout=0, k_size=3)
         # model = define_2d_model_yz(class_type[0], n_bins)
-        # model = model_wide_residual_network(n_bins, batchsize, dim=2, nb_classes=class_type[0], k=4, dropout=0, k_size=3)
+        model = model_wide_residual_network(n_bins, batchsize, dim=2, nb_classes=class_type[0], k=4, dropout=0, k_size=3)
 
     else:
         model = ks.models.load_model('models/trained/trained_' + modelname + str(epoch) + '.h5')
