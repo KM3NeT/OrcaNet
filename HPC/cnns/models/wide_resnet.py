@@ -52,18 +52,18 @@ def decode_input_dimensions(n_bins, batchsize):
     # 2d case
     if n_bins[0] == 1 and n_bins[3] == 1 and n_bins.count(1) == 2:
         print 'Using a Wide ResNet with YZ projection'
-        strides = [(1,1), (2,2)]
+        strides = [(1,1), (1,1), (2,2)]
         average_pooling_size = (6,7)
 
     # 3d case
     elif n_bins[1] == 1 and n_bins.count(1) == 1:
         print 'Using a Wide ResNet with XZT projection'
-        strides = [(1,1,2), (2,2,2)]
+        strides = [(1,1,1), (1,1,2), (2,2,2)]
         average_pooling_size = (6,9,13)
 
     elif n_bins[3] == 1 and n_bins.count(1) == 1:
         print 'Using a Wide ResNet with XYZ projection'
-        strides = [(1,1,1), (2,2,2)]
+        strides = [(1,1,1), (1,1,1), (2,2,2)]
         average_pooling_size = (6,7,9)
 
     else:
@@ -104,7 +104,7 @@ def create_wide_residual_network(n_bins, batchsize, dim, nb_classes=2, N=2, k=8,
     input_layer = Input(shape=input_dim[1:], dtype=K.floatx()) # batch_shape=input_dim
 
     x = initial_conv(input_layer, dim, k_size=k_size)
-    x = expand_conv(x, 16, dim, k=k, k_size=k_size)
+    x = expand_conv(x, 16, dim, k=k, k_size=k_size, strides=strides[0])
     nb_conv = 10 # 1x initial_conv + 3x expand_conv = 1x1 + 3*3 = 10
 
     for i in range(N - 1):
@@ -114,7 +114,7 @@ def create_wide_residual_network(n_bins, batchsize, dim, nb_classes=2, N=2, k=8,
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
 
-    x = expand_conv(x, 32, dim, k=k, strides=strides[0])
+    x = expand_conv(x, 32, dim, k=k, strides=strides[1])
 
     for i in range(N - 1):
         x = conv_block(x, 32, dim, k=k, dropout=dropout, k_size=k_size)
@@ -123,11 +123,14 @@ def create_wide_residual_network(n_bins, batchsize, dim, nb_classes=2, N=2, k=8,
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
 
-    x = expand_conv(x, 64, dim, k=k, strides=strides[1])
+    x = expand_conv(x, 64, dim, k=k, strides=strides[2])
 
     for i in range(N - 1):
         x = conv_block(x, 64, dim, k=k, dropout=dropout, k_size=k_size)
         nb_conv += 2
+
+    x = BatchNormalization(axis=channel_axis)(x)
+    x = Activation('relu')(x)
 
     x = average_pooling_nd(avg_pool_size)(x) # use global average pooling instead of fully connected
     x = Flatten()(x)
@@ -155,14 +158,14 @@ def initial_conv(input_layer, dim, k_size=3):
 
     channel_axis = 1 if K.image_data_format() == "channels_first" else -1
 
-    x = convolution_nd(16, (k_size,) * dim, padding='same', kernel_initializer='he_normal')(input_layer)
+    x = convolution_nd(16, (k_size,) * dim, padding='same', kernel_initializer='he_normal', use_bias=False)(input_layer)
 
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
     return x
 
 
-def expand_conv(init, n_filters, dim, k=1, k_size=3, strides=(1, 1, 1)):
+def expand_conv(init, n_filters, dim, k=1, k_size=3, strides=None):
     """
     Intermediate convolution block that expands the number of features (increase number of filters, i.e. 16->32).
     2D/3D.
@@ -176,17 +179,18 @@ def expand_conv(init, n_filters, dim, k=1, k_size=3, strides=(1, 1, 1)):
     :return: m: Keras functional layer instance where the last layer is the merge.
     """
     if dim not in (2, 3): raise ValueError('dim must be equal to 2 or 3.')
+    if strides is None: strides = (1,) * dim
     convolution_nd = Convolution2D if dim == 2 else Convolution3D
 
     channel_axis = 1 if K.image_data_format() == "channels_first" else -1
 
-    x = convolution_nd(n_filters * k, (k_size,) * dim, padding='same', strides=strides, kernel_initializer='he_normal')(init)
+    x = convolution_nd(n_filters * k, (k_size,) * dim, padding='same', strides=strides, kernel_initializer='he_normal', use_bias=False)(init)
 
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
 
-    x = convolution_nd(n_filters * k, (k_size,) * dim, padding='same', kernel_initializer='he_normal')(x)
-    skip = convolution_nd(n_filters * k, (k_size,) * dim, padding='same', strides=strides, kernel_initializer='he_normal')(init)
+    x = convolution_nd(n_filters * k, (k_size,) * dim, padding='same', kernel_initializer='he_normal', use_bias=False)(x)
+    skip = convolution_nd(n_filters * k, (1,) * dim, padding='same', strides=strides, kernel_initializer='he_normal', use_bias=False)(init)
 
     m = Add()([x, skip])
 
@@ -214,70 +218,13 @@ def conv_block(ip, n_filters, dim, k=1, dropout=0.0, k_size=3):
 
     x = BatchNormalization(axis=channel_axis)(ip)
     x = Activation('relu')(x)
-    x = convolution_nd(n_filters * k, (k_size,) * dim, padding='same', kernel_initializer='he_normal')(x)
+    x = convolution_nd(n_filters * k, (k_size,) * dim, padding='same', kernel_initializer='he_normal', use_bias=False)(x)
 
     if dropout > 0.0: x = Dropout(dropout)(x)
 
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
-    x = convolution_nd(n_filters * k, (k_size,) * dim, padding='same', kernel_initializer='he_normal')(x)
-
-    m = Add()([init, x])
-    return m
-
-
-#-------- only legacy code from here on --------
-#old
-def conv1_block(ip, k=1, dropout=0.0, k_size=3):
-    init = ip # TODO useless?
-
-    channel_axis = 1 if K.image_data_format() == "channels_first" else -1
-
-    x = BatchNormalization(axis=channel_axis)(ip)
-    x = Activation('relu')(x)
-    x = Convolution3D(16 * k, (k_size, k_size, k_size), padding='same')(x)
-
-    if dropout > 0.0: x = Dropout(dropout)(x)
-
-    x = BatchNormalization(axis=channel_axis)(x)
-    x = Activation('relu')(x)
-    x = Convolution3D(16 * k, (k_size, k_size, k_size), padding='same')(x)
-
-    m = Add()([init, x])
-    return m
-
-#old
-def conv2_block(ip, k=1, dropout=0.0, k_size=3):
-    init = ip
-    channel_axis = 1 if K.image_dim_ordering() == "th" else -1
-
-    x = BatchNormalization(axis=channel_axis)(ip)
-    x = Activation('relu')(x)
-    x = Convolution3D(32 * k, (k_size, k_size, k_size), padding='same')(x)
-
-    if dropout > 0.0: x = Dropout(dropout)(x)
-
-    x = BatchNormalization(axis=channel_axis)(x)
-    x = Activation('relu')(x)
-    x = Convolution3D(32 * k, (k_size, k_size, k_size), padding='same')(x)
-
-    m = Add()([init, x])
-    return m
-
-#old
-def conv3_block(ip, k=1, dropout=0.0, k_size=3):
-    init = ip
-    channel_axis = 1 if K.image_dim_ordering() == "th" else -1
-
-    x = BatchNormalization(axis=channel_axis)(ip)
-    x = Activation('relu')(x)
-    x = Convolution3D(64 * k, (k_size, k_size, k_size), padding='same')(x)
-
-    if dropout > 0.0: x = Dropout(dropout)(x)
-
-    x = BatchNormalization(axis=channel_axis)(x)
-    x = Activation('relu')(x)
-    x = Convolution3D(64 * k, (k_size, k_size, k_size), padding='same')(x)
+    x = convolution_nd(n_filters * k, (k_size,) * dim, padding='same', kernel_initializer='he_normal', use_bias=False)(x)
 
     m = Add()([init, x])
     return m
