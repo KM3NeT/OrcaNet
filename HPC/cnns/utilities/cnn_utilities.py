@@ -161,6 +161,7 @@ def encode_targets(y_val, class_type):
                                   I.e. (2, 'muon-CC_to_elec-CC')
     :return: ndarray(ndim=1) train_y: Array that contains the encoded class label information of the input event.
     """
+
     def get_class_up_down(dir_z):
         """
         Converts the zenith information (dir_z) to a binary up/down value.
@@ -173,7 +174,6 @@ def encode_targets(y_val, class_type):
             up_down_class_value = 0
 
         return up_down_class_value
-
 
     def convert_particle_class_to_categorical(particle_type, is_cc, num_classes=4):
         """
@@ -200,17 +200,13 @@ def encode_targets(y_val, class_type):
         train_y[0] = categorical_type[0]
         train_y[1] = categorical_type[2]
 
-        return train_y
-
-    if class_type == (1, 'muon-CC_to_elec-NC'): # only one neuron at the end of the cnn instead of two
+    elif class_type == (1, 'muon-CC_to_elec-NC'): # only one neuron at the end of the cnn instead of two
         categorical_type = convert_particle_class_to_categorical(y_val[1], y_val[3], num_classes=4)
         train_y = np.zeros(1, dtype='float32')
         if categorical_type[0]!=0:
             train_y[0] = categorical_type[0]
 
-        return train_y
-
-    if class_type == (2, 'muon-CC_to_elec-CC'):
+    elif class_type == (2, 'muon-CC_to_elec-CC'):
         categorical_type = convert_particle_class_to_categorical(y_val[1], y_val[3], num_classes=4)
         train_y = np.zeros(2, dtype='float32')
         train_y[0] = categorical_type[1]
@@ -222,9 +218,7 @@ def encode_targets(y_val, class_type):
         #print train_y
         #print '------------------'
 
-        return train_y
-
-    if class_type == (1, 'muon-CC_to_elec-CC'): # only one neuron at the end of the cnn instead of two
+    elif class_type == (1, 'muon-CC_to_elec-CC'): # only one neuron at the end of the cnn instead of two
         categorical_type = convert_particle_class_to_categorical(y_val[1], y_val[3], num_classes=4)
         train_y = np.zeros(1, dtype='float32')
         if categorical_type[1]!=0:
@@ -236,25 +230,22 @@ def encode_targets(y_val, class_type):
         #print train_y
         #print '------------------'
 
-        return train_y
-
-    if class_type == (2, 'up_down'): # up down, one neuron at the cnn end
+    elif class_type == (2, 'up_down'): # up down, one neuron at the cnn end
         up_down_class = get_class_up_down(y_val[7]) # returns 0 or 1
         train_y = np.zeros(2, dtype='float32')
         train_y[up_down_class] = 1
 
-        return train_y
-
-    if class_type == (1, 'up_down'): # up down, one neuron at the cnn end
+    elif class_type == (1, 'up_down'): # up down, one neuron at the cnn end
         up_down_class = get_class_up_down(y_val[7]) # returns 0 or 1
         train_y = np.zeros(1, dtype='float32')
         train_y[0] = up_down_class
 
-        return train_y
-
     else:
         print "Class type " + str(class_type) + " not supported!"
         return y_val
+
+    return train_y
+
 
 #unfinished
 def predictAndPrintSome(model, testFile, printSize, numx, numy, numz, numt, nTargets):
