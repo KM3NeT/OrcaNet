@@ -56,7 +56,7 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, zer
             y_values = np.reshape(y_values, (batchsize, y_values.shape[1]))
             # encode the labels such that they are all within the same range (and filter the ones we don't want for now)
             c = 0
-            # TODO could be vectorized if performance is a bottleneck. Or just used dataflow from tensorpack!
+            # TODO could be vectorized if performance is a bottleneck. Or just use dataflow from tensorpack!
             for y_val in y_values:
                 ys[c] = encode_targets(y_val, class_type)
                 c += 1

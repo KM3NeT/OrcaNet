@@ -96,6 +96,7 @@ def create_wide_residual_network(n_bins, batchsize, dim, nb_classes=2, N=2, k=8,
     if dim not in (2, 3): # Sanity check
         raise IOError('Data types other than 2D or 3D are not yet supported. '
                       'Please specify a 2D or 3D n_bins tuple.')
+    average_pooling_nd = AveragePooling2D if dim==2 else AveragePooling3D
 
     channel_axis = 1 if K.image_data_format() == "channels_first" else -1
 
@@ -128,8 +129,7 @@ def create_wide_residual_network(n_bins, batchsize, dim, nb_classes=2, N=2, k=8,
         x = conv_block(x, 64, dim, k=k, dropout=dropout, k_size=k_size)
         nb_conv += 2
 
-    if dim == 3: x = AveragePooling3D(avg_pool_size)(x) # use global average pooling instead of fully connected
-    if dim == 2: x = AveragePooling2D(avg_pool_size)(x)
+    x = average_pooling_nd(avg_pool_size)(x) # use global average pooling instead of fully connected
     x = Flatten()(x)
 
     # could also be transformed to one neuron -> binary_crossentropy + sigmoid instead of 2 neurons -> cat._crossentropy + softmax
@@ -151,11 +151,11 @@ def initial_conv(input_layer, dim, k_size=3):
     :return: x: Resulting output tensor (model).
     """
     if dim not in (2,3): raise ValueError('dim must be equal to 2 or 3.')
+    convolution_nd = Convolution2D if dim==2 else Convolution3D
 
     channel_axis = 1 if K.image_data_format() == "channels_first" else -1
 
-    if dim == 3: x = Convolution3D(16, (k_size, k_size, k_size), padding='same', kernel_initializer='he_normal')(input_layer)
-    if dim == 2: x = Convolution2D(16, (k_size, k_size), padding='same', kernel_initializer='he_normal')(input_layer)
+    x = convolution_nd(16, (k_size,) * dim, padding='same', kernel_initializer='he_normal')(input_layer)
 
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
@@ -176,22 +176,17 @@ def expand_conv(init, n_filters, dim, k=1, k_size=3, strides=(1, 1, 1)):
     :return: m: Keras functional layer instance where the last layer is the merge.
     """
     if dim not in (2, 3): raise ValueError('dim must be equal to 2 or 3.')
+    convolution_nd = Convolution2D if dim == 2 else Convolution3D
 
     channel_axis = 1 if K.image_data_format() == "channels_first" else -1
 
-    if dim == 3: x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', strides=strides, kernel_initializer='he_normal')(init)
-    if dim == 2: x = Convolution2D(n_filters * k, (k_size, k_size), padding='same', strides=strides, kernel_initializer='he_normal')(init)
+    x = convolution_nd(n_filters * k, (k_size,) * dim, padding='same', strides=strides, kernel_initializer='he_normal')(init)
 
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
 
-    if dim == 3:
-        x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', kernel_initializer='he_normal')(x)
-        skip = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', strides=strides,
-                             kernel_initializer='he_normal')(init)
-    if dim == 2:
-        x = Convolution2D(n_filters * k, (k_size, k_size), padding='same', kernel_initializer='he_normal')(x)
-        skip = Convolution2D(n_filters * k, (k_size, k_size), padding='same', strides=strides, kernel_initializer='he_normal')(init)
+    x = convolution_nd(n_filters * k, (k_size,) * dim, padding='same', kernel_initializer='he_normal')(x)
+    skip = convolution_nd(n_filters * k, (k_size,) * dim, padding='same', strides=strides, kernel_initializer='he_normal')(init)
 
     m = Add()([x, skip])
 
@@ -211,6 +206,7 @@ def conv_block(ip, n_filters, dim, k=1, dropout=0.0, k_size=3):
     :return: m: Keras functional layer instance where the last layer is the merge.
     """
     if dim not in (2, 3): raise ValueError('dim must be equal to 2 or 3.')
+    convolution_nd = Convolution2D if dim == 2 else Convolution3D
 
     init = ip # TODO useless?
 
@@ -218,15 +214,13 @@ def conv_block(ip, n_filters, dim, k=1, dropout=0.0, k_size=3):
 
     x = BatchNormalization(axis=channel_axis)(ip)
     x = Activation('relu')(x)
-    if dim == 3: x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', kernel_initializer='he_normal')(x)
-    if dim == 2: x = Convolution2D(n_filters * k, (k_size, k_size), padding='same', kernel_initializer='he_normal')(x)
+    x = convolution_nd(n_filters * k, (k_size,) * dim, padding='same', kernel_initializer='he_normal')(x)
 
     if dropout > 0.0: x = Dropout(dropout)(x)
 
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
-    if dim == 3: x = Convolution3D(n_filters * k, (k_size, k_size, k_size), padding='same', kernel_initializer='he_normal')(x)
-    if dim == 2: x = Convolution2D(n_filters * k, (k_size, k_size), padding='same', kernel_initializer='he_normal')(x)
+    x = convolution_nd(n_filters * k, (k_size,) * dim, padding='same', kernel_initializer='he_normal')(x)
 
     m = Add()([init, x])
     return m
