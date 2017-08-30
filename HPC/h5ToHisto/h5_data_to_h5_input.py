@@ -119,7 +119,7 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_h
         if os.path.isfile(filename_geometry) is True:
             geo = kp.Geometry(filename='/home/woody/capn/mppi033h/misc/orca_detectors/fixed/' + filename_geometry)
         else:
-            raise IOError('The .detx file does not exist in the default path /home/woody/capn/mppi033h/misc/orca_detectors/fixed/!. '
+            raise IOError('The .detx file does not exist in the default path </home/woody/capn/mppi033h/misc/orca_detectors/fixed/>! '
                           'Change the path or add the .detx file to the default path.')
 
     x_bin_edges, y_bin_edges, z_bin_edges = calculate_bin_edges(n_bins, filename_geo_limits)

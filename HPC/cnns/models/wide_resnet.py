@@ -76,9 +76,8 @@ def decode_input_dimensions(n_bins, batchsize):
 def create_wide_residual_network(n_bins, batchsize, dim, nb_classes=2, N=2, k=8, dropout=0.0, k_size=3, verbose=True):
     """
     Creates a 2D or 3D Wide Residual Network with specified parameters.
-    The torch implementation from the paper differs slightly (change default arguments in Conv and BatchNorm):
+    The torch implementation from the paper differs slightly (change default arguments in BatchNorm):
     - BatchNormalization(axis=channel_axis, momentum=0.1, epsilon=1e-5, gamma_initializer='uniform')(x)
-    - Convolution2D(..., use_bias=False).
     :param tuple n_bins: Number of bins (x,y,z,t) of the data that will be fed to the network.
     :param int batchsize: Batchsize of the fed data.
     :param int dim: dimension of the network and the input (2D or 3D).
