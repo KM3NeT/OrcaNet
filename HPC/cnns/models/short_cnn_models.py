@@ -136,3 +136,41 @@ def define_2d_model_yz(number_of_classes, n_bins):
     model.add(Dense(number_of_classes, activation='softmax')) #activation='sigmoid'
 
     return model
+
+
+def define_2d_model_yz_test(number_of_classes, n_bins):
+    n_filters_1 = 64
+    n_filters_2 = 64
+    n_filters_3 = 128
+    kernel_size = 3
+    dropout_val = 0
+
+    model = ks.models.Sequential()
+    model.add(Convolution2D(n_filters_1, (kernel_size,kernel_size), activation="relu", input_shape=(n_bins[0], n_bins[2], n_bins[3], 1),
+                            padding="same", kernel_initializer='he_normal'))
+    #model.add(BatchNormalization()) # set use_bias=False
+    model.add(Convolution2D(n_filters_1, (kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal'))
+    #model.add(BatchNormalization())
+    #model.add(MaxPooling2D(strides=(2,2)))
+    model.add(Dropout(dropout_val))
+    model.add(Convolution2D(n_filters_2, (kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal'))
+    #model.add(BatchNormalization())
+    model.add(Convolution2D(n_filters_2, (kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal'))
+    #model.add(BatchNormalization())
+    model.add(MaxPooling2D(strides=(2,2)))
+    model.add(Convolution2D(n_filters_2, (kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal'))
+    #model.add(BatchNormalization())
+    model.add(Convolution2D(n_filters_3, (kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal'))
+    #model.add(BatchNormalization())
+    model.add(Convolution2D(n_filters_3, (kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal'))
+    #model.add(BatchNormalization())
+    model.add(Dropout(dropout_val))
+    model.add(Convolution2D(n_filters_3, (kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal'))
+    model.add(MaxPooling2D(strides=(2,2)))
+    model.add(BatchNormalization())
+    model.add(Flatten())
+    model.add(Dense(256, activation="relu"))
+    model.add(Dense(16, activation="relu"))
+    model.add(Dense(number_of_classes, activation='softmax')) #activation='sigmoid'
+
+    return model

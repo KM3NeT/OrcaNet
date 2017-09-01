@@ -132,6 +132,8 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scra
     else:
         model = ks.models.load_model('models/trained/trained_' + modelname + str(epoch) + '.h5')
 
+    ks.utils.plot_model(model, to_file='/models/WRN.png', show_shapes=True, show_layer_names=True) # plot model
+
     if n_gpu > 1:
         gpus_list = get_available_gpus(n_gpu)
         ngpus = len(gpus_list)

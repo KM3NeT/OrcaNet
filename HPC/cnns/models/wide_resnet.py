@@ -53,7 +53,7 @@ def decode_input_dimensions(n_bins, batchsize):
     if n_bins[0] == 1 and n_bins[3] == 1 and n_bins.count(1) == 2:
         print 'Using a Wide ResNet with YZ projection'
         strides = [(1,1), (1,1), (2,2)]
-        average_pooling_size = (6,7)
+        average_pooling_size = (7,9)
 
     # 3d case
     elif n_bins[1] == 1 and n_bins.count(1) == 1:
@@ -102,6 +102,7 @@ def create_wide_residual_network(n_bins, batchsize, dim, nb_classes=2, N=2, k=8,
     input_dim, strides, avg_pool_size = decode_input_dimensions(n_bins, batchsize) # includes batchsize
     input_layer = Input(shape=input_dim[1:], dtype=K.floatx()) # batch_shape=input_dim
 
+    #x = BatchNormalization(axis=channel_axis)(input_layer) # can be used after input in order to omit mean substraction. Care: Change initial conv param to x
     x = initial_conv(input_layer, dim, k_size=k_size)
     x = expand_conv(x, 16, dim, k=k, k_size=k_size, strides=strides[0])
     nb_conv = 10 # 1x initial_conv + 3x expand_conv = 1x1 + 3*3 = 10
