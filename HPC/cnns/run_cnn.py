@@ -13,6 +13,7 @@ from models.wide_resnet import *
 from utilities.cnn_utilities import *
 from utilities.multi_gpu import *
 from utilities.shuffle_h5 import shuffle_h5
+from utilities.visualization.ks_visualize_activations import load_image_from_h5, get_activations, display_activations
 
 
 def parse_input(use_scratch_ssd):
@@ -133,6 +134,11 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scra
         model = ks.models.load_model('models/trained/trained_' + modelname + str(epoch) + '.h5')
 
     ks.utils.plot_model(model, to_file='/models/WRN.png', show_shapes=True, show_layer_names=True) # plot model
+    # visualize activations
+    xs = load_image_from_h5(train_files[0][0])
+    activations = get_activations(model, xs, print_shape_only=False, layer_name=None)
+    #display_activations(activations)
+
 
     if n_gpu > 1:
         gpus_list = get_available_gpus(n_gpu)
