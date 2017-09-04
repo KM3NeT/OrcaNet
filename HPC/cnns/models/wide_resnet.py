@@ -89,7 +89,7 @@ def create_wide_residual_network(n_bins, batchsize, dim, nb_classes=2, N=2, k=8,
     :param int k: Width of the network (gets multiplied by the number of filters for each convolution).
     :param float dropout: Adds dropout if value is greater than 0.0.
     :param int k_size: Kernel size that should be used, same for each dimension.
-    :param bool verbose: Debug info to describe created WRN.
+    :param bool verbose: Debug info to describe the created WRN.
     :return: Model model: Keras WRN model.
     """
     if dim not in (2, 3): # Sanity check

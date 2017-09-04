@@ -7,9 +7,9 @@ import keras.backend as K
 import h5py
 
 
-def load_image_from_h5(filepath):
+def load_image_from_h5_file(filepath, index=0):
     f = h5py.File(filepath, "r")
-    xs = f['x'][0:1]
+    xs = f['x'][index:index+1]
 
     return xs
 
@@ -81,5 +81,6 @@ def display_activations(activation_maps):
                 activations = np.expand_dims(activations, axis=0)
         else:
             raise Exception('len(shape) = 3 has not been implemented.')
-        plt.imshow(activations, interpolation='None', cmap='jet')
+        #plt.imshow(activations, interpolation='None', cmap='jet')
+        plt.imsave('/utilities/visualization/activation_maps', activations, cmap='jet')
     plt.show()

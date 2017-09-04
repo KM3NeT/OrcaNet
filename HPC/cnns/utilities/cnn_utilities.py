@@ -143,9 +143,9 @@ def get_mean_image(f, dimensions, filepath):
         # maybe astype np.float64 for increased precision
         xs_mean = np.mean(f['x'], axis=0)
         xs_mean = np.reshape(xs_mean, dimensions[1:])
+        #xs_std = np.std(f['x'], axis=0, dtype=np.float64)
         np.save(filepath + '_zero_center_mean.npy', xs_mean)
 
-    #xs_mean = np.reshape(xs_mean, dimensions[1:])
     return xs_mean
 
 

@@ -13,7 +13,7 @@ from models.wide_resnet import *
 from utilities.cnn_utilities import *
 from utilities.multi_gpu import *
 from utilities.shuffle_h5 import shuffle_h5
-from utilities.visualization.ks_visualize_activations import load_image_from_h5, get_activations, display_activations
+from utilities.visualization.ks_visualize_activations import load_image_from_h5_file, get_activations, display_activations
 
 
 def parse_input(use_scratch_ssd):
@@ -135,8 +135,8 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scra
 
     ks.utils.plot_model(model, to_file='/models/WRN.png', show_shapes=True, show_layer_names=True) # plot model
     # visualize activations
-    xs = load_image_from_h5(train_files[0][0])
-    activations = get_activations(model, xs, print_shape_only=False, layer_name=None)
+    #xs = load_image_from_h5_file(train_files[0][0])
+    #activations = get_activations(model, xs, print_shape_only=False, layer_name=None)
     #display_activations(activations)
 
 
@@ -151,7 +151,7 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scra
         model = make_parallel(model, gpus_list, usenccl=False, initsync=True, syncopt=False, enqueue=False)
         print_mgpu_modelsummary(model)
 
-    #sgd = ks.optimizers.SGD(lr=0.01, momentum=0.9, decay=0.0005, nesterov=True)
+    #sgd = ks.optimizers.SGD(lr=0.001, momentum=0.9, decay=0.0005, nesterov=True)
     #model.compile(loss='mean_absolute_error', optimizer='sgd', metrics=['mean_squared_error'])
     #model.compile(loss='mean_absolute_error', optimizer='adam', metrics=['mean_squared_error'])
     #adam = ks.optimizers.Adam(lr=0.1, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
