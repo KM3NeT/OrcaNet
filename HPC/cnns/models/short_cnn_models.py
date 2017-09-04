@@ -114,7 +114,7 @@ def define_2d_model_yz(number_of_classes, n_bins):
     dropout_val = 0
 
     model = ks.models.Sequential()
-    model.add(Convolution2D(n_filters_1, (kernel_size,kernel_size), activation="relu", input_shape=(n_bins[0], n_bins[2], n_bins[3], 1),
+    model.add(Convolution2D(n_filters_1, (kernel_size,kernel_size), activation="relu", input_shape=(n_bins[1], n_bins[2], 1),
                             padding="same", kernel_initializer='he_normal'))
     model.add(Convolution2D(n_filters_1, (kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal'))
     #model.add(MaxPooling2D(strides=(2,2)))
@@ -146,7 +146,7 @@ def define_2d_model_yz_test(number_of_classes, n_bins):
     dropout_val = 0
 
     model = ks.models.Sequential()
-    model.add(Convolution2D(n_filters_1, (kernel_size,kernel_size), activation="relu", input_shape=(n_bins[0], n_bins[2], n_bins[3], 1),
+    model.add(Convolution2D(n_filters_1, (kernel_size,kernel_size), activation="relu", input_shape=(n_bins[1], n_bins[2], 1),
                             padding="same", kernel_initializer='he_normal'))
     #model.add(BatchNormalization()) # set use_bias=False
     model.add(Convolution2D(n_filters_1, (kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal'))
