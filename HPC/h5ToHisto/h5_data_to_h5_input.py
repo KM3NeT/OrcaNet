@@ -96,7 +96,7 @@ def calculate_bin_edges(n_bins, fname_geo_limits):
     return x_bin_edges, y_bin_edges, z_bin_edges
 
 
-def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_hits=False, use_calibrated_file=False):
+def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_hits=False, use_calibrated_file=False, data_cuts=None):
     """
     Main code. Reads raw .hdf5 files and creates 2D/3D histogram projections that can be used for a CNN
     :param tuple(int) n_bins: Declares the number of bins that should be used for each dimension (x,y,z,t).
@@ -107,7 +107,12 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_h
     :param bool do4d: Declares if 4D histograms should be created.
     :param bool do_mc_hits: Declares if hits (False, mc_hits + BG) or mc_hits (True) should be processed
     :param bool use_calibrated_file: Declares if the input file is already calibrated (pos_x/y/z, time) or not.
+    :param dict data_cuts: Dictionary that contains information about any possible cuts that should be applied.
+                           Supports the following cuts: 'triggered', 'energy_lower_limit'
     """
+    if data_cuts is None: data_cuts={'triggered': False, 'energy_lower_limit': 0}
+
+
     filename_input = parse_input(do2d, do2d_pdf)
     filename = os.path.basename(os.path.splitext(filename_input)[0])
     filename_output = filename.replace(".","_")
@@ -139,10 +144,11 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_h
             print 'Event No. ' + str(i)
         i+=1
         # filter out all hit and track information belonging that to this event
-        event_hits, event_track = get_event_data(event_blob, geo, do_mc_hits, use_calibrated_file)
+        event_hits, event_track = get_event_data(event_blob, geo, do_mc_hits, use_calibrated_file, data_cuts)
 
-        #if event_track[2] < 10: # Selecting events with energy >= 10 GeV
-         #   continue
+        if event_track[2] < data_cuts['energy_lower_limit']: # Cutting events with energy < threshold (default=0)
+            print 'Cut an event with an energy of ' + str(event_track[2]) + ' GeV'
+            continue
 
         # event_track: [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z, time]
         mc_infos.append(event_track)
@@ -178,7 +184,8 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_h
 
 
 if __name__ == '__main__':
-    main(n_bins=(11,13,18,50), do2d=True, do2d_pdf=(False, 50), do3d=True, do4d=False, do_mc_hits=False, use_calibrated_file=True)
+    main(n_bins=(11,13,18,50), do2d=True, do2d_pdf=(False, 50), do3d=True, do4d=False,
+         do_mc_hits=False, use_calibrated_file=True, data_cuts = {'triggered': False, 'energy_lower_limit': 0})
 
 
 

@@ -22,7 +22,7 @@ def get_primary_track_index(event_blob):
     return primary_index
 
 
-def get_event_data(event_blob, geo, do_mc_hits, use_calibrated_file):
+def get_event_data(event_blob, geo, do_mc_hits, use_calibrated_file, data_cuts):
     """
     Reads a km3pipe blob which contains the information for one event.
     Returns a hit array and a track array that contains all relevant information of the event.
@@ -33,6 +33,7 @@ def get_event_data(event_blob, geo, do_mc_hits, use_calibrated_file):
                             In the case of mc_hits, the dom_id needs to be calculated thanks to the jpp output.
     :param bool use_calibrated_file: specifies if a calibrated file is used as an input for the event_blob.
                                      If False, the hits of the event_blob are calibrated based on the geo parameter.
+    :param dict data_cuts: specifies if cuts should be applied. Contains the keys 'triggered' and 'energy_lower_limit'.
     :return: ndarray(ndim=2) hits_xyz: 2D array containing the hit information of the event [pos_xyz time].
     :return: ndarray(ndim=1) event_track: 1D array containing important MC information of the event.
                                           [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z, time]
@@ -60,6 +61,10 @@ def get_event_data(event_blob, geo, do_mc_hits, use_calibrated_file):
 
     if use_calibrated_file is False:
         hits = geo.apply(hits)
+
+    if data_cuts['triggered'] is True:
+        hits = hits.__array__[hits.triggered.astype(bool)]
+        #hits = hits.triggered_hits # alternative, though it only works for the triggered condition!
 
     pos_x = hits.pos_x.astype('float32')
     pos_y = hits.pos_y.astype('float32')
