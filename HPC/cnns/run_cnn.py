@@ -109,7 +109,7 @@ def use_node_local_ssd_for_input(train_files, test_files):
 def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scratch_ssd=False):
     """
     Runs a convolutional neural network.
-    :param tuple n_bins: Declares the number of bins for each dimension (x,y,z) in the train- and testfiles.
+    :param tuple n_bins: Declares the number of bins for each dimension (x,y,z,t) in the train- and testfiles.
     :param (int, str) class_type: Declares the number of output classes and a string identifier to specify the exact output classes.
                                   I.e. (2, 'muon-CC_to_elec-CC')
     :param int batchsize: Batchsize that should be used for the cnn.
@@ -151,7 +151,7 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scra
         model = make_parallel(model, gpus_list, usenccl=False, initsync=True, syncopt=False, enqueue=False)
         print_mgpu_modelsummary(model)
 
-    #sgd = ks.optimizers.SGD(lr=0.001, momentum=0.9, decay=0.0005, nesterov=True)
+    #sgd = ks.optimizers.SGD(lr=0.001, momentum=0.9, decay=1e-5, nesterov=True)
     #model.compile(loss='mean_absolute_error', optimizer='sgd', metrics=['mean_squared_error'])
     #model.compile(loss='mean_absolute_error', optimizer='adam', metrics=['mean_squared_error'])
     #adam = ks.optimizers.Adam(lr=0.1, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)

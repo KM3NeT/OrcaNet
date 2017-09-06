@@ -22,15 +22,17 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, zer
     """
     dimensions = get_dimensions_encoding(batchsize, n_bins)
 
-    xs = np.array(np.zeros(dimensions)) # TODO redundant or better for performance?
-    ys = np.array(np.zeros((batchsize, class_type[0])))
+    #xs = np.array(np.zeros(dimensions)) # TODO redundant or better for performance?
+    #ys = np.array(np.zeros((batchsize, class_type[0])))
+    xs = np.zeros(dimensions, dtype=np.float32) # TODO redundant or better for performance?
+    ys = np.zeros((batchsize, class_type[0]), dtype=np.float32)
 
     while 1:
         f = h5py.File(filepath, "r")
         filesize = len(f['y'])
         print "filesize = ", filesize
 
-        if zero_center is True: xs_mean = get_mean_image(f, dimensions, filepath)
+        if zero_center is True: xs_mean = get_mean_image(f, dimensions, filepath) #TODO if testing, load data generated from training sample!
 
         # count how many entries we have read
         n_entries = 0
@@ -50,7 +52,7 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, zer
             #print xs_mean
             #print xs_mean.shape # (11, 18, 50)
 
-            if zero_center is True: xs = np.subtract(xs, xs_mean) #TODO maybe rather xs_mean-xs for more positive values?
+            if zero_center is True: xs = np.subtract(xs, xs_mean)
             # and mc info (labels)
             y_values = f['y'][n_entries:n_entries+batchsize]
             y_values = np.reshape(y_values, (batchsize, y_values.shape[1]))
@@ -61,7 +63,7 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, zer
                 ys[c] = encode_targets(y_val, class_type)
                 c += 1
 
-            # we have read one batch more from this file
+            # we have read one more batch from this file
             n_entries += batchsize
             #np.set_printoptions(threshold=np.inf)
             #print 'ys', ys.shape

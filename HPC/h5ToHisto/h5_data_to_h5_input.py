@@ -36,7 +36,7 @@ def parse_input(do2d, do2d_pdf):
         raise ValueError('The 2D pdf images cannot be created if do2d=False. Please try again.')
 
     if do2d_pdf[0] is True and do2d_pdf[1] > 100:
-        warnings.warn('You declared do2d_pdf=(True, int) with int > 100. This will more than two minutes.'
+        warnings.warn('You declared do2d_pdf=(True, int) with int > 100. This will take more than two minutes.'
                       'Do you really want to create pdfs images for so many events?')
 
     if not os.path.isfile(str(sys.argv[1])):
