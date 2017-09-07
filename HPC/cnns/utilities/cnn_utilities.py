@@ -136,7 +136,7 @@ def get_mean_image(f, dimensions, filepath):
     :return: ndarray xs_mean: mean_image of the x dataset. Can be used for zero-centering later on.
     """
 
-    if os.path.isfile(filepath) is True:
+    if os.path.isfile(filepath + '_zero_center_mean.npy') is True:
         print 'Loading an existing xs_mean_array in order to zero_center the data!'
         xs_mean = np.load(filepath + '_zero_center_mean.npy')
 

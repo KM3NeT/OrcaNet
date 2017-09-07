@@ -127,13 +127,13 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scra
         #model = define_3d_model_xyz(class_type[0], n_bins)
         #model = define_3d_model_xzt(class_type[0], n_bins)
         #model = create_wide_residual_network(n_bins, batchsize, dim=3, nb_classes=class_type[0], k=4, dropout=0, k_size=3)
-        # model = define_2d_model_yz(class_type[0], n_bins)
-        model = model_wide_residual_network(n_bins, batchsize, dim=2, nb_classes=class_type[0], k=4, dropout=0, k_size=3)
+        model = define_2d_model_yz_test_batch_norm(class_type[0], n_bins)
+        #model = model_wide_residual_network(n_bins, batchsize, nb_classes=class_type[0], k=4, dropout=0, k_size=3)
 
     else:
         model = ks.models.load_model('models/trained/trained_' + modelname + str(epoch) + '.h5')
 
-    ks.utils.plot_model(model, to_file='/models/WRN.png', show_shapes=True, show_layer_names=True) # plot model
+    #ks.utils.plot_model(model, to_file='/models/WRN.png', show_shapes=True, show_layer_names=True) # plot model
     # visualize activations
     #xs = load_image_from_h5_file(train_files[0][0])
     #activations = get_activations(model, xs, print_shape_only=False, layer_name=None)
@@ -151,7 +151,7 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scra
         model = make_parallel(model, gpus_list, usenccl=False, initsync=True, syncopt=False, enqueue=False)
         print_mgpu_modelsummary(model)
 
-    #sgd = ks.optimizers.SGD(lr=0.001, momentum=0.9, decay=1e-5, nesterov=True)
+    sgd = ks.optimizers.SGD(lr=0.001, momentum=0.9, decay=1e-5, nesterov=True)
     #model.compile(loss='mean_absolute_error', optimizer='sgd', metrics=['mean_squared_error'])
     #model.compile(loss='mean_absolute_error', optimizer='adam', metrics=['mean_squared_error'])
     #adam = ks.optimizers.Adam(lr=0.1, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
@@ -159,7 +159,7 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scra
     adam = ks.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1, decay=0.0)
 
     #model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy', 'binary_accuracy'])
-    model.compile(loss='categorical_crossentropy', optimizer='sgd', metrics=['accuracy'])
+    model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
     model.summary()
 
     while 1:
@@ -172,7 +172,7 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scra
              #   shuffle_h5(f, chunking=(True, batchsize), delete_flag=True)
             print 'Training in epoch', epoch, 'on file ', i, ',', f
             #f_size = 70000 # for testing
-            model.fit_generator(generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, zero_center=True),
+            model.fit_generator(generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, zero_center=False),
                                 steps_per_epoch=int(f_size / batchsize)-1, epochs=1, verbose=1)
                                 #steps_per_epoch=5, epochs=10000, verbose=1)
             # store the trained model
