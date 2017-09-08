@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 import km3pipe as kp
 #from memory_profiler import profile
-#import line_profiler # call with kernprof file.py args
+#import line_profiler # call with kernprof -l -v file.py args
 
 
 def get_primary_track_index(event_blob):
@@ -53,7 +53,7 @@ def get_event_data(event_blob, geo, do_mc_hits, use_calibrated_file, data_cuts):
 
     event_track = np.array([event_id, particle_type, energy, is_cc, bjorkeny, dir_x, dir_y, dir_z, time], dtype=np.float32)
 
-    # parse hits [x, y, z, time]
+    # parse hits [x,y,z,time]
     if do_mc_hits is True:
         hits = event_blob["McHits"]
     else:
