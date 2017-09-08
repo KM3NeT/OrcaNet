@@ -6,7 +6,7 @@ import os
 import sys
 import warnings
 #from memory_profiler import profile # for memory profiling, call with @profile; myfunc()
-#import line_profiler # call with kernprof file.py args
+#import line_profiler # call with kernprof -l -v file.py args
 from matplotlib.backends.backend_pdf import PdfPages
 
 import glob
@@ -112,7 +112,6 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_h
     """
     if data_cuts is None: data_cuts={'triggered': False, 'energy_lower_limit': 0}
 
-
     filename_input = parse_input(do2d, do2d_pdf)
     filename = os.path.basename(os.path.splitext(filename_input)[0])
     filename_output = filename.replace(".","_")
@@ -135,19 +134,20 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_h
     if do2d_pdf[0] is True:
         glob.pdf_2d_plots = PdfPages('Results/4dTo2d/' + filename_output + '_plots.pdf')
 
-    i=0
+    i=-1
     # Initialize HDF5Pump of the input file
     event_pump = kp.io.hdf5.HDF5Pump(filename=filename_input)
     print "Generating histograms from the hits in XYZT format for files based on " + filename_input
     for event_blob in event_pump:
+        i += 1
         if i % 10 == 0:
             print 'Event No. ' + str(i)
-        i+=1
+
         # filter out all hit and track information belonging that to this event
         event_hits, event_track = get_event_data(event_blob, geo, do_mc_hits, use_calibrated_file, data_cuts)
 
         if event_track[2] < data_cuts['energy_lower_limit']: # Cutting events with energy < threshold (default=0)
-            print 'Cut an event with an energy of ' + str(event_track[2]) + ' GeV'
+            #print 'Cut an event with an energy of ' + str(event_track[2]) + ' GeV'
             continue
 
         # event_track: [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z, time]
@@ -171,6 +171,9 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_h
         store_histograms_as_hdf5(np.stack([hist_tuple[0] for hist_tuple in all_4d_to_2d_hists]), np.array(mc_infos), 'Results/4dTo2d/h5/xy/' + filename_output + '_xy.h5')
         store_histograms_as_hdf5(np.stack([hist_tuple[1] for hist_tuple in all_4d_to_2d_hists]), np.array(mc_infos), 'Results/4dTo2d/h5/xz/' + filename_output + '_xz.h5')
         store_histograms_as_hdf5(np.stack([hist_tuple[2] for hist_tuple in all_4d_to_2d_hists]), np.array(mc_infos), 'Results/4dTo2d/h5/yz/' + filename_output + '_yz.h5')
+        store_histograms_as_hdf5(np.stack([hist_tuple[3] for hist_tuple in all_4d_to_2d_hists]), np.array(mc_infos), 'Results/4dTo2d/h5/xt/' + filename_output + '_xt.h5')
+        store_histograms_as_hdf5(np.stack([hist_tuple[4] for hist_tuple in all_4d_to_2d_hists]), np.array(mc_infos), 'Results/4dTo2d/h5/yt/' + filename_output + '_yt.h5')
+        store_histograms_as_hdf5(np.stack([hist_tuple[5] for hist_tuple in all_4d_to_2d_hists]), np.array(mc_infos), 'Results/4dTo2d/h5/zt/' + filename_output + '_zt.h5')
 
     if do3d:
         store_histograms_as_hdf5(np.stack([hist_tuple[0] for hist_tuple in all_4d_to_3d_hists]), np.array(mc_infos), 'Results/4dTo3d/h5/xyz/' + filename_output + '_xyz.h5')
@@ -184,8 +187,8 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_h
 
 
 if __name__ == '__main__':
-    main(n_bins=(11,13,18,50), do2d=True, do2d_pdf=(False, 50), do3d=True, do4d=False,
-         do_mc_hits=False, use_calibrated_file=True, data_cuts = {'triggered': False, 'energy_lower_limit': 0})
+    main(n_bins=(11,13,18,50), do2d=True, do2d_pdf=(False, 50), do3d=False, do4d=False,
+         do_mc_hits=False, use_calibrated_file=True, data_cuts = {'triggered': False, 'energy_lower_limit': 10})
 
 
 

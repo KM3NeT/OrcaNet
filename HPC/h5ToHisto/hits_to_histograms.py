@@ -4,7 +4,8 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
-#import line_profiler # call with kernprof file.py args
+#import line_profiler # call with kernprof -l -v file.py args
+#from memory_profiler import profile
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 import glob
@@ -12,12 +13,11 @@ import glob
 
 def get_time_parameters(t, t_start_margin=0.15, t_end_margin=0.15):
     """
-    Gets the fundamental time parameters in one place (this function).
+    Gets the fundamental time parameters in one place for cutting a time residual.
     Later on these parameters cut out a certain time span of events specified by t_start and t_end.
-    Implemented just for convenience (less lines of code), since it's both used in the 2D and 3D function.
-    :param ndarray(ndim=1) t: time column of the event_hits array
-    :param float t_start_margin: defines the start time of the selected timespan with t_mean - t_start * t_diff
-    :param float t_end_margin: defines the end time of the selected timespan with t_mean + t_start * t_diff
+    :param ndarray(ndim=1) t: time column of the event_hits array.
+    :param float t_start_margin: defines the start time of the selected timespan with t_mean - t_start * t_diff.
+    :param float t_end_margin: defines the end time of the selected timespan with t_mean + t_start * t_diff.
     :return: float t_start, t_end: absolute start and end time that will be used for the later timespan cut.
                                    Events in this timespan are accepted, others are rejected.
     """
@@ -30,7 +30,7 @@ def get_time_parameters(t, t_start_margin=0.15, t_end_margin=0.15):
     t_end = t_mean + t_end_margin * t_diff
 
     return t_start, t_end
-    #return t_min, t_max
+    #return t_min, t_max # for no time cut
 
 
 def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_2d_hists, event_track, do2d_pdf):
@@ -46,11 +46,10 @@ def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     :param bool do2d_pdf: if True, generate 2D matplotlib pdf histograms.
     :return: appends the 2D histograms to the all_4d_to_2d_hists list.
     """
-    # slice out the coordinates of the current hits
-    x = np.array(event_hits[:, 0], np.float32)
-    y = np.array(event_hits[:, 1], np.float32)
-    z = np.array(event_hits[:, 2], np.float32)
-    t = np.array(event_hits[:, 3], np.float32)
+    x = event_hits[:, 0]
+    y = event_hits[:, 1]
+    z = event_hits[:, 2]
+    t = event_hits[:, 3]
 
     # analyze time
     t_start, t_end = get_time_parameters(t, t_start_margin=0.15, t_end_margin=0.15)
@@ -60,7 +59,6 @@ def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     hist_xz = np.histogram2d(x, z, bins=(x_bin_edges, z_bin_edges))
     hist_yz = np.histogram2d(y, z, bins=(y_bin_edges, z_bin_edges))
 
-    #hist_xt = np.histogram2d(x, t, bins=(n_bins[0], n_bins[3]))
     hist_xt = np.histogram2d(x, t, bins=(x_bin_edges, n_bins[3]), range=((min(x_bin_edges), max(x_bin_edges)), (t_start, t_end)))
     hist_yt = np.histogram2d(y, t, bins=(y_bin_edges, n_bins[3]), range=((min(y_bin_edges), max(y_bin_edges)), (t_start, t_end)))
     hist_zt = np.histogram2d(z, t, bins=(z_bin_edges, n_bins[3]), range=((min(z_bin_edges), max(z_bin_edges)), (t_start, t_end)))
@@ -161,21 +159,18 @@ def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
 
     t_start, t_end = get_time_parameters(t, t_start_margin=0.15, t_end_margin=0.15)
 
-    hist_xyz = np.histogramdd(np.array(event_hits[:, 0:3], np.float32), bins=(x_bin_edges, y_bin_edges, z_bin_edges))
+    hist_xyz = np.histogramdd(event_hits[:, 0:3], bins=(x_bin_edges, y_bin_edges, z_bin_edges))
 
-    hist_xyt = np.histogramdd(np.array(np.concatenate([x, y, t], axis=1), np.float32), bins=(x_bin_edges, y_bin_edges, n_bins[3]),
+    hist_xyt = np.histogramdd(np.concatenate([x, y, t], axis=1), bins=(x_bin_edges, y_bin_edges, n_bins[3]),
                               range=((min(x_bin_edges), max(x_bin_edges)), (np.amin(y), np.amax(y)), (t_start, t_end)))
-    hist_xzt = np.histogramdd(np.array(np.concatenate([x, z, t], axis=1), np.float32), bins=(x_bin_edges, z_bin_edges, n_bins[3]),
+    hist_xzt = np.histogramdd(np.concatenate([x, z, t], axis=1), bins=(x_bin_edges, z_bin_edges, n_bins[3]),
                               range=((min(x_bin_edges), max(x_bin_edges)), (min(z_bin_edges), max(z_bin_edges)), (t_start, t_end)))
-    hist_yzt = np.histogramdd(np.array(event_hits[:, 1:4], np.float32), bins=(y_bin_edges, z_bin_edges, n_bins[3]),
+    hist_yzt = np.histogramdd(event_hits[:, 1:4], bins=(y_bin_edges, z_bin_edges, n_bins[3]),
                               range=((min(y_bin_edges), max(y_bin_edges)), (min(z_bin_edges), max(z_bin_edges)), (t_start, t_end)))
 
     # add a rotation-symmetric 3d hist
-    x = np.array(event_hits[:, 0:1], np.float32)
-    y = np.array(event_hits[:, 1:2], np.float32)
     r = np.sqrt(x * x + y * y)
-    zt = np.array(event_hits[:, 2:4], np.float32)
-    rzt = np.array(np.concatenate([r, zt], axis=1), np.float32)
+    rzt = np.concatenate([r, z, t], axis=1)
     hist_rzt = np.histogramdd(rzt, bins=(n_bins[0], n_bins[2], n_bins[3]), range=((np.amin(r), np.amax(r)), (np.amin(z), np.amax(z)), (t_start, t_end)))
 
     all_4d_to_3d_hists.append((np.array(hist_xyz[0], dtype=np.uint8),
@@ -198,7 +193,7 @@ def compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     t = event_hits[:, 3:4]
     t_start, t_end = get_time_parameters(t, t_start_margin=0.15, t_end_margin=0.15)
 
-    hist_xyzt = np.histogramdd(np.array(event_hits[:, 0:4], np.float32),
+    hist_xyzt = np.histogramdd(event_hits[:, 0:4],
                                range=( (min(x_bin_edges),max(x_bin_edges)),(min(y_bin_edges),max(y_bin_edges)),
                                        (min(z_bin_edges),max(z_bin_edges)),(t_start, t_end)))
 
