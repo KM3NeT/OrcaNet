@@ -106,7 +106,7 @@ def use_node_local_ssd_for_input(train_files, test_files):
     return train_files_ssd, test_files_ssd
 
 
-def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scratch_ssd=False):
+def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scratch_ssd=False, zero_center=True):
     """
     Runs a convolutional neural network.
     :param tuple n_bins: Declares the number of bins for each dimension (x,y,z,t) in the train- and testfiles.
@@ -116,25 +116,27 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scra
     :param int epoch: Declares if a previously trained model or a new model (=0) should be loaded.
     :param int n_gpu: Number of gpu's that should be used. n > 1 for multi-gpu implementation.
     :param bool use_scratch_ssd: Declares if the input files should be copied to the node-local SSD scratch before executing the cnn.
+    :param bool zero_center: Declares if the input images ('xs') should be zero-centered before training.
     """
     # TODO list all available class types here (num_classes, class_name)
     train_files, test_files = parse_input(use_scratch_ssd)
 
-    print 'Batchsize = ', batchsize
-    modelname = 'model_3d_xzt_' + class_type[1]
+    xs_mean = load_zero_center_data(train_files, batchsize, n_bins) if zero_center is True else None
+
+    modelname = get_modelname(n_bins, class_type)
 
     if epoch == 0:
         #model = define_3d_model_xyz(class_type[0], n_bins)
         #model = define_3d_model_xzt(class_type[0], n_bins)
-        #model = create_wide_residual_network(n_bins, batchsize, dim=3, nb_classes=class_type[0], k=4, dropout=0, k_size=3)
         model = define_2d_model_yz_test_batch_norm(class_type[0], n_bins)
         #model = model_wide_residual_network(n_bins, batchsize, nb_classes=class_type[0], k=4, dropout=0, k_size=3)
 
     else:
         model = ks.models.load_model('models/trained/trained_' + modelname + str(epoch) + '.h5')
 
-    #ks.utils.plot_model(model, to_file='/models/WRN.png', show_shapes=True, show_layer_names=True) # plot model
-    # visualize activations
+    model.summary()
+    #ks.utils.plot_model(model, to_file='/models/WRN.png', show_shapes=True, show_layer_names=True) # plot model TODO make it work
+    # visualize activations TODO make it work
     #xs = load_image_from_h5_file(train_files[0][0])
     #activations = get_activations(model, xs, print_shape_only=False, layer_name=None)
     #display_activations(activations)
@@ -151,28 +153,34 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scra
         model = make_parallel(model, gpus_list, usenccl=False, initsync=True, syncopt=False, enqueue=False)
         print_mgpu_modelsummary(model)
 
-    sgd = ks.optimizers.SGD(lr=0.001, momentum=0.9, decay=1e-5, nesterov=True)
-    #model.compile(loss='mean_absolute_error', optimizer='sgd', metrics=['mean_squared_error'])
-    #model.compile(loss='mean_absolute_error', optimizer='adam', metrics=['mean_squared_error'])
-    #adam = ks.optimizers.Adam(lr=0.1, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+    #sgd = ks.optimizers.SGD(lr=0.01, momentum=0.9, decay=1e-5, nesterov=True)
     #adam = ks.optimizers.Adam(lr=0.01, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
-    adam = ks.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1, decay=0.0)
+    #adam = ks.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1, decay=0.0)
 
     #model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy', 'binary_accuracy'])
+    #model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
+
+    lr = 0.01
+    lr_stepsize = 1e-5
+    sgd = ks.optimizers.SGD(lr=lr, momentum=0.9, decay=0, nesterov=True)
     model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
-    model.summary()
 
     while 1:
         epoch +=1
         i = 0
+
+        if epoch > 1:
+            lr -= lr_stepsize
+            model.optimizer.lr.assign.set_value(lr)
+
         # process all h5 files, full epoch
         for (f, f_size) in train_files:
             i += 1
             #if epoch > 1: # just for convenience, we don't want to wait before the first epoch each time
              #   shuffle_h5(f, chunking=(True, batchsize), delete_flag=True)
             print 'Training in epoch', epoch, 'on file ', i, ',', f
-            #f_size = 70000 # for testing
-            model.fit_generator(generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, zero_center=False),
+            f_size = 500000 # for testing
+            model.fit_generator(generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, zero_center_image=xs_mean),
                                 steps_per_epoch=int(f_size / batchsize)-1, epochs=1, verbose=1)
                                 #steps_per_epoch=5, epochs=10000, verbose=1)
             # store the trained model
@@ -180,21 +188,17 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scra
 
         for (f, f_size) in test_files:
             print 'Testing on file ', i, ',', f
-            f_size = 700 # for testing
-            evaluation = model.evaluate_generator(generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type),
+            f_size = 50000 # for testing
+            evaluation = model.evaluate_generator(generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, zero_center_image=xs_mean),
                                                   steps=int(f_size / batchsize)-1)
                                                   #steps=1)
-            print evaluation
-            print model.metrics_names
-
-            # if testfile != "":
-            #    results = doTheEvaluation(model, number_of_classes, testfile, testsize, printSize, n_bins_x, n_bins_y, n_bins_z, n_bins_t, batchsize)
+            print 'Test sample results: ' + str(evaluation) + ' (' + str(model.metrics_names) + ')'
 
 
 if __name__ == '__main__':
     # TODO still need to change some stuff in execute_cnn() directly like modelname and optimizers
     execute_cnn(n_bins=(1,13,18,1), class_type = (2, 'muon-CC_to_elec-CC'),
-                batchsize = 32, epoch= 0, n_gpu=1, use_scratch_ssd=False) # standard 4D case: n_bins=[11,13,18,50]
+                batchsize = 32, epoch= 0, n_gpu=1, use_scratch_ssd=False, zero_center=True) # standard 4D case: n_bins=[11,13,18,50]
 
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/train_muon-CC_and_elec-NC_each_480_xyz_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/test_muon-CC_and_elec-NC_each_120_xyz_shuffled.h5
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/train_muon-CC_and_elec-CC_each_480_xzt_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/test_muon-CC_and_elec-CC_each_120_xzt_shuffled.h5
