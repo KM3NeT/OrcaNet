@@ -37,7 +37,7 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, zer
             # start the next batch at index 0
             # create numpy arrays of input data (features)
             xs = f['x'][n_entries : n_entries + batchsize] #TODO check dimensions
-            xs = np.reshape(xs, dimensions).astype('float32')
+            xs = np.reshape(xs, dimensions).astype(np.float32)
 
             #import sys
             #print xs[0][1]
@@ -52,11 +52,9 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, zer
             y_values = f['y'][n_entries:n_entries+batchsize]
             y_values = np.reshape(y_values, (batchsize, y_values.shape[1]))
             # encode the labels such that they are all within the same range (and filter the ones we don't want for now)
-            c = 0
             # TODO could be vectorized if performance is a bottleneck. Or just use dataflow from tensorpack!
-            for y_val in y_values:
-                ys[c] = encode_targets(y_val, class_type)
-                c += 1
+            for c, y_val in enumerate(y_values):
+                ys[c] = encode_targets(y_val, class_type) #TODO test ys[c]=1, simplify
 
             # we have read one more batch from this file
             n_entries += batchsize
