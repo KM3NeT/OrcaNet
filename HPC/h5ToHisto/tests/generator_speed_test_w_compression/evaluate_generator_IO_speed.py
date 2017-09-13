@@ -72,4 +72,4 @@ pr.disable()
 
 pr.print_stats(sort='time')
 
-# TODO check for with batchsize & without, check with blosc and without!
+# TODO check with blosc

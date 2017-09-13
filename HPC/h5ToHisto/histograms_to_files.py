@@ -12,7 +12,14 @@ def store_histograms_as_hdf5(hists, mc_infos, filepath_output):
     :param str filepath_output: complete filepath of the created h5 file.
     """
     h5f = h5py.File(filepath_output, 'w')
-    dset_mc_infos = h5f.create_dataset('y', data=mc_infos, dtype='float32')
     dset_hists = h5f.create_dataset('x', data=hists, dtype='uint8')
+    dset_mc_infos = h5f.create_dataset('y', data=mc_infos, dtype='float32')
+
+    #chunksize = 32
+    #dset_mc_infos = h5f.create_dataset('y', data=mc_infos, dtype='float32', chunks=(chunksize,) + mc_infos.shape[1:],
+     #                               compression='lzf', shuffle=True, fletcher32=True)
+    #dset_hists = h5f.create_dataset('x', data=hists, dtype='uint8', chunks=(chunksize,) + hists.shape[1:],
+     #                               compression='lzf', shuffle=True, fletcher32=True)
+    # dset_hists = h5f.create_dataset('x', data=hists, dtype='uint8', compression=32001, shuffle=False)
 
     h5f.close()

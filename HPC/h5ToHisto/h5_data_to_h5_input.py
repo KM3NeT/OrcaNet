@@ -134,12 +134,10 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_h
     if do2d_pdf[0] is True:
         glob.pdf_2d_plots = PdfPages('Results/4dTo2d/' + filename_output + '_plots.pdf')
 
-    i=-1
     # Initialize HDF5Pump of the input file
     event_pump = kp.io.hdf5.HDF5Pump(filename=filename_input)
     print "Generating histograms from the hits in XYZT format for files based on " + filename_input
-    for event_blob in event_pump:
-        i += 1
+    for i, event_blob in enumerate(event_pump):
         if i % 10 == 0:
             print 'Event No. ' + str(i)
 
@@ -163,7 +161,7 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_h
             compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, all_4d_to_4d_hists)
 
         if do2d_pdf[0] is True:
-            if i == do2d_pdf[1]:
+            if i >= do2d_pdf[1]:
                 glob.pdf_2d_plots.close()
                 break
 
@@ -187,7 +185,7 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_h
 
 
 if __name__ == '__main__':
-    main(n_bins=(11,13,18,50), do2d=True, do2d_pdf=(False, 50), do3d=False, do4d=False,
+    main(n_bins=(11,13,18,50), do2d=True, do2d_pdf=(False, 100), do3d=False, do4d=False,
          do_mc_hits=False, use_calibrated_file=True, data_cuts = {'triggered': False, 'energy_lower_limit': 10})
 
 
