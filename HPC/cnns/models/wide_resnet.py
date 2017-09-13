@@ -55,6 +55,11 @@ def decode_input_dimensions(n_bins, batchsize):
         strides = [(1,1), (1,1), (2,2)]
         average_pooling_size = (7,9)
 
+    elif n_bins[0] == 1 and n_bins[1] == 1 and n_bins.count(1) == 2:
+        print 'Using a Wide ResNet with ZT projection'
+        strides = [(1,1), (1,2), (2,2)]
+        average_pooling_size = (9,13)
+
     # 3d case
     elif n_bins[1] == 1 and n_bins.count(1) == 1:
         print 'Using a Wide ResNet with XZT projection'

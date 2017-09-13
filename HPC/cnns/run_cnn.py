@@ -3,17 +3,18 @@
 """Main code for running CNN's."""
 
 import os
+import shutil
 import sys
 import argparse
-import shutil
 import keras as ks
+from keras import backend as K
 
 from models.short_cnn_models import *
 from models.wide_resnet import *
 from utilities.cnn_utilities import *
-from utilities.multi_gpu import *
-from utilities.shuffle_h5 import shuffle_h5
-from utilities.visualization.ks_visualize_activations import load_image_from_h5_file, get_activations, display_activations
+from utilities.multi_gpu.multi_gpu import *
+from utilities.data_tools.shuffle_h5 import shuffle_h5
+from utilities.visualization.ks_visualize_activations import *
 
 
 def parse_input(use_scratch_ssd):
@@ -118,7 +119,6 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scra
     :param bool use_scratch_ssd: Declares if the input files should be copied to the node-local SSD scratch before executing the cnn.
     :param bool zero_center: Declares if the input images ('xs') should be zero-centered before training.
     """
-    # TODO list all available class types here (num_classes, class_name)
     train_files, test_files = parse_input(use_scratch_ssd)
 
     xs_mean = load_zero_center_data(train_files, batchsize, n_bins) if zero_center is True else None
@@ -128,14 +128,16 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scra
     if epoch == 0:
         #model = define_3d_model_xyz(class_type[0], n_bins)
         #model = define_3d_model_xzt(class_type[0], n_bins)
-        model = define_2d_model_yz_test_batch_norm(class_type[0], n_bins)
-        #model = model_wide_residual_network(n_bins, batchsize, nb_classes=class_type[0], k=4, dropout=0, k_size=3)
+        #model = define_2d_model_yz_test_batch_norm(class_type[0], n_bins)
+        #model = define_2d_model_zt_test_batch_norm(class_type[0], n_bins)
+        model = model_wide_residual_network(n_bins, batchsize, nb_classes=class_type[0], N=4, k=4, dropout=0, k_size=3)
 
     else:
         model = ks.models.load_model('models/trained/trained_' + modelname + str(epoch) + '.h5')
 
     model.summary()
-    #ks.utils.plot_model(model, to_file='/models/WRN.png', show_shapes=True, show_layer_names=True) # plot model TODO make it work
+    # plot model, install missing packages with conda install
+    ks.utils.plot_model(model, to_file='./models/model_plots/' + modelname + '.png', show_shapes=True, show_layer_names=True)
     # visualize activations TODO make it work
     #xs = load_image_from_h5_file(train_files[0][0])
     #activations = get_activations(model, xs, print_shape_only=False, layer_name=None)
@@ -153,51 +155,53 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scra
         model = make_parallel(model, gpus_list, usenccl=False, initsync=True, syncopt=False, enqueue=False)
         print_mgpu_modelsummary(model)
 
-    #sgd = ks.optimizers.SGD(lr=0.01, momentum=0.9, decay=1e-5, nesterov=True)
-    #adam = ks.optimizers.Adam(lr=0.01, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
-    #adam = ks.optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1, decay=0.0)
-
     #model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy', 'binary_accuracy'])
-    #model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
 
-    lr = 0.01
-    lr_stepsize = 1e-5
+    lr = 0.001 # 0.01 default for SGD, 0.001 for Adam
+    lr_decay = 1e-4
     sgd = ks.optimizers.SGD(lr=lr, momentum=0.9, decay=0, nesterov=True)
-    model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
+    adam = ks.optimizers.Adam(lr=lr, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0) # epsilon=1 for deep networks, lr = 0.001 default
+    model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
 
     while 1:
         epoch +=1
-        i = 0
 
-        if epoch > 1:
-            lr -= lr_stepsize
-            model.optimizer.lr.assign.set_value(lr)
+        if epoch > 1 and lr_decay > 0:
+            lr -= lr_decay
+            K.set_value(model.optimizer.lr, lr)
+            print 'Decayed learning rate to ' + str(K.get_value(model.optimizer.lr)) + \
+                  ' after epoch ' + str(epoch) + ' (minus ' + str(lr_decay) + ')'
 
-        # process all h5 files, full epoch
-        for (f, f_size) in train_files:
-            i += 1
+        for i, (f, f_size) in enumerate(train_files): # process all h5 files, full epoch
             #if epoch > 1: # just for convenience, we don't want to wait before the first epoch each time
              #   shuffle_h5(f, chunking=(True, batchsize), delete_flag=True)
             print 'Training in epoch', epoch, 'on file ', i, ',', f
             f_size = 500000 # for testing
             model.fit_generator(generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, zero_center_image=xs_mean),
-                                steps_per_epoch=int(f_size / batchsize)-1, epochs=1, verbose=1)
-                                #steps_per_epoch=5, epochs=10000, verbose=1)
-            # store the trained model
+                                steps_per_epoch=int(f_size / batchsize)-1, epochs=1, verbose=1, max_queue_size=10)
             model.save("models/trained/trained_" + modelname + '_f' + str(i) + '_epoch' + str(epoch) + '.h5')
 
-        for (f, f_size) in test_files:
+        for i, (f, f_size) in enumerate(test_files):
             print 'Testing on file ', i, ',', f
             f_size = 50000 # for testing
             evaluation = model.evaluate_generator(generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, zero_center_image=xs_mean),
-                                                  steps=int(f_size / batchsize)-1)
-                                                  #steps=1)
+                                                  steps=int(f_size / batchsize)-1, max_queue_size=10)
             print 'Test sample results: ' + str(evaluation) + ' (' + str(model.metrics_names) + ')'
+
+            #f_size = 50
+            #predictions = model.predict_generator(generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, zero_center_image=xs_mean),
+            #                                    steps=int(f_size / batchsize) - 1, max_queue_size=1)
+            #print predictions
+            #print predictions.argmax(axis=-1)
 
 
 if __name__ == '__main__':
-    # TODO still need to change some stuff in execute_cnn() directly like modelname and optimizers
-    execute_cnn(n_bins=(1,13,18,1), class_type = (2, 'muon-CC_to_elec-CC'),
+    # TODO still need to change some stuff in execute_cnn() directly like optimizers (lr, decay, sgd/adam, ...)
+    # available class_types:
+    # - (2, 'muon-CC_to_elec-NC'), (1, 'muon-CC_to_elec-NC')
+    # - (2, 'muon-CC_to_elec-CC'), (1, 'muon-CC_to_elec-CC')
+    # - (2, 'up_down'), (1, 'up_down')
+    execute_cnn(n_bins=(1,1,18,50), class_type = (2, 'up_down'),
                 batchsize = 32, epoch= 0, n_gpu=1, use_scratch_ssd=False, zero_center=True) # standard 4D case: n_bins=[11,13,18,50]
 
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/train_muon-CC_and_elec-NC_each_480_xyz_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/test_muon-CC_and_elec-NC_each_120_xyz_shuffled.h5
@@ -205,3 +209,4 @@ if __name__ == '__main__':
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/train_muon-CC_and_elec-CC_each_240_xzt_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/test_muon-CC_and_elec-CC_each_60_xzt_shuffled.h5
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/train_muon-CC_and_elec-CC_each_480_xyz_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/test_muon-CC_and_elec-CC_each_120_xyz_shuffled.h5
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo2d/h5/yz/concatenated/train_muon-CC_and_elec-CC_10-100GeV_each_480_yz_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo2d/h5/yz/concatenated/test_muon-CC_and_elec-CC_10-100GeV_each_120_yz_shuffled.h5
+# python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo2d/h5/zt/concatenated/train_muon-CC_10-100GeV_each_480_zt_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo2d/h5/zt/concatenated/test_muon-CC_10-100GeV_each_120_zt_shuffled.h5

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='cnns',
@@ -9,7 +9,7 @@ setup(
     author='Michael Moser',
     author_email='mmoser@km3net.de',
     license='AGPL',
-    packages=['models', 'utilities'],
+    packages=find_packages(),
     include_package_data=True,
 )
 

@@ -7,7 +7,7 @@
 # Make a .txt file with < find /path/to/files -name "file_x-*.h5" | sort --version-sort > listname.list >
 # Don't forget to create the logs/cout folder in the projection_path!
 
-CodeFolder=/home/woody/capn/mppi033h/Code/HPC/cnns/utilities
+CodeFolder=/home/woody/capn/mppi033h/Code/HPC/cnns/utilities/data_tools
 cd ${CodeFolder}
 
 chunksize=32
@@ -28,6 +28,12 @@ chunksize=32
 #output_name_train=train_muon-CC_and_elec-CC_10-100GeV_each_480_yz.h5 # train
 #input_list_name_test=muon-CC_and_elec-CC_10-100GeV_yz_481_to_600.list # test
 #output_name_test=test_muon-CC_and_elec-CC_10-100GeV_each_120_yz.h5 # test
+# 2d - zt - muon-CC only
+projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo2d/h5/zt
+input_list_name_train=muon-CC_10-100GeV_zt_1_to_480.list # train
+output_name_train=train_muon-CC_10-100GeV_each_480_zt.h5 # train
+input_list_name_test=muon-CC_10-100GeV_zt_481_to_600.list # test
+output_name_test=test_muon-CC_10-100GeV_each_120_zt.h5 # test
 # 3d - xyz
 #projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo3d/h5/xyz
 #input_list_name_train=muon-CC_and_elec-CC_10-100GeV_xyz_1_to_480.list # train
@@ -35,11 +41,13 @@ chunksize=32
 #input_list_name_test=muon-CC_and_elec-CC_10-100GeV_xyz_481_to_600.list # test
 #output_name_test=test_muon-CC_and_elec-CC_10-100GeV_each_120_xyz.h5 # test
 # 3d - yzt
-projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo3d/h5/yzt
-input_list_name_train=muon-CC_and_elec-CC_10-100GeV_yzt_1_to_480.list # train
-output_name_train=train_muon-CC_and_elec-CC_10-100GeV_each_480_yzt.h5 # train
-input_list_name_test=muon-CC_and_elec-CC_10-100GeV_yzt_481_to_600.list # test
-output_name_test=test_muon-CC_and_elec-CC_10-100GeV_each_120_yzt.h5 # test
+#projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo3d/h5/yzt
+#input_list_name_train=muon-CC_and_elec-CC_10-100GeV_yzt_1_to_480.list # train
+#output_name_train=train_muon-CC_and_elec-CC_10-100GeV_each_480_yzt.h5 # train
+#input_list_name_test=muon-CC_and_elec-CC_10-100GeV_yzt_481_to_600.list # test
+#output_name_test=test_muon-CC_and_elec-CC_10-100GeV_each_120_yzt.h5 # test
+
+
 
 
 (time taskset -c 0 python concatenate_h5.py --list ${projection_path}/${input_list_name_train} --chunksize ${chunksize} ${projection_path}/concatenated/${output_name_train} > ${projection_path}/logs/cout/${output_name_train}.txt) &

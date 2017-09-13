@@ -19,55 +19,39 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, zer
     :param ndarray zero_center_image: mean_image of the x dataset used for zero-centering.
     :return: (ndarray, ndarray) (xs, ys): Yields a tuple which contains a full batch of images and labels.
     """
-    dimensions = get_dimensions_encoding(batchsize, n_bins)
+    dimensions = get_dimensions_encoding(n_bins, batchsize)
 
-    xs = np.zeros(dimensions, dtype=np.float32) # TODO redundant or better for performance?
-    ys = np.zeros((batchsize, class_type[0]), dtype=np.float32) #TODO can potentially introduce bugs if outside of the while n_entries loop
+    #xs = np.zeros(dimensions, dtype=np.float32) # better for performance to instantiate xs here
 
     while 1:
         f = h5py.File(filepath, "r")
         filesize = len(f['y'])
-        #print "filesize = ", filesize
 
-        # count how many entries we have read
         n_entries = 0
-        # as long as we haven't read all entries from the file: keep reading
         while n_entries < (filesize - batchsize):
-        #while n_entries < batchsize*5:
             # start the next batch at index 0
             # create numpy arrays of input data (features)
             xs = f['x'][n_entries : n_entries + batchsize] #TODO check dimensions
-            xs = np.reshape(xs, dimensions).astype(np.float32)
-
-            #import sys
-            #print xs[0][1]
-            #print xs.shape # (32, 11, 18, 50, 1)
-            #np.set_printoptions(threshold=10)
-            #print np.amax(xs_mean)
-            #print xs_mean
-            #print xs_mean.shape # (11, 18, 50)
+            xs = np.reshape(xs, dimensions).astype(np.float32) #TODO maybe astype first for better performance
 
             if zero_center_image is not None: xs = np.subtract(xs, zero_center_image)
             # and mc info (labels)
             y_values = f['y'][n_entries:n_entries+batchsize]
             y_values = np.reshape(y_values, (batchsize, y_values.shape[1]))
+            ys = np.zeros((batchsize, class_type[0]), dtype=np.float32)
             # encode the labels such that they are all within the same range (and filter the ones we don't want for now)
             # TODO could be vectorized if performance is a bottleneck. Or just use dataflow from tensorpack!
             for c, y_val in enumerate(y_values):
-                ys[c] = encode_targets(y_val, class_type) #TODO test ys[c]=1, simplify
+                ys[c] = encode_targets(y_val, class_type)
 
             # we have read one more batch from this file
             n_entries += batchsize
-            #np.set_printoptions(threshold=np.inf)
-            #print 'ys', ys.shape
-            #print 'xs', xs.shape
-            #print xs[0][1]
-            #sys.exit()
+
             yield (xs, ys)
         f.close()
 
 
-def get_dimensions_encoding(batchsize, n_bins):
+def get_dimensions_encoding(n_bins, batchsize):
     """
     Returns a dimensions tuple for 2,3 and 4 dimensional data.
     :param int batchsize: Batchsize that is used in generate_batches_from_hdf5_file().
@@ -139,7 +123,10 @@ def encode_targets(y_val, class_type):
         :return: int up_down_class_value: binary up/down class value for the event_track.
         """
         # analyze the track info to determine the class number
-        up_down_class_value = int(np.sign(dir_z))
+        up_down_class_value = int(np.sign(dir_z)) # returns -1 if dir_z < 0, 0 if dir_z==0, 1 if dir_z > 0
+
+        assert up_down_class_value != 0
+
         if up_down_class_value == -1:
             up_down_class_value = 0
 
@@ -194,13 +181,7 @@ def encode_targets(y_val, class_type):
         if categorical_type[1]!=0:
             train_y[0] = categorical_type[1]
 
-        #print '------------------'
-        #print y_val
-        #print categorical_type
-        #print train_y
-        #print '------------------'
-
-    elif class_type == (2, 'up_down'): # up down, one neuron at the cnn end
+    elif class_type == (2, 'up_down'): # up down, two neurons at the cnn end
         up_down_class = get_class_up_down(y_val[7]) # returns 0 or 1
         train_y = np.zeros(2, dtype='float32')
         train_y[up_down_class] = 1
@@ -232,7 +213,7 @@ def load_zero_center_data(train_files, batchsize, n_bins):
     :return: ndarray xs_mean: mean_image of the x dataset. Can be used for zero-centering later on.
     """
     if len(train_files) > 1:
-        raise Exception('More than 1 train file for zero-centering is currently not supported')
+        raise Exception('More than 1 train file for zero-centering is currently not supported!')
 
     filepath = train_files[0][0]
 
@@ -242,7 +223,7 @@ def load_zero_center_data(train_files, batchsize, n_bins):
 
     else:
         print 'Calculating the xs_mean_array in order to zero_center the data! Warning: Memory must be as large as the inputfile!'
-        dimensions = get_dimensions_encoding(batchsize, n_bins)
+        dimensions = get_dimensions_encoding(n_bins, batchsize)
         xs_mean = get_mean_image(filepath, dimensions)
 
     return xs_mean
@@ -260,8 +241,8 @@ def get_mean_image(filepath, dimensions):
     # Example: f['x'] has shape (batchsize * x * y * z * 1) #TODO possibly doesn't work for 4D (or 3.5D) data yet!
     # maybe astype np.float64 for increased precision
     xs_mean = np.mean(f['x'], axis=0) # has shape (x * y * z * channels)
-    assert xs_mean.shape == dimensions[1:] # sanity check
-    #xs_mean = np.reshape(xs_mean, dimensions[1:]) # give the shape the channels dimension again
+    #assert xs_mean.shape == dimensions[1:] # sanity check
+    xs_mean = np.reshape(xs_mean, dimensions[1:]) # give the shape the channels dimension again
     #xs_std = np.std(f['x'], axis=0, dtype=np.float64)
     np.save(filepath + '_zero_center_mean.npy', xs_mean)
 

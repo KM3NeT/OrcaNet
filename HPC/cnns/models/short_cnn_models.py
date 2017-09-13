@@ -180,7 +180,7 @@ def define_2d_model_yz_test_batch_norm(number_of_classes, n_bins):
     n_filters_2 = 64
     n_filters_3 = 128
     kernel_size = 3
-    dropout_val = 0
+    dropout_val = 0.1
 
     model = ks.models.Sequential()
     model.add(Convolution2D(n_filters_1, (kernel_size,kernel_size), activation="relu", input_shape=(n_bins[1], n_bins[2], 1),
@@ -195,6 +195,44 @@ def define_2d_model_yz_test_batch_norm(number_of_classes, n_bins):
     model.add(Convolution2D(n_filters_2, (kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal', use_bias=False))
     model.add(BatchNormalization())
     model.add(MaxPooling2D(strides=(2,2)))
+    model.add(Convolution2D(n_filters_2, (kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal', use_bias=False))
+    model.add(BatchNormalization())
+    model.add(Convolution2D(n_filters_3, (kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal', use_bias=False))
+    model.add(BatchNormalization())
+    model.add(Convolution2D(n_filters_3, (kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal', use_bias=False))
+    model.add(BatchNormalization())
+    model.add(Dropout(dropout_val))
+    model.add(Convolution2D(n_filters_3, (kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal', use_bias=False))
+    model.add(MaxPooling2D(strides=(2,2)))
+    model.add(BatchNormalization())
+    model.add(Flatten())
+    model.add(Dense(256, activation="relu"))
+    model.add(Dense(16, activation="relu"))
+    model.add(Dense(number_of_classes, activation='softmax')) #activation='sigmoid'
+
+    return model
+
+
+def define_2d_model_zt_test_batch_norm(number_of_classes, n_bins):
+    n_filters_1 = 64
+    n_filters_2 = 64
+    n_filters_3 = 128
+    kernel_size = 3
+    dropout_val = 0.2
+
+    model = ks.models.Sequential()
+    model.add(Convolution2D(n_filters_1, (kernel_size,kernel_size), activation="relu", input_shape=(n_bins[2], n_bins[3], 1),
+                            padding="same", kernel_initializer='he_normal', use_bias=False))
+    model.add(BatchNormalization())
+    model.add(Convolution2D(n_filters_1, (kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal', use_bias=False))
+    model.add(BatchNormalization())
+    #model.add(MaxPooling2D(strides=(2,2)))
+    model.add(Dropout(dropout_val))
+    model.add(Convolution2D(n_filters_2, (kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal', use_bias=False))
+    model.add(BatchNormalization())
+    model.add(Convolution2D(n_filters_2, (kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal', use_bias=False))
+    model.add(BatchNormalization())
+    model.add(MaxPooling2D(strides=(1,2)))
     model.add(Convolution2D(n_filters_2, (kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal', use_bias=False))
     model.add(BatchNormalization())
     model.add(Convolution2D(n_filters_3, (kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal', use_bias=False))

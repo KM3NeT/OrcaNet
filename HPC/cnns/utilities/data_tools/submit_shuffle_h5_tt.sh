@@ -6,7 +6,7 @@
 # submit with 'qsub -l nodes=1:ppn=4:sl32g,walltime=01:01:00 submit_shuffle_h5_tt.sh'
 # Don't forget to create the logs/cout folder in the projection_path (concatenated/logs/cout)!
 
-CodeFolder=/home/woody/capn/mppi033h/Code/HPC/cnns/utilities
+CodeFolder=/home/woody/capn/mppi033h/Code/HPC/cnns/utilities/data_tools
 cd ${CodeFolder}
 
 chunksize=32
@@ -23,14 +23,18 @@ chunksize=32
 #projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo2d/h5/yz/concatenated
 #input_filename_train=train_muon-CC_and_elec-CC_10-100GeV_each_480_yz.h5
 #input_filename_test=test_muon-CC_and_elec-CC_10-100GeV_each_120_yz.h5
+# 2d - zt - muon-CC only
+projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo2d/h5/zt/concatenated
+input_filename_train=train_muon-CC_10-100GeV_each_480_zt.h5
+input_filename_test=test_muon-CC_10-100GeV_each_120_zt.h5
 # 3d - xyz
 #projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo3d/h5/xyz/concatenated
 #input_filename_train=train_muon-CC_and_elec-CC_10-100GeV_each_480_xyz.h5
 #input_filename_test=test_muon-CC_and_elec-CC_10-100GeV_each_120_xyz.h5
 # 3d - yzt
-projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo3d/h5/yzt/concatenated
-input_filename_train=train_muon-CC_and_elec-CC_10-100GeV_each_480_yzt.h5
-input_filename_test=test_muon-CC_and_elec-CC_10-100GeV_each_120_yzt.h5
+#projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo3d/h5/yzt/concatenated
+#input_filename_train=train_muon-CC_and_elec-CC_10-100GeV_each_480_yzt.h5
+#input_filename_test=test_muon-CC_and_elec-CC_10-100GeV_each_120_yzt.h5
 
 
 # no parallel shuffling, since we are limited by RAM
