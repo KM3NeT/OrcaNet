@@ -118,7 +118,7 @@ def parallelize_model_to_n_gpus(model, n_gpu, batchsize, lr, lr_decay):
     :return: int batchsize, float lr: new batchsize/lr scaled by the number of used gpu's.
     """
     if n_gpu == 1:
-        return model, batchsize, lr
+        return model, batchsize, lr, lr_decay
 
     else:
         assert n_gpu > 1 and isinstance(n_gpu, int), 'You probably made a typo: n_gpu must be an int with n_gpu >= 1!'
@@ -158,10 +158,10 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scra
 
     if epoch == 0:
         #model = define_3d_model_xyz(class_type[0], n_bins)
-        #model = define_3d_model_xzt(class_type[0], n_bins)
+        model = define_3d_model_xzt(class_type[0], n_bins, dropout=0)
         #model = define_2d_model_yz_test_batch_norm(class_type[0], n_bins)
         #model = define_2d_model_zt_test_batch_norm(class_type[0], n_bins)
-        model = model_wide_residual_network(n_bins, batchsize, nb_classes=class_type[0], N=2, k=4, dropout=0, k_size=3)
+        #model = model_wide_residual_network(n_bins, batchsize, nb_classes=class_type[0], N=2, k=4, dropout=0, k_size=3)
 
     else:
         model = ks.models.load_model('models/trained/trained_' + modelname + str(epoch) + '.h5')
@@ -222,8 +222,8 @@ if __name__ == '__main__':
     # - (2, 'muon-CC_to_elec-NC'), (1, 'muon-CC_to_elec-NC')
     # - (2, 'muon-CC_to_elec-CC'), (1, 'muon-CC_to_elec-CC')
     # - (2, 'up_down'), (1, 'up_down')
-    execute_cnn(n_bins=(1,1,18,50), class_type = (2, 'up_down'), batchsize = 32, epoch= 0,
-                n_gpu=4, use_scratch_ssd=False, zero_center=True, shuffle=True) # standard 4D case: n_bins=[11,13,18,50]
+    execute_cnn(n_bins=(11,1,18,50), class_type = (2, 'up_down'), batchsize = 32, epoch= 0,
+                n_gpu=1, use_scratch_ssd=False, zero_center=False, shuffle=False) # standard 4D case: n_bins=[11,13,18,50]
 
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/train_muon-CC_and_elec-NC_each_480_xyz_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/test_muon-CC_and_elec-NC_each_120_xyz_shuffled.h5
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/train_muon-CC_and_elec-CC_each_480_xzt_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/test_muon-CC_and_elec-CC_each_120_xzt_shuffled.h5
