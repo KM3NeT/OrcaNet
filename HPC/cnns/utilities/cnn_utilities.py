@@ -189,7 +189,7 @@ def encode_targets(y_val, class_type):
             train_y[0] = categorical_type[1]
             train_y[1] = categorical_type[2]
 
-    elif class_type[1] == 'up-down':
+    elif class_type[1] == 'up_down':
         #supports both 1 or 2 neurons at the cnn softmax end
         train_y = get_class_up_down_categorical(y_val[7], class_type[0])
 
