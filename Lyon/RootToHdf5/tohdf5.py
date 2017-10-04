@@ -24,9 +24,13 @@ dir_inputlist = os.path.dirname(fp_list)
 # Write shell script: tohdf5
 RootToHdf5_bashfile = open(dir_inputlist + '/RootToHdf5.sh', 'w')
 RootToHdf5_bashfile.write('#!/bin/bash\n')
-RootToHdf5_bashfile.write('source /afs/in2p3.fr/home/m/mmoser/.bash_profile\n')
+#RootToHdf5_bashfile.write('pip list\n')
+#RootToHdf5_bashfile.write('source /afs/in2p3.fr/home/m/mmoser/.bash_profile\n')
+#RootToHdf5_bashfile.write('pip list\n')
 RootToHdf5_bashfile.write('source /sps/km3net/users/mmoser/pyenv_km3pipe_7.2.2.sh\n')
+#RootToHdf5_bashfile.write('pip list\n')
 RootToHdf5_bashfile.write('source /afs/in2p3.fr/home/m/mmoser/setenvAA_jpp8.sh\n')
+RootToHdf5_bashfile.write('pip list\n')
 
 for filepath in filepaths_root:
     RootToHdf5_bashfile.write('tohdf5 -o ' + dir_inputlist + '/' + str(os.path.splitext(os.path.basename(filepath))[0]) + '.h5 ' + str(filepath) + '\n')
