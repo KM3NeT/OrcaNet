@@ -115,22 +115,33 @@ def encode_targets(y_val, class_type):
                                   I.e. (2, 'muon-CC_to_elec-CC')
     :return: ndarray(ndim=1) train_y: Array that contains the encoded class label information of the input event.
     """
-    #TODO update docs
-    def get_class_up_down(dir_z):
+    def get_class_up_down_categorical(dir_z, n_neurons):
         """
         Converts the zenith information (dir_z) to a binary up/down value.
         :param float32 dir_z: z-direction of the event_track (which contains dir_z).
-        :return: int up_down_class_value: binary up/down class value for the event_track.
+        :param int n_neurons: defines the number of neurons in the last cnn layer that should be used with the categorical array.
+        :return ndarray(ndim=1) y_cat_up_down: categorical y ('label') array which can be fed to a NN.
+                                               E.g. [0],[1] for n=1 or [0,1], [1,0] for n=2
         """
         # analyze the track info to determine the class number
         up_down_class_value = int(np.sign(dir_z)) # returns -1 if dir_z < 0, 0 if dir_z==0, 1 if dir_z > 0
 
-        assert up_down_class_value != 0
+        if up_down_class_value == 0:
+            print 'Warning: Found an event with dir_z==0. Setting the up-down class randomly.'
+            #TODO maybe [0.5, 0.5], but does it make sense with cat_crossentropy?
+            up_down_class_value = np.random.randint(2)
 
-        if up_down_class_value == -1:
-            up_down_class_value = 0
+        if up_down_class_value == -1: up_down_class_value = 0 # Bring -1,1 values to 0,1
 
-        return up_down_class_value
+        y_cat_up_down = np.zeros(n_neurons, dtype='float32')
+
+        if n_neurons == 1:
+            y_cat_up_down[0] = up_down_class_value # 1 or 0 for up/down
+        else:
+            y_cat_up_down[up_down_class_value] = 1 # [0,1] or [1,0] for up/down
+
+        return y_cat_up_down
+
 
     def convert_particle_class_to_categorical(particle_type, is_cc, num_classes=4):
         """
@@ -146,50 +157,41 @@ def encode_targets(y_val, class_type):
             raise ValueError('A number of classes !=4 is currently not supported!')
 
         category = int(particle_type_dict[(abs(particle_type), is_cc)])
-        categorical = np.zeros(num_classes, dtype='int')
+        categorical = np.zeros(num_classes, dtype='int8') # TODO try bool
         categorical[category] = 1
+
         return categorical
 
 
-    if class_type == (2, 'muon-CC_to_elec-NC'):
+    if class_type[1] == 'muon-CC_to_elec-NC':
         categorical_type = convert_particle_class_to_categorical(y_val[1], y_val[3], num_classes=4)
-        train_y = np.zeros(2, dtype='float32')
-        train_y[0] = categorical_type[0]
-        train_y[1] = categorical_type[2]
+        train_y = np.zeros(class_type[0], dtype='float32') # 1 ([0], [1]) or 2 ([0,1], [1,0]) neurons
 
-    elif class_type == (1, 'muon-CC_to_elec-NC'): # only one neuron at the end of the cnn instead of two
-        categorical_type = convert_particle_class_to_categorical(y_val[1], y_val[3], num_classes=4)
-        train_y = np.zeros(1, dtype='float32')
-        if categorical_type[0]!=0:
+        if class_type[0] == 1: # 1 neuron
+            if categorical_type[2] != 0:
+                train_y[0] = categorical_type[2] # =0 if elec-NC, =1 if muon-CC
+
+        else: # 2 neurons
+            assert class_type[0] == 2
             train_y[0] = categorical_type[0]
+            train_y[1] = categorical_type[2]
 
-    elif class_type == (2, 'muon-CC_to_elec-CC'):
+    elif class_type[1] == 'muon-CC_to_elec-CC':
         categorical_type = convert_particle_class_to_categorical(y_val[1], y_val[3], num_classes=4)
-        train_y = np.zeros(2, dtype='float32')
-        train_y[0] = categorical_type[1]
-        train_y[1] = categorical_type[2]
+        train_y = np.zeros(class_type[0], dtype='float32')
 
-        #print '------------------'
-        #print y_val
-        #print categorical_type
-        #print train_y
-        #print '------------------'
+        if class_type[0] == 1: # 1 neuron
+            if categorical_type[2] != 0:
+                train_y[0] = categorical_type[2] # =0 if elec-CC, =1 if muon-CC
 
-    elif class_type == (1, 'muon-CC_to_elec-CC'): # only one neuron at the end of the cnn instead of two
-        categorical_type = convert_particle_class_to_categorical(y_val[1], y_val[3], num_classes=4)
-        train_y = np.zeros(1, dtype='float32')
-        if categorical_type[1]!=0:
+        else: # 2 neurons
+            assert class_type[0] == 2
             train_y[0] = categorical_type[1]
+            train_y[1] = categorical_type[2]
 
-    elif class_type == (2, 'up_down'): # up down, two neurons at the cnn end
-        up_down_class = get_class_up_down(y_val[7]) # returns 0 or 1
-        train_y = np.zeros(2, dtype='float32')
-        train_y[up_down_class] = 1
-
-    elif class_type == (1, 'up_down'): # up down, one neuron at the cnn end
-        up_down_class = get_class_up_down(y_val[7]) # returns 0 or 1
-        train_y = np.zeros(1, dtype='float32')
-        train_y[0] = up_down_class
+    elif class_type[1] == 'up-down':
+        #supports both 1 or 2 neurons at the cnn softmax end
+        train_y = get_class_up_down_categorical(y_val[7], class_type[0])
 
     else:
         print "Class type " + str(class_type) + " not supported!"
