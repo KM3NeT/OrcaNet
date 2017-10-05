@@ -3,6 +3,7 @@
 """Main code for running CNN's."""
 
 import os
+import time
 import shutil
 import sys
 import argparse
@@ -127,8 +128,8 @@ def parallelize_model_to_n_gpus(model, n_gpu, batchsize, lr, lr_decay):
         ngpus = len(gpus_list)
         print('Using GPUs: {}'.format(', '.join(gpus_list)))
         batchsize = batchsize * ngpus
-        lr = lr * ngpus
-        lr_decay = lr_decay * ngpus
+        lr = lr #* ngpus #TODO not sure if this makes sense
+        lr_decay = lr_decay #* ngpus
 
         # Data-Parallelize the model via function
         model = make_parallel(model, gpus_list, usenccl=False, initsync=True, syncopt=False, enqueue=False)
@@ -167,15 +168,22 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scra
         model = ks.models.load_model('models/trained/trainedVGG_' + modelname + '_epoch' + str(epoch) + '.h5')
 
     model.summary()
-    # plot model, install missing packages with conda install
+    # plot model, install missing packages with conda install if it throws a module error
     ks.utils.plot_model(model, to_file='./models/model_plots/' + modelname + '.png', show_shapes=True, show_layer_names=True)
+
+    tb_callback = TensorBoardWrapper(generate_batches_from_hdf5_file(test_files[0][0], batchsize, n_bins, class_type, zero_center_image=xs_mean),
+                                     nb_steps=int(50000 / batchsize)-1, log_dir='models/trained/tb_logs/{}'.format(time.time()), histogram_freq=1, batch_size=batchsize,
+                                     write_graph=False, write_grads=True, write_images=True)
+    #tb_callback = ks.callbacks.TensorBoard(log_dir='models/trained/tb_logs/{}'.format(time.time()), histogram_freq=1, batch_size=batchsize, write_graph=True, write_grads=True,
+          #                                 write_images=True, embeddings_freq=0, embeddings_layer_names=None, embeddings_metadata=None)
+
     # visualize activations TODO make it work
     #xs = load_image_from_h5_file(train_files[0][0])
     #activations = get_activations(model, xs, print_shape_only=False, layer_name=None)
     #display_activations(activations)
 
     lr = 0.001 # 0.01 default for SGD, 0.001 for Adam
-    lr_decay = 2e-4
+    lr_decay = 5e-5
     model, batchsize, lr, lr_decay = parallelize_model_to_n_gpus(model, n_gpu, batchsize, lr, lr_decay)
 
     sgd = ks.optimizers.SGD(lr=lr, momentum=0.9, decay=0, nesterov=True)
@@ -197,9 +205,11 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scra
              #   print 'Shuffling file ', f, ' before training in epoch ', epoch
               #  shuffle_h5(f, chunking=(True, batchsize), delete_flag=True)
             print 'Training in epoch', epoch, 'on file ', i, ',', f
-            #f_size = 500000 # for testing
+            f_size = 500000 # for testing
             model.fit_generator(generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, zero_center_image=xs_mean),
-                                steps_per_epoch=int(f_size / batchsize)-1, epochs=1, verbose=1, max_queue_size=10)
+                                steps_per_epoch=int(f_size / batchsize)-1, epochs=10, verbose=1, max_queue_size=10,
+                                validation_data=generate_batches_from_hdf5_file(test_files[0][0], batchsize, n_bins, class_type, zero_center_image=xs_mean),
+                                validation_steps=int(50000 / batchsize)-1, callbacks=[tb_callback])
             model.save("models/trained/trained_" + modelname +  '_epoch' + str(epoch) + '.h5')
 
         for i, (f, f_size) in enumerate(test_files):
@@ -223,10 +233,8 @@ if __name__ == '__main__':
     # - (2, 'muon-CC_to_elec-CC'), (1, 'muon-CC_to_elec-CC')
     # - (2, 'up_down'), (1, 'up_down')
     execute_cnn(n_bins=(11,1,18,50), class_type = (2, 'up_down'), batchsize = 32, epoch = 0,
-                n_gpu=2, use_scratch_ssd=False, zero_center=True, shuffle=False) # standard 4D case: n_bins=[11,13,18,50]
+                n_gpu=1, use_scratch_ssd=False, zero_center=True, shuffle=False) # standard 4D case: n_bins=[11,13,18,50]
 
-# python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/train_muon-CC_and_elec-NC_each_480_xyz_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/test_muon-CC_and_elec-NC_each_120_xyz_shuffled.h5
-# python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/train_muon-CC_and_elec-CC_each_480_xzt_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/test_muon-CC_and_elec-CC_each_120_xzt_shuffled.h5
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/train_muon-CC_and_elec-CC_each_240_xzt_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/test_muon-CC_and_elec-CC_each_60_xzt_shuffled.h5
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/train_muon-CC_and_elec-CC_each_480_xyz_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/test_muon-CC_and_elec-CC_each_120_xyz_shuffled.h5
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo2d/h5/yz/concatenated/train_muon-CC_and_elec-CC_10-100GeV_each_480_yz_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo2d/h5/yz/concatenated/test_muon-CC_and_elec-CC_10-100GeV_each_120_yz_shuffled.h5

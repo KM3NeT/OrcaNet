@@ -5,6 +5,7 @@
 import numpy as np
 import h5py
 import os
+import keras as ks
 
 #------------- Functions used for supplying images to the GPU -------------#
 
@@ -280,3 +281,36 @@ def get_modelname(n_bins, class_type):
     return modelname
 
 #------------- Various other functions -------------#
+
+
+#------------- Classes -------------#
+
+class TensorBoardWrapper(ks.callbacks.TensorBoard):
+    """Up to now (05.10.17), Keras doesn't accept TensorBoard callbacks with validation data that is fed by a generator.
+     Supplying the validation data is needed for the histogram_freq > 1 argument in the TB callback.
+     Without a workaround, only scalar values (e.g. loss, accuracy) and the computational graph of the model can be saved.
+
+     This class acts as a Wrapper for the ks.callbacks.TensorBoard class in such a way,
+     that the whole validation data is put into a single array by using the generator.
+     Then, the single array is used in the validation steps. This workaround is experimental!"""
+
+    def __init__(self, batch_gen, nb_steps, **kwargs):
+        super(TensorBoardWrapper, self).__init__(**kwargs)
+        self.batch_gen = batch_gen # The generator.
+        self.nb_steps = nb_steps   # Number of times to call next() on the generator.
+
+    def on_epoch_end(self, epoch, logs):
+        # Fill in the `validation_data` property.
+        # After it's filled in, the regular on_epoch_end method has access to the validation_data.
+        imgs, tags = None, None
+        for s in xrange(self.nb_steps):
+            ib, tb = next(self.batch_gen)
+            if imgs is None and tags is None:
+                imgs = np.zeros(((self.nb_steps * ib.shape[0],) + ib.shape[1:]), dtype=np.float32)
+                tags = np.zeros(((self.nb_steps * tb.shape[0],) + tb.shape[1:]), dtype=np.uint8)
+            imgs[s * ib.shape[0]:(s + 1) * ib.shape[0]] = ib
+            tags[s * tb.shape[0]:(s + 1) * tb.shape[0]] = tb
+        self.validation_data = [imgs, tags, np.ones(imgs.shape[0]), 0.0]
+        return super(TensorBoardWrapper, self).on_epoch_end(epoch, logs)
+
+#------------- Classes -------------#
