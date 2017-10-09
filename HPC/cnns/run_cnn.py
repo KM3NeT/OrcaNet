@@ -10,102 +10,13 @@ import argparse
 import keras as ks
 from keras import backend as K
 
+from utilities.input_utilities import *
 from models.short_cnn_models import *
 from models.wide_resnet import *
 from utilities.cnn_utilities import *
 from utilities.multi_gpu.multi_gpu import *
 from utilities.data_tools.shuffle_h5 import shuffle_h5
 from utilities.visualization.ks_visualize_activations import *
-
-
-def parse_input(use_scratch_ssd):
-    """
-    Parses the user input for running the CNN.
-    :param bool use_scratch_ssd: specifies if the input files should be copied to the node-local SSD scratch space.
-    :return: list((train_filepath, train_filesize)) train_files: list of tuples that contains the trainfiles and their number of rows.
-    :return: list((test_filepath, test_filesize)) test_files: list of tuples that contains the testfiles and their number of rows.
-    """
-    parser = argparse.ArgumentParser(description='E.g. < python run_cnn.py train_filepath test_filepath [...] > \n'
-                                                 'Script that runs a CNN. \n'
-                                                 'The input arguments are either single files for train- and testdata or \n'
-                                                 'a .list file that contains the filepaths of the train-/testdata.',
-                                     formatter_class=argparse.RawTextHelpFormatter)
-
-    parser.add_argument('train_file', metavar='train_file', type=str, nargs=1, help='the filepath of the traindata file.')
-    parser.add_argument('test_file', metavar='test_file', type=str, nargs=1, help='the filepath of the testdata file.')
-    parser.add_argument('-l', '--list', dest='listfile_train_and_test', type=str, nargs=2,
-                        help='filepath of a .list file that contains all .h5 files that should be concatenated')
-
-    if len(sys.argv) == 1:
-        parser.print_help()
-        sys.exit(1)
-
-    args = parser.parse_args()
-
-    if args.listfile_train_and_test:
-        train_files = []
-        test_files = []
-
-        for line in open(args.listfile_train_and_test[0]):
-            line.rstrip('\n')
-            train_files.append((line, h5_get_number_of_rows(line)))
-
-        for line in open(args.listfile_train_and_test[1]):
-            line.rstrip('\n')
-            test_files.append((line, h5_get_number_of_rows(line)))
-
-    else:
-        train_files = [(args.train_file[0], h5_get_number_of_rows(args.train_file[0]))]
-        test_files = [(args.test_file[0], h5_get_number_of_rows(args.test_file[0]))]
-
-    if use_scratch_ssd is True:
-        train_files, test_files = use_node_local_ssd_for_input(train_files, test_files)
-
-    return train_files, test_files
-
-
-def h5_get_number_of_rows(h5_filepath):
-    """
-    Gets the total number of rows of the first dataset of a .h5 file. Hence, all datasets should have the same number of rows!
-    :param string h5_filepath: filepath of the .h5 file.
-    :return: int number_of_rows: number of rows of the .h5 file in the first dataset.
-    """
-    f = h5py.File(h5_filepath, 'r')
-    number_of_rows = f[f.keys()[0]].shape[0]
-    f.close()
-
-    return number_of_rows
-
-
-def use_node_local_ssd_for_input(train_files, test_files):
-    """
-    Copies the test and train files to the node-local ssd scratch folder and returns the new filepaths of the train and test data.
-    Speeds up I/O and reduces RRZE network load.
-    :param list train_files: list that contains all train files in tuples (filepath, f_size).
-    :param list test_files: list that contains all test files in tuples (filepath, f_size).
-    :return: list train_files_ssd, test_files_ssd: new train/test list with updated SSD /scratch filepaths.
-    """
-    local_scratch_path = os.environ['TMPDIR']
-    train_files_ssd = []
-    test_files_ssd = []
-
-    print 'Copying the input train/test data to the node-local SSD scratch folder'
-    for file_tuple in train_files:
-        input_filepath, f_size = file_tuple[0], file_tuple[1]
-
-        shutil.copy2(input_filepath, local_scratch_path) # copy to /scratch node-local SSD
-        input_filepath_ssd = local_scratch_path + '/' + os.path.basename(input_filepath)
-        train_files_ssd.append((input_filepath_ssd, f_size))
-
-    for file_tuple in test_files:
-        input_filepath, f_size = file_tuple[0], file_tuple[1]
-
-        shutil.copy2(input_filepath, local_scratch_path) # copy to /scratch node-local SSD
-        input_filepath_ssd = local_scratch_path + '/' + os.path.basename(input_filepath)
-        test_files_ssd.append((input_filepath_ssd, f_size))
-
-    print 'Finished copying the input train/test data to the node-local SSD scratch folder'
-    return train_files_ssd, test_files_ssd
 
 
 def parallelize_model_to_n_gpus(model, n_gpu, batchsize, lr, lr_decay):
@@ -116,6 +27,7 @@ def parallelize_model_to_n_gpus(model, n_gpu, batchsize, lr, lr_decay):
     :param int n_gpu: Number of gpu's that the model should be parallelized to.
     :param int batchsize: original batchsize that should be used for training/testing the nn.
     :param float lr: learning rate of the optimizer used in training.
+    :param float lr_decay: learning rate decay during training.
     :return: int batchsize, float lr: new batchsize/lr scaled by the number of used gpu's.
     """
     if n_gpu == 1:
@@ -138,7 +50,88 @@ def parallelize_model_to_n_gpus(model, n_gpu, batchsize, lr, lr_decay):
         return model, batchsize, lr, lr_decay
 
 
-def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scratch_ssd=False, zero_center=True, shuffle=False):
+def train_and_test_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean, epoch, shuffle, lr, lr_decay, tb_logger):
+    """
+    Convenience function that trains (fit_generator) and tests (evaluate_generator) a Keras model.
+    For documentation of the parameters, confer to the fit_model and evaluate_model functions.
+    """
+    epoch += 1
+    if epoch > 1 and lr_decay > 0:
+        lr -= lr_decay
+        K.set_value(model.optimizer.lr, lr)
+        print 'Decayed learning rate to ' + str(K.get_value(model.optimizer.lr)) + \
+              ' before epoch ' + str(epoch) + ' (minus ' + str(lr_decay) + ')'
+
+    fit_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean, epoch, shuffle, tb_logger)
+    evaluate_model(model, test_files, batchsize, n_bins, class_type, xs_mean)
+
+
+def fit_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean, epoch, shuffle, tb_logger=False):
+    """
+    Trains a model based on the Keras fit_generator method.
+    If a TensorBoard callback is wished, validation data has to be passed to the fit_generator method.
+    For this purpose, the first file of the test_files is used.
+    :param ks.model.Model/Sequential model: Keras model of a neural network.
+    :param str modelname: Name of the model.
+    :param list train_files: list of tuples that contains the testfiles and their number of rows (filepath, f_size).
+    :param list test_files: list of tuples that contains the testfiles and their number of rows for the tb_callback.
+    :param int batchsize: Batchsize that is used in the fit_generator method.
+    :param tuple n_bins: Number of bins for each dimension (x,y,z,t) in both the train- and test_files.
+    :param (int, str) class_type: Tuple with the number of output classes and a string identifier to specify the output classes.
+    :param ndarray xs_mean: mean_image of the x (train-) dataset used for zero-centering the test data.
+    :param int epoch: Epoch of the model if it has been trained before.
+    :param bool shuffle: Declares if the training data should be shuffled before the next training epoch.
+    :param bool tb_logger: Declares if a tb_callback during fit_generator should be used (takes long time to save the tb_log!).
+    """
+    if tb_logger is True:
+        tb_callback = TensorBoardWrapper(generate_batches_from_hdf5_file(test_files[0][0], batchsize, n_bins, class_type, zero_center_image=xs_mean),
+                                     nb_steps=int(50000 / batchsize), log_dir='models/trained/tb_logs/' + modelname + '_{}'.format(time.time()),
+                                     histogram_freq=1, batch_size=batchsize, write_graph=False, write_grads=True, write_images=True)
+        callbacks = [tb_callback]
+        validation_data = generate_batches_from_hdf5_file(test_files[0][0], batchsize, n_bins, class_type, zero_center_image=xs_mean) #f_size=None is ok here
+        validation_steps = int(50000 / batchsize)
+    else:
+        validation_data, validation_steps, callbacks = None, None, None
+
+    for i, (f, f_size) in enumerate(train_files):  # process all h5 files, full epoch
+        if epoch > 1 and shuffle is True: # just for convenience, we don't want to wait before the first epoch each time
+            print 'Shuffling file ', f, ' before training in epoch ', epoch
+            shuffle_h5(f, chunking=(True, batchsize), delete_flag=True)
+
+        print 'Training in epoch', epoch, 'on file ', i, ',', f
+        f_size = 50000  # for testing
+        model.fit_generator(
+            generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, f_size=f_size, zero_center_image=xs_mean),
+            steps_per_epoch=int(f_size / batchsize), epochs=1, verbose=1, max_queue_size=10,
+            validation_data=validation_data, validation_steps=validation_steps, callbacks=callbacks)
+        model.save("models/trained/trained_" + modelname + '_epoch' + str(epoch) + '.h5')
+
+
+def evaluate_model(model, test_files, batchsize, n_bins, class_type, xs_mean):
+    """
+    Evaluates a model with validation data based on the Keras evaluate_generator method.
+    :param ks.model.Model/Sequential model: Keras model (trained) of a neural network.
+    :param list test_files: list of tuples that contains the testfiles and their number of rows.
+    :param int batchsize: Batchsize that is used in the evaluate_generator method.
+    :param tuple n_bins: Number of bins for each dimension (x,y,z,t) in the test_files.
+    :param (int, str) class_type: Tuple with the number of output classes and a string identifier to specify the output classes.
+    :param ndarray xs_mean: mean_image of the x (train-) dataset used for zero-centering the test data.
+    """
+    for i, (f, f_size) in enumerate(test_files):
+        print 'Testing on file ', i, ',', f
+        f_size = 50000  # for testing
+        evaluation = model.evaluate_generator(
+            generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, f_size=f_size, zero_center_image=xs_mean),
+            steps=int(f_size / batchsize), max_queue_size=10)
+        print 'Test sample results: ' + str(evaluation) + ' (' + str(model.metrics_names) + ')'
+        # f_size = 50
+        # predictions = model.predict_generator(generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, zero_center_image=xs_mean),
+        #                                    steps=int(f_size / batchsize) - 1, max_queue_size=1)
+        # print predictions
+        # print predictions.argmax(axis=-1)
+
+
+def execute_cnn(n_bins, class_type, batchsize, epoch, n_gpu=1, use_scratch_ssd=False, zero_center=False, shuffle=False, tb_logger=False):
     """
     Runs a convolutional neural network.
     :param tuple n_bins: Declares the number of bins for each dimension (x,y,z,t) in the train- and testfiles.
@@ -150,6 +143,7 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scra
     :param bool use_scratch_ssd: Declares if the input files should be copied to the node-local SSD scratch before executing the cnn.
     :param bool zero_center: Declares if the input images ('xs') should be zero-centered before training.
     :param bool shuffle: Declares if the training data should be shuffled before the next training epoch.
+    :param bool tb_logger: Declares if a tb_callback should be used during training (takes longer to train due to overhead!).
     """
     train_files, test_files = parse_input(use_scratch_ssd)
 
@@ -171,12 +165,6 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scra
     # plot model, install missing packages with conda install if it throws a module error
     ks.utils.plot_model(model, to_file='./models/model_plots/' + modelname + '.png', show_shapes=True, show_layer_names=True)
 
-    tb_callback = TensorBoardWrapper(generate_batches_from_hdf5_file(test_files[0][0], batchsize, n_bins, class_type, zero_center_image=xs_mean),
-                                     nb_steps=int(50000 / batchsize)-1, log_dir='models/trained/tb_logs/{}'.format(time.time()), histogram_freq=1, batch_size=batchsize,
-                                     write_graph=False, write_grads=True, write_images=True)
-    #tb_callback = ks.callbacks.TensorBoard(log_dir='models/trained/tb_logs/{}'.format(time.time()), histogram_freq=1, batch_size=batchsize, write_graph=True, write_grads=True,
-          #                                 write_images=True, embeddings_freq=0, embeddings_layer_names=None, embeddings_metadata=None)
-
     # visualize activations TODO make it work
     #xs = load_image_from_h5_file(train_files[0][0])
     #activations = get_activations(model, xs, print_shape_only=False, layer_name=None)
@@ -192,38 +180,8 @@ def execute_cnn(n_bins, class_type, batchsize = 32, epoch = 0, n_gpu=1, use_scra
     #model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy', 'binary_accuracy'])
 
     while 1:
-        epoch +=1
-
-        if epoch > 1 and lr_decay > 0:
-            lr -= lr_decay
-            K.set_value(model.optimizer.lr, lr)
-            print 'Decayed learning rate to ' + str(K.get_value(model.optimizer.lr)) + \
-                  ' before epoch ' + str(epoch) + ' (minus ' + str(lr_decay) + ')'
-
-        for i, (f, f_size) in enumerate(train_files): # process all h5 files, full epoch
-            #if epoch > 1 and shuffle is True: # just for convenience, we don't want to wait before the first epoch each time
-             #   print 'Shuffling file ', f, ' before training in epoch ', epoch
-              #  shuffle_h5(f, chunking=(True, batchsize), delete_flag=True)
-            print 'Training in epoch', epoch, 'on file ', i, ',', f
-            f_size = 500000 # for testing
-            model.fit_generator(generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, zero_center_image=xs_mean),
-                                steps_per_epoch=int(f_size / batchsize)-1, epochs=10, verbose=1, max_queue_size=10,
-                                validation_data=generate_batches_from_hdf5_file(test_files[0][0], batchsize, n_bins, class_type, zero_center_image=xs_mean),
-                                validation_steps=int(50000 / batchsize)-1, callbacks=[tb_callback])
-            model.save("models/trained/trained_" + modelname +  '_epoch' + str(epoch) + '.h5')
-
-        for i, (f, f_size) in enumerate(test_files):
-            print 'Testing on file ', i, ',', f
-            f_size = 50000 # for testing
-            evaluation = model.evaluate_generator(generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, zero_center_image=xs_mean),
-                                                  steps=int(f_size / batchsize)-1, max_queue_size=10)
-            print 'Test sample results: ' + str(evaluation) + ' (' + str(model.metrics_names) + ')'
-
-            #f_size = 50
-            #predictions = model.predict_generator(generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, zero_center_image=xs_mean),
-            #                                    steps=int(f_size / batchsize) - 1, max_queue_size=1)
-            #print predictions
-            #print predictions.argmax(axis=-1)
+        train_and_test_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean,
+                             epoch, shuffle, lr, lr_decay, tb_logger)
 
 
 if __name__ == '__main__':
@@ -233,7 +191,7 @@ if __name__ == '__main__':
     # - (2, 'muon-CC_to_elec-CC'), (1, 'muon-CC_to_elec-CC')
     # - (2, 'up_down'), (1, 'up_down')
     execute_cnn(n_bins=(11,1,18,50), class_type = (2, 'up_down'), batchsize = 32, epoch = 0,
-                n_gpu=1, use_scratch_ssd=False, zero_center=True, shuffle=False) # standard 4D case: n_bins=[11,13,18,50]
+                n_gpu=1, use_scratch_ssd=False, zero_center=True, shuffle=False, tb_logger=False) # standard 4D case: n_bins=[11,13,18,50]
 
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/train_muon-CC_and_elec-CC_each_240_xzt_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/test_muon-CC_and_elec-CC_each_60_xzt_shuffled.h5
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/train_muon-CC_and_elec-CC_each_480_xyz_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/test_muon-CC_and_elec-CC_each_120_xyz_shuffled.h5
