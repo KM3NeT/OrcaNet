@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """Utility functions used for training a CNN."""
 
+import warnings
 import numpy as np
 import h5py
 import os
@@ -9,7 +10,7 @@ import keras as ks
 
 #------------- Functions used for supplying images to the GPU -------------#
 
-def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, zero_center_image=None):
+def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, f_size=None, zero_center_image=None):
     """
     Generator that returns batches of images ('xs') and labels ('ys') from a h5 file.
     :param string filepath: Full filepath of the input h5 file, e.g. '/path/to/file/file.h5'.
@@ -17,23 +18,27 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, zer
     :param tuple n_bins: Number of bins for each dimension (x,y,z,t) in the h5 file.
     :param (int, str) class_type: Tuple with the umber of output classes and a string identifier to specify the exact output classes.
                                   I.e. (2, 'muon-CC_to_elec-CC')
+    :param int f_size: Specifies the filesize (#images) of the .h5 file if not the whole .h5 file
+                       but a fraction of it (e.g. 10%) should be used for yielding the xs/ys arrays.
+                       This is important if you run fit_generator(epochs>1) with a filesize (and hence # of steps) that is smaller than the .h5 file.
     :param ndarray zero_center_image: mean_image of the x dataset used for zero-centering.
     :return: (ndarray, ndarray) (xs, ys): Yields a tuple which contains a full batch of images and labels.
     """
     dimensions = get_dimensions_encoding(n_bins, batchsize)
 
-    #xs = np.zeros(dimensions, dtype=np.float32) # better for performance to instantiate xs here
-
     while 1:
         f = h5py.File(filepath, "r")
-        filesize = len(f['y'])
+        if f_size is None:
+            f_size = len(f['y'])
+            warnings.warn('f_size=None could produce unexpected results if the f_size used in fit_generator(steps=int(f_size / batchsize)) with epochs > 1 '
+                          'is not equal to the f_size of the true .h5 file. Should be ok if you use the tb_callback.')
 
         n_entries = 0
-        while n_entries < (filesize - batchsize):
+        while n_entries <= (f_size - batchsize):
             # start the next batch at index 0
             # create numpy arrays of input data (features)
-            xs = f['x'][n_entries : n_entries + batchsize] #TODO check dimensions
-            xs = np.reshape(xs, dimensions).astype(np.float32) #TODO maybe astype first for better performance
+            xs = f['x'][n_entries : n_entries + batchsize]
+            xs = np.reshape(xs, dimensions).astype(np.float32)
 
             if zero_center_image is not None: xs = np.subtract(xs, zero_center_image)
             # and mc info (labels)
@@ -49,7 +54,7 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, zer
             n_entries += batchsize
 
             yield (xs, ys)
-        f.close()
+        f.close() #this line of code is actually not reached if steps=f_size/batchsize
 
 
 def get_dimensions_encoding(n_bins, batchsize):
