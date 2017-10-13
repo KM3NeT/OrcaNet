@@ -10,7 +10,7 @@ import keras as ks
 
 #------------- Functions used for supplying images to the GPU -------------#
 
-def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, f_size=None, zero_center_image=None):
+def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, f_size=None, zero_center_image=None, yield_mc_info=False):
     """
     Generator that returns batches of images ('xs') and labels ('ys') from a h5 file.
     :param string filepath: Full filepath of the input h5 file, e.g. '/path/to/file/file.h5'.
@@ -22,7 +22,9 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, f_s
                        but a fraction of it (e.g. 10%) should be used for yielding the xs/ys arrays.
                        This is important if you run fit_generator(epochs>1) with a filesize (and hence # of steps) that is smaller than the .h5 file.
     :param ndarray zero_center_image: mean_image of the x dataset used for zero-centering.
-    :return: (ndarray, ndarray) (xs, ys): Yields a tuple which contains a full batch of images and labels.
+    :param bool yield_mc_info: Specifies if mc-infos (y_values) should be yielded as well.
+                               The mc-infos are used for evaluation after training and testing is finished.
+    :return: tuple output: Yields a tuple which contains a full batch of images and labels (+ mc_info if yield_mc_info=True).
     """
     dimensions = get_dimensions_encoding(n_bins, batchsize)
 
@@ -35,7 +37,6 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, f_s
 
         n_entries = 0
         while n_entries <= (f_size - batchsize):
-            # start the next batch at index 0
             # create numpy arrays of input data (features)
             xs = f['x'][n_entries : n_entries + batchsize]
             xs = np.reshape(xs, dimensions).astype(np.float32)
@@ -53,7 +54,8 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, f_s
             # we have read one more batch from this file
             n_entries += batchsize
 
-            yield (xs, ys)
+            output = (xs, ys) if yield_mc_info is False else (xs, ys) + (y_values,)
+            yield output
         f.close() #this line of code is actually not reached if steps=f_size/batchsize
 
 

@@ -107,6 +107,7 @@ def define_3d_model_xzt(number_of_classes, n_bins, dropout=0):
     model.add(BatchNormalization())
     model.add(Flatten())
     model.add(Dense(256, activation="relu"))
+    model.add(Dropout(dropout))
     model.add(Dense(16, activation="relu"))
     model.add(Dense(number_of_classes, activation='softmax')) #activation='sigmoid'
 
