@@ -212,7 +212,7 @@ def encode_targets(y_val, class_type):
 
 #------------- Functions for preprocessing -------------#
 
-def load_zero_center_data(train_files, batchsize, n_bins):
+def load_zero_center_data(train_files, batchsize, n_bins, n_gpu):
     """
     Gets the xs_mean array that can be used for zero-centering.
     The array is either loaded from a previously saved file or it is calculated on the fly.
@@ -220,6 +220,7 @@ def load_zero_center_data(train_files, batchsize, n_bins):
     :param list((train_filepath, train_filesize)) train_files: list of tuples that contains the trainfiles and their number of rows.
     :param int batchsize: Batchsize that is being used in the data.
     :param tuple n_bins: Number of bins for each dimension (x,y,z,t) in the tran_file.
+    :param int n_gpu: Number of gpu's, used for calculating the available RAM space in get_mean_image().
     :return: ndarray xs_mean: mean_image of the x dataset. Can be used for zero-centering later on.
     """
     if len(train_files) > 1:
@@ -234,28 +235,44 @@ def load_zero_center_data(train_files, batchsize, n_bins):
     else:
         print 'Calculating the xs_mean_array in order to zero_center the data! Warning: Memory must be as large as the inputfile!'
         dimensions = get_dimensions_encoding(n_bins, batchsize)
-        xs_mean = get_mean_image(filepath, dimensions)
+        xs_mean = get_mean_image(filepath, dimensions, n_gpu)
 
     return xs_mean
 
 
-def get_mean_image(filepath, dimensions):
+def get_mean_image(filepath, dimensions, n_gpu):
     """
-    Returns the mean_image of a xs dataset by loading or calculating it.
+    Returns the mean_image of a xs dataset.
     :param str filepath: Filepath of the data upon which the mean_image should be calculated.
-    :param tuple dimensions: dimensions tuple for 2D, 3D or 4D data.
-    :param filepath: filepath of the input data, used as a str for saving the xs_mean_image.
+    :param tuple dimensions: Dimensions tuple for 2D, 3D or 4D data.
+    :param filepath: Filepath of the input data, used as a str for saving the xs_mean_image.
+    :param int n_gpu: Number of used gpu's that is related to how much RAM is available (16G per GPU).
     :return: ndarray xs_mean: mean_image of the x dataset. Can be used for zero-centering later on.
     """
     f = h5py.File(filepath, "r")
-    # Example: f['x'] has shape (batchsize * x * y * z * 1) #TODO possibly doesn't work for 4D (or 3.5D) data yet!
-    # maybe astype np.float64 for increased precision
-    xs_mean = np.mean(f['x'], axis=0) # has shape (x * y * z * channels)
-    #assert xs_mean.shape == dimensions[1:] # sanity check
-    xs_mean = np.reshape(xs_mean, dimensions[1:]) # give the shape the channels dimension again
-    #xs_std = np.std(f['x'], axis=0, dtype=np.float64)
-    np.save(filepath + '_zero_center_mean.npy', xs_mean)
 
+    # check available memory and divide the mean calculation in steps
+    total_memory = n_gpu * 8e9 # In bytes. Take 1/2 of what is available per GPU (16G), just to make sure.
+    filesize = os.path.getsize(filepath)
+    steps = int(np.ceil(filesize/total_memory))
+    n_rows = f['x'].shape[0]
+    stepsize = int(n_rows / float(steps))
+
+    xs_mean_arr = None
+    for i in xrange(steps):
+        if xs_mean_arr is None: # create xs_mean_arr that stores intermediate mean_temp results
+            xs_mean_arr = np.zeros((steps, ) + f['x'].shape[1:], dtype=np.float64)
+
+        if i == steps-1 or steps == 1: # for the last step, calculate mean till the end of the file
+            xs_mean_temp = np.mean(f['x'][i * stepsize: n_rows], axis=0, dtype=np.float64)
+        else:
+            xs_mean_temp = np.mean(f['x'][i*stepsize : (i+1) * stepsize], axis=0, dtype=np.float64)
+        xs_mean_arr[i] = xs_mean_temp
+
+    xs_mean = np.mean(xs_mean_arr, axis=0, dtype=np.float64).astype(np.float32)
+    xs_mean = np.reshape(xs_mean, dimensions[1:]) # give the shape the channels dimension again if not 4D
+
+    np.save(filepath + '_zero_center_mean.npy', xs_mean)
     return xs_mean
 
 #------------- Functions for preprocessing -------------#

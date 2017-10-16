@@ -108,7 +108,7 @@ def fit_model(model, modelname, train_files, test_files, batchsize, n_bins, clas
             generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, f_size=f_size, zero_center_image=xs_mean),
             steps_per_epoch=int(f_size / batchsize), epochs=1, verbose=1, max_queue_size=10,
             validation_data=validation_data, validation_steps=validation_steps, callbacks=callbacks)
-        model.save("models/trained/trained_" + modelname + '_epoch' + str(epoch) + '.h5')
+        model.save("models/trained/trained_" + modelname + '_epoch' + str(epoch) + '.h5') #TODO
 
 
 def evaluate_model(model, test_files, batchsize, n_bins, class_type, xs_mean, n_events=None):
@@ -151,13 +151,13 @@ def execute_cnn(n_bins, class_type, batchsize, epoch, n_gpu=1, mode='train', use
     """
     train_files, test_files = parse_input(use_scratch_ssd)
 
-    xs_mean = load_zero_center_data(train_files, batchsize, n_bins) if zero_center is True else None
+    xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu) if zero_center is True else None
 
     modelname = get_modelname(n_bins, class_type)
 
     if epoch == 0:
-        #model = define_3d_model_xyz(class_type[0], n_bins)
-        model = define_3d_model_xzt(class_type[0], n_bins, dropout=0.25)
+        model = define_3d_model_xyz(class_type[0], n_bins, dropout=0.1)
+        #model = define_3d_model_xzt(class_type[0], n_bins, dropout=0.25)
         #model = define_2d_model_yz_test_batch_norm(class_type[0], n_bins)
         #model = define_2d_model_zt_test_batch_norm(class_type[0], n_bins)
         #model = model_wide_residual_network(n_bins, batchsize, nb_classes=class_type[0], N=2, k=4, dropout=0, k_size=3)
@@ -191,8 +191,8 @@ def execute_cnn(n_bins, class_type, batchsize, epoch, n_gpu=1, mode='train', use
     if mode == 'eval':
         # After training is finished, investigate model performance
         arr_energy_correct = make_performance_array_energy_correct(model, test_files[0][0], n_bins, class_type, batchsize, xs_mean, samples=None)
-        make_energy_to_accuracy_plot(arr_energy_correct, filepath='results/plots/UD_' + modelname + '.pdf',
-                                     title='Up/down classification for muon-CC_and_elec-CC_3-100GeV') #TODO think about more automatic savenames
+        make_energy_to_accuracy_plot_multiple_classes(arr_energy_correct, filepath='results/plots/PT_' + modelname + '.pdf',
+                                     title='Classification for muon-CC_and_elec-CC_3-100GeV') #TODO think about more automatic savenames
 
 
 if __name__ == '__main__':
@@ -202,7 +202,7 @@ if __name__ == '__main__':
     # - (2, 'muon-CC_to_elec-CC'), (1, 'muon-CC_to_elec-CC')
     # - (2, 'up_down'), (1, 'up_down')
     execute_cnn(n_bins=(11,1,18,50), class_type = (2, 'muon-CC_to_elec-CC'), batchsize = 32, epoch = 0,
-                n_gpu=2, mode='train', use_scratch_ssd=False, zero_center=True, shuffle=False, tb_logger=False) # standard 4D case: n_bins=[11,13,18,50]
+                n_gpu=1, mode='train', use_scratch_ssd=False, zero_center=True, shuffle=False, tb_logger=False) # standard 4D case: n_bins=[11,13,18,50]
 
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/train_muon-CC_and_elec-CC_each_240_xzt_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/test_muon-CC_and_elec-CC_each_60_xzt_shuffled.h5
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/train_muon-CC_and_elec-CC_each_480_xyz_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/test_muon-CC_and_elec-CC_each_120_xyz_shuffled.h5

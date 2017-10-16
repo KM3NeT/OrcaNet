@@ -39,31 +39,41 @@ def define_3d_model_xyz_test(number_of_classes, n_bins):
 
     return model
 
-def define_3d_model_xyz(number_of_classes, n_bins):
+def define_3d_model_xyz(number_of_classes, n_bins, dropout=0):
     n_filters_1 = 64
     n_filters_2 = 64
     n_filters_3 = 128
     kernel_size = 3
-    dropout_val = 0.1
+    #dropout_val = 0.1
 
     model = ks.models.Sequential()
-    model.add(Convolution3D(n_filters_1, (kernel_size,kernel_size,kernel_size), activation="relu", input_shape=(n_bins[0], n_bins[1], n_bins[2], 1), padding="same"))
-    model.add(Convolution3D(n_filters_1, (kernel_size,kernel_size,kernel_size), activation="relu", padding="same"))
-    model.add(MaxPooling3D(strides=(1,1,2)))
-    model.add(Dropout(dropout_val))
-    model.add(Convolution3D(n_filters_2, (kernel_size,kernel_size,kernel_size), activation="relu", padding="same"))
-    model.add(Convolution3D(n_filters_2, (kernel_size,kernel_size,kernel_size), activation="relu", padding="same"))
+    model.add(Convolution3D(n_filters_1, (kernel_size,kernel_size,kernel_size), activation="relu", input_shape=(n_bins[0], n_bins[1], n_bins[2], 1),
+                            padding="same", kernel_initializer='he_normal', use_bias=False))
+    model.add(BatchNormalization())
+    model.add(Convolution3D(n_filters_1, (kernel_size,kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal', use_bias=False))
+    model.add(BatchNormalization())
+    #model.add(MaxPooling3D(strides=(1,1,2)))
+    model.add(Dropout(dropout))
+    #model.add(Dropout(dropout_val))
+    model.add(Convolution3D(n_filters_2, (kernel_size,kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal', use_bias=False))
+    model.add(BatchNormalization())
+    model.add(Convolution3D(n_filters_2, (kernel_size,kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal', use_bias=False))
+    model.add(BatchNormalization())
     model.add(MaxPooling3D(strides=(2,2,2)))
-    model.add(Convolution3D(n_filters_2, (kernel_size,kernel_size,kernel_size), activation="relu", padding="same"))
-    #model.add(normal.BatchNormalization())
-    model.add(Convolution3D(n_filters_3, (kernel_size,kernel_size,kernel_size), activation="relu", padding="same"))
-    model.add(Convolution3D(n_filters_3, (kernel_size,kernel_size,kernel_size), activation="relu", padding="same"))
-    model.add(Dropout(dropout_val))
-    model.add(Convolution3D(n_filters_3, (kernel_size,kernel_size,kernel_size), activation="relu", padding="same"))
+    model.add(Convolution3D(n_filters_2, (kernel_size,kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal', use_bias=False))
+    model.add(BatchNormalization())
+    model.add(Convolution3D(n_filters_3, (kernel_size,kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal', use_bias=False))
+    model.add(BatchNormalization())
+    model.add(Convolution3D(n_filters_3, (kernel_size,kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal', use_bias=False))
+    model.add(BatchNormalization())
+    model.add(Dropout(dropout))
+    model.add(Convolution3D(n_filters_3, (kernel_size,kernel_size,kernel_size), activation="relu", padding="same", kernel_initializer='he_normal', use_bias=False))
+    model.add(BatchNormalization())
     model.add(MaxPooling3D(strides=(2,2,2)))
     model.add(BatchNormalization())
     model.add(Flatten())
     model.add(Dense(256, activation="relu"))
+    model.add(Dropout(dropout))
     model.add(Dense(16, activation="relu"))
     model.add(Dense(number_of_classes, activation='softmax'))
 
