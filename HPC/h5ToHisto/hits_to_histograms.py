@@ -162,7 +162,7 @@ def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     hist_xyz = np.histogramdd(event_hits[:, 0:3], bins=(x_bin_edges, y_bin_edges, z_bin_edges))
 
     hist_xyt = np.histogramdd(np.concatenate([x, y, t], axis=1), bins=(x_bin_edges, y_bin_edges, n_bins[3]),
-                              range=((min(x_bin_edges), max(x_bin_edges)), (np.amin(y), np.amax(y)), (t_start, t_end)))
+                              range=((min(x_bin_edges), max(x_bin_edges)), (min(y_bin_edges), max(y_bin_edges)), (t_start, t_end)))
     hist_xzt = np.histogramdd(np.concatenate([x, z, t], axis=1), bins=(x_bin_edges, z_bin_edges, n_bins[3]),
                               range=((min(x_bin_edges), max(x_bin_edges)), (min(z_bin_edges), max(z_bin_edges)), (t_start, t_end)))
     hist_yzt = np.histogramdd(event_hits[:, 1:4], bins=(y_bin_edges, z_bin_edges, n_bins[3]),
@@ -180,21 +180,22 @@ def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
                                np.array(hist_rzt[0], dtype=np.uint8)))
 
 
-def compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, all_4d_to_4d_hists):
+def compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_4d_hists):
     """
     Computes 4D numpy histogram 'images' from the 4D data.
     :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyzt) data for a certain eventID. [positions_xyz, time]
     :param ndarray(ndim=1) x_bin_edges: bin edges for the X-direction.
     :param ndarray(ndim=1) y_bin_edges: bin edges for the Y-direction.
     :param ndarray(ndim=1) z_bin_edges: bin edges for the Z-direction.
+    :param tuple n_bins: Declares the number of bins that should be used for each dimension (x,y,z,t).
     :param list all_4d_to_4d_hists: contains all 4D histogram projections.
     :return: appends the 4D histogram to the all_4d_to_4d_hists list. [xyzt]
     """
     t = event_hits[:, 3:4]
     t_start, t_end = get_time_parameters(t, t_start_margin=0.15, t_end_margin=0.15)
 
-    hist_xyzt = np.histogramdd(event_hits[:, 0:4],
-                               range=( (min(x_bin_edges),max(x_bin_edges)),(min(y_bin_edges),max(y_bin_edges)),
-                                       (min(z_bin_edges),max(z_bin_edges)),(t_start, t_end)))
+    hist_xyzt = np.histogramdd(event_hits[:, 0:4], bins=(x_bin_edges, y_bin_edges, z_bin_edges, n_bins[3]),
+                               range=((min(x_bin_edges),max(x_bin_edges)),(min(y_bin_edges),max(y_bin_edges)),
+                                      (min(z_bin_edges),max(z_bin_edges)),(t_start, t_end)))
 
     all_4d_to_4d_hists.append(np.array(hist_xyzt[0], dtype=np.uint8))
