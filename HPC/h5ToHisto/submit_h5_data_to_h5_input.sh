@@ -18,12 +18,12 @@ i=$((1+((${n}-1) * 4)))
 CodeFolder=/home/woody/capn/mppi033h/Code/HPC/h5ToHisto
 cd ${CodeFolder}
 
-ParticleType=muon-CC #muon-CC
+#ParticleType=muon-CC #muon-CC
 #ParticleType=elec-NC #elec-NC
-#ParticleType=elec-CC #elec-CC
-FileName=JTE.KM3Sim.gseagen.${ParticleType}.3-100GeV-9.1E7-1bin-3.0gspec.ORCA115_9m_2016 #muon-CC
+ParticleType=elec-CC #elec-CC
+#FileName=JTE.KM3Sim.gseagen.${ParticleType}.3-100GeV-9.1E7-1bin-3.0gspec.ORCA115_9m_2016 #muon-CC
 #FileName=JTE.KM3Sim.gseagen.${ParticleType}.3-100GeV-3.4E6-1bin-3.0gspec.ORCA115_9m_2016 #elec-NC
-#FileName=JTE.KM3Sim.gseagen.${ParticleType}.3-100GeV-1.1E6-1bin-3.0gspec.ORCA115_9m_2016 #elec-CC
+FileName=JTE.KM3Sim.gseagen.${ParticleType}.3-100GeV-1.1E6-1bin-3.0gspec.ORCA115_9m_2016 #elec-CC
 HDFFOLDER=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/raw_data/h5/calibrated/${ParticleType}/3-100GeV
 
 # run
@@ -39,11 +39,6 @@ do
     thread2=$((${file_no_loop_start} + 1))
     thread3=$((${file_no_loop_start} + 2))
     thread4=$((${file_no_loop_start} + 3))
-
-    #echo ${thread1}
-    #echo ${thread2}
-    #echo ${thread3}
-    #echo ${thread4}
 
     (time taskset -c 0  python ${CodeFolder}/h5_data_to_h5_input.py ${HDFFOLDER}/${FileName}.${thread1}.h5 > ./logs/cout/${FileName}.${thread1}.txt) &
     (time taskset -c 1  python ${CodeFolder}/h5_data_to_h5_input.py ${HDFFOLDER}/${FileName}.${thread2}.h5 > ./logs/cout/${FileName}.${thread2}.txt) &
