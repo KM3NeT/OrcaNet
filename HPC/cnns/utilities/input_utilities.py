@@ -23,10 +23,10 @@ def parse_input(use_scratch_ssd):
                                                  'a .list file that contains the filepaths of the train-/testdata.',
                                      formatter_class=argparse.RawTextHelpFormatter)
 
-    parser.add_argument('train_file', metavar='train_file', type=str, nargs=1, help='the filepath of the traindata file.')
-    parser.add_argument('test_file', metavar='test_file', type=str, nargs=1, help='the filepath of the testdata file.')
+    parser.add_argument('train_file', metavar='train_file', type=str, nargs='?', help='the filepath of the traindata file.')
+    parser.add_argument('test_file', metavar='test_file', type=str, nargs='?', help='the filepath of the testdata file.')
     parser.add_argument('-l', '--list', dest='listfile_train_and_test', type=str, nargs=2,
-                        help='filepath of a .list file that contains all .h5 files that should be concatenated')
+                        help='filepath of a .list file that contains all .h5 files that should be used for training/testing')
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -39,16 +39,16 @@ def parse_input(use_scratch_ssd):
         test_files = []
 
         for line in open(args.listfile_train_and_test[0]):
-            line.rstrip('\n')
+            line = line.rstrip('\n')
             train_files.append((line, h5_get_number_of_rows(line)))
 
         for line in open(args.listfile_train_and_test[1]):
-            line.rstrip('\n')
+            line = line.rstrip('\n')
             test_files.append((line, h5_get_number_of_rows(line)))
 
     else:
-        train_files = [(args.train_file[0], h5_get_number_of_rows(args.train_file[0]))]
-        test_files = [(args.test_file[0], h5_get_number_of_rows(args.test_file[0]))]
+        train_files = [(args.train_file, h5_get_number_of_rows(args.train_file))]
+        test_files = [(args.test_file, h5_get_number_of_rows(args.test_file))]
 
     if use_scratch_ssd is True:
         train_files, test_files = use_node_local_ssd_for_input(train_files, test_files)

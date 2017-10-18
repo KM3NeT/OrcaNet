@@ -23,7 +23,7 @@ def make_performance_array_energy_correct(model, f, n_bins, class_type, batchsiz
                                   I.e. (2, 'muon-CC_to_elec-CC')
     :param int batchsize: Batchsize that should be used for predicting.
     :param ndarray xs_mean: mean_image of the x dataset if zero-centering is enabled.
-    :param int samples: Number of events that should be predicted. If samples=None, the whole file will be used.
+    :param None/int samples: Number of events that should be predicted. If samples=None, the whole file will be used.
     :return: ndarray arr_energy_correct: Array that contains the energy, correct, particle_type and is_cc info for each event.
     """
     #TODO make docu

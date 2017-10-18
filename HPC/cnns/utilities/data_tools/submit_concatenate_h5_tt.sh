@@ -11,15 +11,37 @@ CodeFolder=/home/woody/capn/mppi033h/Code/HPC/cnns/utilities/data_tools
 cd ${CodeFolder}
 
 chunksize=32
+compression=
 
 
 #------ 3-100GeV ------#
 # 3d - xzt
-#projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt
+projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt
 #input_list_name_train=muon-CC_and_elec-CC_xzt_1_to_240.list # train
 #output_name_train=train_muon-CC_and_elec-CC_each_240_xzt.h5 # train
 #input_list_name_test=muon-CC_and_elec-CC_xzt_241_to_300.list # test
 #output_name_test=test_muon-CC_and_elec-CC_each_60_xzt.h5 # test
+#----batch 2
+input_list_name_train=muon-CC_and_elec-CC_xzt_301_to_540.list # train
+output_name_train=train_muon-CC_and_elec-CC_each_240_batch_301-540_xzt.h5 # train
+input_list_name_test=muon-CC_and_elec-CC_xzt_541_to_600.list # test
+output_name_test=test_muon-CC_and_elec-CC_each_60_batch_541-600_xzt.h5 # test
+
+# 3d - yzt
+#projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/yzt
+#input_list_name_train=muon-CC_and_elec-CC_yzt_1_to_240.list # train
+#output_name_train=train_muon-CC_and_elec-CC_each_240_yzt.h5 # train
+#input_list_name_test=muon-CC_and_elec-CC_yzt_241_to_300.list # test
+#output_name_test=test_muon-CC_and_elec-CC_each_60_yzt.h5 # test
+
+
+# 4d - xyzt
+#projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/h5/xyzt
+#input_list_name_train=muon-CC_and_elec-CC_xyzt_1_to_480.list # train
+#output_name_train=train_muon-CC_and_elec-CC_each_480_xyzt.h5 # train
+#input_list_name_test=muon-CC_and_elec-CC_xyzt_481_to_600.list # test
+#output_name_test=test_muon-CC_and_elec-CC_each_120_xyzt.h5 # test
+
 
 #------ 10-100GeV ------#
 # 2d - yz
@@ -29,11 +51,11 @@ chunksize=32
 #input_list_name_test=muon-CC_and_elec-CC_10-100GeV_yz_481_to_600.list # test
 #output_name_test=test_muon-CC_and_elec-CC_10-100GeV_each_120_yz.h5 # test
 # 2d - zt - muon-CC only
-projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo2d/h5/zt
-input_list_name_train=muon-CC_10-100GeV_zt_1_to_480.list # train
-output_name_train=train_muon-CC_10-100GeV_each_480_zt.h5 # train
-input_list_name_test=muon-CC_10-100GeV_zt_481_to_600.list # test
-output_name_test=test_muon-CC_10-100GeV_each_120_zt.h5 # test
+#projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo2d/h5/zt
+#input_list_name_train=muon-CC_10-100GeV_zt_1_to_480.list # train
+#output_name_train=train_muon-CC_10-100GeV_each_480_zt.h5 # train
+#input_list_name_test=muon-CC_10-100GeV_zt_481_to_600.list # test
+#output_name_test=test_muon-CC_10-100GeV_each_120_zt.h5 # test
 # 3d - xyz
 #projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo3d/h5/xyz
 #input_list_name_train=muon-CC_and_elec-CC_10-100GeV_xyz_1_to_480.list # train

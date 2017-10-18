@@ -69,6 +69,9 @@ def parse_input():
                         help = 'filepath of a .list file that contains all .h5 files that should be concatenated')
     parser.add_argument('-c', '--chunksize', dest='chunksize', type=int,
                         help = 'specify a specific chunksize that should be used instead of the automatic selection.')
+    parser.add_argument('-g', '--compression', dest='compression', action='store_true',
+                        help = 'if a gzip filter with compression 1 should be used for saving.')
+    parser.set_defaults(compression=False)
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -89,7 +92,11 @@ def parse_input():
     if args.chunksize:
         custom_chunksize = (True, args.chunksize)
 
-    return file_list, output_filepath, custom_chunksize
+    compress=(None, None)
+    if args.compression is True:
+        compress = ('gzip', 1)
+
+    return file_list, output_filepath, custom_chunksize, compress
 
 
 def concatenate_h5_files():
@@ -101,7 +108,7 @@ def concatenate_h5_files():
     In deep learning applications for example, the chunksize should be equal to the batch size that is used later on for reading the data.
     """
 
-    file_list, output_filepath, custom_chunksize = parse_input()
+    file_list, output_filepath, custom_chunksize, compress = parse_input()
     cum_rows_list, mean_number_of_rows = get_cum_number_of_rows(file_list)
 
     file_output = h5py.File(output_filepath, 'w')
@@ -122,11 +129,11 @@ def concatenate_h5_files():
                 maxshape = (None,) + folder_data.shape[1:] # change shape of axis zero to None
 
                 if custom_chunksize[0] is True:
-                    output_dataset = file_output.create_dataset(folder_name, data=folder_data, maxshape=maxshape,
-                                                                chunks=(custom_chunksize[1],) + folder_data.shape[1:])
+                    output_dataset = file_output.create_dataset(folder_name, data=folder_data, maxshape=maxshape, chunks=(custom_chunksize[1],) + folder_data.shape[1:],
+                                                                compression=compress[0], compression_opts=compress[1])
                 else:
-                    output_dataset = file_output.create_dataset(folder_name, data=folder_data, maxshape=maxshape,
-                                                                chunks=(mean_number_of_rows,) + folder_data.shape[1:])
+                    output_dataset = file_output.create_dataset(folder_name, data=folder_data, maxshape=maxshape, chunks=(mean_number_of_rows,) + folder_data.shape[1:],
+                                                                compression=compress[0], compression_opts=compress[1])
                 output_dataset.resize(cum_rows_list[-1], axis=0)
 
             else:

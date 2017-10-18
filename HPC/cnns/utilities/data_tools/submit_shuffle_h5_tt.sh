@@ -14,9 +14,22 @@ chunksize=32
 
 #------ 3-100GeV ------#
 # 3d - xzt
-#projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated
+projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated
 #input_filename_train=train_muon-CC_and_elec-CC_each_240_xzt.h5
 #input_filename_test=test_muon-CC_and_elec-CC_each_60_xzt.h5
+#---- batch 2
+input_filename_train=train_muon-CC_and_elec-CC_each_240_batch_301-540_xzt.h5
+input_filename_test=test_muon-CC_and_elec-CC_each_60_batch_541-600_xzt.h5
+
+# 3d - yzt
+#projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/yzt/concatenated
+#input_filename_train=train_muon-CC_and_elec-CC_each_240_yzt.h5
+#input_filename_test=test_muon-CC_and_elec-CC_each_60_yzt.h5
+
+#4d - xyzt
+#projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/h5/xyzt/concatenated
+#input_filename_train=train_muon-CC_and_elec-CC_each_480_xyzt.h5
+#input_filename_test=test_muon-CC_and_elec-CC_each_120_xyzt.h5
 
 #------ 10-100GeV ------#
 # 2d - yz
@@ -24,9 +37,9 @@ chunksize=32
 #input_filename_train=train_muon-CC_and_elec-CC_10-100GeV_each_480_yz.h5
 #input_filename_test=test_muon-CC_and_elec-CC_10-100GeV_each_120_yz.h5
 # 2d - zt - muon-CC only
-projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo2d/h5/zt/concatenated
-input_filename_train=train_muon-CC_10-100GeV_each_480_zt.h5
-input_filename_test=test_muon-CC_10-100GeV_each_120_zt.h5
+#projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo2d/h5/zt/concatenated
+#input_filename_train=train_muon-CC_10-100GeV_each_480_zt.h5
+#input_filename_test=test_muon-CC_10-100GeV_each_120_zt.h5
 # 3d - xyz
 #projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo3d/h5/xyz/concatenated
 #input_filename_train=train_muon-CC_and_elec-CC_10-100GeV_each_480_xyz.h5

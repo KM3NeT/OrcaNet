@@ -224,7 +224,8 @@ def load_zero_center_data(train_files, batchsize, n_bins, n_gpu):
     :return: ndarray xs_mean: mean_image of the x dataset. Can be used for zero-centering later on.
     """
     if len(train_files) > 1:
-        raise Exception('More than 1 train file for zero-centering is currently not supported!')
+        warnings.warn('More than 1 train file for zero-centering is currently not supported! '
+                      'Only the first file is used for calculating the xs_mean_array.')
 
     filepath = train_files[0][0]
 

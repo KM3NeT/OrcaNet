@@ -73,7 +73,6 @@ def shuffle_h5(filepath, delete_flag=True, chunking=(False, None), tool=False):
                       In this case, the shuffled .h5 file is returned instead of closed.
     :return: h5py.File output_file_shuffled: returns the shuffled .h5 file object if it is called from the tool.
     """
-
     input_file = h5py.File(filepath, 'r')
     folder_data_array_dict = {}
 
@@ -123,7 +122,6 @@ def shuffle_h5_tool():
     Shuffles .h5 files where each dataset needs to have the same number of rows (axis_0) for a single file.
     Saves the shuffled data to a new .h5 file.
     """
-
     file_list, delete_flag, chunking = parse_input()
 
     for filepath in file_list:
