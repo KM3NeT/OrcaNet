@@ -24,6 +24,7 @@ def parse_input():
     :return: list file_list: list that contains all filepaths of the input files.
     :return: bool delete_flag: specifies if the old, unshuffled file should be deleted after extracting the data.
     :return: (bool, int) chunking: specifies if chunks should be used and if yes which size the chunks should have.
+    :return (None/str, None/int) compress: Tuple that specifies if a compression should be used for saving.
     """
 
     parser = argparse.ArgumentParser(description='E.g. < python shuffle_h5.py filepath_1 [filepath_2] [...] > \n'
@@ -78,6 +79,7 @@ def shuffle_h5(filepath, delete_flag=True, chunking=(False, None), tool=False, c
     :param (bool, int) chunking: specifies if chunks should be used and if yes which size the chunks should have.
     :param bool tool: specifies if the function is accessed from the shuffle_h5_tool.
                       In this case, the shuffled .h5 file is returned instead of closed.
+    :param (None/str, None/int) compress: Tuple that specifies if a compression should be used for saving. ('gzip', 1)
     :return: h5py.File output_file_shuffled: returns the shuffled .h5 file object if it is called from the tool.
     """
     input_file = h5py.File(filepath, 'r')

@@ -50,6 +50,7 @@ def parse_input():
     :return: list file_list: list that contains all filepaths of the input files.
     :return: str output_filepath: specifies the filepath (path+name) of the output .h5 file.
     :return: (bool, int) custom_chunksize: specifies if a custom_chunksize should be used and if yes, which chunksize has been specified. I.e. (True, 1000).
+    :return (None/str, None/int) compress: Tuple that specifies if a compression should be used for saving. ('gzip', 1)
     """
     parser = argparse.ArgumentParser(description='E.g. < python concatenate_h5.py file_1 file_2 /path/to/output.h5 > or '
                                                  '< python concatenate_h5.py --list filepaths.txt /path/to/output.h5 >.\n'
@@ -107,7 +108,6 @@ def concatenate_h5_files():
     For faster I/O, the chunksize should be set by the user depending on the use case.
     In deep learning applications for example, the chunksize should be equal to the batch size that is used later on for reading the data.
     """
-
     file_list, output_filepath, custom_chunksize, compress = parse_input()
     cum_rows_list, mean_number_of_rows = get_cum_number_of_rows(file_list)
 
