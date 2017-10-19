@@ -40,6 +40,9 @@ def parse_input():
                         help = 'deletes the original input file after the shuffled .h5 is created.')
     parser.add_argument('-c', '--chunksize', dest='chunksize', type=int,
                         help = 'specify a chunksize value in order to use chunked storage for the shuffled .h5 file (default: not chunked).')
+    parser.add_argument('-g', '--compression', dest='compression', action='store_true',
+                        help = 'if a gzip filter with compression 1 should be used for saving. Only works with -c option!')
+    parser.set_defaults(compression=False)
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -59,10 +62,14 @@ def parse_input():
     if args.chunksize:
         chunking = (True, args.chunksize)
 
-    return file_list, delete_flag, chunking
+    compress=(None, None)
+    if args.compression is True:
+        compress = ('gzip', 1)
+
+    return file_list, delete_flag, chunking, compress
 
 
-def shuffle_h5(filepath, delete_flag=True, chunking=(False, None), tool=False):
+def shuffle_h5(filepath, delete_flag=True, chunking=(False, None), tool=False, compress=(None, None)):
     """
     Shuffles a .h5 file where each dataset needs to have the same number of rows (axis_0).
     The shuffled data is saved to a new .h5 file with the suffix < _shuffled.h5 >.
@@ -105,11 +112,11 @@ def shuffle_h5(filepath, delete_flag=True, chunking=(False, None), tool=False):
             np.random.shuffle(dataset)
 
         if chunking[0] is True:
-            dset_shuffled = output_file_shuffled.create_dataset(dataset_key,
-                                                                data=dataset, dtype=dataset.dtype, chunks=(chunking[1],) + dataset.shape[1:])
+            dset_shuffled = output_file_shuffled.create_dataset(dataset_key, data=dataset, dtype=dataset.dtype, chunks=(chunking[1],) + dataset.shape[1:],
+                                                                compression=compress[0], compression_opts=compress[1])
         else:
-            dset_shuffled = output_file_shuffled.create_dataset(dataset_key,
-                                                                data=dataset, dtype=dataset.dtype)
+            dset_shuffled = output_file_shuffled.create_dataset(dataset_key, data=dataset, dtype=dataset.dtype,
+                                                                compression=compress[0], compression_opts=compress[1])
     if tool is True:
         return output_file_shuffled
     else:
@@ -122,11 +129,11 @@ def shuffle_h5_tool():
     Shuffles .h5 files where each dataset needs to have the same number of rows (axis_0) for a single file.
     Saves the shuffled data to a new .h5 file.
     """
-    file_list, delete_flag, chunking = parse_input()
+    file_list, delete_flag, chunking, compress = parse_input()
 
     for filepath in file_list:
         print 'Shuffling file ' + filepath
-        output_file_shuffled = shuffle_h5(filepath, delete_flag=delete_flag, chunking=chunking, tool=True)
+        output_file_shuffled = shuffle_h5(filepath, delete_flag=delete_flag, chunking=chunking, tool=True, compress=compress)
 
         print 'Finished shuffling. Output information:'
         print '---------------------------------------'
