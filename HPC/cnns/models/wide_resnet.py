@@ -43,7 +43,7 @@ def decode_input_dimensions(n_bins, batchsize):
     and appropriate strides and avg_pooling sizes depending on the projection type.
     :param tuple n_bins: Number of bins (x,y,z,t) of the data.
     :param int batchsize: Batchsize of the fed data.
-    :return: tuple input_dim: 2D, 3D or 4D dimensions tuple (ints).
+    :return: tuple input_dim: dimensions tuple for 2D, 3D or 4D data (ints).
     :return: [tuple, tuple] strides: Strides of the WRN.
     :return: tuple average_pooling_size: Avg_pooling size of the WRN.
     """
