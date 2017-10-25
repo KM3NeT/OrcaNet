@@ -11,12 +11,13 @@ from utilities.cnn_utilities import get_dimensions_encoding
 
 #------------- VGG-like model -------------#
 
-def decode_input_dimensions_vgg(n_bins, batchsize):
+def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels):
     """
     Returns the general dimension (2D/3D), the input dimensions (i.e. bs x 11 x 13 x 18 x channels=1 for 3D)
     and appropriate max_pool_sizes depending on the projection type.
     :param tuple n_bins: Number of bins (x,y,z,t) of the data.
     :param int batchsize: Batchsize of the fed data.
+    :param None/str swap_4d_channels: For 3.5D nets, specifies if the default channel (t) should be swapped with another dim.
     :return: int dim: Dimension of the network (2D/3D).
     :return: tuple input_dim: dimensions tuple for 2D, 3D or 4D data (ints).
     :return: dict max_pool_sizes: Dict that specifies the Pooling locations and properties for the VGG net.
@@ -55,6 +56,22 @@ def decode_input_dimensions_vgg(n_bins, batchsize):
             raise IndexError('No suitable 3D projection found in decode_input_dimensions().'
                              'Please add the projection type with the pooling dict to the function.')
 
+    elif n_bins.count(1) == 0:
+        dim = 3
+
+        if swap_4d_channels is None:
+            print 'Using a VGG-like 3.5D CNN with XYZ data and T channel information.'
+            max_pool_sizes = {3: (2, 2, 2), 7: (2, 2, 2)}
+
+        elif swap_4d_channels == 'yzt-x':
+            print 'Using a VGG-like 3.5D CNN with YZT data and X channel information.'
+            max_pool_sizes = {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}
+            input_dim = (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1]) # [bs,y,z,t,x]
+
+        else:
+            raise IOError('3.5D projection types other than XYZ-T and YZT-X are not yet supported.'
+                          'Please add the max_pool_sizes dict in the function by yourself.')
+
     else:
         raise IOError('Data types other than 2D or 3D are not yet supported. '
                       'Please specify a 2D or 3D n_bins tuple.')
@@ -62,7 +79,7 @@ def decode_input_dimensions_vgg(n_bins, batchsize):
     return dim, input_dim, max_pool_sizes
 
 
-def create_vgg_like_model(n_bins, batchsize, nb_classes=2, n_filters=None, dropout=0, k_size=3):
+def create_vgg_like_model(n_bins, batchsize, nb_classes=2, n_filters=None, dropout=0, k_size=3, swap_4d_channels=None):
     """
     Returns a VGG-like model (stacked conv. layers) with MaxPooling and Dropout if wished.
     The number of convolutional layers can be controlled with the n_filters parameter:
@@ -72,12 +89,13 @@ def create_vgg_like_model(n_bins, batchsize, nb_classes=2, n_filters=None, dropo
     :param int batchsize: Batchsize of the data that will be used with the VGG net.
     :param tuple n_filters: Number of filters for each conv. layer. len(n_filters)=n_conv_layer.
     :param float dropout: Adds dropout if >0.
-    :param int k_size: Kernel size which is used for all three dimensions.
+    :param int k_size: Kernel size which is used for all dimensions.
+    :param None/str swap_4d_channels: For 3.5D nets, specifies if the default channel (t) should be swapped with another dim.
     :return: Model model: Keras VGG-like model.
     """
     if n_filters is None: n_filters = (64,64,64,64,64,128,128,128)
 
-    dim, input_dim, max_pool_sizes = decode_input_dimensions_vgg(n_bins, batchsize)
+    dim, input_dim, max_pool_sizes = decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels)
 
     input_layer = Input(shape=input_dim[1:], dtype=K.floatx())  # input_layer
     x = conv_block(input_layer, dim, n_filters[0], k_size=k_size, dropout=dropout, max_pooling=max_pool_sizes.get(0))
@@ -86,7 +104,6 @@ def create_vgg_like_model(n_bins, batchsize, nb_classes=2, n_filters=None, dropo
         x = conv_block(x, dim, n_filters[i], k_size=k_size, dropout=dropout, max_pooling=max_pool_sizes.get(i))
 
     x = Flatten()(x)
-    x = Dense(512, activation='relu')(x)
     x = Dense(256, activation='relu')(x)
     if dropout > 0.0: x = Dropout(dropout)(x)
     x = Dense(16, activation='relu')(x)

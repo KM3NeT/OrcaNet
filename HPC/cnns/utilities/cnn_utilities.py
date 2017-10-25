@@ -10,7 +10,7 @@ import keras as ks
 
 #------------- Functions used for supplying images to the GPU -------------#
 
-def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, f_size=None, zero_center_image=None, yield_mc_info=False):
+def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, f_size=None, zero_center_image=None, yield_mc_info=False, swap_col=None):
     """
     Generator that returns batches of images ('xs') and labels ('ys') from a h5 file.
     :param string filepath: Full filepath of the input h5 file, e.g. '/path/to/file/file.h5'.
@@ -24,6 +24,8 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, f_s
     :param ndarray zero_center_image: mean_image of the x dataset used for zero-centering.
     :param bool yield_mc_info: Specifies if mc-infos (y_values) should be yielded as well.
                                The mc-infos are used for evaluation after training and testing is finished.
+    :param bool swap_col: Specifies, if the index of the columns for xs should be swapped. Necessary for 3.5D nets.
+                          Currently available: 'yzt-x' -> [3,1,2,0] from [0,1,2,3]
     :return: tuple output: Yields a tuple which contains a full batch of images and labels (+ mc_info if yield_mc_info=True).
     """
     dimensions = get_dimensions_encoding(n_bins, batchsize)
@@ -41,14 +43,17 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, f_s
             xs = f['x'][n_entries : n_entries + batchsize]
             xs = np.reshape(xs, dimensions).astype(np.float32)
 
-            if zero_center_image is not None: xs = np.subtract(xs, zero_center_image)
+            if swap_col is not None:
+                swap_4d_channels_dict = {'yzt-x': [3,1,2,0]}
+                xs[:, swap_4d_channels_dict[swap_col]] = xs[:, [0,1,2,3]]
+
+            if zero_center_image is not None: xs = np.subtract(xs, zero_center_image) # if swap_col is not None, zero_center_image is already swapped
             # and mc info (labels)
             y_values = f['y'][n_entries:n_entries+batchsize]
-            y_values = np.reshape(y_values, (batchsize, y_values.shape[1]))
+            y_values = np.reshape(y_values, (batchsize, y_values.shape[1])) #TODO simplify with (y_values, y_values.shape) ?
             ys = np.zeros((batchsize, class_type[0]), dtype=np.float32)
             # encode the labels such that they are all within the same range (and filter the ones we don't want for now)
-            # TODO could be vectorized if performance is a bottleneck. Or just use dataflow from tensorpack!
-            for c, y_val in enumerate(y_values):
+            for c, y_val in enumerate(y_values): # Could be vectorized with numba, or use dataflow from tensorpack
                 ys[c] = encode_targets(y_val, class_type)
 
             # we have read one more batch from this file
@@ -56,7 +61,7 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, f_s
 
             output = (xs, ys) if yield_mc_info is False else (xs, ys) + (y_values,)
             yield output
-        f.close() #this line of code is actually not reached if steps=f_size/batchsize
+        f.close() # this line of code is actually not reached if steps=f_size/batchsize
 
 
 def get_dimensions_encoding(n_bins, batchsize):
@@ -212,7 +217,7 @@ def encode_targets(y_val, class_type):
 
 #------------- Functions for preprocessing -------------#
 
-def load_zero_center_data(train_files, batchsize, n_bins, n_gpu):
+def load_zero_center_data(train_files, batchsize, n_bins, n_gpu, swap_4d_channels=None):
     """
     Gets the xs_mean array that can be used for zero-centering.
     The array is either loaded from a previously saved file or it is calculated on the fly.
@@ -221,6 +226,7 @@ def load_zero_center_data(train_files, batchsize, n_bins, n_gpu):
     :param int batchsize: Batchsize that is being used in the data.
     :param tuple n_bins: Number of bins for each dimension (x,y,z,t) in the tran_file.
     :param int n_gpu: Number of gpu's, used for calculating the available RAM space in get_mean_image().
+    :param None/str swap_4d_channels: For 4D data. Specifies if the columns in the xs_mean array should be swapped.
     :return: ndarray xs_mean: mean_image of the x dataset. Can be used for zero-centering later on.
     """
     if len(train_files) > 1:
@@ -232,11 +238,14 @@ def load_zero_center_data(train_files, batchsize, n_bins, n_gpu):
     if os.path.isfile(filepath + '_zero_center_mean.npy') is True:
         print 'Loading an existing xs_mean_array in order to zero_center the data!'
         xs_mean = np.load(filepath + '_zero_center_mean.npy')
-
     else:
-        print 'Calculating the xs_mean_array in order to zero_center the data! Warning: Memory must be as large as the inputfile!'
+        print 'Calculating the xs_mean_array in order to zero_center the data!'
         dimensions = get_dimensions_encoding(n_bins, batchsize)
         xs_mean = get_mean_image(filepath, dimensions, n_gpu)
+
+    if swap_4d_channels is not None:
+        swap_4d_channels_dict = {'yzt-x': [3,1,2,0]}
+        xs_mean[:, swap_4d_channels_dict['yzt-x']] = xs_mean[:, [0,1,2,3]]
 
     return xs_mean
 
@@ -244,6 +253,7 @@ def load_zero_center_data(train_files, batchsize, n_bins, n_gpu):
 def get_mean_image(filepath, dimensions, n_gpu):
     """
     Returns the mean_image of a xs dataset.
+    Calculating still works if xs is larger than the available memory and also if the file is compressed!
     :param str filepath: Filepath of the data upon which the mean_image should be calculated.
     :param tuple dimensions: Dimensions tuple for 2D, 3D or 4D data.
     :param filepath: Filepath of the input data, used as a str for saving the xs_mean_image.
@@ -254,13 +264,17 @@ def get_mean_image(filepath, dimensions, n_gpu):
 
     # check available memory and divide the mean calculation in steps
     total_memory = n_gpu * 8e9 # In bytes. Take 1/2 of what is available per GPU (16G), just to make sure.
-    filesize = os.path.getsize(filepath)
+    #filesize = os.path.getsize(filepath) # doesn't work for compressed files
+    filesize =  get_array_memsize(f['x'])
+
     steps = int(np.ceil(filesize/total_memory))
     n_rows = f['x'].shape[0]
     stepsize = int(n_rows / float(steps))
 
     xs_mean_arr = None
+
     for i in xrange(steps):
+        print 'Calculating the mean_image of the xs dataset in step ' + str(i)
         if xs_mean_arr is None: # create xs_mean_arr that stores intermediate mean_temp results
             xs_mean_arr = np.zeros((steps, ) + f['x'].shape[1:], dtype=np.float64)
 
@@ -275,6 +289,21 @@ def get_mean_image(filepath, dimensions, n_gpu):
 
     np.save(filepath + '_zero_center_mean.npy', xs_mean)
     return xs_mean
+
+
+def get_array_memsize(array):
+    """
+    Calculates the approximate memory size of an array.
+    :param ndarray array: an array.
+    :return: float memsize: size of the array in bytes.
+    """
+    shape = array.shape
+    n_numbers = reduce(lambda x, y: x*y, shape) # number of entries in an array
+    precision = 8 # Precision of each entry, typically uint8 for xs datasets
+    memsize = (n_numbers * precision) / float(8) # in bytes
+
+    return memsize
+
 
 #------------- Functions for preprocessing -------------#
 
