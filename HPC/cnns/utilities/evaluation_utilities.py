@@ -26,9 +26,8 @@ def make_performance_array_energy_correct(model, f, n_bins, class_type, batchsiz
     :param None/int samples: Number of events that should be predicted. If samples=None, the whole file will be used.
     :return: ndarray arr_energy_correct: Array that contains the energy, correct, particle_type and is_cc info for each event.
     """
-    #TODO make docu
     # TODO only works for a single test_file till now
-    generator = generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, zero_center_image=xs_mean, yield_mc_info=True)
+    generator = generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, zero_center_image=xs_mean, yield_mc_info=True) # f_size=samples prob not necessary
 
     if samples is None: samples = len(h5py.File(f, 'r')['y'])
     steps = samples/batchsize
@@ -177,8 +176,6 @@ def make_step_plot_1d_energy_accuracy_class(arr_energy_correct_classes, axes, pa
     hist_1d_energy_correct_class = np.histogram(arr_energy_correct_class[correct_class == 1, 0], bins=98, range=plot_range)
 
     bin_edges = hist_1d_energy_class[1]
-    #print hist_1d_energy_correct_class[0]
-    #print hist_1d_energy_class[0]
     hist_1d_energy_accuracy_class_bins = np.divide(hist_1d_energy_correct_class[0], hist_1d_energy_class[0], dtype=np.float32) # TODO solve division by zero
 
     if invert is True:
@@ -197,9 +194,6 @@ def select_class(arr_energy_correct_classes, class_vector):
     :param (int, int) class_vector: Specifies the class that is used for filtering the array. E.g. (14,1) for muon-CC.
     """
     check_arr_for_class = arr_energy_correct_classes[:,2:4] == class_vector  # returns a bool for each of the class_vector entries
-
-    #print arr_energy_correct_classes
-    #print check_arr_for_class
 
     # Select only the events, where every bool for one event is True
     indices_rows_with_class = np.logical_and(check_arr_for_class[:, 0], check_arr_for_class[:, 1])
