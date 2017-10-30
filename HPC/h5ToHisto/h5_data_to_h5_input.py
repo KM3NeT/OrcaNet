@@ -131,8 +131,7 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_h
     all_4d_to_2d_hists, all_4d_to_3d_hists, all_4d_to_4d_hists = [], [], []
     mc_infos = []
 
-    if do2d_pdf[0] is True:
-        glob.pdf_2d_plots = PdfPages('Results/4dTo2d/' + filename_output + '_plots.pdf')
+    if do2d_pdf[0] is True: glob.pdf_2d_plots = PdfPages('Results/4dTo2d/' + filename_output + '_plots.pdf')
 
     # Initialize HDF5Pump of the input file
     event_pump = kp.io.hdf5.HDF5Pump(filename=filename_input)
@@ -160,10 +159,9 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_h
         if do4d:
             compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_4d_hists)
 
-        if do2d_pdf[0] is True:
-            if i >= do2d_pdf[1]:
-                glob.pdf_2d_plots.close()
-                break
+        if do2d_pdf[0] is True and i >= do2d_pdf[1]:
+            glob.pdf_2d_plots.close()
+            break
 
     if do2d:
         store_histograms_as_hdf5(np.stack([hist_tuple[0] for hist_tuple in all_4d_to_2d_hists]), np.array(mc_infos), 'Results/4dTo2d/h5/xy/' + filename_output + '_xy.h5')
