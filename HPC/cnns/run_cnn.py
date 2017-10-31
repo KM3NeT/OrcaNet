@@ -58,7 +58,7 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
     """
     epoch += 1
     if epoch > 1 and lr_decay > 0:
-        lr -= lr_decay
+        lr *= 1 - float(lr_decay)
         K.set_value(model.optimizer.lr, lr)
         print 'Decayed learning rate to ' + str(K.get_value(model.optimizer.lr)) + \
               ' before epoch ' + str(epoch) + ' (minus ' + str(lr_decay) + ')'
@@ -94,7 +94,7 @@ def fit_model(model, modelname, train_files, test_files, batchsize, n_bins, clas
                                      nb_steps=int(5000 / batchsize), log_dir='models/trained/tb_logs/' + modelname + '_{}'.format(time.time()),
                                      histogram_freq=1, batch_size=batchsize, write_graph=False, write_grads=True, write_images=True)
         callbacks = [tb_callback]
-        validation_data = generate_batches_from_hdf5_file(test_files[0][0], batchsize, n_bins, class_type, zero_center_image=xs_mean) #f_size=None is ok here
+        validation_data = generate_batches_from_hdf5_file(test_files[0][0], batchsize, n_bins, class_type, swap_col=swap_4d_channels, zero_center_image=xs_mean) #f_size=None is ok here
         validation_steps = int(5000 / batchsize)
     else:
         validation_data, validation_steps, callbacks = None, None, None
@@ -111,7 +111,7 @@ def fit_model(model, modelname, train_files, test_files, batchsize, n_bins, clas
             generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, f_size=f_size, zero_center_image=xs_mean, swap_col=swap_4d_channels),
             steps_per_epoch=int(f_size / batchsize), epochs=1, verbose=1, max_queue_size=10,
             validation_data=validation_data, validation_steps=validation_steps, callbacks=callbacks)
-        model.save("models/trained/trained_" + modelname + '_epoch' + str(epoch) + '.h5') #TODO
+        model.save("models/trained/trained_" + modelname + '_epoch' + str(epoch) + '.h5')
 
 
 def evaluate_model(model, test_files, batchsize, n_bins, class_type, xs_mean, swap_4d_channels, n_events=None):
@@ -137,13 +137,14 @@ def evaluate_model(model, test_files, batchsize, n_bins, class_type, xs_mean, sw
         print 'Test sample results: ' + str(evaluation) + ' (' + str(model.metrics_names) + ')'
 
 
-def execute_cnn(n_bins, class_type, batchsize, epoch, n_gpu=1, mode='train', swap_4d_channels=None,
+def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=1, mode='train', swap_4d_channels=None,
                 use_scratch_ssd=False, zero_center=False, shuffle=False, tb_logger=False):
     """
     Runs a convolutional neural network.
     :param tuple n_bins: Declares the number of bins for each dimension (x,y,z,t) in the train- and testfiles.
     :param (int, str) class_type: Declares the number of output classes and a string identifier to specify the exact output classes.
                                   I.e. (2, 'muon-CC_to_elec-CC')
+    :param str nn_arch: Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
     :param int batchsize: Batchsize that should be used for the cnn.
     :param int epoch: Declares if a previously trained model or a new model (=0) should be loaded.
     :param int n_gpu: Number of gpu's that should be used. n > 1 for multi-gpu implementation.
@@ -162,15 +163,14 @@ def execute_cnn(n_bins, class_type, batchsize, epoch, n_gpu=1, mode='train', swa
 
     xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu, swap_4d_channels=swap_4d_channels) if zero_center is True else None
 
-    modelname = get_modelname(n_bins, class_type)
+    modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels)
 
     if epoch == 0:
-        #model = define_3d_model_xzt(class_type[0], n_bins, dropout=0.0)
-        #model = define_35d_model_xyz_t(class_type[0], n_bins, dropout=0.1)
+        if nn_arch is 'WRN': model = create_wide_residual_network(n_bins, batchsize, nb_classes=class_type[0], N=2, k=2, dropout=0, k_size=3)
 
-        #model = model_wide_residual_network(n_bins, batchsize, nb_classes=class_type[0], N=2, k=2, dropout=0, k_size=3)
-        model = create_vgg_like_model(n_bins, batchsize, nb_classes=class_type[0], dropout=0.1,
-                                      n_filters=(64, 64, 64, 64, 64, 128, 128, 128), swap_4d_channels=swap_4d_channels)
+        elif nn_arch is 'VGG': model = create_vgg_like_model(n_bins, batchsize, nb_classes=class_type[0], dropout=0.1,
+                                                           n_filters=(64, 64, 64, 64, 64, 128, 128, 128), swap_4d_channels=swap_4d_channels)
+        else: raise ValueError('Currently, only "WRN" or "VGG" are available as nn_arch')
     else:
         model = ks.models.load_model('models/trained/trained_' + modelname + '_epoch' + str(epoch) + '.h5')
 
@@ -183,14 +183,13 @@ def execute_cnn(n_bins, class_type, batchsize, epoch, n_gpu=1, mode='train', swa
     #activations = get_activations(model, xs, print_shape_only=False, layer_name=None)
     #display_activations(activations)
 
-    #lr = 0.001 # 0.01 default for SGD, 0.001 for Adam
-    lr = 0.001
-    lr_decay = 4e-5
+    lr = 0.001 # 1e-2 default for SGD, 1e-3 for Adam
+    lr_decay = 0.1 # % decay for each epoch, e.g. if 0.1 -> lr_new = lr*(1-0.1)=0.9*lr
     model, batchsize, lr, lr_decay = parallelize_model_to_n_gpus(model, n_gpu, batchsize, lr, lr_decay)
 
     sgd = ks.optimizers.SGD(lr=lr, momentum=0.9, decay=0, nesterov=True)
     adam = ks.optimizers.Adam(lr=lr, beta_1=0.9, beta_2=0.999, epsilon=0.1, decay=0.0) # epsilon=1 for deep networks, lr = 0.001 default
-    model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
+    if epoch == 0: model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
     #model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy', 'binary_accuracy'])
 
     if mode == 'train':
@@ -211,8 +210,8 @@ if __name__ == '__main__':
     # - (2, 'muon-CC_to_elec-NC'), (1, 'muon-CC_to_elec-NC')
     # - (2, 'muon-CC_to_elec-CC'), (1, 'muon-CC_to_elec-CC')
     # - (2, 'up_down'), (1, 'up_down')
-    execute_cnn(n_bins=(11,13,18,50), class_type = (2, 'muon-CC_to_elec-CC'), batchsize = 32, epoch = 0,
-                n_gpu=1, mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False) # standard 4D case: n_bins=[11,13,18,50]
+    execute_cnn(n_bins=(11,13,18,50), class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='WRN', batchsize=32, epoch=0,
+                n_gpu=1, mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False) # standard 4D case: n_bins=[11,13,18,50]
 
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/train_muon-CC_and_elec-CC_each_240_xzt_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/test_muon-CC_and_elec-CC_each_60_xzt_shuffled.h5
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/train_muon-CC_and_elec-CC_each_480_xyz_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/test_muon-CC_and_elec-CC_each_120_xyz_shuffled.h5

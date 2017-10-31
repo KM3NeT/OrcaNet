@@ -73,8 +73,8 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels):
                           'Please add the max_pool_sizes dict in the function by yourself.')
 
     else:
-        raise IOError('Data types other than 2D or 3D are not yet supported. '
-                      'Please specify a 2D or 3D n_bins tuple.')
+        raise IOError('Data types other than 2D, 3D or 4D (3.5D actually) are not yet supported. '
+                      'Please specify a 2D, 3D or 4D n_bins tuple.')
 
     return dim, input_dim, max_pool_sizes
 
