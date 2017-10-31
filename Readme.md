@@ -1,4 +1,6 @@
 ## Deep Learning in KM3NeT-ORCA and the Tau-Appearance project <br />
+Find more information about KM3NeT on [www.km3net.org](http://www.km3net.org).
+
 This repository contains contains code that is used for a Deep Learning project with 4D data (xyz,t). <br />
 The goal of the project is to identify the different neutrino particle types and interaction channels within the frame of the Tau Appearance KM3NeT project. <br />
 
@@ -15,5 +17,5 @@ In the HPC folder, two subprojects exist:
 
 Feel free to use tools like concatenate_h5.py or shuffle_h5.py (and the other stuff as well of course) for your personal usecase.
 
-Find more information about KM3NeT on [www.km3net.org](http://www.km3net.org).
+
 
