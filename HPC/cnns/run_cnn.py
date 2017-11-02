@@ -166,7 +166,7 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=1, mode='tr
     modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels)
 
     if epoch == 0:
-        if nn_arch is 'WRN': model = create_wide_residual_network(n_bins, batchsize, nb_classes=class_type[0], N=2, k=2, dropout=0, k_size=3)
+        if nn_arch is 'WRN': model = create_wide_residual_network(n_bins, batchsize, nb_classes=class_type[0], N=2, k=2, dropout=0.1, k_size=3)
 
         elif nn_arch is 'VGG': model = create_vgg_like_model(n_bins, batchsize, nb_classes=class_type[0], dropout=0.1,
                                                            n_filters=(64, 64, 64, 64, 64, 128, 128, 128), swap_4d_channels=swap_4d_channels)
@@ -178,19 +178,13 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=1, mode='tr
     # plot model, install missing packages with conda install if it throws a module error
     ks.utils.plot_model(model, to_file='./models/model_plots/' + modelname + '.png', show_shapes=True, show_layer_names=True)
 
-    # visualize activations TODO make it work
-    #xs = load_image_from_h5_file(train_files[0][0])
-    #activations = get_activations(model, xs, print_shape_only=False, layer_name=None)
-    #display_activations(activations)
-
-    lr = 0.001 # 1e-2 default for SGD, 1e-3 for Adam
-    lr_decay = 0.1 # % decay for each epoch, e.g. if 0.1 -> lr_new = lr*(1-0.1)=0.9*lr
+    lr = 0.00059 # 0.01 default for SGD, 0.001 for Adam
+    lr_decay = 0.05 # % decay for each epoch, e.g. if 0.1 -> lr_new = lr*(1-0.1)=0.9*lr
     model, batchsize, lr, lr_decay = parallelize_model_to_n_gpus(model, n_gpu, batchsize, lr, lr_decay)
 
     sgd = ks.optimizers.SGD(lr=lr, momentum=0.9, decay=0, nesterov=True)
     adam = ks.optimizers.Adam(lr=lr, beta_1=0.9, beta_2=0.999, epsilon=0.1, decay=0.0) # epsilon=1 for deep networks, lr = 0.001 default
     if epoch == 0: model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
-    #model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy', 'binary_accuracy'])
 
     if mode == 'train':
         while 1:
@@ -199,9 +193,13 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=1, mode='tr
 
     if mode == 'eval':
         # After training is finished, investigate model performance
-        arr_energy_correct = make_performance_array_energy_correct(model, test_files[0][0], n_bins, class_type, batchsize, xs_mean, samples=None)
-        make_energy_to_accuracy_plot_multiple_classes(arr_energy_correct, filepath='results/plots/PT_' + modelname + '.pdf',
-                                     title='Classification for muon-CC_and_elec-CC_3-100GeV') #TODO think about more automatic savenames
+        #arr_energy_correct = make_performance_array_energy_correct(model, test_files[0][0], n_bins, class_type, batchsize, xs_mean, swap_4d_channels, samples=None)
+        #np.save('results/plots/saved_predictions/arr_energy_correct_' + modelname + '.npy', arr_energy_correct)
+
+        arr_energy_correct = np.load('results/plots/saved_predictions/arr_energy_correct_' + modelname + '.npy')
+        make_energy_to_accuracy_plot_multiple_classes(arr_energy_correct, title='Classification for muon-CC_and_elec-CC_3-100GeV',
+                                                      filename='results/plots/PT_' + modelname) #TODO think about more automatic savenames
+        make_prob_hists(arr_energy_correct[:, ], modelname=modelname)
 
 
 if __name__ == '__main__':
@@ -210,8 +208,8 @@ if __name__ == '__main__':
     # - (2, 'muon-CC_to_elec-NC'), (1, 'muon-CC_to_elec-NC')
     # - (2, 'muon-CC_to_elec-CC'), (1, 'muon-CC_to_elec-CC')
     # - (2, 'up_down'), (1, 'up_down')
-    execute_cnn(n_bins=(11,13,18,50), class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='WRN', batchsize=32, epoch=0,
-                n_gpu=1, mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False) # standard 4D case: n_bins=[11,13,18,50]
+    execute_cnn(n_bins=(11,13,18,50), class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=26,
+                n_gpu=1, mode='eval', swap_4d_channels=None, zero_center=True, tb_logger=False) # standard 4D case: n_bins=[11,13,18,50]
 
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/train_muon-CC_and_elec-CC_each_240_xzt_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/test_muon-CC_and_elec-CC_each_60_xzt_shuffled.h5
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/train_muon-CC_and_elec-CC_each_480_xyz_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/test_muon-CC_and_elec-CC_each_120_xyz_shuffled.h5

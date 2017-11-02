@@ -141,8 +141,8 @@ def create_wide_residual_network(n_bins, batchsize, nb_classes=2, N=2, k=8, drop
     input_layer = Input(shape=input_dim[1:], dtype=K.floatx()) # batch_shape=input_dim
 
     #x = BatchNormalization(axis=channel_axis)(input_layer) # can be used after input in order to omit mean substraction. Care: Change initial conv param to x
-    x = initial_conv(input_layer, dim, k_size=k_size, channel_axis=channel_axis)
-    x = expand_conv(x, 16, dim, k=k, k_size=k_size, strides=strides[0], channel_axis=channel_axis)
+    x = initial_conv(input_layer, dim, dropout=dropout, k_size=k_size, channel_axis=channel_axis)
+    x = expand_conv(x, 16, dim, k=k, dropout=dropout, k_size=k_size, strides=strides[0], channel_axis=channel_axis)
     nb_conv = 10 # 1x initial_conv + 3x expand_conv = 1x1 + 3*3 = 10
 
     for i in range(N - 1):
@@ -182,12 +182,13 @@ def create_wide_residual_network(n_bins, batchsize, nb_classes=2, N=2, k=8, drop
     return model
 
 
-def initial_conv(input_layer, dim, k_size=3, channel_axis=-1):
+def initial_conv(input_layer, dim, dropout=0.0, k_size=3, channel_axis=-1):
     """
     Initial convolution prior to the ResNet blocks (2D/3D).
     C-B-A
     :param ks.layers.Input input_layer: Keras Input layer (tensor) that specifies the shape of the input data.
     :param int dim: 2D or 3D block.
+    :param float dropout: Adds dropout if >0.
     :param int k_size: Kernel size that should be used.
     :param int channel_axis: the channel axis that the BatchNorm layer should be applied on.
     :return: x: Resulting output tensor (model).
@@ -197,12 +198,14 @@ def initial_conv(input_layer, dim, k_size=3, channel_axis=-1):
 
     x = convolution_nd(16, (k_size,) * dim, padding='same', kernel_initializer='he_normal', use_bias=False)(input_layer) # TODO probably more filters
 
+    if dropout > 0.0: x = Dropout(dropout)(x)
+
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
     return x
 
 
-def expand_conv(ip, n_filters, dim, k=1, k_size=3, strides=None, channel_axis=-1):
+def expand_conv(ip, n_filters, dim, k=1, dropout=0.0, k_size=3, strides=None, channel_axis=-1):
     """
     Intermediate convolution block that expands the number of features (increase number of filters, i.e. 16->32).
     2D/3D.
@@ -211,6 +214,7 @@ def expand_conv(ip, n_filters, dim, k=1, k_size=3, strides=None, channel_axis=-1
     :param int n_filters: Number of filters used for each convolution.
     :param int dim: 2D or 3D block.
     :param int k: Width of the convolution, multiplicative factor to "n_filters".
+    :param float dropout: Adds dropout if >0.
     :param int k_size: Kernel size which is used for all three dimensions.
     :param tuple(int) strides: Strides of the convolutional layers.
     :param int channel_axis: the channel axis that the BatchNorm layer should be applied on.
@@ -221,6 +225,8 @@ def expand_conv(ip, n_filters, dim, k=1, k_size=3, strides=None, channel_axis=-1
     convolution_nd = Convolution2D if dim == 2 else Convolution3D
 
     x = convolution_nd(n_filters * k, (k_size,) * dim, padding='same', strides=strides, kernel_initializer='he_normal', use_bias=False)(ip)
+
+    if dropout > 0.0: x = Dropout(dropout)(x)
 
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
@@ -253,6 +259,9 @@ def conv_block(ip, n_filters, dim, k=1, dropout=0.0, k_size=3, channel_axis=-1):
 
     x = BatchNormalization(axis=channel_axis)(ip)
     x = Activation('relu')(x)
+
+    if dropout > 0.0: x = Dropout(dropout)(x)
+
     x = convolution_nd(n_filters * k, (k_size,) * dim, padding='same', kernel_initializer='he_normal', use_bias=False)(x)
 
     if dropout > 0.0: x = Dropout(dropout)(x)
