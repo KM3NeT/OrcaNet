@@ -44,8 +44,13 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, f_s
             xs = np.reshape(xs, dimensions).astype(np.float32)
 
             if swap_col is not None:
-                swap_4d_channels_dict = {'yzt-x': [3,1,2,0]}
-                xs[:, swap_4d_channels_dict[swap_col]] = xs[:, [0,1,2,3]]
+                #print 'test'
+                #print xs.shape
+                #swap_4d_channels_dict = {'yzt-x': [3,1,2,0]}
+                swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1)}
+                #xs[:, swap_4d_channels_dict[swap_col]] = xs[:, [0,1,2,3]]
+                xs = np.transpose(xs, swap_4d_channels_dict[swap_col])
+                #print xs.shape
 
             if zero_center_image is not None: xs = np.subtract(xs, zero_center_image) # if swap_col is not None, zero_center_image is already swapped
             # and mc info (labels)
@@ -244,8 +249,8 @@ def load_zero_center_data(train_files, batchsize, n_bins, n_gpu, swap_4d_channel
         xs_mean = get_mean_image(filepath, dimensions, n_gpu)
 
     if swap_4d_channels is not None:
-        swap_4d_channels_dict = {'yzt-x': [3,1,2,0]}
-        xs_mean[:, swap_4d_channels_dict['yzt-x']] = xs_mean[:, [0,1,2,3]]
+        swap_4d_channels_dict = {'yzt-x': (1, 2, 3, 0)}
+        xs_mean = np.transpose(xs_mean, swap_4d_channels_dict[swap_4d_channels])
 
     return xs_mean
 
@@ -310,7 +315,7 @@ def get_array_memsize(array):
 
 #------------- Various other functions -------------#
 
-def get_modelname(n_bins, class_type):
+def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels):
     """
     Derives the name of a model based on its number of bins and the class_type tuple.
     The final modelname is defined as 'model_Nd_proj_class_type[1]'.
@@ -318,17 +323,23 @@ def get_modelname(n_bins, class_type):
     :param tuple n_bins: Number of bins for each dimension (x,y,z,t) of the training images.
     :param (int, str) class_type: Tuple that declares the number of output classes and a string identifier to specify the exact output classes.
                                   I.e. (2, 'muon-CC_to_elec-CC')
+    :param str nn_arch: String that declares which neural network model architecture is used.
+    :param None/str swap_4d_channels: For 4D data input (3.5D models). Specifies the projection type.
     :return: str modelname: Derived modelname.
     """
-    modelname = 'model_'
+    modelname = 'model_' + nn_arch + '_'
 
     dim = 4- n_bins.count(1)
-
     projection = ''
-    if n_bins[0] > 1: projection += 'x'
-    if n_bins[1] > 1: projection += 'y'
-    if n_bins[2] > 1: projection += 'z'
-    if n_bins[3] > 1: projection += 't'
+
+    if n_bins.count(1) == 0: # for 4D input
+        projection += 'xyz-t' if swap_4d_channels is None else swap_4d_channels
+
+    else: # 2D/3D input
+        if n_bins[0] > 1: projection += 'x'
+        if n_bins[1] > 1: projection += 'y'
+        if n_bins[2] > 1: projection += 'z'
+        if n_bins[3] > 1: projection += 't'
 
     modelname += str(dim) + 'd_' + projection + '_' + class_type[1]
 
