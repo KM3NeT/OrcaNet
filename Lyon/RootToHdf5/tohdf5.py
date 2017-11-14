@@ -37,10 +37,10 @@ for filepath in filepaths_root:
 
 RootToHdf5_bashfile.close()
 
-os.system('qsub -P P_km3net -V -l ct=36:00:00 -l vmem=4G -l s_rss=2G -l fsize=1G -l sps=1 -o /sps/km3net/users/mmoser -e /sps/km3net/users/mmoser ' + dir_inputlist + '/RootToHdf5.sh')
+os.system('qsub -P P_km3net -V -l ct=48:00:00 -l vmem=4G -l s_rss=2G -l fsize=1G -l sps=1 -o /sps/km3net/users/mmoser -e /sps/km3net/users/mmoser ' + dir_inputlist + '/RootToHdf5.sh')
 print '-----------------------------------------------------------------------------------------------------------------------------------------------------------'
 print 'Finished! Submitted a job to convert the .root files to .hdf5 files as follows:\n' \
-      'qsub -P P_km3net -V -l ct=36:00:00 -l vmem=4G -l s_rss=2G -l fsize=1G -l sps=1 -o /sps/km3net/users/mmoser -e /sps/km3net/users/mmoser ' + dir_inputlist + '/RootToHdf5.sh\n' \
+      'qsub -P P_km3net -V -l ct=48:00:00 -l vmem=4G -l s_rss=2G -l fsize=1G -l sps=1 -o /sps/km3net/users/mmoser -e /sps/km3net/users/mmoser ' + dir_inputlist + '/RootToHdf5.sh\n' \
       'Please change the resources like ct if you have thousands of files (>36h)'
 print '-----------------------------------------------------------------------------------------------------------------------------------------------------------'
 
