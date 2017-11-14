@@ -42,6 +42,7 @@ def get_event_data(event_blob, geo, do_mc_hits, use_calibrated_file, data_cuts):
 
     # parse tracks [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z, time]
     event_id = event_blob['EventInfo'].event_id[0]
+    run_id = event_blob['EventInfo'].run_id[0]
     particle_type = event_blob['McTracks'][p].type
     energy = event_blob['McTracks'][p].energy
     is_cc = event_blob['McTracks'][p].is_cc
@@ -51,7 +52,7 @@ def get_event_data(event_blob, geo, do_mc_hits, use_calibrated_file, data_cuts):
     dir_z = event_blob['McTracks'][p].dir[2]
     time = event_blob['McTracks'][p].time
 
-    event_track = np.array([event_id, particle_type, energy, is_cc, bjorkeny, dir_x, dir_y, dir_z, time], dtype=np.float32)
+    event_track = np.array([event_id, particle_type, energy, is_cc, bjorkeny, dir_x, dir_y, dir_z, time, run_id], dtype=np.float32)
 
     # parse hits [x,y,z,time]
     if do_mc_hits is True:
