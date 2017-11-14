@@ -152,7 +152,7 @@ def create_wide_residual_network(n_bins, batchsize, nb_classes=2, N=2, k=8, drop
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
 
-    x = expand_conv(x, 32, dim, k=k, strides=strides[1], channel_axis=channel_axis)
+    x = expand_conv(x, 32, dim, k=k, dropout=dropout, strides=strides[1], channel_axis=channel_axis)
 
     for i in range(N - 1):
         x = conv_block(x, 32, dim, k=k, dropout=dropout, k_size=k_size, channel_axis=channel_axis)
@@ -161,7 +161,7 @@ def create_wide_residual_network(n_bins, batchsize, nb_classes=2, N=2, k=8, drop
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
 
-    x = expand_conv(x, 64, dim, k=k, strides=strides[2], channel_axis=channel_axis)
+    x = expand_conv(x, 64, dim, k=k, dropout=dropout, strides=strides[2], channel_axis=channel_axis)
 
     for i in range(N - 1):
         x = conv_block(x, 64, dim, k=k, dropout=dropout, k_size=k_size, channel_axis=channel_axis)
@@ -174,7 +174,7 @@ def create_wide_residual_network(n_bins, batchsize, nb_classes=2, N=2, k=8, drop
     x = Flatten()(x)
 
     # could also be transformed to one neuron -> binary_crossentropy + sigmoid instead of 2 neurons -> cat._crossentropy + softmax
-    x = Dense(nb_classes, activation='softmax')(x) # actually linear in the paper, could also be transformed to one neuron
+    x = Dense(nb_classes, activation='softmax', kernel_initializer='he_normal')(x) # actually linear in the paper, could also be transformed to one neuron
 
     model = Model(input_layer, x)
 
@@ -196,7 +196,7 @@ def initial_conv(input_layer, dim, dropout=0.0, k_size=3, channel_axis=-1):
     if dim not in (2,3): raise ValueError('dim must be equal to 2 or 3.')
     convolution_nd = Convolution2D if dim==2 else Convolution3D
 
-    x = convolution_nd(16, (k_size,) * dim, padding='same', kernel_initializer='he_normal', use_bias=False)(input_layer) # TODO probably more filters
+    x = convolution_nd(16, (k_size,) * dim, padding='same', kernel_initializer='he_normal', use_bias=False)(input_layer) # TODO probably more filters, standard=16
 
     if dropout > 0.0: x = Dropout(dropout)(x)
 

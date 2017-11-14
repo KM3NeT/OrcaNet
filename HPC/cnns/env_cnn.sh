@@ -9,5 +9,5 @@ module load cudnn/6.0-cuda8.0
 # obtaining software from the outside world requires a working proxy to be set
 export https_proxy=https://pi4060.physik.uni-erlangen.de:8888
 export http_proxy=http://pi4060.physik.uni-erlangen.de:8888
-#pip install --user --upgrade tensorflow-gpu keras h5py numpy sklearn
-pip install --upgrade tensorflow-gpu keras h5py numpy sklearn
+pip install --user --upgrade tensorflow-gpu keras h5py numpy sklearn
+#pip install --upgrade tensorflow-gpu keras h5py numpy sklearn

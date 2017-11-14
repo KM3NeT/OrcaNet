@@ -11,8 +11,6 @@ CodeFolder=/home/woody/capn/mppi033h/Code/HPC/cnns/utilities/data_tools
 cd ${CodeFolder}
 
 chunksize=32
-compression=
-
 
 #------ 3-100GeV ------#
 # 3d - xzt
@@ -36,12 +34,21 @@ compression=
 
 
 # 4d - xyzt
-projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/h5/xyzt
+#projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/h5/xyzt
+#input_list_name_train=muon-CC_and_elec-CC_xyzt_1_to_480.list # train
+#output_name_train=train_muon-CC_and_elec-CC_each_480_xyzt.h5 # train
+#input_list_name_test=muon-CC_and_elec-CC_xyzt_481_to_600.list # test
+#output_name_test=test_muon-CC_and_elec-CC_each_120_xyzt.h5 # test
+#compression=--compression
+
+# 4d - xyzt - with run_id
+projection_path=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/h5/xyzt
 input_list_name_train=muon-CC_and_elec-CC_xyzt_1_to_480.list # train
 output_name_train=train_muon-CC_and_elec-CC_each_480_xyzt.h5 # train
 input_list_name_test=muon-CC_and_elec-CC_xyzt_481_to_600.list # test
 output_name_test=test_muon-CC_and_elec-CC_each_120_xyzt.h5 # test
 compression=--compression
+
 
 
 #------ 10-100GeV ------#

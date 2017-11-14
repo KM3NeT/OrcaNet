@@ -104,9 +104,11 @@ def create_vgg_like_model(n_bins, batchsize, nb_classes=2, n_filters=None, dropo
         x = conv_block(x, dim, n_filters[i], k_size=k_size, dropout=dropout, max_pooling=max_pool_sizes.get(i))
 
     x = Flatten()(x)
-    x = Dense(256, activation='relu', kernel_initializer='he_normal')(x)
+    x = Dense(256, activation='relu', kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+    #x = BatchNormalization(axis=-1)(x)
     if dropout > 0.0: x = Dropout(dropout)(x)
-    x = Dense(16, activation='relu', kernel_initializer='he_normal')(x)
+    x = Dense(16, activation='relu', kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+    #x = BatchNormalization(axis=-1)(x)
 
     x = Dense(nb_classes, activation='softmax', kernel_initializer='he_normal')(x)
 

@@ -4,6 +4,7 @@
 
 import os
 import time
+from time import gmtime, strftime
 import shutil
 import sys
 import argparse
@@ -50,6 +51,26 @@ def parallelize_model_to_n_gpus(model, n_gpu, batchsize, lr, lr_decay):
         return model, batchsize, lr, lr_decay
 
 
+def save_train_and_test_statistics_to_txt(model, history_train, history_test, modelname, lr, lr_decay, epoch,
+                                          train_files, test_files, batchsize, n_bins, class_type, swap_4d_channels):
+
+    with open('models/trained/train_logs/log_' + modelname + '.txt', 'a+') as f_out:
+        f_out.write('--------------------------------------------------------------------------------------------------------\n')
+        f_out.write('\n')
+        f_out.write('Current time: ' + strftime("%Y-%m-%d %H:%M:%S", gmtime()) + '\n')
+        f_out.write('Decayed learning rate to ' + str(lr) + ' before epoch ' + str(epoch) + ' (minus ' + str(lr_decay) + ')\n') #TODO fix
+        f_out.write('Trained in epoch ' + str(epoch) + ' on train_files ' + str(train_files) + '\n')
+        f_out.write('Tested in epoch ' + str(epoch) + ' on test_files ' + str(test_files) + '\n')
+        f_out.write('History for training and testing: \n')
+        f_out.write('Train: ' + str(history_train.history) + '\n')
+        f_out.write('Test: ' + str(history_test) + ' (' + str(model.metrics_names) + ')' + '\n')
+        f_out.write('\n')
+        f_out.write('Additional Info:\n')
+        f_out.write('Batchsize=' + str(batchsize) + ', n_bins=' + str(n_bins) +
+                    ', class_type=' + str(class_type) + ', swap_4d_channels=' + str(swap_4d_channels) + '\n')
+        f_out.write('\n')
+
+
 def train_and_test_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
                          shuffle, lr, lr_decay, tb_logger, swap_4d_channels):
     """
@@ -61,10 +82,14 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
         lr *= 1 - float(lr_decay)
         K.set_value(model.optimizer.lr, lr)
         print 'Decayed learning rate to ' + str(K.get_value(model.optimizer.lr)) + \
-              ' before epoch ' + str(epoch) + ' (minus ' + str(lr_decay) + ')'
+              ' before epoch ' + str(epoch) + ' (minus ' + '{:.1%}'.format(lr_decay) + ')'
 
-    fit_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean, epoch, shuffle, swap_4d_channels, n_events=None, tb_logger=tb_logger)
-    evaluate_model(model, test_files, batchsize, n_bins, class_type, xs_mean, swap_4d_channels, n_events=None)
+    history_train = fit_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
+                              shuffle, swap_4d_channels, n_events=None, tb_logger=tb_logger)
+    history_test = evaluate_model(model, test_files, batchsize, n_bins, class_type, xs_mean, swap_4d_channels, n_events=None)
+
+    save_train_and_test_statistics_to_txt(model, history_train, history_test, modelname, lr, lr_decay, epoch,
+                                          train_files, test_files, batchsize, n_bins, class_type, swap_4d_channels)
 
     return epoch, lr
 
@@ -99,6 +124,7 @@ def fit_model(model, modelname, train_files, test_files, batchsize, n_bins, clas
     else:
         validation_data, validation_steps, callbacks = None, None, None
 
+    history = None
     for i, (f, f_size) in enumerate(train_files):  # process all h5 files, full epoch
         if epoch > 1 and shuffle is True: # just for convenience, we don't want to wait before the first epoch each time
             print 'Shuffling file ', f, ' before training in epoch ', epoch
@@ -107,11 +133,13 @@ def fit_model(model, modelname, train_files, test_files, batchsize, n_bins, clas
 
         if n_events is not None: f_size = n_events  # for testing
 
-        model.fit_generator(
+        history = model.fit_generator(
             generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, f_size=f_size, zero_center_image=xs_mean, swap_col=swap_4d_channels),
             steps_per_epoch=int(f_size / batchsize), epochs=1, verbose=1, max_queue_size=10,
             validation_data=validation_data, validation_steps=validation_steps, callbacks=callbacks)
         model.save("models/trained/trained_" + modelname + '_epoch' + str(epoch) + '.h5')
+
+    return history
 
 
 def evaluate_model(model, test_files, batchsize, n_bins, class_type, xs_mean, swap_4d_channels, n_events=None):
@@ -126,15 +154,18 @@ def evaluate_model(model, test_files, batchsize, n_bins, class_type, xs_mean, sw
     :param None/int swap_4d_channels: For 3.5D, param for the gen to specify, if the default channel (t) should be swapped with another dim.
     :param None/int n_events: For testing purposes if not the whole .h5 file should be used for evaluating.
     """
+    history = None
     for i, (f, f_size) in enumerate(test_files):
         print 'Testing on file ', i, ',', f
 
         if n_events is not None: f_size = n_events  # for testing
 
-        evaluation = model.evaluate_generator(
+        history = model.evaluate_generator(
             generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, swap_col=swap_4d_channels, f_size=f_size, zero_center_image=xs_mean),
             steps=int(f_size / batchsize), max_queue_size=10)
-        print 'Test sample results: ' + str(evaluation) + ' (' + str(model.metrics_names) + ')'
+        print 'Test sample results: ' + str(history) + ' (' + str(model.metrics_names) + ')'
+
+    return history
 
 
 def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=1, mode='train', swap_4d_channels=None,
@@ -178,8 +209,8 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=1, mode='tr
     # plot model, install missing packages with conda install if it throws a module error
     ks.utils.plot_model(model, to_file='./models/model_plots/' + modelname + '.png', show_shapes=True, show_layer_names=True)
 
-    lr = 0.00059 # 0.01 default for SGD, 0.001 for Adam
-    lr_decay = 0.05 # % decay for each epoch, e.g. if 0.1 -> lr_new = lr*(1-0.1)=0.9*lr
+    lr = 0.00015 # 0.01 default for SGD, 0.001 for Adam
+    lr_decay = 0.08 # % decay for each epoch, e.g. if 0.1 -> lr_new = lr*(1-0.1)=0.9*lr
     model, batchsize, lr, lr_decay = parallelize_model_to_n_gpus(model, n_gpu, batchsize, lr, lr_decay)
 
     sgd = ks.optimizers.SGD(lr=lr, momentum=0.9, decay=0, nesterov=True)
@@ -193,12 +224,12 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=1, mode='tr
 
     if mode == 'eval':
         # After training is finished, investigate model performance
-        #arr_energy_correct = make_performance_array_energy_correct(model, test_files[0][0], n_bins, class_type, batchsize, xs_mean, swap_4d_channels, samples=None)
-        #np.save('results/plots/saved_predictions/arr_energy_correct_' + modelname + '.npy', arr_energy_correct)
+        arr_energy_correct = make_performance_array_energy_correct(model, test_files[0][0], n_bins, class_type, batchsize, xs_mean, swap_4d_channels, samples=None)
+        np.save('results/plots/saved_predictions/arr_energy_correct_' + modelname + '.npy', arr_energy_correct)
 
         arr_energy_correct = np.load('results/plots/saved_predictions/arr_energy_correct_' + modelname + '.npy')
         make_energy_to_accuracy_plot_multiple_classes(arr_energy_correct, title='Classification for muon-CC_and_elec-CC_3-100GeV',
-                                                      filename='results/plots/PT_' + modelname) #TODO think about more automatic savenames
+                                                      filename='results/plots/PT_' + modelname, compare_pheid=True) #TODO think about more automatic savenames
         make_prob_hists(arr_energy_correct[:, ], modelname=modelname)
 
 
@@ -208,8 +239,8 @@ if __name__ == '__main__':
     # - (2, 'muon-CC_to_elec-NC'), (1, 'muon-CC_to_elec-NC')
     # - (2, 'muon-CC_to_elec-CC'), (1, 'muon-CC_to_elec-CC')
     # - (2, 'up_down'), (1, 'up_down')
-    execute_cnn(n_bins=(11,13,18,50), class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=26,
-                n_gpu=1, mode='eval', swap_4d_channels=None, zero_center=True, tb_logger=False) # standard 4D case: n_bins=[11,13,18,50]
+    execute_cnn(n_bins=(11,13,18,50), class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=29,
+                n_gpu=1, mode='eval', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False) # standard 4D case: n_bins=[11,13,18,50]
 
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/train_muon-CC_and_elec-CC_each_240_xzt_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/test_muon-CC_and_elec-CC_each_60_xzt_shuffled.h5
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/train_muon-CC_and_elec-CC_each_480_xyz_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xyz/concatenated/test_muon-CC_and_elec-CC_each_120_xyz_shuffled.h5
@@ -217,6 +248,9 @@ if __name__ == '__main__':
 # python run_cnn.py --list /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/train_files.list /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/test_files.list placeholder placeholder
 
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/h5/xyzt/concatenated/train_muon-CC_and_elec-CC_each_480_xyzt_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/h5/xyzt/concatenated/test_muon-CC_and_elec-CC_each_120_xyzt_shuffled.h5
+
+# with run_id
+# python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/h5/xyzt/concatenated/train_muon-CC_and_elec-CC_each_480_xyzt_shuffled_1.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/h5/xyzt/concatenated/test_muon-CC_and_elec-CC_each_120_xyzt_shuffled.h5
 
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo2d/h5/yz/concatenated/train_muon-CC_and_elec-CC_10-100GeV_each_480_yz_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo2d/h5/yz/concatenated/test_muon-CC_and_elec-CC_10-100GeV_each_120_yz_shuffled.h5
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo2d/h5/zt/concatenated/train_muon-CC_10-100GeV_each_480_zt_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_10-100GeV/4dTo2d/h5/zt/concatenated/test_muon-CC_10-100GeV_each_120_zt_shuffled.h5

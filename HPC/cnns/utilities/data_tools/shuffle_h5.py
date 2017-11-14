@@ -43,6 +43,8 @@ def parse_input():
                         help = 'specify a chunksize value in order to use chunked storage for the shuffled .h5 file (default: not chunked).')
     parser.add_argument('-g', '--compression', dest='compression', action='store_true',
                         help = 'if a gzip filter with compression 1 should be used for saving. Only works with -c option!')
+    parser.add_argument('-n', '--n_shuffles', dest='n_shuffles', type=int,
+                        help = 'specify if multiple shuffles should be executed on a single file.') #TODO don't combine with -d option
     parser.set_defaults(compression=False)
 
     if len(sys.argv) == 1:
@@ -67,10 +69,14 @@ def parse_input():
     if args.compression is True:
         compress = ('gzip', 1)
 
-    return file_list, delete_flag, chunking, compress
+    n_shuffles = 1
+    if args.n_shuffles:
+        n_shuffles = args.n_shuffles
+
+    return file_list, delete_flag, chunking, compress, n_shuffles
 
 
-def shuffle_h5(filepath, delete_flag=True, chunking=(False, None), tool=False, compress=(None, None)):
+def shuffle_h5(filepath, delete_flag=True, chunking=(False, None), tool=False, compress=(None, None), n_shuffles=1):
     """
     Shuffles a .h5 file where each dataset needs to have the same number of rows (axis_0).
     The shuffled data is saved to a new .h5 file with the suffix < _shuffled.h5 >.
@@ -90,39 +96,40 @@ def shuffle_h5(filepath, delete_flag=True, chunking=(False, None), tool=False, c
         folder_data_array_dict[folder_name] = folder_data_array # workaround in order to be able to close the input file at the next step
 
     input_file.close()
-    if delete_flag is True:
-        os.remove(filepath)
+    if delete_flag is True: os.remove(filepath)
 
     filepath_without_extension = os.path.splitext(filepath)[0]
-    if '_shuffled' in filepath_without_extension:
-        # we don't want to create a file with hundreds of _shuffled suffixes
-        output_file_shuffled = h5py.File(filepath_without_extension + '.h5', 'w')
-    else:
-        output_file_shuffled = h5py.File(filepath_without_extension + '_shuffled.h5', 'w')
+    output_file_shuffled = None
+    for i in xrange(n_shuffles):
 
-    for n, dataset_key in enumerate(folder_data_array_dict):
-
-        dataset = folder_data_array_dict[dataset_key]
-
-        if n == 0:
-            # get a particular seed for the first dataset such that the shuffling is consistens across the datasets
-            rng_state = np.random.get_state()
-            np.random.shuffle(dataset)
-
+        if '_shuffled' in filepath_without_extension:
+            # we don't want to create a file with hundreds of _shuffled suffixes
+            output_file_shuffled = h5py.File(filepath_without_extension + '_' + str(i) + '.h5', 'w')
         else:
-            np.random.set_state(rng_state) # recover seed of the first dataset
-            np.random.shuffle(dataset)
+            output_file_shuffled = h5py.File(filepath_without_extension + '_shuffled_' + str(i) + '.h5', 'w')
 
-        if chunking[0] is True:
-            dset_shuffled = output_file_shuffled.create_dataset(dataset_key, data=dataset, dtype=dataset.dtype, chunks=(chunking[1],) + dataset.shape[1:],
+        for n, dataset_key in enumerate(folder_data_array_dict):
+
+            dataset = folder_data_array_dict[dataset_key]
+
+            if n == 0:
+                # get a particular seed for the first dataset such that the shuffling is consistent across the datasets
+                r = np.random.RandomState()
+                state = r.get_state()
+                r.shuffle(dataset)
+
+            else:
+                r.set_state(state) # recover shuffle seed of the first dataset
+                r.shuffle(dataset)
+
+            chunks = (chunking[1],) + dataset.shape[1:] if chunking[0] is True else None
+            output_file_shuffled.create_dataset(dataset_key, data=dataset, dtype=dataset.dtype, chunks=chunks,
                                                                 compression=compress[0], compression_opts=compress[1])
-        else:
-            dset_shuffled = output_file_shuffled.create_dataset(dataset_key, data=dataset, dtype=dataset.dtype,
-                                                                compression=compress[0], compression_opts=compress[1])
-    if tool is True:
-        return output_file_shuffled
-    else:
-        output_file_shuffled.close()
+
+        # don't close in the case of tool=True and the last iteration of the loop
+        if tool is False or tool is True and i < n_shuffles-1: output_file_shuffled.close()
+
+    if tool is True: return output_file_shuffled
 
 
 def shuffle_h5_tool():
@@ -131,11 +138,12 @@ def shuffle_h5_tool():
     Shuffles .h5 files where each dataset needs to have the same number of rows (axis_0) for a single file.
     Saves the shuffled data to a new .h5 file.
     """
-    file_list, delete_flag, chunking, compress = parse_input()
+    file_list, delete_flag, chunking, compress, n_shuffles = parse_input()
+    print n_shuffles
 
     for filepath in file_list:
         print 'Shuffling file ' + filepath
-        output_file_shuffled = shuffle_h5(filepath, delete_flag=delete_flag, chunking=chunking, tool=True, compress=compress)
+        output_file_shuffled = shuffle_h5(filepath, delete_flag=delete_flag, chunking=chunking, tool=True, compress=compress, n_shuffles=n_shuffles)
 
         print 'Finished shuffling. Output information:'
         print '---------------------------------------'
