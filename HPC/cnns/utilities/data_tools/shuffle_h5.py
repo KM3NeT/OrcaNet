@@ -26,7 +26,6 @@ def parse_input():
     :return: (bool, int) chunking: specifies if chunks should be used and if yes which size the chunks should have.
     :return (None/str, None/int) compress: Tuple that specifies if a compression should be used for saving.
     """
-
     parser = argparse.ArgumentParser(description='E.g. < python shuffle_h5.py filepath_1 [filepath_2] [...] > \n'
                                                  'Shuffles .h5 files. Requires that each dataset of the files has the same number of rows (axis_0). \n'
                                                  'Outputs a new, shuffled .h5 file with the suffix < _shuffled >. \n'

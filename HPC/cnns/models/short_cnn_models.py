@@ -79,7 +79,7 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels):
     return dim, input_dim, max_pool_sizes
 
 
-def create_vgg_like_model(n_bins, batchsize, nb_classes=2, n_filters=None, dropout=0, k_size=3, swap_4d_channels=None):
+def create_vgg_like_model(n_bins, batchsize, nb_classes=2, n_filters=None, dropout=0, k_size=3, swap_4d_channels=None, activation='relu'):
     """
     Returns a VGG-like model (stacked conv. layers) with MaxPooling and Dropout if wished.
     The number of convolutional layers can be controlled with the n_filters parameter:
@@ -98,16 +98,16 @@ def create_vgg_like_model(n_bins, batchsize, nb_classes=2, n_filters=None, dropo
     dim, input_dim, max_pool_sizes = decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels)
 
     input_layer = Input(shape=input_dim[1:], dtype=K.floatx())  # input_layer
-    x = conv_block(input_layer, dim, n_filters[0], k_size=k_size, dropout=dropout, max_pooling=max_pool_sizes.get(0))
+    x = conv_block(input_layer, dim, n_filters[0], k_size=k_size, dropout=dropout, max_pooling=max_pool_sizes.get(0), activation=activation)
 
     for i in xrange(1, len(n_filters)):
-        x = conv_block(x, dim, n_filters[i], k_size=k_size, dropout=dropout, max_pooling=max_pool_sizes.get(i))
+        x = conv_block(x, dim, n_filters[i], k_size=k_size, dropout=dropout, max_pooling=max_pool_sizes.get(i), activation=activation)
 
     x = Flatten()(x)
-    x = Dense(256, activation='relu', kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+    x = Dense(256, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
     #x = BatchNormalization(axis=-1)(x)
     if dropout > 0.0: x = Dropout(dropout)(x)
-    x = Dense(16, activation='relu', kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+    x = Dense(16, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
     #x = BatchNormalization(axis=-1)(x)
 
     x = Dense(nb_classes, activation='softmax', kernel_initializer='he_normal')(x)
@@ -117,7 +117,7 @@ def create_vgg_like_model(n_bins, batchsize, nb_classes=2, n_filters=None, dropo
     return model
 
 
-def conv_block(ip, dim, n_filters, k_size=3, dropout=0, max_pooling=None):
+def conv_block(ip, dim, n_filters, k_size=3, dropout=0, max_pooling=None, activation='relu'):
     """
     2D/3D Convolutional block followed by BatchNorm and Activation with optional MaxPooling or Dropout.
     C-B-A-(MP)-(D)
@@ -127,6 +127,7 @@ def conv_block(ip, dim, n_filters, k_size=3, dropout=0, max_pooling=None):
     :param int k_size: Kernel size which is used for all three dimensions.
     :param float dropout: Adds a dropout layer if value is greater than 0.
     :param None/tuple max_pooling: Specifies if a MaxPooling layer should be added. e.g. (1,1,2) for 3D.
+    :param str activation: Type of activation function that should be used. E.g. 'linear', 'relu', 'elu', 'selu'.
     :return: x: Resulting output tensor (model).
     """
     if dim not in (2,3): raise ValueError('dim must be equal to 2 or 3.')
@@ -138,7 +139,7 @@ def conv_block(ip, dim, n_filters, k_size=3, dropout=0, max_pooling=None):
     x = convolution_nd(n_filters, (k_size,) * dim, padding='same', kernel_initializer='he_normal', use_bias=False)(ip)
 
     x = BatchNormalization(axis=channel_axis)(x)
-    x = Activation('relu')(x)
+    x = Activation(activation)(x)
 
     if max_pooling is not None: x = max_pooling_nd(strides=max_pooling, padding='valid')(x)
     if dropout > 0.0: x = Dropout(dropout)(x)
