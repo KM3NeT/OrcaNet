@@ -1,21 +1,34 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+Submits a job to concatenate the .h5 files in a specified folder.
+"""
+
 import os
 import sys
 import argparse
 import numpy as np
 import natsort as ns
+import math
 
 
 def parse_input():
     """
-        Parses the user input in order to return the most important information:
-        1) list of files that should be shuffled 2) if the unshuffled file should be deleted 3) if the user wants to use chunks or not.
-        :return: list file_list: list that contains all filepaths of the input files.
-        :return: bool delete_flag: specifies if the old, unshuffled file should be deleted after extracting the data.
-        :return: (bool, int) chunking: specifies if chunks should be used and if yes which size the chunks should have.
-        :return (None/str, None/int) compress: Tuple that specifies if a compression should be used for saving.
-        """
-
-    parser = argparse.ArgumentParser(description='Placeholder',
+    Parses the user input in order to return the most important information:
+    1) directory where the .h5 files that should be concatenated are located 2) the fraction of the data that should be used for the test split
+    3) the total number of train files 4) the total number of test files
+    :return: str dirpath: full path of the folder with the .h5 files.
+    :return: float test_fraction: fraction of the total data that should be used for the test data sample.
+    :return: int, int n_train_files, n_test_files: number of concatenated .h5 train/test files.
+    :return int n_file_start: specifies the first file number of the .h5 files (standard: 1).
+    :return None/int n_files_max: specifies the maximum file number upon which the concatenation should happen.
+    :return: (bool, int) chunking: specifies if chunks should be used and if yes which size the chunks should have.
+    :return (None/str, None/int) compress: Tuple that specifies if a compression should be used for saving.
+    """
+    parser = argparse.ArgumentParser(description='Parses the user input in order to return the most important information:\n'
+                                                 '1) directory where the .h5 files that should be concatenated are located\n '
+                                                 '2) the fraction of the data that should be used for the test split\n'
+                                                 '3) the total number of train files 4) the total number of test files',
                                      formatter_class=argparse.RawTextHelpFormatter)
 
     parser.add_argument('dirpath', metavar='dirpath', type=str, nargs=1,
@@ -69,6 +82,11 @@ def parse_input():
 
 
 def get_filepaths(dirpath):
+    """
+    Returns the filepaths of all .h5 files that are located in a specific directory.
+    :param str dirpath: path of the directory where the .h5 files are located.
+    :return: list filepaths: list with the full filepaths of all .h5 files in the dirpath folder.
+    """
     filepaths = []
     for f in os.listdir(dirpath):
         if f.endswith(".h5"):
@@ -77,8 +95,14 @@ def get_filepaths(dirpath):
     filepaths = ns.natsorted(filepaths)
     return filepaths
 
-def get_f_property_indices(filepaths):
 
+def get_f_property_indices(filepaths):
+    """
+    Returns the index of the file number and the index of the projection type of .h5 files based on the filenames in <filepaths>.
+    :param list filepaths: list with the full filepaths of various .h5 files.
+    :return: int index_f_number: index of the file number in a filepath str.
+    :return: int index_proj_type: index of the projection type in a filepath str.
+    """
     # find index of file number, which is defined to be following the '2016' identifier
     identifier_year = '2016'
     index_f_number = filepaths[0].split('_').index(identifier_year) + 1 # f_number is one after year information
@@ -86,8 +110,15 @@ def get_f_property_indices(filepaths):
 
     return index_f_number, index_proj_type
 
-def get_f_properties(filepaths, index_proj_type):
 
+def get_f_properties(filepaths, index_proj_type):
+    """
+    Returns the particle type and projection type information for the .h5 filepaths.
+    :param list filepaths: list with the full filepaths of various .h5 files.
+    :param int index_proj_type: index of the projection type in a filepath str.
+    :return: str ptype_str: string with particle type information, e.g. 'elec-CC_and_muon-CC' if strings with both type are given.
+    :return: str proj_type: projection type of the .h5 files in the filepath strings, e.g. 'xyzt'.
+    """
     # get all particle_types
     particle_types = []
     for f in filepaths:
@@ -110,12 +141,27 @@ def get_f_properties(filepaths, index_proj_type):
 
 
 def save_filepaths_to_list(dirpath, filepaths, include_range, p_type, proj_type, index_f_number, sample_type=''):
-
+    """
+    Saves the filepaths in the list <filepaths> to a .list file.
+    The variable 'include_range' can be used to only save filepaths with file numbers in between a certain range.
+    :param str dirpath: the directory where the .list file should be saved.
+    :param list filepaths: list with the full filepaths of various .h5 files.
+    :param ndarray(dim=1) include_range: 1D array that specifies into how many files the filepaths should be split.
+                                         E.g. [0, 120, 240, 360, 480] for 4 total list files: 1-120, 121-240, 241-360, 361-480.
+    :param str p_type: string with particle type information for the name of the .list file, e.g. 'elec-CC_and_muon-CC'.
+    :param str proj_type: string with the projection type of the .h5 files in the filepath strings, e.g. 'xyzt'.
+    :param int index_f_number: index for the file number in a .split('_') list.
+    :param str sample_type: additional information in the filename of the .list file with specifies if train/test.
+    :return: list list_savenames: list that contains the savenames of all .list files that have been created.
+    """
     n_files = len(include_range) - 1
     if sample_type != '': sample_type = sample_type + '_'
 
+    list_savenames = []
     for i in xrange(n_files):
-        savepath = dirpath + '/' + p_type + '_' + proj_type + '_' + sample_type + str(include_range[i] + 1) + '_to_' + str(include_range[i + 1]) + '.list'
+        savename = p_type + '_' + proj_type + '_' + sample_type + str(include_range[i] + 1) + '_to_' + str(include_range[i + 1]) + '.list'
+        savepath = dirpath + '/' + savename
+        list_savenames.append(savename)
 
         with open(savepath, 'w') as f_out:
             for f in filepaths:
@@ -123,19 +169,22 @@ def save_filepaths_to_list(dirpath, filepaths, include_range, p_type, proj_type,
                 if include_range[i] < f_number <= include_range[i+1]:
                     f_out.write(dirpath + '/' + f + '\n')
 
-    # TODO store name of saved .list files for concatenating
+    return list_savenames
 
 
-def user_input_sanity_check(n_test_files, test_fraction, n_test_start_minus_one, n_test_end,
+def user_input_sanity_check(n_test_files, test_fraction, n_test_start, n_test_end,
                             n_train_files, n_train_start_minus_one, n_train_end,
                             n_total_files):
-
+    """
+    Sanity check in order to verify that the user doesn't input data splits that are not possible.
+    [I.e., we can only split into an integer amount of files.]
+    """
     n_train_split = n_total_files * float(test_fraction)
     if not n_train_split.is_integer():
         raise ValueError(str(n_total_files) +
                         ' cannot be split in whole numbers with a test fraction of ' + str(test_fraction))
 
-    range_validation = np.linspace(n_test_start_minus_one, n_test_end, n_test_files + 1)
+    range_validation = np.linspace(n_test_start, n_test_end, n_test_files + 1)
     for step in range_validation:
         if not step.is_integer():
             raise ValueError('The test data cannot be split equally with ' + str(n_test_files) + ' test files.')
@@ -147,7 +196,18 @@ def user_input_sanity_check(n_test_files, test_fraction, n_test_start_minus_one,
 
 
 def make_list_files(dirpath, test_fraction, n_train_files, n_test_files, n_file_start, n_files_max):
-
+    """
+    Makes .list files of .h5 files in a <dirpath> based on a certain test_fraction and a specified number of train/test files.
+    :param str dirpath: path of the directory where the .h5 files are located.
+    :param float test_fraction: fraction of the total data that should be used for the test data sample.
+    :param int n_train_files: number of concatenated .h5 train files.
+    :param int n_test_files: number of concatenated .h5 test files.
+    :param int n_file_start: specifies the first file number of the .h5 files (standard: 1).
+    :param None/int n_files_max: specifies the maximum file number upon which the concatenation should happen.
+    :return: list savenames_tt: list that contains the savenames of all created .list files.
+    :return str p_type: string with particle type information for the name of the .list file, e.g. 'elec-CC_and_muon-CC'.
+    :return str proj_type: string with the projection type of the .h5 files in the filepath strings, e.g. 'xyzt'.
+    """
     filepaths = get_filepaths(dirpath)
 
     # find index of file number, which is defined to be following the '2016' identifier
@@ -156,34 +216,117 @@ def make_list_files(dirpath, test_fraction, n_train_files, n_test_files, n_file_
 
     # get total number of files
     n_total_files = int(max(int(i.split('_')[index_f_number]) for i in filepaths)) if n_files_max is None else n_files_max
-    #n_total_files = int(max(int(i.split('_')[index_f_number]) for i in filepaths))
-    range_all = np.linspace(0, n_total_files, 2, dtype=np.int)
+    range_all = np.linspace(0, n_total_files, 2, dtype=np.int) # range for ALL files
 
-    n_val_start_minus_one = (n_total_files - test_fraction * n_total_files)  # since the files don't start from 0 but 1.....
-    n_val_end = n_total_files
-    range_validation = np.linspace(n_val_start_minus_one, n_val_end, n_test_files+1, dtype=np.int)
+    # test
+    n_test_start = (n_total_files - test_fraction * n_total_files)
+    n_test_end = n_total_files
+    range_test = np.linspace(n_test_start, n_test_end, n_test_files+1, dtype=np.int)
 
     # train
-    n_train_start_minus_one = n_file_start -1
+    n_train_start_minus_one = n_file_start - 1
     n_train_end = (n_total_files - test_fraction * n_total_files)
 
-    range_train = np.linspace(n_train_start_minus_one, n_train_end, n_test_files+1, dtype=np.int)  # [1,2,3,4,5....,480]
+    range_train = np.linspace(n_train_start_minus_one, n_train_end, n_train_files+1, dtype=np.int)  # [1,2,3,4,5....,480]
 
-    user_input_sanity_check(n_test_files, test_fraction, n_val_start_minus_one, n_val_end,
+    user_input_sanity_check(n_test_files, test_fraction, n_test_start, n_test_end,
                             n_train_files, n_train_start_minus_one, n_train_end,
                             n_total_files)
 
     save_filepaths_to_list(dirpath, filepaths, range_all, p_type, proj_type, index_f_number)
-    save_filepaths_to_list(dirpath, filepaths, range_validation, p_type, proj_type, index_f_number, sample_type='test')
-    save_filepaths_to_list(dirpath, filepaths, range_train, p_type, proj_type, index_f_number, sample_type='train')
+    savenames_test = save_filepaths_to_list(dirpath, filepaths, range_test, p_type, proj_type, index_f_number, sample_type='test')
+    savenames_train = save_filepaths_to_list(dirpath, filepaths, range_train, p_type, proj_type, index_f_number, sample_type='train')
+
+    savenames_tt = savenames_train + savenames_test
+
+    return savenames_tt, p_type, proj_type
 
 
 def make_list_files_and_concatenate():
+    """
+    Wrapper function that does the following:
+    1) get user input from parse_input()
+    2) make all .list files which contains the filepaths of the .h5 files that should be concatenated
+    3) make a submit script to concatenate the .h5 files in the .list files.
+    """
     dirpath, test_fraction, n_train_files, n_test_files, n_file_start, n_files_max, chunking, compress = parse_input()
 
-    make_list_files(dirpath, test_fraction, n_train_files, n_test_files, n_file_start, n_files_max)
+    savenames_tt, p_type, proj_type = make_list_files(dirpath, test_fraction, n_train_files, n_test_files, n_file_start, n_files_max)
+    submit_concatenate_list_files(savenames_tt, dirpath, p_type, proj_type)
 
-    # submit concatenate files
+
+def submit_concatenate_list_files(savenames, dirpath, p_type, proj_type):
+    """
+    Function that writes a qsub .sh files which concatenates all files inside the .list files from the <savenames> list.
+    :param list savenames: list that contains the savenames of all created .list files.
+    :param str dirpath: path of the directory where the .h5 files are located.
+    :param str p_type: string with particle type information for the name of the .list file, e.g. 'elec-CC_and_muon-CC'.
+    :param str proj_type: string with the projection type of the .h5 files in the filepath strings, e.g. 'xyzt'.
+    """
+    if not os.path.exists(dirpath + '/logs/cout'): # check if /logs/cout folder exists, if not create it.
+        os.makedirs(dirpath + '/logs/cout')
+
+    # make qsub .sh file
+    with open(dirpath + '/submit_concatenate_h5_' + p_type + '_' + proj_type + '.sh', 'w') as f:
+        f.write('#!/usr/bin/env bash\n')
+        f.write('#\n')
+        f.write('#PBS -o /home/woody/capn/mppi033h/logs/submit_concatenate_h5_${PBS_JOBID}.out -e /home/woody/capn/mppi033h/logs/submit_concatenate_h5_${PBS_JOBID}.err\n')
+        f.write('\n')
+        f.write('CodeFolder=/home/woody/capn/mppi033h/Code/HPC/cnns/utilities/data_tools\n')
+        f.write('cd ${CodeFolder}\n')
+        f.write('chunksize=32\n')
+        f.write('compression=--compression\n')
+        f.write('projection_path=' + dirpath + '\n')
+        f.write('\n')
+        f.write('# lists with files that should be concatenated\n')
+
+        n_cores = 4
+        n_lists = len(savenames)
+        n_loops = int(math.ceil(n_lists/float(n_cores)))
+
+        for i in xrange(n_loops):
+            n_lists_left = n_lists - i*n_cores
+            write_txt_concatenate_files_one_loop(f, savenames, i, n_lists_left, n_cores)
+
+    #os.system('qsub -l nodes=1:ppn=4,walltime=01:01:00 ' + dirpath + '/submit_concatenate_h5_' + p_type + '_' + proj_type + '.sh')
+
+
+def write_txt_concatenate_files_one_loop(f, savenames, i, n_lists_left, n_cores):
+    """
+    Writes one n_cores loop which calls concatenate_h5.py for the .h5 files in the .list files.
+    One iteration (loop) concatenates n_cores .list files.
+    :param f: the qsub .sh file.
+    :param list savenames: list that contains the savenames of all created .list files.
+    :param int i: specifies how many times we have already looped over n_cores.
+    :param int n_lists_left: remaining number of .lists of which the .h5 files still need to be concatenated.
+    :param int n_cores: Number of cores and processes that should be used in one concatenation loop (standard: 4).
+    """
+    j = i*n_cores
+
+    # define input (.list) and output filenames (concatenated .h5 files)
+    loop_index = 0
+    for n in range(j, j + n_cores): # write input and output filenames
+        loop_index += 1
+
+        if loop_index <= n_lists_left:
+            name = os.path.splitext(savenames[n])[0] # get name without extension
+            f.write('input_list_name_' + str(n) + '=' + name + '.list\n') # input
+            f.write('output_list_name_' + str(n) + '=' + name + '.h5\n') # output
+
+    # run concatenate script
+    loop_index = 0
+    for n in range(j, j + n_cores):
+        loop_index += 1
+
+        if loop_index <= n_lists_left:
+            f.write('(time taskset -c ' +  str(loop_index-1) + ' python concatenate_h5.py --list ${projection_path}/${input_list_name_' + str(n) + '} '
+                    '${compression} --chunksize ${chunksize} ${projection_path}/concatenated/${output_list_name_' + str(n) + '} > '
+                    '${projection_path}/logs/cout/${output_list_name_' + str(n) + '}.txt) &\n')
+
+    f.write('wait\n')
+    f.write('\n')
+
+
 if __name__ == '__main__':
     make_list_files_and_concatenate()
 
