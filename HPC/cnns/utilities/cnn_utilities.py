@@ -3,6 +3,7 @@
 """Utility functions used for training a CNN."""
 
 import warnings
+import re
 import numpy as np
 import h5py
 import os
@@ -239,6 +240,10 @@ def load_zero_center_data(train_files, batchsize, n_bins, n_gpu, swap_4d_channel
                       'Only the first file is used for calculating the xs_mean_array.')
 
     filepath = train_files[0][0]
+
+    # if the file has a shuffle index (e.g. shuffled_6.h5) and a .npy exists for the first shuffled file (shuffled.h5), we don't want to calculate the mean again
+    shuffle_index = re.search('shuffled(.*).h5', filepath)
+    filepath = re.sub(shuffle_index.group(1), '', filepath)
 
     if os.path.isfile(filepath + '_zero_center_mean.npy') is True:
         print 'Loading an existing xs_mean_array in order to zero_center the data!'
