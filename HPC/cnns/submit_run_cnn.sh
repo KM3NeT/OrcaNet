@@ -1,9 +1,8 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bash -l
 #
 #PBS -o /home/woody/capn/mppi033h/logs/submit_run_cnn_${PBS_JOBID}.out -e /home/woody/capn/mppi033h/logs/submit_run_cnn_${PBS_JOBID}.err
 
 # run with 'qsub.tinygpu -l walltime=23:59:00,nodes=1:ppn=4:gtx1080 submit_run_cnn.sh'
-
 
 source /home/hpc/capn/mppi033h/.bash_profile
 

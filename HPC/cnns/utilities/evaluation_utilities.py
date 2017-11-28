@@ -109,8 +109,14 @@ def load_pheid_event_selection():
                                                    for each event that survives the precuts.
     """
     path = '/home/woody/capn/mppi033h/Code/HPC/cnns/results/plots/pheid_event_selection_txt/' # folder for storing the precut .txts
-    particle_type_dict = {'muon-CC': ['muon_cc_3_100_selectedEvents_forMichael.txt', (14,1)],
-                          'elec-CC': ['elec_cc_3_100_selectedEvents_forMichael.txt', (12,1)]}
+
+    # Moritz's precuts
+    # particle_type_dict = {'muon-CC': ['muon_cc_3_100_selectedEvents_forMichael_fixed.txt', (14,1)],
+    #                       'elec-CC': ['elec_cc_3_100_selectedEvents_forMichael_fixed.txt', (12,1)]}
+
+    # Containment cut
+    particle_type_dict = {'muon-CC': ['muon_cc_3_100_selectedEvents_Rsmaller100_abszsmaller90_forMichael.txt', (14,1)],
+                          'elec-CC': ['elec_cc_3_100_selectedEvents_Rsmaller100_abszsmaller90_forMichael.txt', (12,1)]}
 
     arr_pheid_sel_events = None
     for key in particle_type_dict:

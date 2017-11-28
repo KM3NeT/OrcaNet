@@ -25,11 +25,12 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, f_s
     :param ndarray zero_center_image: mean_image of the x dataset used for zero-centering.
     :param bool yield_mc_info: Specifies if mc-infos (y_values) should be yielded as well.
                                The mc-infos are used for evaluation after training and testing is finished.
-    :param bool swap_col: Specifies, if the index of the columns for xs should be swapped. Necessary for 3.5D nets.
+    :param bool/str swap_col: Specifies, if the index of the columns for xs should be swapped. Necessary for 3.5D nets.
                           Currently available: 'yzt-x' -> [3,1,2,0] from [0,1,2,3]
     :return: tuple output: Yields a tuple which contains a full batch of images and labels (+ mc_info if yield_mc_info=True).
     """
     dimensions = get_dimensions_encoding(n_bins, batchsize)
+    swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'tyz-x': (0, 4, 2, 3, 1)}
 
     while 1:
         f = h5py.File(filepath, "r")
@@ -44,16 +45,17 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, f_s
             xs = f['x'][n_entries : n_entries + batchsize]
             xs = np.reshape(xs, dimensions).astype(np.float32)
 
-            if swap_col is not None:
-                #print 'test'
-                #print xs.shape
-                #swap_4d_channels_dict = {'yzt-x': [3,1,2,0]}
-                swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1)}
-                #xs[:, swap_4d_channels_dict[swap_col]] = xs[:, [0,1,2,3]]
-                xs = np.transpose(xs, swap_4d_channels_dict[swap_col])
-                #print xs.shape
+            if zero_center_image is not None: xs = np.subtract(xs, zero_center_image)  # if swap_col is not None, zero_center_image is already swapped // CHANGED!! not anymore
 
-            if zero_center_image is not None: xs = np.subtract(xs, zero_center_image) # if swap_col is not None, zero_center_image is already swapped
+            if swap_col is not None:
+                if swap_col == 'yzt-x':
+                    xs = np.transpose(xs, swap_4d_channels_dict[swap_col])
+                elif swap_col == 'xyz-t_and_yzt-x':
+                    xs_xyz_t = xs
+                    #xs_tyz_x = np.transpose(xs, swap_4d_channels_dict['tyz-x'])
+                    xs_yzt_x = np.transpose(xs, swap_4d_channels_dict['yzt-x'])
+                else: raise ValueError('The argument "swap_col"=' + str(swap_col) + ' is not valid.')
+
             # and mc info (labels)
             y_values = f['y'][n_entries:n_entries+batchsize]
             y_values = np.reshape(y_values, (batchsize, y_values.shape[1])) #TODO simplify with (y_values, y_values.shape) ?
@@ -65,7 +67,11 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, f_s
             # we have read one more batch from this file
             n_entries += batchsize
 
-            output = (xs, ys) if yield_mc_info is False else (xs, ys) + (y_values,)
+            if swap_col == 'xyz-t_and_yzt-x':
+                output = ([xs_xyz_t, xs_yzt_x], ys) if yield_mc_info is False else ([xs_xyz_t, xs_yzt_x], ys) + (y_values,)
+            else:
+                output = (xs, ys) if yield_mc_info is False else (xs, ys) + (y_values,)
+
             yield output
         f.close() # this line of code is actually not reached if steps=f_size/batchsize
 
@@ -253,9 +259,9 @@ def load_zero_center_data(train_files, batchsize, n_bins, n_gpu, swap_4d_channel
         dimensions = get_dimensions_encoding(n_bins, batchsize)
         xs_mean = get_mean_image(filepath, dimensions, n_gpu)
 
-    if swap_4d_channels is not None:
-        swap_4d_channels_dict = {'yzt-x': (1, 2, 3, 0)}
-        xs_mean = np.transpose(xs_mean, swap_4d_channels_dict[swap_4d_channels])
+    # if swap_4d_channels is not None:
+    #     swap_4d_channels_dict = {'yzt-x': (1, 2, 3, 0)}
+    #     xs_mean = np.transpose(xs_mean, swap_4d_channels_dict[swap_4d_channels])
 
     return xs_mean
 
