@@ -11,32 +11,44 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import glob
 
 
-def get_time_parameters(t, t_start_margin=0.15, t_end_margin=0.15):
+def get_time_parameters(event_hits, mode='timeslice_relative', t_start_margin=0.15, t_end_margin=0.15):
     """
     Gets the fundamental time parameters in one place for cutting a time residual.
     Later on these parameters cut out a certain time span of events specified by t_start and t_end.
-    :param ndarray(ndim=1) t: time column of the event_hits array.
-    :param float t_start_margin: defines the start time of the selected timespan with t_mean - t_start * t_diff.
-    :param float t_end_margin: defines the end time of the selected timespan with t_mean + t_start * t_diff.
+    :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyzt) data for a certain eventID. [positions_xyz, time, triggered]
+    :param str mode: type of time cut that is used. Currently available: timeslice_relative and first_triggered.
+    :param float t_start_margin: Used in timeslice_relative mode. Defines the start time of the selected timespan with t_mean - t_start * t_diff.
+    :param float t_end_margin: Used in timeslice_relative mode. Defines the end time of the selected timespan with t_mean + t_start * t_diff.
     :return: float t_start, t_end: absolute start and end time that will be used for the later timespan cut.
                                    Events in this timespan are accepted, others are rejected.
     """
-    t_min = np.amin(t)
-    t_max = np.amax(t)
-    t_diff = t_max - t_min
-    t_mean = t_min + 0.5 * t_diff
+    t = event_hits[:, 3:4]
 
-    t_start = t_mean - t_start_margin * t_diff
-    t_end = t_mean + t_end_margin * t_diff
+    if mode == 'first_triggered':
+        triggered = event_hits[:, 4:5]
+        t = t[triggered == 1]
+        t_min = np.amin(t)
+        t_start = t_min - 200 # -200ns
+        t_end = t_min + 800 # +800ns
+
+    elif mode == 'timeslice_relative':
+        t_min = np.amin(t)
+        t_max = np.amax(t)
+        t_diff = t_max - t_min
+        t_mean = t_min + 0.5 * t_diff
+
+        t_start = t_mean - t_start_margin * t_diff
+        t_end = t_mean + t_end_margin * t_diff
+
+    else: raise ValueError('Time cut modes other than "first_triggered" or "timeslice_relative" are currently not supported.')
 
     return t_start, t_end
-    #return t_min, t_max # for no time cut
 
 
 def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_2d_hists, event_track, do2d_pdf):
     """
     Computes 2D numpy histogram 'images' from the 4D data.
-    :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyzt) data for a certain eventID. [positions_xyz, time]
+    :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyzt) data for a certain eventID. [positions_xyz, time, triggered]
     :param ndarray(ndim=1) x_bin_edges: bin edges for the X-direction.
     :param ndarray(ndim=1) y_bin_edges: bin edges for the Y-direction.
     :param ndarray(ndim=1) z_bin_edges: bin edges for the Z-direction.
@@ -52,7 +64,8 @@ def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     t = event_hits[:, 3]
 
     # analyze time
-    t_start, t_end = get_time_parameters(t, t_start_margin=0.15, t_end_margin=0.15)
+    #t_start, t_end = get_time_parameters(event_hits, t_start_margin=0.15, t_end_margin=0.15)
+    t_start, t_end = get_time_parameters(event_hits, mode='first_triggered')
 
     # create histograms for this event
     hist_xy = np.histogram2d(x, y, bins=(x_bin_edges, y_bin_edges))  # hist[0] = H, hist[1] = xedges, hist[2] = yedges
@@ -144,7 +157,7 @@ def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     Careful: Currently, appending to all_4d_to_3d_hists takes quite a lot of memory (about 200MB for 3500 events).
     In the future, the list should be changed to a numpy ndarray.
     (Which unfortunately would make the code less readable, since an array is needed for each projection...)
-    :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyzt) data for a certain eventID. [positions_xyz, time]
+    :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyzt) data for a certain eventID. [positions_xyz, time, triggered]
     :param ndarray(ndim=1) x_bin_edges: bin edges for the X-direction. 
     :param ndarray(ndim=1) y_bin_edges: bin edges for the Y-direction.
     :param ndarray(ndim=1) z_bin_edges: bin edges for the Z-direction.
@@ -157,7 +170,8 @@ def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     z = event_hits[:, 2:3]
     t = event_hits[:, 3:4]
 
-    t_start, t_end = get_time_parameters(t, t_start_margin=0.15, t_end_margin=0.15)
+    #t_start, t_end = get_time_parameters(t, t_start_margin=0.15, t_end_margin=0.15)
+    t_start, t_end = get_time_parameters(event_hits, mode='first_triggered')
 
     hist_xyz = np.histogramdd(event_hits[:, 0:3], bins=(x_bin_edges, y_bin_edges, z_bin_edges))
 
@@ -183,7 +197,7 @@ def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
 def compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_4d_hists):
     """
     Computes 4D numpy histogram 'images' from the 4D data.
-    :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyzt) data for a certain eventID. [positions_xyz, time]
+    :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyzt) data for a certain eventID. [positions_xyz, time, triggered]
     :param ndarray(ndim=1) x_bin_edges: bin edges for the X-direction.
     :param ndarray(ndim=1) y_bin_edges: bin edges for the Y-direction.
     :param ndarray(ndim=1) z_bin_edges: bin edges for the Z-direction.
@@ -191,8 +205,8 @@ def compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     :param list all_4d_to_4d_hists: contains all 4D histogram projections.
     :return: appends the 4D histogram to the all_4d_to_4d_hists list. [xyzt]
     """
-    t = event_hits[:, 3:4]
-    t_start, t_end = get_time_parameters(t, t_start_margin=0.15, t_end_margin=0.15)
+    #t_start, t_end = get_time_parameters(event_hits, t_start_margin=0.15, t_end_margin=0.15)
+    t_start, t_end = get_time_parameters(event_hits, mode = 'first_triggered')
 
     hist_xyzt = np.histogramdd(event_hits[:, 0:4], bins=(x_bin_edges, y_bin_edges, z_bin_edges, n_bins[3]),
                                range=((min(x_bin_edges),max(x_bin_edges)),(min(y_bin_edges),max(y_bin_edges)),
