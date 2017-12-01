@@ -24,12 +24,13 @@ def get_time_parameters(event_hits, mode='timeslice_relative', t_start_margin=0.
     """
     t = event_hits[:, 3:4]
 
-    if mode == 'first_triggered':
+    if mode == 'trigger_cluster':
         triggered = event_hits[:, 4:5]
         t = t[triggered == 1]
-        t_min = np.amin(t)
-        t_start = t_min - 200 # -200ns
-        t_end = t_min + 800 # +800ns
+        t_mean = np.mean(t, dtype=np.float64)
+
+        t_start = t_mean - 350 # trigger-cluster - 350ns
+        t_end = t_mean + 850 # trigger-cluster + 850ns
 
     elif mode == 'timeslice_relative':
         t_min = np.amin(t)
@@ -65,7 +66,7 @@ def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
 
     # analyze time
     #t_start, t_end = get_time_parameters(event_hits, t_start_margin=0.15, t_end_margin=0.15)
-    t_start, t_end = get_time_parameters(event_hits, mode='first_triggered')
+    t_start, t_end = get_time_parameters(event_hits, mode='trigger_cluster')
 
     # create histograms for this event
     hist_xy = np.histogram2d(x, y, bins=(x_bin_edges, y_bin_edges))  # hist[0] = H, hist[1] = xedges, hist[2] = yedges
@@ -171,7 +172,7 @@ def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     t = event_hits[:, 3:4]
 
     #t_start, t_end = get_time_parameters(t, t_start_margin=0.15, t_end_margin=0.15)
-    t_start, t_end = get_time_parameters(event_hits, mode='first_triggered')
+    t_start, t_end = get_time_parameters(event_hits, mode='trigger_cluster')
 
     hist_xyz = np.histogramdd(event_hits[:, 0:3], bins=(x_bin_edges, y_bin_edges, z_bin_edges))
 
@@ -206,7 +207,7 @@ def compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     :return: appends the 4D histogram to the all_4d_to_4d_hists list. [xyzt]
     """
     #t_start, t_end = get_time_parameters(event_hits, t_start_margin=0.15, t_end_margin=0.15)
-    t_start, t_end = get_time_parameters(event_hits, mode = 'first_triggered')
+    t_start, t_end = get_time_parameters(event_hits, mode = 'trigger_cluster')
 
     hist_xyzt = np.histogramdd(event_hits[:, 0:4], bins=(x_bin_edges, y_bin_edges, z_bin_edges, n_bins[3]),
                                range=((min(x_bin_edges),max(x_bin_edges)),(min(y_bin_edges),max(y_bin_edges)),
