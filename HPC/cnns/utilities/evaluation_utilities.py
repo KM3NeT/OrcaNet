@@ -105,7 +105,7 @@ def add_pid_column_to_array(array, particle_type_dict, key):
 def load_pheid_event_selection():
     """
     Loads the pheid event that survive the precuts from a .txt file, adds a pid column to them and returns it.
-    :return: ndarray(ndim=2) arr_pheid_sel_events: 2D array that contains [event_id, run_id, particle_type, is_cc]
+    :return: ndarray(ndim=2) arr_pheid_sel_events: 2D array that contains [particle_type, is_cc, event_id, run_id]
                                                    for each event that survives the precuts.
     """
     path = '/home/woody/capn/mppi033h/Code/HPC/cnns/results/plots/pheid_event_selection_txt/' # folder for storing the precut .txts
@@ -137,14 +137,14 @@ def load_pheid_event_selection():
     return arr_pheid_sel_events
 
 
-def in_nd(a, b, abs=True, assume_unique=False):
+def in_nd(a, b, absolute=True, assume_unique=False):
     """
     Function that generalizes the np in_1d function to nd.
     Checks if entries in axis_0 of a exist in b and returns the bool array for all rows.
     Kind of hacky by using str views on the np arrays.
     :param ndarray(ndim=2) a: array where it should be checked whether each row exists in b or not.
     :param ndarray(ndim=2) b: array upon which the rows of a are checked.
-    :param bool abs: Specifies if absolute() should be called on the arrays before applying in_nd.
+    :param bool absolute: Specifies if absolute() should be called on the arrays before applying in_nd.
                      Useful when e.g. in_nd shouldn't care about particle (+) or antiparticle (-).
     :param bool assume_unique: ff True, the input arrays are both assumed to be unique, which can speed up the calculation.
     :return: ndarray(ndim=1): Boolean array that specifies for each row of a if it also exists in b or not.
@@ -153,7 +153,7 @@ def in_nd(a, b, abs=True, assume_unique=False):
     a = np.asarray(a, order='C')
     b = np.asarray(b, order='C')
 
-    if abs is True: # we don't care about e.g. particles or antiparticles
+    if absolute is True: # we don't care about e.g. particles or antiparticles
         a = np.absolute(a)
         b = np.absolute(b)
 
@@ -173,7 +173,7 @@ def arr_energy_correct_select_pheid_events(arr_energy_correct, invert=False):
     """
     pheid_evt_run_id = load_pheid_event_selection()
 
-    evt_run_id_in_pheid = in_nd(arr_energy_correct[:, [2,3,6,7]], pheid_evt_run_id, abs=True) # 2,3,6,7: particle_type, is_cc, event_id, run_id
+    evt_run_id_in_pheid = in_nd(arr_energy_correct[:, [2,3,6,7]], pheid_evt_run_id, absolute=True) # 2,3,6,7: particle_type, is_cc, event_id, run_id
 
     if invert is True: evt_run_id_in_pheid = np.invert(evt_run_id_in_pheid)
 

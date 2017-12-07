@@ -138,7 +138,7 @@ def shuffle_h5_tool():
     Saves the shuffled data to a new .h5 file.
     """
     file_list, delete_flag, chunking, compress, n_shuffles = parse_input()
-    print n_shuffles
+    print 'Shuffling ' + str(n_shuffles) + ' times'
 
     for filepath in file_list:
         print 'Shuffling file ' + filepath

@@ -133,9 +133,9 @@ def encode_targets(y_val, class_type):
     """
     Encodes the labels (classes) of the images.
     :param ndarray(ndim=1) y_val: Array that contains ALL event class information for one event.
-           ---------------------------------------------------------------------------------------------------------------------------
-           Current content: [event_id -> 0, particle_type -> 1, energy -> 2, isCC -> 3, bjorkeny -> 4, dir_x/y/z -> 5/6/7, time -> 8]
-           ---------------------------------------------------------------------------------------------------------------------------
+           ---------------------------------------------------------------------------------------------------------------------------------------
+           Current content: [event_id -> 0, particle_type -> 1, energy -> 2, isCC -> 3, bjorkeny -> 4, dir_x/y/z -> 5/6/7, time -> 8, run_id -> 9]
+           ---------------------------------------------------------------------------------------------------------------------------------------
     :param (int, str) class_type: Tuple with the umber of output classes and a string identifier to specify the exact output classes.
                                   I.e. (2, 'muon-CC_to_elec-CC')
     :return: ndarray(ndim=1) train_y: Array that contains the encoded class label information of the input event.
@@ -249,15 +249,15 @@ def load_zero_center_data(train_files, batchsize, n_bins, n_gpu, swap_4d_channel
 
     # if the file has a shuffle index (e.g. shuffled_6.h5) and a .npy exists for the first shuffled file (shuffled.h5), we don't want to calculate the mean again
     shuffle_index = re.search('shuffled(.*).h5', filepath)
-    filepath = re.sub(shuffle_index.group(1), '', filepath)
+    filepath_without_index = re.sub(shuffle_index.group(1), '', filepath)
 
-    if os.path.isfile(filepath + '_zero_center_mean.npy') is True:
+    if os.path.isfile(filepath_without_index + '_zero_center_mean.npy') is True:
         print 'Loading an existing xs_mean_array in order to zero_center the data!'
-        xs_mean = np.load(filepath + '_zero_center_mean.npy')
+        xs_mean = np.load(filepath_without_index + '_zero_center_mean.npy')
     else:
         print 'Calculating the xs_mean_array in order to zero_center the data!'
         dimensions = get_dimensions_encoding(n_bins, batchsize)
-        xs_mean = get_mean_image(filepath, dimensions, n_gpu)
+        xs_mean = get_mean_image(filepath, filepath_without_index, dimensions, n_gpu)
 
     # if swap_4d_channels is not None:
     #     swap_4d_channels_dict = {'yzt-x': (1, 2, 3, 0)}
@@ -266,7 +266,7 @@ def load_zero_center_data(train_files, batchsize, n_bins, n_gpu, swap_4d_channel
     return xs_mean
 
 
-def get_mean_image(filepath, dimensions, n_gpu):
+def get_mean_image(filepath, filepath_without_index, dimensions, n_gpu):
     """
     Returns the mean_image of a xs dataset.
     Calculating still works if xs is larger than the available memory and also if the file is compressed!
@@ -303,7 +303,7 @@ def get_mean_image(filepath, dimensions, n_gpu):
     xs_mean = np.mean(xs_mean_arr, axis=0, dtype=np.float64).astype(np.float32)
     xs_mean = np.reshape(xs_mean, dimensions[1:]) # give the shape the channels dimension again if not 4D
 
-    np.save(filepath + '_zero_center_mean.npy', xs_mean)
+    np.save(filepath_without_index + '_zero_center_mean.npy', xs_mean)
     return xs_mean
 
 
@@ -388,5 +388,44 @@ class TensorBoardWrapper(ks.callbacks.TensorBoard):
             tags[s * tb.shape[0]:(s + 1) * tb.shape[0]] = tb
         self.validation_data = [imgs, tags, np.ones(imgs.shape[0]), 0.0]
         return super(TensorBoardWrapper, self).on_epoch_end(epoch, logs)
+
+
+class BatchLevelPerformanceLogger(ks.callbacks.Callback):
+    # Batch level performance logger
+    # Gibt lOSS aus über alle :display batches, gemittelt über die letzten :display batches
+    def __init__(self, display, modelname, steps_per_epoch, epoch):
+        self.seen = 0
+        self.display = display
+        self.averageLoss = 0
+        self.averageAcc = 0
+        self.logfile_train_fname = 'models/trained/perf_plots/log_train_' + modelname + '.txt'
+        self.logfile_train = open(self.logfile_train_fname, 'a+')
+        if os.stat(self.logfile_train_fname).st_size == 0: self.logfile_train.write("#Batch\t#Batch_float\tLoss\tAccuracy")
+        self.steps_per_epoch = steps_per_epoch
+        self.epoch = epoch
+        self.loglist = []
+
+    def on_batch_end(self, batch, logs={}):
+        self.seen += 1
+        self.averageLoss += logs.get('loss')
+        self.averageAcc += logs.get("acc")
+        if self.seen % self.display == 0:
+            averaged_loss = self.averageLoss / self.display
+            averaged_acc = self.averageAcc / self.display
+            batchnumber_float = (self.seen - self.display / 2.) / float(self.steps_per_epoch) + self.epoch - 1  # start from zero
+            self.loglist.append('\n{0}\t{1}\t{2}\t{3}'.format(self.seen, batchnumber_float, averaged_loss, averaged_acc))
+            #self.logfile_train.write('\n{0}\t{1}\t{2}\t{3}'.format(self.seen, batchnumber_float, averaged_loss, averaged_acc))
+            #self.logfile_train.flush()
+            #os.fsync(self.logfile_train.fileno())
+            self.averageLoss = 0
+            self.averageAcc = 0
+
+    def on_epoch_end(self, batch, logs={}):
+        for batch_statistics in self.loglist: # only write finished epochs to the .txt
+            self.logfile_train.write(batch_statistics)
+
+        self.logfile_train.flush()
+        os.fsync(self.logfile_train.fileno())
+        self.logfile_train.close()
 
 #------------- Classes -------------#

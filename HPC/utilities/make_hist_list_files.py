@@ -48,7 +48,11 @@ def parse_input():
                         help = 'if a gzip filter with compression 1 should be used for saving. Only works with -c option!')
     parser.add_argument('-c', '--chunksize', dest='chunksize', type=int,
                         help = 'specify a chunksize value in order to use chunked storage for the concatenated .h5 file (default: not chunked).')
+    parser.add_argument('-p', '--cuts', dest='cuts', action='store_true',
+                        help = 'if cuts should be applied for the to be concatenated h5 files. '
+                               'The txt files with the cut informationa are specified in the load_event_selection() function of concatenate_h5.py.')
     parser.set_defaults(compression=False)
+    parser.set_defaults(cuts=False)
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -69,16 +73,16 @@ def parse_input():
     if args.n_files_max:
         n_files_max = args.n_files_max
 
-    chunking = (False, None)
-    if args.chunksize:
-        chunking = (True, args.chunksize)
+    chunking = None
+    if args.chunksize: chunking = '--chunksize ' + str(args.chunksize)
 
-    compress = (None, None)
-    if args.compression is True:
-        compress = ('gzip', 1)
+    compress = None
+    if args.compression: compress = '--compression'
 
+    cuts = None
+    if args.cuts: cuts = '--cuts'
 
-    return dirpath, test_fraction, n_train_files, n_test_files, n_file_start, n_files_max, chunking, compress
+    return dirpath, test_fraction, n_train_files, n_test_files, n_file_start, n_files_max, chunking, compress, cuts
 
 
 def get_filepaths(dirpath):
@@ -249,13 +253,13 @@ def make_list_files_and_concatenate():
     2) make all .list files which contains the filepaths of the .h5 files that should be concatenated
     3) make a submit script to concatenate the .h5 files in the .list files.
     """
-    dirpath, test_fraction, n_train_files, n_test_files, n_file_start, n_files_max, chunking, compress = parse_input()
+    dirpath, test_fraction, n_train_files, n_test_files, n_file_start, n_files_max, chunking, compress, cuts = parse_input()
 
     savenames_tt, p_type, proj_type = make_list_files(dirpath, test_fraction, n_train_files, n_test_files, n_file_start, n_files_max)
-    submit_concatenate_list_files(savenames_tt, dirpath, p_type, proj_type)
+    submit_concatenate_list_files(savenames_tt, dirpath, p_type, proj_type, chunking, compress, cuts)
 
 
-def submit_concatenate_list_files(savenames, dirpath, p_type, proj_type):
+def submit_concatenate_list_files(savenames, dirpath, p_type, proj_type, chunking, compress, cuts):
     """
     Function that writes a qsub .sh files which concatenates all files inside the .list files from the <savenames> list.
     :param list savenames: list that contains the savenames of all created .list files.
@@ -266,17 +270,20 @@ def submit_concatenate_list_files(savenames, dirpath, p_type, proj_type):
     if not os.path.exists(dirpath + '/logs/cout'): # check if /logs/cout folder exists, if not create it.
         os.makedirs(dirpath + '/logs/cout')
 
+    xstr = lambda s: '' if s is None else str(s) # Make str(None) = ''
+
     # make qsub .sh file
     with open(dirpath + '/submit_concatenate_h5_' + p_type + '_' + proj_type + '.sh', 'w') as f:
         f.write('#!/usr/bin/env bash\n')
         f.write('#\n')
         f.write('#PBS -o /home/woody/capn/mppi033h/logs/submit_concatenate_h5_${PBS_JOBID}.out -e /home/woody/capn/mppi033h/logs/submit_concatenate_h5_${PBS_JOBID}.err\n')
         f.write('\n')
-        f.write('CodeFolder=/home/woody/capn/mppi033h/Code/HPC/cnns/utilities/data_tools\n')
+        f.write('CodeFolder="/home/woody/capn/mppi033h/Code/HPC/cnns/utilities/data_tools"\n')
         f.write('cd ${CodeFolder}\n')
-        f.write('chunksize=32\n')
-        f.write('compression=--compression\n')
-        f.write('projection_path=' + dirpath + '\n')
+        f.write('chunksize="' + xstr(chunking) + '"\n')
+        f.write('compression="' + xstr(compress) + '"\n')
+        f.write('cuts="' + xstr(cuts) + '"\n')
+        f.write('projection_path="' + dirpath + '"\n')
         f.write('\n')
         f.write('# lists with files that should be concatenated\n')
 
@@ -319,9 +326,10 @@ def write_txt_concatenate_files_one_loop(f, savenames, i, n_lists_left, n_cores)
         loop_index += 1
 
         if loop_index <= n_lists_left:
+            and_char = '&' if loop_index < n_lists_left else '' # in order to make execution on multiple cpus at the same time possible #TODO test
             f.write('(time taskset -c ' +  str(loop_index-1) + ' python concatenate_h5.py --list ${projection_path}/${input_list_name_' + str(n) + '} '
-                    '${compression} --chunksize ${chunksize} ${projection_path}/concatenated/${output_list_name_' + str(n) + '} > '
-                    '${projection_path}/logs/cout/${output_list_name_' + str(n) + '}.txt) &\n')
+                    '${compression} ${cuts} ${chunksize} ${projection_path}/concatenated/${output_list_name_' + str(n) + '} > '
+                    '${projection_path}/logs/cout/${output_list_name_' + str(n) + '}.txt) ' + and_char + '\n')
 
     f.write('wait\n')
     f.write('\n')
@@ -331,7 +339,8 @@ if __name__ == '__main__':
     make_list_files_and_concatenate()
 
 
-# python make_hist_list_files.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/h5/xyzt 0.2 1 1 --compression --chunksize 32
+# python make_hist_list_files.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/h5/xyzt 0.2 1 1 --compression --cuts --chunksize 32
+# submit with e.g. 'qsub -l nodes=1:ppn=4,walltime=02:00:00 submit_concatenate_h5_elec-CC_and_muon-CC_xyzt.sh'
 
 
 
