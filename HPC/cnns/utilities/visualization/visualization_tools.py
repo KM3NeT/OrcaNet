@@ -31,15 +31,7 @@ def plot_train_and_test_statistics(modelname):
     plt.plot(train_batchnr, train_loss, 'b--', zorder=3, label='train', lw=0.5, alpha=0.5)
     plt.plot(test_epoch, test_loss, 'b', marker='o', zorder=3, label='test', lw=0.5, markersize=3)
 
-    n_epochs = np.amax(test_epoch)
-
-    # if we didn't start logging with epoch 1
-    min_test = np.amin(test_epoch)
-    min_train = np.amin(train_batchnr)
-    minimum = min_test if min_test < min_train else min_train
-    start_epoch = np.floor(minimum)
-
-    x_ticks_major = np.linspace(start_epoch, n_epochs + 1, n_epochs + 2)
+    x_ticks_major = get_epoch_xticks(test_epoch, train_batchnr)
     plt.xticks(x_ticks_major)
 
     axes.legend(loc='upper right')
@@ -52,6 +44,28 @@ def plot_train_and_test_statistics(modelname):
 
     plt.savefig('models/trained/perf_plots/plots/loss_' + modelname + '.pdf')
     plt.savefig('models/trained/perf_plots/plots/loss_' + modelname + '.png', dpi=600)
+
+
+def get_epoch_xticks(test_epoch, train_batchnr):
+
+    # if we didn't start logging with epoch 1
+    min_test, max_test = np.amin(test_epoch), np.amax(test_epoch)
+    min_train, max_train = np.amin(train_batchnr), np.amax(train_batchnr)
+    minimum = min_test if min_test < min_train else min_train
+    maximum = max_test if max_test > max_train else max_train
+    start_epoch, end_epoch = np.floor(minimum), np.ceil(maximum)
+
+    # reduce number of x_ticks by factor of 2 if n_epochs > 20
+    n_epochs = end_epoch - start_epoch
+    #reduce_x_ticks = 1 + np.floor(n_epochs / 10.)
+    #x_ticks_n_steps = (n_epochs + 2) / reduce_x_ticks
+
+    #x_ticks_major = np.linspace(start_epoch, end_epoch + 1, x_ticks_n_steps)
+    x_ticks_stepsize = 1 + np.floor(n_epochs / 20.) # 20 ticks max, increase stepsize if n_epochs >= 20
+    x_ticks_major = np.arange(start_epoch, end_epoch + x_ticks_stepsize, x_ticks_stepsize)
+
+    return x_ticks_major
+
 
 
 def get_activations_and_weights(model, f, n_bins, class_type, xs_mean, swap_4d_channels,  layer_name=None, learning_phase='test'):
@@ -120,17 +134,17 @@ def plot_weights_and_activations(model, f, n_bins, class_type, xs_mean, swap_4d_
     pdf_activations_and_weights = PdfPages('models/trained/perf_plots/model_stat_plots/act_and_weights_plots_' + modelname + '_epoch' + str(epoch) + '.pdf')
 
     # plot weights
-    event_id = y_values[0][0]
+    event_id = int(y_values[0][0])
     energy = y_values[0][2]
 
     try:
-        run_id = y_values[0][9] # if it doesn't exist in the file
+        run_id = int(y_values[0][9]) # if it doesn't exist in the file
     except IndexError:
         run_id = ''
 
     for i, layer_activations in enumerate(activations):
         plt.hist(layer_activations.flatten(), bins=100)
-        plt.title('Run/Event-ID: ' + str(run_id) + '/' + str(event_id) + ', E=' + str(energy) + 'GeV. ' + 'Activations for layer ' + str(layer_names[i]))
+        plt.title('Run/Event-ID: ' + str(run_id) + '/' + str(event_id) + ', E=' + str(energy) + 'GeV. \n ' + 'Activations for layer ' + str(layer_names[i]))
         plt.xlabel('Activation (layer output)')
         plt.ylabel('Quantity [#]')
         pdf_activations_and_weights.savefig(fig)
@@ -152,6 +166,7 @@ def plot_weights_and_activations(model, f, n_bins, class_type, xs_mean, swap_4d_
         plt.title('Weights for layer ' + str(layer_names[i]))
         plt.xlabel('Weight')
         plt.xlabel('Quantity [#]')
+        plt.tight_layout()
         pdf_activations_and_weights.savefig(fig)
         plt.cla()
 

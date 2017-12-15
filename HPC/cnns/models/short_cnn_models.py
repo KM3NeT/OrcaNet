@@ -220,6 +220,154 @@ def create_vgg_like_model_double_input(n_bins, batchsize, nb_classes=2, n_filter
     return model
 
 
+def create_vgg_like_model_double_input_from_single_nns(n_bins, batchsize, nb_classes=2, dropout=0, swap_4d_channels=None, activation='relu'):
+    """
+    Returns a double input, VGG-like model (stacked conv. layers) with MaxPooling and Dropout if wished.
+    The two single VGG networks are concatenated after the last flatten layers.
+    The number of convolutional layers can be controlled with the n_filters parameter:
+    n_conv_layers = len(n_filters)
+    :param tuple n_bins: Number of bins (x,y,z,t) of the data.
+    :param int nb_classes: Number of output classes.
+    :param int batchsize: Batchsize of the data that will be used with the VGG net.
+    :param float dropout: Adds dropout if >0.
+    :param None/str swap_4d_channels: For 3.5D nets, specifies if the default channel (t) should be swapped with another dim.
+    :param str activation: Type of activation function that should be used. E.g. 'linear', 'relu', 'elu', 'selu'.
+    :return: Model model: Keras VGG-like model.
+    """
+    dim, input_dim, max_pool_sizes = decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels)
+
+    trained_model_1_path = 'models/trained/backup/VGG-4d-xyz-t-without-run-id-Acc-70-3-dp01-old/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_epoch26.h5'# xyz-t
+    trained_model_2_path = 'models/trained/backup/VGG-4d-yzt-x-without-run-id-Acc-70-9/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_epoch51.h5'# yzt-x
+
+    trained_model_1 = ks.models.load_model(trained_model_1_path)# xyz-t
+    trained_model_2 = ks.models.load_model(trained_model_2_path)# yzt-x
+
+    # model 1
+    input_layer_net_1 = Input(shape=input_dim[0][1:], name='input_net_1', dtype=K.floatx()) # have to do that manually
+    layer_numbers_net_1 = {'conv': 1, 'batch_norm': 1, 'activation': 1, 'max_pooling': 1, 'dropout': 1}
+
+    x_1 = create_layer_from_config(input_layer_net_1, trained_model_1.layers[1], layer_numbers_net_1, net='1')
+
+    for trained_layer in trained_model_1.layers[2:]:
+        if 'flatten' in trained_layer.name: break  # we don't want to get anything after the flatten layer
+        x_1 = create_layer_from_config(x_1, trained_layer, layer_numbers_net_1, net='1', dropout=0)
+
+    # model 2
+    input_layer_net_2 = Input(shape=input_dim[1][1:], name='input_net_2', dtype=K.floatx()) # change input layer name
+    layer_numbers_net_2 = {'conv': 1, 'batch_norm': 1, 'activation': 1, 'max_pooling': 1, 'dropout': 1}
+
+    x_2 = create_layer_from_config(input_layer_net_2, trained_model_2.layers[1], layer_numbers_net_2, net='2')
+
+    for trained_layer in trained_model_2.layers[2:]:
+        if 'flatten' in trained_layer.name: break # we don't want to get anything after the flatten layer
+        x_2 = create_layer_from_config(x_2, trained_layer, layer_numbers_net_2, net='2', dropout=0)
+
+    # flatten both nets
+    x_1 = Flatten()(x_1)
+    x_2 = Flatten()(x_2)
+
+    # concatenate both nets
+    x = ks.layers.concatenate([x_1, x_2])
+
+    x = Dense(256, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+    x = Dropout(dropout)(x)
+    x = Dense(16, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+
+    x = Dense(nb_classes, activation='softmax', kernel_initializer='he_normal')(x)
+
+    model = Model(inputs=[input_layer_net_1, input_layer_net_2], outputs=x)
+
+    set_layer_weights(model, trained_model_1, trained_model_2) # set weights
+
+    return model
+
+
+def create_layer_from_config(x, trained_layer, layer_numbers, net='', dropout=0):
+    """
+    Creates a new Keras nn layer from the config of an already existing layer.
+    Changes the 'trainable' flag of the new layer to false and optionally udates the dropout rate.
+    Adds a layer name based on the layer_numbers dict.
+    :param x: Keras functional model api instance. E.g. TF tensors.
+    :param ks.layer trained_layer: Keras layer instance that is already trained.
+    :param dict layer_numbers: dictionary for the different layer types to keep track of the layer_number in the layer names.
+    :param str net: additional string that is added to the layer name. E.g. 'net_2' if a double input model is used.
+    :param float dropout: optional, dropout rate of the new layer
+    :return: x: Keras functional model api instance. E.g. TF tensors. Contains a new layer now!
+    """
+    if 'conv' in trained_layer.name:
+        layer = Convolution3D
+        name = 'conv'
+    elif 'batch_normalization' in trained_layer.name:
+        layer = BatchNormalization
+        name = 'batch_norm'
+    elif 'activation' in trained_layer.name:
+        layer = Activation
+        name = 'activation'
+    elif 'pooling' in trained_layer.name:
+        layer = MaxPooling3D
+        name = 'max_pooling'
+    elif 'dropout' in trained_layer.name:
+        layer = Dropout
+        name = 'dropout'
+    else:
+        return x #if 'dropout' or 'input' or 'dense' or 'flatten'
+
+    config = trained_layer.get_config()
+    config.update({'trainable': False}) # for freezing the layer
+    if name == 'dropout': config.update({'rate': dropout})
+
+    new_layer_name = name + '_' + str(layer_numbers[name]) + '_net_' + net
+    layer_numbers[name] = layer_numbers[name] + 1
+    config.update({'name': new_layer_name})
+
+    x = layer.from_config(config)(x)
+
+    return x
+
+
+def set_layer_weights(model, trained_model_1, trained_model_2):
+    """
+    Sets the weights of a double input model (until the first flatten layer) based on two pretrained models.
+    :param Model model: Keras model instance.
+    :param Model trained_model_1: Pretrained Keras model 1.
+    :param Model trained_model_2: Pretrained Keras model 2.
+    :return:
+    """
+    skip_layers = ['dropout', 'input', 'dense', 'flatten', 'max_pooling', 'activation', 'concatenate']
+
+    # net_1
+    trained_layers_w_weights_net1 = [layer for layer in trained_model_1.layers if 'conv' in layer.name or 'batch_normalization' in layer.name] # still ordered
+
+    i=-1
+    for layer in model.layers:
+        if 'net_2' in layer.name: continue
+
+        skip = False # workaround of hell...
+        for skip_layer_str in skip_layers:
+            if skip_layer_str in layer.name:
+                skip = True
+        if skip: continue
+
+        i += 1
+        layer.set_weights(trained_layers_w_weights_net1[i].get_weights())
+
+    # net_2
+    trained_layers_w_weights_net2 = [layer for layer in trained_model_2.layers if 'conv' in layer.name or 'batch_normalization' in layer.name] # still ordered
+
+    i = -1
+    for layer in model.layers:
+        if 'net_1' in layer.name: continue
+
+        skip = False # workaround of hell...
+        for skip_layer_str in skip_layers:
+            if skip_layer_str in layer.name:
+                skip = True
+        if skip: continue
+
+        i += 1
+        layer.set_weights(trained_layers_w_weights_net2[i].get_weights())
+
+
 #------------- VGG-like model -------------#
 
 
