@@ -224,8 +224,6 @@ def create_vgg_like_model_double_input_from_single_nns(n_bins, batchsize, nb_cla
     """
     Returns a double input, VGG-like model (stacked conv. layers) with MaxPooling and Dropout if wished.
     The two single VGG networks are concatenated after the last flatten layers.
-    The number of convolutional layers can be controlled with the n_filters parameter:
-    n_conv_layers = len(n_filters)
     :param tuple n_bins: Number of bins (x,y,z,t) of the data.
     :param int nb_classes: Number of output classes.
     :param int batchsize: Batchsize of the data that will be used with the VGG net.
