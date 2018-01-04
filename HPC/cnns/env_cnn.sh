@@ -2,7 +2,7 @@
 # remember: qsub.tinygpu -I -l walltime=00:59:00,nodes=1:ppn=4:gtx1080
 
 # load conda virtualenv
-env_dl
+source activate /home/hpc/capn/mppi033h/.virtualenv/h5_to_histo_env/
 # required:
 module use -a /home/vault/capn/shared/apps/U16/modules
 module load cudnn/6.0-cuda8.0

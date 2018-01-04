@@ -218,6 +218,20 @@ def encode_targets(y_val, class_type):
         #supports both 1 or 2 neurons at the cnn softmax end
         train_y = get_class_up_down_categorical(y_val[7], class_type[0])
 
+    elif class_type[1] == 'tau-CC_vs_other_neutrinos':
+        categorical_type = convert_particle_class_to_categorical(y_val[1], y_val[3], num_classes=4) # yields [0/1,0/1,0/1,0/1]; elec_NC, elec_CC, muon_CC, tau_CC
+        train_y = np.zeros(class_type[0], dtype='float32')
+
+        if class_type[0] == 1:
+            if categorical_type[3] != 0:
+                train_y[0] = categorical_type[3]
+
+        else:
+            assert class_type[0] == 2
+            train_y[0] = categorical_type[3]
+            if categorical_type[3] != 1:
+                train_y[1] = 1
+
     else:
         print "Class type " + str(class_type) + " not supported!"
         return y_val
@@ -229,7 +243,7 @@ def encode_targets(y_val, class_type):
 
 #------------- Functions for preprocessing -------------#
 
-def load_zero_center_data(train_files, batchsize, n_bins, n_gpu, swap_4d_channels=None):
+def load_zero_center_data(train_files, batchsize, n_bins, n_gpu):
     """
     Gets the xs_mean array that can be used for zero-centering.
     The array is either loaded from a previously saved file or it is calculated on the fly.
@@ -238,7 +252,6 @@ def load_zero_center_data(train_files, batchsize, n_bins, n_gpu, swap_4d_channel
     :param int batchsize: Batchsize that is being used in the data.
     :param tuple n_bins: Number of bins for each dimension (x,y,z,t) in the tran_file.
     :param int n_gpu: Number of gpu's, used for calculating the available RAM space in get_mean_image().
-    :param None/str swap_4d_channels: For 4D data. Specifies if the columns in the xs_mean array should be swapped.
     :return: ndarray xs_mean: mean_image of the x dataset. Can be used for zero-centering later on.
     """
     if len(train_files) > 1:
@@ -259,10 +272,6 @@ def load_zero_center_data(train_files, batchsize, n_bins, n_gpu, swap_4d_channel
         dimensions = get_dimensions_encoding(n_bins, batchsize)
         xs_mean = get_mean_image(filepath, filepath_without_index, dimensions, n_gpu)
 
-    # if swap_4d_channels is not None:
-    #     swap_4d_channels_dict = {'yzt-x': (1, 2, 3, 0)}
-    #     xs_mean = np.transpose(xs_mean, swap_4d_channels_dict[swap_4d_channels])
-
     return xs_mean
 
 
@@ -271,6 +280,7 @@ def get_mean_image(filepath, filepath_without_index, dimensions, n_gpu):
     Returns the mean_image of a xs dataset.
     Calculating still works if xs is larger than the available memory and also if the file is compressed!
     :param str filepath: Filepath of the data upon which the mean_image should be calculated.
+    :param str filepath_without_index: filepath without the number index.
     :param tuple dimensions: Dimensions tuple for 2D, 3D or 4D data.
     :param filepath: Filepath of the input data, used as a str for saving the xs_mean_image.
     :param int n_gpu: Number of used gpu's that is related to how much RAM is available (16G per GPU).
@@ -326,7 +336,7 @@ def get_array_memsize(array):
 
 #------------- Various other functions -------------#
 
-def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels):
+def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident=''):
     """
     Derives the name of a model based on its number of bins and the class_type tuple.
     The final modelname is defined as 'model_Nd_proj_class_type[1]'.
@@ -336,6 +346,7 @@ def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels):
                                   I.e. (2, 'muon-CC_to_elec-CC')
     :param str nn_arch: String that declares which neural network model architecture is used.
     :param None/str swap_4d_channels: For 4D data input (3.5D models). Specifies the projection type.
+    :param str str_ident: Optional str identifier that gets appended to the modelname.
     :return: str modelname: Derived modelname.
     """
     modelname = 'model_' + nn_arch + '_'
@@ -352,7 +363,8 @@ def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels):
         if n_bins[2] > 1: projection += 'z'
         if n_bins[3] > 1: projection += 't'
 
-    modelname += str(dim) + 'd_' + projection + '_' + class_type[1]
+    str_ident = '_' + str_ident if str_ident is not '' else str_ident
+    modelname += str(dim) + 'd_' + projection + '_' + class_type[1] + str_ident
 
     return modelname
 
@@ -399,8 +411,7 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
         self.averageLoss = 0
         self.averageAcc = 0
         self.logfile_train_fname = 'models/trained/perf_plots/log_train_' + modelname + '.txt'
-        self.logfile_train = open(self.logfile_train_fname, 'a+')
-        if os.stat(self.logfile_train_fname).st_size == 0: self.logfile_train.write("#Batch\t#Batch_float\tLoss\tAccuracy")
+        self.logfile_train = None
         self.steps_per_epoch = steps_per_epoch
         self.epoch = epoch
         self.loglist = []
@@ -414,13 +425,13 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
             averaged_acc = self.averageAcc / self.display
             batchnumber_float = (self.seen - self.display / 2.) / float(self.steps_per_epoch) + self.epoch - 1  # start from zero
             self.loglist.append('\n{0}\t{1}\t{2}\t{3}'.format(self.seen, batchnumber_float, averaged_loss, averaged_acc))
-            #self.logfile_train.write('\n{0}\t{1}\t{2}\t{3}'.format(self.seen, batchnumber_float, averaged_loss, averaged_acc))
-            #self.logfile_train.flush()
-            #os.fsync(self.logfile_train.fileno())
             self.averageLoss = 0
             self.averageAcc = 0
 
     def on_epoch_end(self, batch, logs={}):
+        self.logfile_train = open(self.logfile_train_fname, 'a+')
+        if os.stat(self.logfile_train_fname).st_size == 0: self.logfile_train.write("#Batch\t#Batch_float\tLoss\tAccuracy")
+
         for batch_statistics in self.loglist: # only write finished epochs to the .txt
             self.logfile_train.write(batch_statistics)
 

@@ -220,14 +220,14 @@ def create_vgg_like_model_double_input(n_bins, batchsize, nb_classes=2, n_filter
     return model
 
 
-def create_vgg_like_model_double_input_from_single_nns(n_bins, batchsize, nb_classes=2, dropout=0, swap_4d_channels=None, activation='relu'):
+def create_vgg_like_model_double_input_from_single_nns(n_bins, batchsize, nb_classes=2, dropout=(0, 0.2), swap_4d_channels=None, activation='relu'):
     """
     Returns a double input, VGG-like model (stacked conv. layers) with MaxPooling and Dropout if wished.
     The two single VGG networks are concatenated after the last flatten layers.
     :param tuple n_bins: Number of bins (x,y,z,t) of the data.
     :param int nb_classes: Number of output classes.
     :param int batchsize: Batchsize of the data that will be used with the VGG net.
-    :param float dropout: Adds dropout if >0.
+    :param (float, float) dropout: Adds dropout if >0.
     :param None/str swap_4d_channels: For 3.5D nets, specifies if the default channel (t) should be swapped with another dim.
     :param str activation: Type of activation function that should be used. E.g. 'linear', 'relu', 'elu', 'selu'.
     :return: Model model: Keras VGG-like model.
@@ -244,21 +244,21 @@ def create_vgg_like_model_double_input_from_single_nns(n_bins, batchsize, nb_cla
     input_layer_net_1 = Input(shape=input_dim[0][1:], name='input_net_1', dtype=K.floatx()) # have to do that manually
     layer_numbers_net_1 = {'conv': 1, 'batch_norm': 1, 'activation': 1, 'max_pooling': 1, 'dropout': 1}
 
-    x_1 = create_layer_from_config(input_layer_net_1, trained_model_1.layers[1], layer_numbers_net_1, net='1')
+    x_1 = create_layer_from_config(input_layer_net_1, trained_model_1.layers[1], layer_numbers_net_1, trainable=False, net='1')
 
     for trained_layer in trained_model_1.layers[2:]:
         if 'flatten' in trained_layer.name: break  # we don't want to get anything after the flatten layer
-        x_1 = create_layer_from_config(x_1, trained_layer, layer_numbers_net_1, net='1', dropout=0)
+        x_1 = create_layer_from_config(x_1, trained_layer, layer_numbers_net_1, trainable=False, net='1', dropout=dropout[0])
 
     # model 2
     input_layer_net_2 = Input(shape=input_dim[1][1:], name='input_net_2', dtype=K.floatx()) # change input layer name
     layer_numbers_net_2 = {'conv': 1, 'batch_norm': 1, 'activation': 1, 'max_pooling': 1, 'dropout': 1}
 
-    x_2 = create_layer_from_config(input_layer_net_2, trained_model_2.layers[1], layer_numbers_net_2, net='2')
+    x_2 = create_layer_from_config(input_layer_net_2, trained_model_2.layers[1], layer_numbers_net_2, trainable=False, net='2')
 
     for trained_layer in trained_model_2.layers[2:]:
         if 'flatten' in trained_layer.name: break # we don't want to get anything after the flatten layer
-        x_2 = create_layer_from_config(x_2, trained_layer, layer_numbers_net_2, net='2', dropout=0)
+        x_2 = create_layer_from_config(x_2, trained_layer, layer_numbers_net_2, trainable=False, net='2', dropout=dropout[0])
 
     # flatten both nets
     x_1 = Flatten()(x_1)
@@ -268,7 +268,7 @@ def create_vgg_like_model_double_input_from_single_nns(n_bins, batchsize, nb_cla
     x = ks.layers.concatenate([x_1, x_2])
 
     x = Dense(256, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
-    x = Dropout(dropout)(x)
+    x = Dropout(dropout[1])(x)
     x = Dense(16, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
 
     x = Dense(nb_classes, activation='softmax', kernel_initializer='he_normal')(x)
@@ -280,7 +280,7 @@ def create_vgg_like_model_double_input_from_single_nns(n_bins, batchsize, nb_cla
     return model
 
 
-def create_layer_from_config(x, trained_layer, layer_numbers, net='', dropout=0):
+def create_layer_from_config(x, trained_layer, layer_numbers, trainable=False, net='', dropout=0):
     """
     Creates a new Keras nn layer from the config of an already existing layer.
     Changes the 'trainable' flag of the new layer to false and optionally udates the dropout rate.
@@ -288,33 +288,35 @@ def create_layer_from_config(x, trained_layer, layer_numbers, net='', dropout=0)
     :param x: Keras functional model api instance. E.g. TF tensors.
     :param ks.layer trained_layer: Keras layer instance that is already trained.
     :param dict layer_numbers: dictionary for the different layer types to keep track of the layer_number in the layer names.
+    :param bool trainable: flag to set the <trainable> attribute of the new layer.
     :param str net: additional string that is added to the layer name. E.g. 'net_2' if a double input model is used.
     :param float dropout: optional, dropout rate of the new layer
     :return: x: Keras functional model api instance. E.g. TF tensors. Contains a new layer now!
     """
     if 'conv' in trained_layer.name:
-        layer = Convolution3D
-        name = 'conv'
-    elif 'batch_normalization' in trained_layer.name:
-        layer = BatchNormalization
-        name = 'batch_norm'
+        layer, name = Convolution3D, 'conv'
+    elif 'batch_norm' in trained_layer.name:
+        layer, name = BatchNormalization, 'batch_norm'
     elif 'activation' in trained_layer.name:
-        layer = Activation
-        name = 'activation'
+        layer, name = Activation, 'activation'
     elif 'pooling' in trained_layer.name:
-        layer = MaxPooling3D
-        name = 'max_pooling'
+        layer, name = MaxPooling3D, 'max_pooling'
     elif 'dropout' in trained_layer.name:
-        layer = Dropout
-        name = 'dropout'
+        layer, name = Dropout, 'dropout'
+    elif 'dense' in trained_layer.name:
+        layer, name = Dense, 'dense'
     else:
-        return x #if 'dropout' or 'input' or 'dense' or 'flatten'
+        return x # if 'input' or 'flatten'
 
     config = trained_layer.get_config()
-    config.update({'trainable': False}) # for freezing the layer
+    config.update({'trainable': trainable}) # for freezing the layer if wanted
     if name == 'dropout': config.update({'rate': dropout})
 
-    new_layer_name = name + '_' + str(layer_numbers[name]) + '_net_' + net
+    if net == '':
+        new_layer_name = name + '_' + str(layer_numbers[name])
+    else:
+        new_layer_name = name + '_' + str(layer_numbers[name]) + '_net_' + net
+
     layer_numbers[name] = layer_numbers[name] + 1
     config.update({'name': new_layer_name})
 
@@ -365,6 +367,76 @@ def set_layer_weights(model, trained_model_1, trained_model_2):
         i += 1
         layer.set_weights(trained_layers_w_weights_net2[i].get_weights())
 
+
+def change_dropout_rate_for_double_input_model(n_bins, batchsize, trained_model, dropout=(0.2, 0.2), trainable=(True, True), swap_4d_channels=None):
+    """
+    Function that rebuilds a keras model and modifies its dropout rate. Workaround, till layer.rate is fixed to work with Dropout layers.
+    :param tuple n_bins: Number of bins (x,y,z,t) of the data.
+    :param int batchsize: Batchsize of the data that will be used with the VGG net.
+    :param ks.models.Model trained_model: Trained Keras model, upon which the dropout rate should be changed.
+    :param (float, float) dropout: Adds dropout if > 0. First value for the conv block, second value for the dense.
+    :param (bool, bool) trainable: Sets the trainable flag for the conv block layers and for the dense layers.
+    :param None/str swap_4d_channels: For 3.5D nets, specifies if the default channel (t) should be swapped with another dim. Only used to decode the input_dim.
+    :return: Model model: Keras VGG-like model based on the trained_model with modified dropout layers.
+    """
+    dim, input_dim, max_pool_sizes = decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels)
+
+    # rebuild trained_model based on it's layer config
+    input_layer_net_1 = Input(shape=input_dim[0][1:], name='input_net_1', dtype=K.floatx())  # have to do that manually, xyz-t
+    input_layer_net_2 = Input(shape=input_dim[1][1:], name='input_net_2', dtype=K.floatx())  # change input layer name, yzt-x
+
+    layer_numbers_net_1 = {'conv': 1, 'batch_norm': 1, 'activation': 1, 'max_pooling': 1, 'dropout': 1}
+    layer_numbers_net_2 = {'conv': 1, 'batch_norm': 1, 'activation': 1, 'max_pooling': 1, 'dropout': 1}
+    layer_names = [layer.name for layer in trained_model.layers]
+
+    x_1, x_2 = input_layer_net_1, input_layer_net_2 # needed for creating the trained_model later on
+    for trained_layer in trained_model.layers[2:]:
+        if 'net_1' in trained_layer.name:
+            x_1 = create_layer_from_config(x_1, trained_layer, layer_numbers_net_1, trainable=trainable[0], net='1', dropout=dropout[0])
+
+        elif 'net_2' in trained_layer.name:
+            x_2 = create_layer_from_config(x_2, trained_layer, layer_numbers_net_2, trainable=trainable[0], net='2', dropout=dropout[0])
+
+        else: break
+
+    # flatten both nets and concatenate them
+    x_1 = Flatten()(x_1)
+    x_2 = Flatten()(x_2)
+    x = ks.layers.concatenate([x_1, x_2])
+
+    # rebuild dense layers
+    layer_index_first_dense = layer_names.index('concatenate_1') + 1
+    layer_numbers_fc = {'dense': 1, 'dropout': 1}
+
+    for trained_layer in trained_model.layers[layer_index_first_dense:]:
+        x = create_layer_from_config(x, trained_layer, layer_numbers_fc, trainable=trainable[1], dropout=dropout[1])
+
+    model = Model(inputs=[input_layer_net_1, input_layer_net_2], outputs=x)
+
+    set_layer_weights_from_single_trained_model(model, trained_model) # set weights
+
+    return model
+
+
+def set_layer_weights_from_single_trained_model(model, trained_model):
+    """
+    Sets the weights of a Keras model based on an already trained trained_model.
+    :param Model model: Keras model instance withought weights.
+    :param Model trained_model: Pretrained Keras model used to set the weights for the new model.
+    """
+    skip_layers = ['dropout', 'input', 'flatten', 'max_pooling', 'activation', 'concatenate']
+
+    i = -1
+    for layer in model.layers:
+        i += 1
+
+        skip = False # workaround of hell...
+        for skip_layer_str in skip_layers:
+            if skip_layer_str in layer.name:
+                skip = True
+        if skip: continue
+
+        layer.set_weights(trained_model.layers[i].get_weights())
 
 #------------- VGG-like model -------------#
 
