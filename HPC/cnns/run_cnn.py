@@ -23,69 +23,109 @@ from utilities.visualization.visualization_tools import *
 from utilities.evaluation_utilities import *
 
 
-def parallelize_model_to_n_gpus(model, n_gpu, batchsize, lr, lr_decay, optimizer, mode='avolkov'):
+def parallelize_model_to_n_gpus(model, n_gpu, batchsize):
     """
     Parallelizes the nn-model to multiple gpu's.
     Currently, up to 4 GPU's at Tiny-GPU are supported.
     :param ks.model.Model/Sequential model: Keras model of a neural network.
-    :param int n_gpu: Number of gpu's that the model should be parallelized to.
+    :param (int/str) n_gpu: Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov').
     :param int batchsize: original batchsize that should be used for training/testing the nn.
-    :param float lr: learning rate of the optimizer used in training.
-    :param float lr_decay: learning rate decay during training.
     :return: int batchsize, float lr: new batchsize/lr scaled by the number of used gpu's.
     """
-    if mode == 'horovod':
-        import tensorflow as tf
-        import horovod.keras as hvd
-
-        hvd.init()
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = True
-        config.gpu_options.visible_device_list = str(hvd.local_rank()) #TODO is this a number??
-        K.set_session(tf.Session(config=config))
-
-        lr = lr  # * ngpus #TODO not sure if this makes sense
-        lr_decay = lr_decay  # * ngpus
-
-
-    else:
-        if n_gpu == 1:
-            return model, batchsize, lr, lr_decay, optimizer
+    if n_gpu[1] == 'avolkov':
+        if n_gpu[0] == 1:
+            return model, batchsize
         else:
-            assert n_gpu > 1 and isinstance(n_gpu, int), 'You probably made a typo: n_gpu must be an int with n_gpu >= 1!'
+            assert n_gpu[0] > 1 and isinstance(n_gpu[0], int), 'You probably made a typo: n_gpu must be an int with n_gpu >= 1!'
 
-            gpus_list = get_available_gpus(n_gpu)
+            gpus_list = get_available_gpus(n_gpu[0])
             ngpus = len(gpus_list)
             print('Using GPUs: {}'.format(', '.join(gpus_list)))
             batchsize = batchsize * ngpus
-            lr = lr #* ngpus #TODO not sure if this makes sense
-            lr_decay = lr_decay #* ngpus
 
             # Data-Parallelize the model via function
             model = make_parallel(model, gpus_list, usenccl=False, initsync=True, syncopt=False, enqueue=False)
             print_mgpu_modelsummary(model)
 
-            return model, batchsize, lr, lr_decay, optimizer
+            return model, batchsize
+
+    else:
+        raise ValueError('Currently, no multi_gpu mode other than "avolkov" is available.')
 
 
-def save_train_and_test_statistics_to_txt(model, history_train, history_test, modelname, lr, lr_decay, epoch,
-                                          train_files, test_files, batchsize, n_bins, class_type, swap_4d_channels):
+def schedule_learning_rate(model, epoch, n_gpu, lr_initial=0.001, manual_mode=(False, None, 0.0, None)):
+    """
+    Function that schedules a learning rate during training.
+    If manual_mode[0] is False, the current lr will be automatically calculated if the training is resumed, based on the epoch variable.
+    If manual_mode[0] is True, the final lr during the last training session (manual_mode[1]) and the lr_decay (manual_mode[1])
+    have to be set manually.
+    :param Model model: Keras nn model instance. Used for setting the lr.
+    :param int epoch: The epoch number at which this training session is resumed (last finished epoch).
+    :param (int/str) n_gpu: Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov').
+    :param float lr_initial: Initial lr that is used with the automatic mode. Typically 0.01 for SGD and 0.001 for Adam.
+    :param (bool, None/float, float, None/float) manual_mode: Tuple that controls the options for the manual mode.
+            manual_mode[0] = flag to enable the manual mode, manual_mode[1] = lr value, of which the mode should start off
+            manual_mode[2] = lr_decay during epochs, manual_mode[3] = current lr, only used to check if this is the first instance of the while loop
+    :return: int epoch: The epoch number of the new epoch (+= 1).
+    :return: float lr: Learning rate that has been set for the model and for this epoch.
+    :return: float lr_decay: Learning rate decay that has been used to decay the lr rate used for this epoch.
+    """
+    assert isinstance(epoch, int)
+    epoch += 1
 
-    with open('models/trained/train_logs/log_' + modelname + '.txt', 'a+') as f_out:
-        f_out.write('--------------------------------------------------------------------------------------------------------\n')
-        f_out.write('\n')
-        f_out.write('Current time: ' + strftime("%Y-%m-%d %H:%M:%S", gmtime()) + '\n')
-        f_out.write('Decayed learning rate to ' + str(lr) + ' before epoch ' + str(epoch) + ' (minus ' + str(lr_decay) + ')\n')
-        f_out.write('Trained in epoch ' + str(epoch) + ' on train_files ' + str(train_files) + '\n')
-        f_out.write('Tested in epoch ' + str(epoch) + ' on test_files ' + str(test_files) + '\n')
-        f_out.write('History for training and testing: \n')
-        f_out.write('Train: ' + str(history_train.history) + '\n')
-        f_out.write('Test: ' + str(history_test) + ' (' + str(model.metrics_names) + ')' + '\n')
-        f_out.write('\n')
-        f_out.write('Additional Info:\n')
-        f_out.write('Batchsize=' + str(batchsize) + ', n_bins=' + str(n_bins) +
-                    ', class_type=' + str(class_type) + ', swap_4d_channels=' + str(swap_4d_channels) + '\n')
-        f_out.write('\n')
+    if manual_mode[0] is True:
+        lr = manual_mode[1] if manual_mode[3] is None else K.get_value(model.optimizer.lr)
+        lr_decay = manual_mode[2]
+        K.set_value(model.optimizer.lr, lr)
+
+        if epoch > 1 and lr_decay > 0:
+            lr *= 1 - float(lr_decay)
+            K.set_value(model.optimizer.lr, lr)
+            print 'Decayed learning rate to ' + str(K.get_value(model.optimizer.lr)) + \
+                  ' before epoch ' + str(epoch) + ' (minus ' + '{:.1%}'.format(lr_decay) + ')'
+
+    else:
+        if epoch == 1:
+            lr, lr_decay = lr_initial * n_gpu[0], 0.00
+            K.set_value(model.optimizer.lr, lr)
+            print 'Set learning rate to ' + str(K.get_value(model.optimizer.lr)) + ' before epoch ' + str(epoch)
+        else:
+            lr, lr_decay = get_new_learning_rate(epoch, lr_initial, n_gpu[0])
+            K.set_value(model.optimizer.lr, lr)
+            print 'Decayed learning rate to ' + str(K.get_value(model.optimizer.lr)) + \
+                  ' before epoch ' + str(epoch) + ' (minus ' + '{:.1%}'.format(lr_decay) + ')'
+
+    return epoch, lr, lr_decay
+
+
+def get_new_learning_rate(epoch, lr_initial, n_gpu):
+    """
+    Function that calculates the current learning rate based on the number of already trained epochs.
+    Learning rate schedule is as follows: lr_decay = 7% for lr > 0.0003
+                                          lr_decay = 4% for 0.0003 >= lr > 0.0001
+                                          lr_decay = 2% for 0.0001 >= lr
+    :param int epoch: The number of the current epoch which is used to calculate the new learning rate.
+    :param float lr_initial: Initial lr for the first epoch. Typically 0.01 for SGD and 0.001 for Adam.
+    :param int n_gpu: number of gpu's that are used during the training. Used for scaling the lr.
+    :return: float lr_temp: Calculated learning rate for this epoch.
+    :return: float lr_decay: Latest learning rate decay used.
+    """
+    n_lr_decays = epoch - 1
+    lr_temp = lr_initial * n_gpu
+    lr_decay = None
+
+    for i in xrange(n_lr_decays):
+
+        if lr_temp > 0.0003:
+            lr_decay = 0.07
+        elif 0.0003 >= lr_temp > 0.0001:
+            lr_decay = 0.04
+        else:
+            lr_decay = 0.02
+
+        lr_temp = lr_temp * (1 - float(lr_decay))
+
+    return lr_temp, lr_decay
 
 
 def train_and_test_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
@@ -94,13 +134,6 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
     Convenience function that trains (fit_generator) and tests (evaluate_generator) a Keras model.
     For documentation of the parameters, confer to the fit_model and evaluate_model functions.
     """
-    epoch += 1
-    if epoch > 1 and lr_decay > 0:
-        lr *= 1 - float(lr_decay)
-        K.set_value(model.optimizer.lr, lr)
-        print 'Decayed learning rate to ' + str(K.get_value(model.optimizer.lr)) + \
-              ' before epoch ' + str(epoch) + ' (minus ' + '{:.1%}'.format(lr_decay) + ')'
-
     history_train = fit_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
                               shuffle, swap_4d_channels, n_events=None, tb_logger=tb_logger)
     history_test = evaluate_model(model, modelname, test_files, batchsize, n_bins, class_type, xs_mean, epoch, swap_4d_channels, n_events=None)
@@ -109,10 +142,7 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
                                           train_files, test_files, batchsize, n_bins, class_type, swap_4d_channels)
 
     plot_train_and_test_statistics(modelname)
-
     plot_weights_and_activations(model, test_files[0][0], n_bins, class_type, xs_mean, swap_4d_channels, modelname, epoch)
-
-    return epoch, lr
 
 
 def fit_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
@@ -181,6 +211,7 @@ def evaluate_model(model, modelname, test_files, batchsize, n_bins, class_type, 
     :param tuple n_bins: Number of bins for each dimension (x,y,z,t) in the test_files.
     :param (int, str) class_type: Tuple with the number of output classes and a string identifier to specify the output classes.
     :param ndarray xs_mean: mean_image of the x (train-) dataset used for zero-centering the test data.
+    :param int epoch: Current epoch of the training.
     :param None/int swap_4d_channels: For 3.5D, param for the gen to specify, if the default channel (t) should be swapped with another dim.
     :param None/int n_events: For testing purposes if not the whole .h5 file should be used for evaluating.
     """
@@ -203,8 +234,28 @@ def evaluate_model(model, modelname, test_files, batchsize, n_bins, class_type, 
     return history
 
 
-def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=1, mode='train', swap_4d_channels=None,
-                use_scratch_ssd=False, zero_center=False, shuffle=(False,None), tb_logger=False):
+def save_train_and_test_statistics_to_txt(model, history_train, history_test, modelname, lr, lr_decay, epoch,
+                                          train_files, test_files, batchsize, n_bins, class_type, swap_4d_channels):
+
+    with open('models/trained/train_logs/log_' + modelname + '.txt', 'a+') as f_out:
+        f_out.write('--------------------------------------------------------------------------------------------------------\n')
+        f_out.write('\n')
+        f_out.write('Current time: ' + strftime("%Y-%m-%d %H:%M:%S", gmtime()) + '\n')
+        f_out.write('Decayed learning rate to ' + str(lr) + ' before epoch ' + str(epoch) + ' (minus ' + str(lr_decay) + ')\n')
+        f_out.write('Trained in epoch ' + str(epoch) + ' on train_files ' + str(train_files) + '\n')
+        f_out.write('Tested in epoch ' + str(epoch) + ' on test_files ' + str(test_files) + '\n')
+        f_out.write('History for training and testing: \n')
+        f_out.write('Train: ' + str(history_train.history) + '\n')
+        f_out.write('Test: ' + str(history_test) + ' (' + str(model.metrics_names) + ')' + '\n')
+        f_out.write('\n')
+        f_out.write('Additional Info:\n')
+        f_out.write('Batchsize=' + str(batchsize) + ', n_bins=' + str(n_bins) +
+                    ', class_type=' + str(class_type) + ', swap_4d_channels=' + str(swap_4d_channels) + '\n')
+        f_out.write('\n')
+
+
+def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None,
+                use_scratch_ssd=False, zero_center=False, shuffle=(False,None), tb_logger=False, str_ident=''):
     """
     Runs a convolutional neural network.
     :param tuple n_bins: Declares the number of bins for each dimension (x,y,z,t) in the train- and testfiles.
@@ -213,7 +264,7 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=1, mode='tr
     :param str nn_arch: Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
     :param int batchsize: Batchsize that should be used for the cnn.
     :param int epoch: Declares if a previously trained model or a new model (=0) should be loaded.
-    :param int n_gpu: Number of gpu's that should be used. n > 1 for multi-gpu implementation.
+    :param (int/str) n_gpu: Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov').
     :param str mode: Specifies what the function should do - train & test a model or evaluate a 'finished' model?
                      Currently, there are two modes available: 'train' & 'eval'.
     :param None/str swap_4d_channels: For 4D data input (3.5D models). Specifies, if the channels for the 3.5D net should be swapped.
@@ -222,48 +273,56 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=1, mode='tr
     :param bool zero_center: Declares if the input images ('xs') should be zero-centered before training.
     :param (bool, None/int) shuffle: Declares if the training data should be shuffled before the next training epoch.
     :param bool tb_logger: Declares if a tb_callback should be used during training (takes longer to train due to overhead!).
+    :param str str_ident: Optional str identifier that gets appended to the modelname. Useful when training models which would have the same modelname.
     """
     if swap_4d_channels is not None and n_bins.count(1) != 0: raise ValueError('swap_4d_channels must be None if dim < 4.')
 
     train_files, test_files = parse_input(use_scratch_ssd)
 
-    xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu, swap_4d_channels=swap_4d_channels) if zero_center is True else None
+    xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu[0]) if zero_center is True else None
 
-    modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels)
+    modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident)
 
     if epoch == 0:
-        if nn_arch is 'WRN': model = create_wide_residual_network(n_bins, batchsize, nb_classes=class_type[0], n=1, k=1, dropout=0.1, k_size=3)
+        if nn_arch is 'WRN': model = create_wide_residual_network(n_bins, batchsize, nb_classes=class_type[0], n=1, k=1, dropout=0.2, k_size=3, swap_4d_channels=swap_4d_channels)
 
         elif nn_arch is 'VGG':
             if swap_4d_channels == 'xyz-t_and_yzt-x':
-                model = create_vgg_like_model_double_input(n_bins, batchsize, nb_classes=class_type[0], dropout=0.1,
-                                                               n_filters=(64, 64, 64, 64, 64, 128, 128, 128), swap_4d_channels=swap_4d_channels)
+                if str_ident == 'double_input_single_train':
+                    model = create_vgg_like_model_double_input_from_single_nns(n_bins, batchsize, nb_classes=class_type[0], dropout=(0,0.2), swap_4d_channels=swap_4d_channels)
+                else:
+                    model = create_vgg_like_model_double_input(n_bins, batchsize, nb_classes=class_type[0], dropout=0.2,
+                                                                   n_filters=(64, 64, 64, 64, 64, 128, 128, 128), swap_4d_channels=swap_4d_channels)
             else:
-                model = create_vgg_like_model(n_bins, batchsize, nb_classes=class_type[0], dropout=0.2,
+                model = create_vgg_like_model(n_bins, batchsize, nb_classes=class_type[0], dropout=0.1,
                                                                n_filters=(64, 64, 64, 64, 64, 128, 128, 128), swap_4d_channels=swap_4d_channels)
         else: raise ValueError('Currently, only "WRN" or "VGG" are available as nn_arch')
     else:
         model = ks.models.load_model('models/trained/trained_' + modelname + '_epoch' + str(epoch) + '.h5')
 
-    model.summary()
     # plot model, install missing packages with conda install if it throws a module error
     ks.utils.plot_model(model, to_file='./models/model_plots/' + modelname + '.png', show_shapes=True, show_layer_names=True)
 
-    lr = 0.0003 # 0.01 default for SGD, 0.001 for Adam
-    lr_decay = 0.05 # % decay for each epoch, e.g. if 0.1 -> lr_new = lr*(1-0.1)=0.9*lr
+    sgd = ks.optimizers.SGD(momentum=0.9, decay=0, nesterov=True)
+    adam = ks.optimizers.Adam(beta_1=0.9, beta_2=0.999, epsilon=0.1, decay=0.0) # epsilon=1 for deep networks
+    optimizer = adam # Choose optimizer, only used if epoch == 0
 
-    sgd = ks.optimizers.SGD(lr=lr, momentum=0.9, decay=0, nesterov=True)
-    adam = ks.optimizers.Adam(lr=lr, beta_1=0.9, beta_2=0.999, epsilon=0.1, decay=0.0) # epsilon=1 for deep networks, lr = 0.001 default
-    optimizer = sgd
+    # if epoch == 3 and str_ident == 'double_input_single_train':
+    #     model = change_dropout_rate_for_double_input_model(n_bins, batchsize, model, dropout=(0.1, 0.1), trainable=(True, True), swap_4d_channels=swap_4d_channels)
+    #     model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
 
-    model, batchsize, lr, lr_decay, optimizer = parallelize_model_to_n_gpus(model, n_gpu, batchsize, lr, lr_decay, optimizer, mode='avolkov') #TODO compile after restart????
-    model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
+    model, batchsize = parallelize_model_to_n_gpus(model, n_gpu, batchsize) #TODO compile after restart????
+
+    model.summary()
+
     if epoch == 0: model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
 
     if mode == 'train':
+        lr = None
         while 1:
-            epoch, lr = train_and_test_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean,
-                                             epoch, shuffle, lr, lr_decay, tb_logger, swap_4d_channels)
+            epoch, lr, lr_decay = schedule_learning_rate(model, epoch, n_gpu, lr_initial=0.001, manual_mode=(True, 0.0003, 0.03, lr))
+            train_and_test_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean,
+                                 epoch, shuffle, lr, lr_decay, tb_logger, swap_4d_channels)
 
     if mode == 'eval':
         # After training is finished, investigate model performance
@@ -283,12 +342,21 @@ if __name__ == '__main__':
     # - (2, 'muon-CC_to_elec-NC'), (1, 'muon-CC_to_elec-NC')
     # - (2, 'muon-CC_to_elec-CC'), (1, 'muon-CC_to_elec-CC')
     # - (2, 'up_down'), (1, 'up_down')
-    # execute_cnn(n_bins=(11,13,18,60), class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=6,
-    #             n_gpu=1, mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, 19)) # new TODO implement string suffix
+    # changed lr from 0.2 to 0.3 after epoch 40
+    # execute_cnn(n_bins=(11,13,18,60), class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=96,
+    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, 19), str_ident='')
 
-    execute_cnn(n_bins=(11,13,18,50), class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=25,
-                n_gpu=1, mode='train', swap_4d_channels='xyz-t_and_yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None)) # old
+    # execute_cnn(n_bins=(11,13,18,50), class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=29,
+    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='xyz-t_and_yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='') # old
 
+    execute_cnn(n_bins=(11,13,18,50), class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=0,
+                n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='xyz-t_and_yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='double_input_single_train') # old, single trained
+
+    # execute_cnn(n_bins=(11,13,18,50), class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='WRN', batchsize=32, epoch=0,
+    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='')
+
+    # execute_cnn(n_bins=(11,13,18,60), class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=4,
+    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='only_new_timecut_dp01')
 
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/h5/xyzt/concatenated/train_muon-CC_and_elec-CC_each_480_xyzt_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/h5/xyzt/concatenated/test_muon-CC_and_elec-CC_each_120_xyzt_shuffled.h5
 # same as above, shuffled again
@@ -297,5 +365,10 @@ if __name__ == '__main__':
 # with run_id
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/h5/xyzt/concatenated/train_muon-CC_and_elec-CC_each_480_xyzt_shuffled_1.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/h5/xyzt/concatenated/test_muon-CC_and_elec-CC_each_120_xyzt_shuffled.h5
 
-# with run_id but without time corr. new 04.12.17
+# with run_id but without time corr. new time cut, precuts 04.12.17
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/without_mc_time_fix/h5/xyzt/concatenated/elec-CC_and_muon-CC_xyzt_train_1_to_480_shuffled_0.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/without_mc_time_fix/h5/xyzt/concatenated/elec-CC_and_muon-CC_xyzt_test_481_to_600_shuffled_0.h5
+# with run_id and with new time cut 05.01.17, without precuts
+# python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/without_mc_time_fix/h5/xyzt/concatenated/elec-CC_and_muon-CC_xyzt_train_1_to_480_shuffled_0.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/without_mc_time_fix/h5/xyzt/concatenated/elec-CC_and_muon-CC_xyzt_test_481_to_600_shuffled_0.h5
+
+# WRN test 3D xzt
+# python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/train_muon-CC_and_elec-CC_each_240_batch_301-540_xzt_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/test_muon-CC_and_elec-CC_each_60_batch_541-600_xzt_shuffled.h5

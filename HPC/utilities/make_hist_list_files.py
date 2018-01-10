@@ -339,7 +339,7 @@ if __name__ == '__main__':
     make_list_files_and_concatenate()
 
 
-# python make_hist_list_files.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/h5/xyzt 0.2 1 1 --compression --cuts --chunksize 32
+# python make_hist_list_files.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/without_mc_time_fix/h5/xyzt 0.2 1 1 --compression --cuts --chunksize 32
 # submit with e.g. 'qsub -l nodes=1:ppn=4,walltime=02:00:00 submit_concatenate_h5_elec-CC_and_muon-CC_xyzt.sh'
 
 
