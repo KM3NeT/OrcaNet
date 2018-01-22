@@ -137,58 +137,21 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
     Convenience function that trains (fit_generator) and tests (evaluate_generator) a Keras model.
     For documentation of the parameters, confer to the fit_model and evaluate_model functions.
     """
-    history_train = fit_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
-                              shuffle, swap_4d_channels, n_events=None, tb_logger=tb_logger)
-    history_test = evaluate_model(model, modelname, test_files, batchsize, n_bins, class_type, xs_mean, epoch, swap_4d_channels, n_events=None)
-
-    save_train_and_test_statistics_to_txt(model, history_train, history_test, modelname, lr, lr_decay, epoch,
-                                          train_files, test_files, batchsize, n_bins, class_type, swap_4d_channels)
-
-    plot_train_and_test_statistics(modelname)
-    plot_weights_and_activations(model, test_files[0][0], n_bins, class_type, xs_mean, swap_4d_channels, modelname, epoch)
-
-
-def train_and_test_model_one_epoch(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
-                         shuffle, lr, lr_decay, tb_logger, swap_4d_channels):
-    """
-    Convenience function that trains (fit_generator) and tests (evaluate_generator) a Keras model.
-    For documentation of the parameters, confer to the fit_model and evaluate_model functions.
-    """
     for file_no, (f, f_size) in enumerate(train_files, 1):
         if file_no < epoch[1]:
             continue # skip if this file for this epoch has already been used for training
 
-        history_train = fit_model_one_epoch(model, modelname, f, f_size, file_no, test_files, batchsize, n_bins, class_type, xs_mean, epoch[0],
+        history_train = fit_model(model, modelname, f, f_size, file_no, test_files, batchsize, n_bins, class_type, xs_mean, epoch[0],
                                             shuffle, swap_4d_channels, n_events=None, tb_logger=tb_logger)
         history_test = evaluate_model(model, modelname, test_files, batchsize, n_bins, class_type, xs_mean, epoch[0], swap_4d_channels, n_events=None)
 
-        save_train_and_test_statistics_to_txt_one_epoch(model, history_train, history_test, modelname, lr, lr_decay, epoch[0],
+        save_train_and_test_statistics_to_txt(model, history_train, history_test, modelname, lr, lr_decay, epoch[0],
                                           file_no, f, test_files, batchsize, n_bins, class_type, swap_4d_channels)
         plot_train_and_test_statistics(modelname)
         plot_weights_and_activations(model, test_files[0][0], n_bins, class_type, xs_mean, swap_4d_channels, modelname, epoch[0])
 
 
-def save_train_and_test_statistics_to_txt_one_epoch(model, history_train, history_test, modelname, lr, lr_decay, epoch, train_file_no,
-                                          train_file, test_files, batchsize, n_bins, class_type, swap_4d_channels):
-
-    with open('models/trained/train_logs/log_' + modelname + '.txt', 'a+') as f_out:
-        f_out.write('--------------------------------------------------------------------------------------------------------\n')
-        f_out.write('\n')
-        f_out.write('Current time: ' + strftime("%Y-%m-%d %H:%M:%S", gmtime()) + '\n')
-        f_out.write('Decayed learning rate to ' + str(lr) + ' before epoch ' + str(epoch) + ' (minus ' + str(lr_decay) + ')\n')
-        f_out.write('Trained in epoch ' + str(epoch) + ' on file ' + str(train_file_no) + ', ' + str(train_file) + '\n')
-        f_out.write('Tested in epoch ' + str(epoch) + ', file ' + str(train_file_no) + ' on test_files ' + str(test_files) + '\n')
-        f_out.write('History for training and testing: \n')
-        f_out.write('Train: ' + str(history_train.history) + '\n')
-        f_out.write('Test: ' + str(history_test) + ' (' + str(model.metrics_names) + ')' + '\n')
-        f_out.write('\n')
-        f_out.write('Additional Info:\n')
-        f_out.write('Batchsize=' + str(batchsize) + ', n_bins=' + str(n_bins) +
-                    ', class_type=' + str(class_type) + ', swap_4d_channels=' + str(swap_4d_channels) + '\n')
-        f_out.write('\n')
-
-
-def fit_model_one_epoch(model, modelname, f, f_size, file_no, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
+def fit_model(model, modelname, f, f_size, file_no, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
               shuffle, swap_4d_channels, n_events=None, tb_logger=False):
     """
     Trains a model based on the Keras fit_generator method.
@@ -243,62 +206,6 @@ def fit_model_one_epoch(model, modelname, f, f_size, file_no, test_files, batchs
     return history
 
 
-
-def fit_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
-              shuffle, swap_4d_channels, n_events=None, tb_logger=False):
-    """
-    Trains a model based on the Keras fit_generator method.
-    If a TensorBoard callback is wished, validation data has to be passed to the fit_generator method.
-    For this purpose, the first file of the test_files is used.
-    :param ks.model.Model/Sequential model: Keras model of a neural network.
-    :param str modelname: Name of the model.
-    :param list train_files: list of tuples that contains the testfiles and their number of rows (filepath, f_size).
-    :param list test_files: list of tuples that contains the testfiles and their number of rows for the tb_callback.
-    :param int batchsize: Batchsize that is used in the fit_generator method.
-    :param tuple n_bins: Number of bins for each dimension (x,y,z,t) in both the train- and test_files.
-    :param (int, str) class_type: Tuple with the number of output classes and a string identifier to specify the output classes.
-    :param ndarray xs_mean: mean_image of the x (train-) dataset used for zero-centering the test data.
-    :param int epoch: Epoch of the model if it has been trained before.
-    :param (bool, None/int) shuffle: Declares if the training data should be shuffled before the next training epoch.
-    :param None/int n_events: For testing purposes if not the whole .h5 file should be used for training.
-    :param None/int swap_4d_channels: For 3.5D, param for the gen to specify, if the default channel (t) should be swapped with another dim.
-    :param bool tb_logger: Declares if a tb_callback during fit_generator should be used (takes long time to save the tb_log!).
-    """
-    if tb_logger is True:
-        callbacks = [TensorBoardWrapper(generate_batches_from_hdf5_file(test_files[0][0], batchsize, n_bins, class_type, zero_center_image=xs_mean),
-                                     nb_steps=int(5000 / batchsize), log_dir='models/trained/tb_logs/' + modelname + '_{}'.format(time.time()),
-                                     histogram_freq=1, batch_size=batchsize, write_graph=False, write_grads=True, write_images=True)]
-        validation_data = generate_batches_from_hdf5_file(test_files[0][0], batchsize, n_bins, class_type, swap_col=swap_4d_channels, zero_center_image=xs_mean) #f_size=None is ok here
-        validation_steps = int(5000 / batchsize)
-    else:
-        validation_data, validation_steps, callbacks = None, None, []
-
-    history = None
-    for i, (f, f_size) in enumerate(train_files):  # process all h5 files, full epoch
-        if n_events is not None: f_size = n_events  # for testing purposes
-
-        logger = BatchLevelPerformanceLogger(display=100, modelname=modelname, steps_per_epoch=int(f_size / batchsize), epoch=epoch) #TODO bug if TB callback is enabled
-        callbacks.append(logger)
-
-        if epoch > 1 and shuffle[0] is True: # just for convenience, we don't want to wait before the first epoch each time
-            print 'Shuffling file ', f, ' before training in epoch ', epoch
-            shuffle_h5(f, chunking=(True, batchsize), delete_flag=True)
-
-        if shuffle[1] is not None:
-            n_preshuffled = shuffle[1]
-            f = f.replace('0.h5', str(epoch-1) + '.h5') if epoch <= n_preshuffled else f.replace('0.h5', str(np.random.randint(0, n_preshuffled+1)) + '.h5')
-
-        print 'Training in epoch', epoch, 'on file ', i, ',', f
-
-        history = model.fit_generator(
-            generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, f_size=f_size, zero_center_image=xs_mean, swap_col=swap_4d_channels),
-            steps_per_epoch=int(f_size / batchsize), epochs=1, verbose=1, max_queue_size=10,
-            validation_data=validation_data, validation_steps=validation_steps, callbacks=callbacks)
-        model.save("models/trained/trained_" + modelname + '_epoch' + str(epoch) + '.h5')
-
-    return history
-
-
 def evaluate_model(model, modelname, test_files, batchsize, n_bins, class_type, xs_mean, epoch, swap_4d_channels, n_events=None):
     """
     Evaluates a model with validation data based on the Keras evaluate_generator method.
@@ -332,16 +239,16 @@ def evaluate_model(model, modelname, test_files, batchsize, n_bins, class_type, 
     return history
 
 
-def save_train_and_test_statistics_to_txt(model, history_train, history_test, modelname, lr, lr_decay, epoch,
-                                          train_files, test_files, batchsize, n_bins, class_type, swap_4d_channels):
+def save_train_and_test_statistics_to_txt(model, history_train, history_test, modelname, lr, lr_decay, epoch, train_file_no,
+                                          train_file, test_files, batchsize, n_bins, class_type, swap_4d_channels):
 
     with open('models/trained/train_logs/log_' + modelname + '.txt', 'a+') as f_out:
         f_out.write('--------------------------------------------------------------------------------------------------------\n')
         f_out.write('\n')
         f_out.write('Current time: ' + strftime("%Y-%m-%d %H:%M:%S", gmtime()) + '\n')
         f_out.write('Decayed learning rate to ' + str(lr) + ' before epoch ' + str(epoch) + ' (minus ' + str(lr_decay) + ')\n')
-        f_out.write('Trained in epoch ' + str(epoch) + ' on train_files ' + str(train_files) + '\n')
-        f_out.write('Tested in epoch ' + str(epoch) + ' on test_files ' + str(test_files) + '\n')
+        f_out.write('Trained in epoch ' + str(epoch) + ' on file ' + str(train_file_no) + ', ' + str(train_file) + '\n')
+        f_out.write('Tested in epoch ' + str(epoch) + ', file ' + str(train_file_no) + ' on test_files ' + str(test_files) + '\n')
         f_out.write('History for training and testing: \n')
         f_out.write('Train: ' + str(history_train.history) + '\n')
         f_out.write('Test: ' + str(history_test) + ' (' + str(model.metrics_names) + ')' + '\n')
@@ -419,9 +326,7 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
         lr = None
         while 1:
             epoch, lr, lr_decay = schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=0.001, manual_mode=(False, 0.0003, 0.07, lr))
-            # train_and_test_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean,
-            #                      epoch[0], shuffle, lr, lr_decay, tb_logger, swap_4d_channels)
-            train_and_test_model_one_epoch(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean,
+            train_and_test_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean,
                                  epoch, shuffle, lr, lr_decay, tb_logger, swap_4d_channels)
 
     if mode == 'eval':

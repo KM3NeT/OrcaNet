@@ -403,9 +403,9 @@ class TensorBoardWrapper(ks.callbacks.TensorBoard):
 
 
 class BatchLevelPerformanceLogger(ks.callbacks.Callback):
-    # Batch level performance logger
-    # Gibt lOSS aus über alle :display batches, gemittelt über die letzten :display batches
+    # Gibt loss aus über alle :display batches, gemittelt über die letzten :display batches
     def __init__(self, display, modelname, steps_per_epoch, epoch):
+        ks.callbacks.Callback.__init__(self)
         self.seen = 0
         self.display = display
         self.averageLoss = 0
