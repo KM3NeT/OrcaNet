@@ -1,10 +1,12 @@
-## Deep Learning in KM3NeT-ORCA and the Tau-Appearance project <br />
+## Deep Learning in KM3NeT-ORCA <br />
 Find more information about KM3NeT on [www.km3net.org](http://www.km3net.org).
 
-This repository contains contains code that is used for a Deep Learning project with 4D data (xyz,t). <br />
-The goal of the project is to identify the different neutrino particle types and interaction channels within the frame of the Tau Appearance KM3NeT project. <br />
+This repository contains contains code that is used for a Deep Learning project with the neutrino telescope KM3NeT, which records 4D data (xyz,t). <br />
+The goal of the project is to classify the different event topologies & properties of KM3NeT events. <br />
+These characteristics are then used in a research project to detect tau neutrinos with KM3NeT-ORCA. <br />
 
-The repository is structured in code for two computing centers: the CCIN2P3 in Lyon and the HPC in Erlangen. <br />
+
+The repository is structured in code for two computing centers that I use: the CCIN2P3 in Lyon and the HPC in Erlangen. <br />
 The Lyon folder just contains code to convert .root files to .h5 files, while the HPC folder contains the main code. <br />
 
 In the HPC folder, two subprojects exist:
