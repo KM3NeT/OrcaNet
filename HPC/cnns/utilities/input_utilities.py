@@ -4,6 +4,7 @@
 technical stuff like copying the files to the node-local SSD."""
 
 import os
+import glob
 import shutil
 import sys
 import argparse
@@ -95,6 +96,12 @@ def use_node_local_ssd_for_input(train_files, test_files):
         shutil.copy2(input_filepath, local_scratch_path) # copy to /scratch node-local SSD
         input_filepath_ssd = local_scratch_path + '/' + os.path.basename(input_filepath)
         test_files_ssd.append((input_filepath_ssd, f_size))
+
+    # copy xs_mean array to local ssd
+    files_npy = glob.iglob(os.path.join(os.path.dirname(train_files[0][0]), '*.npy'))
+    for f in files_npy:
+        if os.path.isfile(f):
+            shutil.copy2(f, local_scratch_path)
 
     print 'Finished copying the input train/test data to the node-local SSD scratch folder'
     return train_files_ssd, test_files_ssd

@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Placeholder"""
+"""Functions for creating VGG-like models (including VGG-LSTM)"""
 
 import keras as ks
 from keras.models import Model
-from keras.layers import Input, Dense, Dropout, Activation, Flatten, Convolution3D, BatchNormalization, MaxPooling3D, Convolution2D, MaxPooling2D
+from keras.layers import Input, Dense, Dropout, Activation, Flatten, Convolution3D, BatchNormalization, MaxPooling3D, Convolution2D, MaxPooling2D, TimeDistributed, CuDNNLSTM
 from keras import backend as K
 from keras.regularizers import l2
 
@@ -81,6 +81,10 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels):
             input_dim = [(input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]), # xyz-t
                          (input_dim[0], input_dim[4], input_dim[2], input_dim[3], input_dim[1])] # tyz-x
 
+        elif swap_4d_channels == 'conv_lstm': # TODO fix whole function to make it more general and not only 3.5D stuff
+            max_pool_sizes = {1: (2, 2, 2), 5: (2, 2, 2)}
+            input_dim = (input_dim[0], input_dim[4], input_dim[1], input_dim[2], input_dim[3], 1) # t-xyz
+
         else:
             raise IOError('3.5D projection types other than XYZ-T and YZT-X are not yet supported.'
                           'Please add the max_pool_sizes dict in the function by yourself.')
@@ -121,13 +125,11 @@ def create_vgg_like_model(n_bins, batchsize, nb_classes=2, n_filters=None, dropo
         x = conv_block(x, dim, n_filters[i], k_size=k_size, dropout=dropout, max_pooling=max_pool_sizes.get(i), activation=activation, kernel_reg=kernel_reg)
 
     x = Flatten()(x)
-    x = Dense(256, kernel_initializer='he_normal', kernel_regularizer=kernel_reg)(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+    x = Dense(256, kernel_initializer='he_normal', kernel_regularizer=kernel_reg)(x)
     x = Activation(activation)(x)
-    #x = BatchNormalization(axis=-1)(x)
     if dropout > 0.0: x = Dropout(dropout)(x)
     x = Dense(16, kernel_initializer='he_normal', kernel_regularizer=kernel_reg)(x) #bias_initializer=ks.initializers.Constant(value=0.1)
     x = Activation(activation)(x)
-    #x = BatchNormalization(axis=-1)(x)
 
     x = Dense(nb_classes, activation='softmax', kernel_initializer='he_normal')(x)
 
@@ -267,7 +269,7 @@ def create_vgg_like_model_double_input_from_single_nns(n_bins, batchsize, nb_cla
     # concatenate both nets
     x = ks.layers.concatenate([x_1, x_2])
 
-    x = Dense(256, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+    x = Dense(64, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
     x = Dropout(dropout[1])(x)
     x = Dense(16, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
 
@@ -276,6 +278,10 @@ def create_vgg_like_model_double_input_from_single_nns(n_bins, batchsize, nb_cla
     model = Model(inputs=[input_layer_net_1, input_layer_net_2], outputs=x)
 
     set_layer_weights(model, trained_model_1, trained_model_2) # set weights
+
+    for layer in model.layers: # freeze trainable batch_norm weights, but not running mean and variance
+        if 'batch_norm' in layer.name:
+            layer.stateful = True
 
     return model
 
@@ -437,6 +443,79 @@ def set_layer_weights_from_single_trained_model(model, trained_model):
         if skip: continue
 
         layer.set_weights(trained_model.layers[i].get_weights())
+
+
+def create_convolutional_lstm(n_bins, batchsize, nb_classes=2, n_filters=None, dropout=0, k_size=3, activation='relu', kernel_reg=None):
+    """
+    Returns a VGG-like model (stacked conv. layers) with MaxPooling and Dropout if wished.
+    The number of convolutional layers can be controlled with the n_filters parameter:
+    n_conv_layers = len(n_filters)
+    :param tuple n_bins: Number of bins (x,y,z,t) of the data.
+    :param int nb_classes: Number of output classes.
+    :param int batchsize: Batchsize of the data that will be used with the VGG net.
+    :param tuple/None n_filters: Number of filters for each conv. layer. len(n_filters)=n_conv_layer.
+    :param float dropout: Adds dropout if >0.
+    :param int k_size: Kernel size which is used for all dimensions.
+    :param str activation: Type of activation function that should be used for the net. E.g. 'linear', 'relu', 'elu', 'selu'.
+    :param None/str kernel_reg: if L2 regularization with 1e-4 should be employed. 'l2' to enable the regularization.
+    :return: Model model: Keras VGG-like model.
+    """
+    #if n_filters is None: n_filters = (64,64,64,64,64,128,128,128)
+    if n_filters is None: n_filters = (32, 32, 64, 64, 64, 64, 128)
+    if kernel_reg is 'l2': kernel_reg = l2(0.0001)
+
+    dim, input_dim, max_pool_sizes = decode_input_dimensions_vgg(n_bins, batchsize, 'conv_lstm') # TODO fix input dim
+
+    input_layer = Input(shape=input_dim[1:], dtype=K.floatx())  # input_layer
+    x = conv_block_time_distributed(input_layer, n_filters[0], k_size=k_size, dropout=dropout, max_pooling=max_pool_sizes.get(0), activation=activation, kernel_reg=kernel_reg)
+
+    for i in xrange(1, len(n_filters)):
+        x = conv_block_time_distributed(x, n_filters[i], k_size=k_size, dropout=dropout, max_pooling=max_pool_sizes.get(i), activation=activation, kernel_reg=kernel_reg)
+
+    x = TimeDistributed(Flatten())(x)
+
+    x = CuDNNLSTM(768)(x)
+
+    if dropout > 0.0: x = Dropout(dropout)(x)
+
+    x = Dense(64, kernel_initializer='he_normal', kernel_regularizer=kernel_reg)(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+    x = Activation(activation)(x)
+    # #x = BatchNormalization(axis=-1)(x)
+    if dropout > 0.0: x = Dropout(dropout)(x)
+    x = Dense(16, kernel_initializer='he_normal', kernel_regularizer=kernel_reg)(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+    x = Activation(activation)(x)
+    # #x = BatchNormalization(axis=-1)(x)
+
+    x = Dense(nb_classes, activation='softmax', kernel_initializer='he_normal')(x)
+
+    model = Model(inputs=input_layer, outputs=x)
+
+    return model
+
+
+def conv_block_time_distributed(ip, n_filters, k_size=3, dropout=0, max_pooling=None, activation='relu', kernel_reg = None):
+    """
+    2D/3D Convolutional block followed by BatchNorm and Activation with optional MaxPooling or Dropout.
+    C-B-A-(MP)-(D)
+    :param ip: Keras functional layer instance that is used as the starting point of this convolutional block.
+    :param int n_filters: Number of filters used for the convolution.
+    :param int k_size: Kernel size which is used for all three dimensions.
+    :param float dropout: Adds a dropout layer if value is greater than 0.
+    :param None/tuple max_pooling: Specifies if a MaxPooling layer should be added. e.g. (1,1,2) for 3D.
+    :param str activation: Type of activation function that should be used. E.g. 'linear', 'relu', 'elu', 'selu'.
+    :param None/str kernel_reg: if L2 regularization with 1e-4 should be employed. 'l2' to enable the regularization.
+    :return: x: Resulting output tensor (model).
+    """
+    x = TimeDistributed(Convolution3D(n_filters, (k_size,) * 3, padding='same', kernel_initializer='he_normal', use_bias=False, kernel_regularizer=kernel_reg))(ip)
+
+    x = TimeDistributed(BatchNormalization(axis=-1))(x)
+    x = Activation(activation)(x)
+
+    if max_pooling is not None: x = TimeDistributed(MaxPooling3D(pool_size=max_pooling, padding='valid'))(x)
+    if dropout > 0.0: x = TimeDistributed(Dropout(dropout))(x)
+
+    return x
+
 
 #------------- VGG-like model -------------#
 

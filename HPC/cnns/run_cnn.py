@@ -89,7 +89,8 @@ def schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=0.001, m
 
     else:
         if epoch[0] == 1:
-            lr, lr_decay = lr_initial * n_gpu[0], 0.00
+            lr, lr_decay = lr_initial, 0.00
+            #lr, lr_decay = lr_initial * n_gpu[0], 0.00
             K.set_value(model.optimizer.lr, lr)
             print 'Set learning rate to ' + str(K.get_value(model.optimizer.lr)) + ' before epoch ' + str(epoch[0])
         else:
@@ -114,7 +115,7 @@ def get_new_learning_rate(epoch, lr_initial, n_gpu):
     :return: float lr_decay: Latest learning rate decay used.
     """
     n_lr_decays = epoch - 1
-    lr_temp = lr_initial * n_gpu
+    lr_temp = lr_initial # * n_gpu TODO think about multi gpu lr
     lr_decay = None
 
     for i in xrange(n_lr_decays):
@@ -148,7 +149,7 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
         save_train_and_test_statistics_to_txt(model, history_train, history_test, modelname, lr, lr_decay, epoch[0],
                                           file_no, f, test_files, batchsize, n_bins, class_type, swap_4d_channels)
         plot_train_and_test_statistics(modelname)
-        plot_weights_and_activations(model, test_files[0][0], n_bins, class_type, xs_mean, swap_4d_channels, modelname, epoch[0])
+        plot_weights_and_activations(model, test_files[0][0], n_bins, class_type, xs_mean, swap_4d_channels, modelname, epoch[0], file_no)
 
 
 def fit_model(model, modelname, f, f_size, file_no, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
@@ -301,6 +302,11 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
             else:
                 model = create_vgg_like_model(n_bins, batchsize, nb_classes=class_type[0], dropout=0.1,
                                                                n_filters=(64, 64, 64, 64, 64, 128, 128, 128), swap_4d_channels=swap_4d_channels)
+
+        elif nn_arch is 'Conv_LSTM':
+            model = create_convolutional_lstm(n_bins, batchsize, nb_classes=class_type[0], dropout=0.1,
+                                              n_filters=None)
+
         else: raise ValueError('Currently, only "WRN" or "VGG" are available as nn_arch')
     else:
         model = ks.models.load_model('models/trained/trained_' + modelname + '_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5')
@@ -317,6 +323,7 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
     #     model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
 
     model, batchsize = parallelize_model_to_n_gpus(model, n_gpu, batchsize) #TODO compile after restart????
+    if n_gpu[0] > 1: model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy']) # TODO check
 
     model.summary()
 
@@ -334,12 +341,15 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
         #arr_energy_correct = make_performance_array_energy_correct(model, test_files[0][0], n_bins, class_type, batchsize, xs_mean, swap_4d_channels, samples=None)
         #np.save('results/plots/saved_predictions/arr_energy_correct_' + modelname + '.npy', arr_energy_correct)
 
-        arr_energy_correct = np.load('results/plots/saved_predictions/arr_energy_correct_' + modelname + '.npy')
+        #arr_energy_correct = np.load('results/plots/saved_predictions/arr_energy_correct_' + modelname + '.npy')
+        arr_energy_correct = np.load('results/plots/saved_predictions/arr_energy_correct_model_VGG_4d_yzt-x_muon-CC_to_elec-CC.npy')
         make_energy_to_accuracy_plot_multiple_classes(arr_energy_correct, title='Classification for muon-CC_and_elec-CC_3-100GeV',
                                                       filename='results/plots/PT_' + modelname, compare_pheid=True) #TODO think about more automatic savenames
         make_prob_hists(arr_energy_correct[:, ], modelname=modelname, compare_pheid=True)
         make_property_to_accuracy_plot(arr_energy_correct, 'bjorken-y', title='Bjorken-y distribution vs Accuracy, 3-100GeV',
                                        filename='results/plots/PT_bjorken_y_vs_accuracy' + modelname, e_cut=False, compare_pheid=True)
+
+        make_hist_2d_property_vs_property(arr_energy_correct, modelname, property_types=('bjorken-y', 'probability'), e_cut=(3, 100), compare_pheid=True)
 
 
 if __name__ == '__main__':
@@ -347,33 +357,43 @@ if __name__ == '__main__':
     # - (2, 'muon-CC_to_elec-NC'), (1, 'muon-CC_to_elec-NC')
     # - (2, 'muon-CC_to_elec-CC'), (1, 'muon-CC_to_elec-CC')
     # - (2, 'up_down'), (1, 'up_down')
-    # changed lr from 0.2 to 0.3 after epoch 40
-    # execute_cnn(n_bins=(11,13,18,60), class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=96,
-    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, 19), str_ident='')
 
-    # execute_cnn(n_bins=(11,13,18,50), class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=29,
-    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='xyz-t_and_yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='') # old
-
-    # execute_cnn(n_bins=(11,13,18,50), class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(0,1),
-    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='xyz-t_and_yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='double_input_single_train') # old, single trained
+    # execute_cnn(n_bins=(11,13,18,50), class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(6,1),
+    #             n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels='xyz-t_and_yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='double_input_single_train') # old, single trained
 
     # execute_cnn(n_bins=(11,13,18,50), class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='WRN', batchsize=32, epoch=0,
     #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='')
 
-    execute_cnn(n_bins=(11,13,18,60), class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(22,1),
+    execute_cnn(n_bins=(11,13,18,60), class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(48,1), use_scratch_ssd=True,
                 n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='only_new_timecut_dp01')
+
+    # execute_cnn(n_bins=(11,13,18,50), class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='Conv_LSTM', batchsize=8, epoch=(10,1), use_scratch_ssd=True,
+    #             n_gpu=(4, 'avolkov'), mode='train', swap_4d_channels='conv_lstm', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='')
+
+    # execute_cnn(n_bins=(11,13,18,60), class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(20,1), use_scratch_ssd=True,
+    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='new_tight_timecut_250_500_dp01')
+
+    # #initial lr 0.003
+    # execute_cnn(n_bins=(11,13,18,60), class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=64, epoch=(4,1), use_scratch_ssd=True,
+    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='new_tight_timecut_250_500_dp01_larger_bs_128')
+
+    # execute_cnn(n_bins=(11, 13, 18, 50), class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(0, 1), n_gpu=(1, 'avolkov'), mode='eval',
+    #             swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='just_for_eval')
 
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/h5/xyzt/concatenated/train_muon-CC_and_elec-CC_each_480_xyzt_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/h5/xyzt/concatenated/test_muon-CC_and_elec-CC_each_120_xyzt_shuffled.h5
 # same as above, shuffled again
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/h5/xyzt/concatenated/train_muon-CC_and_elec-CC_each_480_xyzt_shuffled_0.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/h5/xyzt/concatenated/test_muon-CC_and_elec-CC_each_120_xyzt_shuffled.h5
 
 # with run_id
-# python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/h5/xyzt/concatenated/train_muon-CC_and_elec-CC_each_480_xyzt_shuffled_1.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/h5/xyzt/concatenated/test_muon-CC_and_elec-CC_each_120_xyzt_shuffled.h5
+# python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/without_mc_time_fix/h5/xyzt/concatenated/train_muon-CC_and_elec-CC_each_480_xyzt_shuffled_0.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/without_mc_time_fix/h5/xyzt/concatenated/test_muon-CC_and_elec-CC_each_120_xyzt_shuffled_0.h5
 
 # with run_id but without time corr. new time cut, precuts 04.12.17
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/without_mc_time_fix/h5/xyzt/concatenated/elec-CC_and_muon-CC_xyzt_train_1_to_480_shuffled_0.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/without_mc_time_fix/h5/xyzt/concatenated/elec-CC_and_muon-CC_xyzt_test_481_to_600_shuffled_0.h5
 # with run_id and with new time cut 05.01.17, without precuts
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/without_mc_time_fix/h5/xyzt/concatenated/elec-CC_and_muon-CC_xyzt_train_1_to_480_shuffled_0.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/without_mc_time_fix/h5/xyzt/concatenated/elec-CC_and_muon-CC_xyzt_test_481_to_600_shuffled_0.h5
+
+# with run_id and with new tight time cut 26.01.17, without precuts
+# python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/time_-250+500_only/concatenated/elec-CC_and_muon-CC_xyzt_train_1_to_480_shuffled_0.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/time_-250+500_only/concatenated/elec-CC_and_muon-CC_xyzt_test_481_to_600_shuffled_0.h5
 
 # WRN test 3D xzt
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/train_muon-CC_and_elec-CC_each_240_batch_301-540_xzt_shuffled.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo3d/h5/xzt/concatenated/test_muon-CC_and_elec-CC_each_60_batch_541-600_xzt_shuffled.h5

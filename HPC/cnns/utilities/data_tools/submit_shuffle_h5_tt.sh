@@ -32,7 +32,7 @@ input_filename_test=test_muon-CC_and_elec-CC_each_60_batch_541-600_xzt.h5
 #input_filename_test=test_muon-CC_and_elec-CC_each_120_xyzt.h5
 
 # Notes for shuffling 4d on TinyFat:
-# qsub.tinyfat -I -q broadwell512 -l walltime=01:59:00,nodes=1:ppn=56
+# qsub.tinyfat -I -q broadwell512 -l walltime=02:59:00,nodes=1:ppn=56
 # python shuffle_h5.py --chunksize 32 --compression --n_shuffles 20 path/to/file
 #
 # I.e. python shuffle_h5.py --chunksize 32 --compression --n_shuffles 20 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/h5/xyzt/concatenated/train_muon-CC_and_elec-CC_each_480_xyzt_shuffled_1.h5

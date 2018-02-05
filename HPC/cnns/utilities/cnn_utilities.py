@@ -30,7 +30,7 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, f_s
     :return: tuple output: Yields a tuple which contains a full batch of images and labels (+ mc_info if yield_mc_info=True).
     """
     dimensions = get_dimensions_encoding(n_bins, batchsize)
-    swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'tyz-x': (0, 4, 2, 3, 1)}
+    swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'tyz-x': (0, 4, 2, 3, 1), 't-xyz': (0, 4, 1, 2, 3)}
 
     while 1:
         f = h5py.File(filepath, "r")
@@ -52,8 +52,10 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, f_s
                     xs = np.transpose(xs, swap_4d_channels_dict[swap_col])
                 elif swap_col == 'xyz-t_and_yzt-x':
                     xs_xyz_t = xs
-                    #xs_tyz_x = np.transpose(xs, swap_4d_channels_dict['tyz-x'])
                     xs_yzt_x = np.transpose(xs, swap_4d_channels_dict['yzt-x'])
+                elif swap_col == 'conv_lstm':
+                    xs = np.transpose(xs, swap_4d_channels_dict['t-xyz'])
+                    xs = xs.reshape(xs.shape + (1,))
                 else: raise ValueError('The argument "swap_col"=' + str(swap_col) + ' is not valid.')
 
             # and mc info (labels)
@@ -381,7 +383,6 @@ class TensorBoardWrapper(ks.callbacks.TensorBoard):
      This class acts as a Wrapper for the ks.callbacks.TensorBoard class in such a way,
      that the whole validation data is put into a single array by using the generator.
      Then, the single array is used in the validation steps. This workaround is experimental!"""
-
     def __init__(self, batch_gen, nb_steps, **kwargs):
         super(TensorBoardWrapper, self).__init__(**kwargs)
         self.batch_gen = batch_gen # The generator.

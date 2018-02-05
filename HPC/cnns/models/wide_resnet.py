@@ -14,29 +14,6 @@ from keras import backend as K
 from utilities.cnn_utilities import get_dimensions_encoding
 
 
-# def model_wide_residual_network(n_bins, batchsize, **kwargs):
-#     """
-#     Defines a Keras WRN model. Wrapper for the create_wrn function.
-#     :param tuple n_bins: Number of bins (x,y,z,t) of the data that will be fed to the network.
-#     :param int batchsize: Batchsize of the fed data.
-#     :param kwargs: arbitrary number of keyword arguments based on the args in create_wrn
-#     :return: Model model: Keras WRN model.
-#     """
-#     if n_bins.count(1) == 2:
-#         dim = 2
-#         model = create_wide_residual_network(n_bins, batchsize, dim, **kwargs)
-#
-#     elif n_bins.count(1) == 1:
-#         dim = 3
-#         model = create_wide_residual_network(n_bins, batchsize, dim, **kwargs)
-#
-#     else:
-#         raise IOError('Data types other than 2D or 3D are not yet supported. '
-#                       'Please specify a 2D or 3D n_bins tuple.')
-#
-#     return model
-
-
 def decode_input_dimensions(n_bins, batchsize, swap_4d_channels):
     """
     Returns the input dimensions (e.g. batchsize x 11 x 13 x 18 x Channels for 3D)
@@ -94,12 +71,14 @@ def decode_input_dimensions(n_bins, batchsize, swap_4d_channels):
 
         if swap_4d_channels is None:
             print 'Using a WRN 3.5D CNN with XYZ data and T channel information.'
-            strides = [(1,1,1), (1,1,1), (2,2,2)]
+            #strides = [(1,1,1), (1,1,1), (2,2,2)]
+            strides = [(1, 1, 1), (2, 2, 2)]
             average_pooling_size = (6,7,9)
 
         elif swap_4d_channels == 'yzt-x':
             print 'Using a WRN 3.5D CNN with YZT data and X channel information.'
-            strides = [(1,1,1), (1,1,2), (2,2,2)]
+            #strides = [(1,1,1), (1,1,2), (2,2,2)]
+            strides = [(1,1,2), (2,2,2)]
             average_pooling_size = (7,9,13)
             input_dim = (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1]) # [bs,y,z,t,x]
 
@@ -114,7 +93,7 @@ def decode_input_dimensions(n_bins, batchsize, swap_4d_channels):
     return dim, input_dim, strides, average_pooling_size
 
 
-def create_wide_residual_network(n_bins, batchsize, nb_classes=2, N=2, k=8, dropout=0.0, k_size=3, verbose=True, swap_4d_channels=None):
+def create_wide_residual_network(n_bins, batchsize, nb_classes=2, n=1, k=8, dropout=0.0, k_size=3, verbose=True, swap_4d_channels=None):
     """
     Creates a 2D or 3D Wide Residual Network with specified parameters.
     The torch implementation from the paper differs slightly (change default arguments in BatchNorm):
@@ -122,10 +101,10 @@ def create_wide_residual_network(n_bins, batchsize, nb_classes=2, N=2, k=8, drop
     :param tuple n_bins: Number of bins (x,y,z,t) of the data that will be fed to the network.
     :param int batchsize: Batchsize of the fed data.
     :param int nb_classes: Number of output classes.
-    :param int N: Depth of the network. Compute N = (n - 4) / 6.
-                  Example : For a depth of 16, n = 16, N = (16 - 4) / 6 = 2
-                  Example2: For a depth of 28, n = 28, N = (28 - 4) / 6 = 4
-                  Example3: For a depth of 40, n = 40, N = (40 - 4) / 6 = 6
+    :param int n: Depth of the network. Compute n = (N - 4) / 6.
+                  Example : For a depth of 16, N = 16, n = (16 - 4) / 6 = 2
+                  Example2: For a depth of 28, N = 28, n = (28 - 4) / 6 = 4
+                  Example3: For a depth of 40, N = 40, n = (40 - 4) / 6 = 6
     :param int k: Width of the network (gets multiplied by the number of filters for each convolution).
     :param float dropout: Adds dropout if value is greater than 0.0.
     :param int k_size: Kernel size that should be used, same for each dimension.
@@ -141,34 +120,38 @@ def create_wide_residual_network(n_bins, batchsize, nb_classes=2, N=2, k=8, drop
     input_layer = Input(shape=input_dim[1:], dtype=K.floatx()) # batch_shape=input_dim
 
     #x = BatchNormalization(axis=channel_axis)(input_layer) # can be used after input in order to omit mean substraction. Care: Change initial conv param to x
-    x = initial_conv(input_layer, dim, dropout=dropout, k_size=k_size, channel_axis=channel_axis)
-    x = expand_conv(x, 16, dim, k=k, dropout=dropout, k_size=k_size, strides=strides[0], channel_axis=channel_axis)
+    x = initial_conv(input_layer, 64, dim, dropout=dropout, k_size=k_size, channel_axis=channel_axis)
+    x = expand_conv(x, 64, dim, k=k, dropout=dropout, k_size=k_size, strides=strides[0], channel_axis=channel_axis)
     nb_conv = 10 # 1x initial_conv + 3x expand_conv = 1x1 + 3*3 = 10
 
-    for i in range(N - 1):
-        x = conv_block(x, 16, dim, k=k, dropout=dropout, k_size=k_size, channel_axis=channel_axis)
-        nb_conv += 2
-
-    x = BatchNormalization(axis=channel_axis)(x)
-    x = Activation('relu')(x)
-
-    x = expand_conv(x, 32, dim, k=k, dropout=dropout, strides=strides[1], channel_axis=channel_axis)
-
-    for i in range(N - 1):
-        x = conv_block(x, 32, dim, k=k, dropout=dropout, k_size=k_size, channel_axis=channel_axis)
-        nb_conv += 2
-
-    x = BatchNormalization(axis=channel_axis)(x)
-    x = Activation('relu')(x)
-
-    x = expand_conv(x, 64, dim, k=k, dropout=dropout, strides=strides[2], channel_axis=channel_axis)
-
-    for i in range(N - 1):
+    for i in range(n):
         x = conv_block(x, 64, dim, k=k, dropout=dropout, k_size=k_size, channel_axis=channel_axis)
         nb_conv += 2
 
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
+
+    if dropout > 0.0: x = Dropout(dropout)(x)
+
+    x = expand_conv(x, 128, dim, k=k, dropout=dropout, strides=strides[1], channel_axis=channel_axis)
+
+    for i in range(n):
+        x = conv_block(x, 128, dim, k=k, dropout=dropout, k_size=k_size, channel_axis=channel_axis)
+        nb_conv += 2
+
+    x = BatchNormalization(axis=channel_axis)(x)
+    x = Activation('relu')(x)
+
+    # x = expand_conv(x, 64, dim, k=k, dropout=dropout, strides=strides[2], channel_axis=channel_axis)
+    #
+    # for i in range(n):
+    #     x = conv_block(x, 64, dim, k=k, dropout=dropout, k_size=k_size, channel_axis=channel_axis)
+    #     nb_conv += 2
+    #
+    # x = BatchNormalization(axis=channel_axis)(x)
+    # x = Activation('relu')(x)
+
+    if dropout > 0.0: x = Dropout(dropout)(x)
 
     x = average_pooling_nd(avg_pool_size)(x) # use global average pooling instead of fully connected
     x = Flatten()(x)
@@ -182,11 +165,12 @@ def create_wide_residual_network(n_bins, batchsize, nb_classes=2, N=2, k=8, drop
     return model
 
 
-def initial_conv(input_layer, dim, dropout=0.0, k_size=3, channel_axis=-1):
+def initial_conv(input_layer,n_filters, dim, dropout=0.0, k_size=3, channel_axis=-1):
     """
     Initial convolution prior to the ResNet blocks (2D/3D).
     C-B-A
     :param ks.layers.Input input_layer: Keras Input layer (tensor) that specifies the shape of the input data.
+    :param int n_filters: Number of filters used for the initial convolution.
     :param int dim: 2D or 3D block.
     :param float dropout: Adds dropout if >0.
     :param int k_size: Kernel size that should be used.
@@ -196,12 +180,13 @@ def initial_conv(input_layer, dim, dropout=0.0, k_size=3, channel_axis=-1):
     if dim not in (2,3): raise ValueError('dim must be equal to 2 or 3.')
     convolution_nd = Convolution2D if dim==2 else Convolution3D
 
-    x = convolution_nd(16, (k_size,) * dim, padding='same', kernel_initializer='he_normal', use_bias=False)(input_layer) # TODO probably more filters, standard=16
-
-    if dropout > 0.0: x = Dropout(dropout)(x)
+    x = convolution_nd(n_filters, (k_size,) * dim, padding='same', kernel_initializer='he_normal', use_bias=False)(input_layer) # TODO probably more filters, standard=16
 
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
+
+    if dropout > 0.0: x = Dropout(dropout)(x)
+
     return x
 
 
@@ -226,13 +211,15 @@ def expand_conv(ip, n_filters, dim, k=1, dropout=0.0, k_size=3, strides=None, ch
 
     x = convolution_nd(n_filters * k, (k_size,) * dim, padding='same', strides=strides, kernel_initializer='he_normal', use_bias=False)(ip)
 
-    if dropout > 0.0: x = Dropout(dropout)(x)
-
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
 
+    if dropout > 0.0: x = Dropout(dropout)(x)
+
     x = convolution_nd(n_filters * k, (k_size,) * dim, padding='same', kernel_initializer='he_normal', use_bias=False)(x)
     skip = convolution_nd(n_filters * k, (1,) * dim, padding='same', strides=strides, kernel_initializer='he_normal', use_bias=False)(ip)
+
+    if dropout > 0.0: skip = Dropout(dropout)(skip) #
 
     m = Add()([x, skip])
 
@@ -260,15 +247,18 @@ def conv_block(ip, n_filters, dim, k=1, dropout=0.0, k_size=3, channel_axis=-1):
     x = BatchNormalization(axis=channel_axis)(ip)
     x = Activation('relu')(x)
 
-    if dropout > 0.0: x = Dropout(dropout)(x)
+    if dropout > 0.0: x = Dropout(dropout)(x) ##
 
     x = convolution_nd(n_filters * k, (k_size,) * dim, padding='same', kernel_initializer='he_normal', use_bias=False)(x)
-
-    if dropout > 0.0: x = Dropout(dropout)(x)
 
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation('relu')(x)
+
+    if dropout > 0.0: x = Dropout(dropout)(x)
+
     x = convolution_nd(n_filters * k, (k_size,) * dim, padding='same', kernel_initializer='he_normal', use_bias=False)(x)
+
+    if dropout > 0.0: init = Dropout(dropout)(init) #
 
     m = Add()([init, x])
     return m

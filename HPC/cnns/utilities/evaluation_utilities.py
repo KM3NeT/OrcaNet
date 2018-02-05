@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """Utility code for the evaluation of a network's performance after training."""
 
+import os
 import h5py
 import numpy as np
 import keras as ks
@@ -114,7 +115,10 @@ def load_pheid_event_selection():
     # particle_type_dict = {'muon-CC': ['muon_cc_3_100_selectedEvents_forMichael_fixed.txt', (14,1)],
     #                       'elec-CC': ['elec_cc_3_100_selectedEvents_forMichael_fixed.txt', (12,1)]}
 
-    # Containment cut
+    # particle_type_dict = {'muon-CC': ['muon_cc_3_100_selectedEvents_forMichael_01_18.txt', (14,1)],
+    #                       'elec-CC': ['elec_cc_3_100_selectedEvents_forMichael_01_18.txt', (12,1)]}
+
+    # # Containment cut
     particle_type_dict = {'muon-CC': ['muon_cc_3_100_selectedEvents_Rsmaller100_abszsmaller90_forMichael.txt', (14,1)],
                           'elec-CC': ['elec_cc_3_100_selectedEvents_Rsmaller100_abszsmaller90_forMichael.txt', (12,1)]}
 
@@ -488,6 +492,187 @@ def make_step_plot_1d_property_accuracy_class(prop, arr_energy_correct, axes, pa
 
 
 #-- Functions for making property (e.g. bjorken_y) vs accuracy plots --#
+
+def make_hist_2d_property_vs_property(arr_energy_correct, modelname, property_types=('bjorken-y', 'probability'), e_cut=(3, 100), compare_pheid=False):
+
+    if compare_pheid is True:
+        arr_energy_correct = arr_energy_correct_select_pheid_events(arr_energy_correct, invert=False)
+
+    particle_types_dict = {'muon-CC': (14, 1), 'a_muon-CC': (-14, 1), 'elec-CC': (12, 1), 'a_elec-CC': (-12, 1)}
+    properties = {'bjorken-y': {'index': 8, 'n_bins': 20, 'label': 'Bjorken-y'},
+                  'probability': {'index': 5, 'n_bins': 20, 'label': 'Probability for track class'}} # probability: index 4 -> elec-CC, index 5 -> muon-CC
+    prop_1, prop_2 = properties[property_types[0]], properties[property_types[1]]
+
+    if not os.path.exists('results/plots/2d/' + modelname):
+        os.makedirs('results/plots/2d/' + modelname)
+
+    make_hist_2d_class(prop_1, prop_2, arr_energy_correct, particle_types_dict, e_cut, 'muon-CC',
+                       savepath='results/plots/2d/' + modelname + '/hist_2d_muon-CC_' + property_types[0] + '_vs_' + property_types[1] + '_e_cut_' + str(e_cut))
+    make_hist_2d_class(prop_1, prop_2, arr_energy_correct, particle_types_dict, e_cut, 'a_muon-CC',
+                       savepath='results/plots/2d/' + modelname + '/hist_2d_a_muon-CC_' + property_types[0] + '_vs_' + property_types[1] + '_e_cut_' + str(e_cut))
+    make_hist_2d_class(prop_1, prop_2, arr_energy_correct, particle_types_dict, e_cut, 'elec-CC',
+                       savepath='results/plots/2d/' + modelname + '/hist_2d_elec-CC_' + property_types[0] + '_vs_' + property_types[1] + '_e_cut_' + str(e_cut))
+    make_hist_2d_class(prop_1, prop_2, arr_energy_correct, particle_types_dict, e_cut, 'a_elec-CC',
+                       savepath='results/plots/2d/' + modelname + '/hist_2d_a_elec-CC_' + property_types[0] + '_vs_' + property_types[1] + '_e_cut_' + str(e_cut))
+
+
+    # make multiple cuts in range
+    e_cut_range = (3, 40)
+    stepsize = 1
+
+    pdf_file_muon_CC = mpl.backends.backend_pdf.PdfPages('results/plots/2d/' + modelname + '/hist_2d_muon-CC_'
+                                                         + property_types[0] + '_vs_' + property_types[1] + '_e_cut_' + 'multiple.pdf')
+    pdf_file_a_muon_CC = mpl.backends.backend_pdf.PdfPages('results/plots/2d/' + modelname + '/hist_2d_a_muon-CC_'
+                                                           + property_types[0] + '_vs_' + property_types[1] + '_e_cut_' + 'multiple.pdf')
+    pdf_file_elec_CC = mpl.backends.backend_pdf.PdfPages('results/plots/2d/' + modelname + '/hist_2d_elec-CC_'
+                                                         + property_types[0] + '_vs_' + property_types[1] + '_e_cut_' + 'multiple.pdf')
+    pdf_file_a_elec_CC = mpl.backends.backend_pdf.PdfPages('results/plots/2d/' + modelname + '/hist_2d_a_elec-CC_'
+                                                           + property_types[0] + '_vs_' + property_types[1] + '_e_cut_' + 'multiple.pdf')
+
+    for i in xrange(e_cut_range[1] - e_cut_range[0]):
+        e_cut_temp = (e_cut_range[0] + i*stepsize, e_cut_range[0] + i * stepsize + stepsize)
+
+        make_hist_2d_class(prop_1, prop_2, arr_energy_correct, particle_types_dict, e_cut_temp, 'muon-CC',pdf_file=pdf_file_muon_CC)
+        make_hist_2d_class(prop_1, prop_2, arr_energy_correct, particle_types_dict, e_cut_temp, 'a_muon-CC',pdf_file=pdf_file_a_muon_CC)
+        make_hist_2d_class(prop_1, prop_2, arr_energy_correct, particle_types_dict, e_cut_temp, 'elec-CC',pdf_file=pdf_file_elec_CC)
+        make_hist_2d_class(prop_1, prop_2, arr_energy_correct, particle_types_dict, e_cut_temp, 'a_elec-CC',pdf_file=pdf_file_a_elec_CC)
+
+    for i in xrange(e_cut_range[1] - e_cut_range[0]):
+        e_cut_temp = (e_cut_range[0] + i*stepsize, e_cut_range[0] + i * stepsize + stepsize)
+
+        make_hist_2d_class(prop_1, prop_2, arr_energy_correct, particle_types_dict, e_cut_temp, 'muon-CC',pdf_file=pdf_file_muon_CC, log=True)
+        make_hist_2d_class(prop_1, prop_2, arr_energy_correct, particle_types_dict, e_cut_temp, 'a_muon-CC',pdf_file=pdf_file_a_muon_CC, log=True)
+        make_hist_2d_class(prop_1, prop_2, arr_energy_correct, particle_types_dict, e_cut_temp, 'elec-CC',pdf_file=pdf_file_elec_CC, log=True)
+        make_hist_2d_class(prop_1, prop_2, arr_energy_correct, particle_types_dict, e_cut_temp, 'a_elec-CC',pdf_file=pdf_file_a_elec_CC, log=True)
+
+    pdf_file_muon_CC.close()
+    pdf_file_a_muon_CC.close()
+    pdf_file_elec_CC.close()
+    pdf_file_a_elec_CC.close()
+
+    # TODO add anti and not-anti
+
+
+def make_hist_2d_class(prop_1, prop_2, arr_energy_correct, particle_types_dict, e_cut, particle_type, savepath='', pdf_file=None, log=False):
+
+    arr_energy_correct = arr_energy_correct[np.logical_and(e_cut[0] <= arr_energy_correct[:, 0], arr_energy_correct[:, 0] <= e_cut[1])]
+
+    class_vector = particle_types_dict[particle_type]
+
+    arr_energy_correct_class = select_class(arr_energy_correct, class_vector=class_vector)
+
+    property_1_class = arr_energy_correct_class[:, prop_1['index']]
+    property_2_class = arr_energy_correct_class[:, prop_2['index']]
+
+    fig = plt.figure()
+
+    if log is True:
+        plt.hist2d(property_1_class, property_2_class, bins=[prop_1['n_bins'], prop_2['n_bins']], norm=mpl.colors.LogNorm())
+    else:
+        plt.hist2d(property_1_class, property_2_class, bins=[prop_1['n_bins'], prop_2['n_bins']])
+
+    plt.colorbar()
+    plt.xlabel(prop_1['label'])
+    plt.ylabel(prop_2['label'])
+
+    plt.title(particle_type + ', ' + str(e_cut[0]) + '-' + str(e_cut[1]) + ' GeV \n' +
+              prop_1['label'] + ' vs ' + prop_2['label'])
+
+    if pdf_file is None:
+        plt.savefig(savepath + '.pdf')
+        plt.savefig(savepath + '.png', dpi=600)
+
+    else:
+        pdf_file.savefig(fig)
+
+    plt.clf()
+    plt.close()
+
+
+def calculate_and_plot_correlation(arr_energy_correct, modelname, e_cut_range=(3, 40), compare_pheid=False):
+
+    if compare_pheid is True:
+        arr_energy_correct = arr_energy_correct_select_pheid_events(arr_energy_correct, invert=False)
+
+    particle_types_dict = {'muon-CC': (14, 1), 'a_muon-CC': (-14, 1), 'elec-CC': (12, 1), 'a_elec-CC': (-12, 1)}
+
+    bins=40
+    stepsize = 1
+
+    correlation_coefficients = []
+
+    e_cut_range = np.logspace(0.3, 2, 18)
+
+    #for i in xrange(e_cut_range[1] - e_cut_range[0]):
+        #e_cut_temp = (e_cut_range[0] + i * stepsize, e_cut_range[0] + i * stepsize + stepsize)
+
+    n = 0
+    for e_cut_temp in zip(e_cut_range[:-1], e_cut_range[1:]):
+        n += 1
+        if n <= 2: continue # ecut steffen
+
+        arr_energy_correct_e_cut = arr_energy_correct[np.logical_and(e_cut_temp[0] <= arr_energy_correct[:, 0], arr_energy_correct[:, 0] <= e_cut_temp[1])]
+
+        arr_energy_correct_e_cut_muon_cc = select_class(arr_energy_correct_e_cut, class_vector=particle_types_dict['muon-CC'])
+        arr_energy_correct_e_cut_a_muon_cc = select_class(arr_energy_correct_e_cut, class_vector=particle_types_dict['a_muon-CC'])
+        arr_energy_correct_e_cut_sum_muon_cc = np.concatenate([arr_energy_correct_e_cut_muon_cc, arr_energy_correct_e_cut_a_muon_cc], axis=0)
+
+        arr_energy_correct_e_cut_elec_cc = select_class(arr_energy_correct_e_cut, class_vector=particle_types_dict['elec-CC'])
+        arr_energy_correct_e_cut_a_elec_cc = select_class(arr_energy_correct_e_cut, class_vector=particle_types_dict['a_elec-CC'])
+        arr_energy_correct_e_cut_sum_elec_cc = np.concatenate([arr_energy_correct_e_cut_elec_cc, arr_energy_correct_e_cut_a_elec_cc], axis=0)
+
+        hist_prob_track_e_cut_sum_muon_cc = np.histogram(arr_energy_correct_e_cut_sum_muon_cc[:, 5], bins=40, density=True)
+        hist_prob_track_e_cut_sum_elec_cc = np.histogram(arr_energy_correct_e_cut_sum_elec_cc[:, 5], bins=40, density=True)
+
+        correlation_coeff_enumerator = 0
+        for j in xrange(bins - 1):
+            correlation_coeff_enumerator += hist_prob_track_e_cut_sum_muon_cc[0][j] * hist_prob_track_e_cut_sum_elec_cc[0][j]
+
+        sum_prob_muon_cc = np.sum(hist_prob_track_e_cut_sum_muon_cc[0] ** 2)
+        sum_prob_elec_cc = np.sum(hist_prob_track_e_cut_sum_elec_cc[0] ** 2)
+
+        correlation_coeff_denominator = np.sqrt(sum_prob_muon_cc * sum_prob_elec_cc)
+
+        correlation_coeff = 1 - correlation_coeff_enumerator/float(correlation_coeff_denominator)
+
+        average_energy = (e_cut_temp[1] + e_cut_temp[0]) / float(2)
+
+        correlation_coefficients.append((correlation_coeff, average_energy))
+
+    correlation_coefficients = np.array(correlation_coefficients)
+    # plot the array
+
+    fig, axes = plt.subplots()
+
+    plt.plot(correlation_coefficients[:, 1], correlation_coefficients[:, 0], 'b', marker='o', lw=0.5, markersize=3, label='Deep Learning')
+
+    # data Steffen
+    correlation_coefficients_steffen = np.array([(0.11781, 2.23872), (0.135522, 2.81838), (0.15929, 3.54813), (0.189369, 4.46684), (0.241118, 5.62341), (0.337265, 7.07946),
+                                        (0.511258, 8.91251), (0.715669, 11.2202), (0.84403, 14.1254), (0.893825, 17.7828), (0.920772, 22.3872), (0.930504, 28.1838),
+                                        (0.941481, 35.4813), (0.950237, 44.6684), (0.954144, 56.2341), (0.960136, 70.7946), (0.96377, 89.1251)])
+
+    plt.plot(correlation_coefficients_steffen[:, 1], correlation_coefficients_steffen[:, 0], 'r', marker='o', lw=0.5, markersize=3, label='Shallow Learning')
+
+    plt.xlabel('Energy [GeV]')
+    plt.ylabel('Separability (1-c)')
+    plt.grid(True, zorder=0, linestyle='dotted')
+
+    axes.legend(loc='center right')
+    title = plt.title('Correlation coefficients for track vs shower PID')
+    title.set_position([.5, 1.04])
+
+    plt.yticks(np.arange(0, 1.1, 0.1))
+    # plt.xticks(np.arange(0, 110, 10))
+    plt.xscale('log')
+
+    plt.savefig('/results/plots/1d/Correlation_Coefficients_' + modelname + '.pdf')
+    plt.savefig('/results/plots/1d/Correlation_Coefficients_' + modelname + '.png', dpi=600)
+
+    plt.close()
+
+
+
+
 
 #------------- Functions used in making Matplotlib plots -------------#
 
