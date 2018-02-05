@@ -11,7 +11,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import glob
 
 
-def get_time_parameters(event_hits, mode='timeslice_relative', t_start_margin=0.15, t_end_margin=0.15):
+def get_time_parameters(event_hits, mode=('timeslice_relative', None), t_start_margin=0.15, t_end_margin=0.15):
     """
     Gets the fundamental time parameters in one place for cutting a time residual.
     Later on these parameters cut out a certain time span of events specified by t_start and t_end.
@@ -24,15 +24,23 @@ def get_time_parameters(event_hits, mode='timeslice_relative', t_start_margin=0.
     """
     t = event_hits[:, 3:4]
 
-    if mode == 'trigger_cluster':
+    if mode[0] == 'trigger_cluster':
         triggered = event_hits[:, 4:5]
         t = t[triggered == 1]
         t_mean = np.mean(t, dtype=np.float64)
 
-        t_start = t_mean - 350 # trigger-cluster - 350ns
-        t_end = t_mean + 850 # trigger-cluster + 850ns
+        if mode[1] == 'tight_1':
+            # second try, make a tighter cut
+            t_start = t_mean - 250  # trigger-cluster - 350ns
+            t_end = t_mean + 500  # trigger-cluster + 850ns
 
-    elif mode == 'timeslice_relative':
+        else:
+            assert mode[1] == 'all'
+            # first try, include nearly all mc_hits from muon-CC and elec-CC
+            t_start = t_mean - 350 # trigger-cluster - 350ns
+            t_end = t_mean + 850 # trigger-cluster + 850ns
+
+    elif mode[0] == 'timeslice_relative':
         t_min = np.amin(t)
         t_max = np.amax(t)
         t_diff = t_max - t_min
@@ -65,8 +73,7 @@ def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     t = event_hits[:, 3]
 
     # analyze time
-    #t_start, t_end = get_time_parameters(event_hits, t_start_margin=0.15, t_end_margin=0.15)
-    t_start, t_end = get_time_parameters(event_hits, mode='trigger_cluster')
+    t_start, t_end = get_time_parameters(event_hits, mode=('trigger_cluster', 'all'))
 
     # create histograms for this event
     hist_xy = np.histogram2d(x, y, bins=(x_bin_edges, y_bin_edges))  # hist[0] = H, hist[1] = xedges, hist[2] = yedges
@@ -171,8 +178,7 @@ def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     z = event_hits[:, 2:3]
     t = event_hits[:, 3:4]
 
-    #t_start, t_end = get_time_parameters(t, t_start_margin=0.15, t_end_margin=0.15)
-    t_start, t_end = get_time_parameters(event_hits, mode='trigger_cluster')
+    t_start, t_end = get_time_parameters(event_hits, mode=('trigger_cluster', 'all'))
 
     hist_xyz = np.histogramdd(event_hits[:, 0:3], bins=(x_bin_edges, y_bin_edges, z_bin_edges))
 
@@ -195,7 +201,7 @@ def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
                                np.array(hist_rzt[0], dtype=np.uint8)))
 
 
-def compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_4d_hists):
+def compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_4d_hists, do4d):
     """
     Computes 4D numpy histogram 'images' from the 4D data.
     :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyzt) data for a certain eventID. [positions_xyz, time, triggered]
@@ -204,13 +210,26 @@ def compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     :param ndarray(ndim=1) z_bin_edges: bin edges for the Z-direction.
     :param tuple n_bins: Declares the number of bins that should be used for each dimension (x,y,z,t).
     :param list all_4d_to_4d_hists: contains all 4D histogram projections.
+    :param (bool, str) do4d: Tuple, where [1] declares what should be used as 4th dimension after xyz.
+                             Currently, only 'time' and 'channel_id' are available.
     :return: appends the 4D histogram to the all_4d_to_4d_hists list. [xyzt]
     """
-    #t_start, t_end = get_time_parameters(event_hits, t_start_margin=0.15, t_end_margin=0.15)
-    t_start, t_end = get_time_parameters(event_hits, mode = 'trigger_cluster')
+    t_start, t_end = get_time_parameters(event_hits, mode=('trigger_cluster', 'all'))
 
-    hist_xyzt = np.histogramdd(event_hits[:, 0:4], bins=(x_bin_edges, y_bin_edges, z_bin_edges, n_bins[3]),
-                               range=((min(x_bin_edges),max(x_bin_edges)),(min(y_bin_edges),max(y_bin_edges)),
-                                      (min(z_bin_edges),max(z_bin_edges)),(t_start, t_end)))
+    if do4d[1] == 'time':
+        hist_4d = np.histogramdd(event_hits[:, 0:4], bins=(x_bin_edges, y_bin_edges, z_bin_edges, n_bins[3]),
+                                   range=((min(x_bin_edges),max(x_bin_edges)),(min(y_bin_edges),max(y_bin_edges)),
+                                          (min(z_bin_edges),max(z_bin_edges)),(t_start, t_end)))
 
-    all_4d_to_4d_hists.append(np.array(hist_xyzt[0], dtype=np.uint8))
+    elif do4d[1] == 'channel_id':
+        time = event_hits[:, 3]
+        event_hits = event_hits[np.logical_and(time >= t_start, time <= t_end)]
+        channel_id = event_hits[:, 4:5]
+        hist_4d = np.histogramdd(np.concatenate([event_hits[:, 0:3], channel_id], axis=1), bins=(x_bin_edges, y_bin_edges, z_bin_edges, 31),
+                                   range=((min(x_bin_edges),max(x_bin_edges)),(min(y_bin_edges),max(y_bin_edges)),
+                                          (min(z_bin_edges),max(z_bin_edges)),(np.amin(channel_id), np.amax(channel_id))))
+
+    else:
+        raise ValueError('The parameter in do4d[1] ' + str(do4d[1]) + ' is not available. Currently, only time and channel_id are supported.')
+
+    all_4d_to_4d_hists.append(np.array(hist_4d[0], dtype=np.uint8))

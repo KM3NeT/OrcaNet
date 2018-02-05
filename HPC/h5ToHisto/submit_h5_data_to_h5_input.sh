@@ -10,7 +10,7 @@
 # The files should be converted in batches of files_per_job=60 files per job
 
 # load env
-source activate /home/hpc/capn/mppi033h/.virtualenv/h5_to_histo_env/
+source activate /home/hpc/capn/mppi033h/.virtualenv/env_km3pipe_tb/
 
 n=${PBS_ARRAYID}
 i=$((1+((${n}-1) * 4)))
@@ -24,7 +24,6 @@ ParticleType=elec-CC #elec-CC
 #FileName=JTE.KM3Sim.gseagen.${ParticleType}.3-100GeV-9.1E7-1bin-3.0gspec.ORCA115_9m_2016 #muon-CC
 #FileName=JTE.KM3Sim.gseagen.${ParticleType}.3-100GeV-3.4E6-1bin-3.0gspec.ORCA115_9m_2016 #elec-NC
 FileName=JTE.KM3Sim.gseagen.${ParticleType}.3-100GeV-1.1E6-1bin-3.0gspec.ORCA115_9m_2016 #elec-CC
-#HDFFOLDER=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/raw_data/h5/calibrated/${ParticleType}/3-100GeV
 
 #with run_id
 HDFFOLDER=/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/raw_data/h5/calibrated/with_run_id/without_mc_time_fix/${ParticleType}/3-100GeV

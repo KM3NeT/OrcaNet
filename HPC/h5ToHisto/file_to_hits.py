@@ -22,7 +22,7 @@ def get_primary_track_index(event_blob):
     return primary_index
 
 
-def get_event_data(event_blob, geo, do_mc_hits, use_calibrated_file, data_cuts):
+def get_event_data(event_blob, geo, do_mc_hits, use_calibrated_file, data_cuts, do4d):
     """
     Reads a km3pipe blob which contains the information for one event.
     Returns a hit array and a track array that contains all relevant information of the event.
@@ -34,7 +34,9 @@ def get_event_data(event_blob, geo, do_mc_hits, use_calibrated_file, data_cuts):
     :param bool use_calibrated_file: specifies if a calibrated file is used as an input for the event_blob.
                                      If False, the hits of the event_blob are calibrated based on the geo parameter.
     :param dict data_cuts: specifies if cuts should be applied. Contains the keys 'triggered' and 'energy_lower_limit'.
-    :return: ndarray(ndim=2) hits_xyz: 2D array containing the hit information of the event [pos_xyz time].
+    :param (bool, str) do4d: Tuple that declares if 4D histograms should be created [0] and if yes, what should be used as the 4th dim after xyz.
+                             In the case of 'channel_id', this information needs to be included in the event_hits as well.
+    :return: ndarray(ndim=2) event_hits: 2D array containing the hit information of the event [pos_xyz time (channel_id)].
     :return: ndarray(ndim=1) event_track: 1D array containing important MC information of the event.
                                           [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z, time]
     """
@@ -71,12 +73,14 @@ def get_event_data(event_blob, geo, do_mc_hits, use_calibrated_file, data_cuts):
     pos_y = hits.pos_y.astype('float32')
     pos_z = hits.pos_z.astype('float32')
     time = hits.time.astype('float32')
-    triggered = hits.triggered.astype('float32')
 
     ax = np.newaxis
-    event_hits = np.concatenate([pos_x[:, ax], pos_y[:, ax], pos_z[:, ax], time[:, ax], triggered[:, ax]], axis=1)
+    event_hits = np.concatenate([pos_x[:, ax], pos_y[:, ax], pos_z[:, ax], time[:, ax]], axis=1)
 
-    # event_hits: 2D hits array for one event, event_track: 1D track array containing event information
+    if do4d[0] is True and do4d[1] == 'channel_id':
+        channel_id = hits.channel_id.astype('float32')
+        event_hits = np.concatenate([event_hits, channel_id[:, ax]], axis=1)
+
     return event_hits, event_track
 
 

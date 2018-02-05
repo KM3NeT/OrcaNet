@@ -91,12 +91,19 @@ def calculate_bin_edges(n_bins, fname_geo_limits):
     y_bin_edges = np.linspace(geo_limits[0][2] - 9.75, geo_limits[1][2] + 9.75, num=n_bins[1] + 1) # Delta y = 19.483
     z_bin_edges = np.linspace(geo_limits[0][3] - 4.665, geo_limits[1][3] + 4.665, num=n_bins[2] + 1) # Delta z = 9.329
 
+    # Gefittete offsets: x,y,factor: factor*(x+x_off)
+    # [6.19, 0.064, 1.0128]
+    # # Stefan's modifications
+    offset_x, offset_y, scale = [6.19, 0.064, 1.0128]
+    x_bin_edges = (x_bin_edges + offset_x )*scale
+    y_bin_edges = (y_bin_edges + offset_y )*scale
+
     #calculate_bin_edges_test(geo, y_bin_edges, z_bin_edges) # test disabled by default. Activate it, if you change the offsets in x/y/z-bin-edges
 
     return x_bin_edges, y_bin_edges, z_bin_edges
 
 
-def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_hits=False, use_calibrated_file=False, data_cuts=None):
+def main(n_bins, do2d=False, do2d_pdf=(False, 10), do3d=False, do4d=(True, 'time'), do_mc_hits=False, use_calibrated_file=False, data_cuts=None):
     """
     Main code. Reads raw .hdf5 files and creates 2D/3D histogram projections that can be used for a CNN
     :param tuple(int) n_bins: Declares the number of bins that should be used for each dimension (x,y,z,t).
@@ -104,7 +111,8 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_h
     :param (bool, int) do2d_pdf: Declares if pdf visualizations of the 2D histograms should be created. Cannot be called if do2d=False.
                                  The event loop will be stopped after the integer specified in the second argument.
     :param bool do3d: Declares if 3D histograms should be created.
-    :param bool do4d: Declares if 4D histograms should be created.
+    :param (bool, str) do4d: Tuple that declares if 4D histograms should be created [0] and if yes, what should be used as the 4th dim after xyz.
+                             Currently, only 'time' and 'channel_id' are available.
     :param bool do_mc_hits: Declares if hits (False, mc_hits + BG) or mc_hits (True) should be processed
     :param bool use_calibrated_file: Declares if the input file is already calibrated (pos_x/y/z, time) or not.
     :param dict data_cuts: Dictionary that contains information about any possible cuts that should be applied.
@@ -141,10 +149,9 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_h
             print 'Event No. ' + str(i)
 
         # filter out all hit and track information belonging that to this event
-        event_hits, event_track = get_event_data(event_blob, geo, do_mc_hits, use_calibrated_file, data_cuts)
+        event_hits, event_track = get_event_data(event_blob, geo, do_mc_hits, use_calibrated_file, data_cuts, do4d)
 
         if event_track[2] < data_cuts['energy_lower_limit']: # Cutting events with energy < threshold (default=0)
-            #print 'Cut an event with an energy of ' + str(event_track[2]) + ' GeV'
             continue
 
         # event_track: [event_id, particle_type, energy, isCC, bjorkeny, dir_x/y/z, time]
@@ -156,8 +163,8 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_h
         if do3d:
             compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_3d_hists)
 
-        if do4d:
-            compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_4d_hists)
+        if do4d[0]:
+            compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_4d_hists, do4d)
 
         if do2d_pdf[0] is True and i >= do2d_pdf[1]:
             glob.pdf_2d_plots.close()
@@ -178,12 +185,14 @@ def main(n_bins, do2d=True, do2d_pdf=(False, 10), do3d=True, do4d=False, do_mc_h
         store_histograms_as_hdf5(np.stack([hist_tuple[3] for hist_tuple in all_4d_to_3d_hists]), np.array(mc_infos), 'Results/4dTo3d/h5/yzt/' + filename_output + '_yzt.h5', compression=('gzip', 1))
         store_histograms_as_hdf5(np.stack([hist_tuple[4] for hist_tuple in all_4d_to_3d_hists]), np.array(mc_infos), 'Results/4dTo3d/h5/rzt/' + filename_output + '_rzt.h5', compression=('gzip', 1))
 
-    if do4d:
+    if do4d[0]:
         store_histograms_as_hdf5(np.array(all_4d_to_4d_hists), np.array(mc_infos), 'Results/4dTo4d/h5/xyzt/' + filename_output + '_xyzt.h5', compression=('gzip', 1))
 
 
 if __name__ == '__main__':
-    main(n_bins=(11,13,18,60), do2d=False, do2d_pdf=(False, 100), do3d=True, do4d=True,
+    # main(n_bins=(11,13,18,50), do2d=False, do2d_pdf=(False, 100), do3d=False, do4d=(True, 'time'),
+    #      do_mc_hits=False, use_calibrated_file=True, data_cuts = {'triggered': False, 'energy_lower_limit': 0})
+    main(n_bins=(11,13,18,31), do2d=False, do2d_pdf=(False, 100), do3d=False, do4d=(True, 'channel_id'),
          do_mc_hits=False, use_calibrated_file=True, data_cuts = {'triggered': False, 'energy_lower_limit': 0})
 
 
