@@ -149,7 +149,7 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
         save_train_and_test_statistics_to_txt(model, history_train, history_test, modelname, lr, lr_decay, epoch[0],
                                           file_no, f, test_files, batchsize, n_bins, class_type, swap_4d_channels)
         plot_train_and_test_statistics(modelname)
-        plot_weights_and_activations(model, test_files[0][0], n_bins, class_type, xs_mean, swap_4d_channels, modelname, epoch[0], file_no)
+        plot_weights_and_activations(test_files[0][0], n_bins, class_type, xs_mean, swap_4d_channels, modelname, epoch[0], file_no)
 
 
 def fit_model(model, modelname, f, f_size, file_no, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
