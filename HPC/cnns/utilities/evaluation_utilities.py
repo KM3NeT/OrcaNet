@@ -19,7 +19,7 @@ def make_performance_array_energy_correct(model, f, n_bins, class_type, batchsiz
     Creates an energy_correct array based on test_data that specifies for every event, if the model's prediction is True/False.
     :param ks.model.Model/Sequential model: Fully trained Keras model of a neural network.
     :param str f: Filepath of the file that is used for making predctions.
-    :param tuple n_bins: The number of bins for each dimension (x,y,z,t) in the testfile.
+    :param list(tuple) n_bins: The number of bins for each dimension (x,y,z,t) in the testfile. Can contain multiple n_bins tuples.
     :param (int, str) class_type: The number of output classes and a string identifier to specify the exact output classes.
                                   I.e. (2, 'muon-CC_to_elec-CC')
     :param int batchsize: Batchsize that should be used for predicting.

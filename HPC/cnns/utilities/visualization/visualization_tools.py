@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Visualization tools for activations in Keras.
+"""
+Visualization tools used with Keras.
+1) Makes performance graphs for training and testing.
+2) Visualizes activations for Keras models
 """
 
 import numpy as np
@@ -75,7 +78,7 @@ def get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels
     """
     Get the weights of a model and also the activations of the model for a single event.
     :param str f: path to a .h5 file that contains images of events. Needed for plotting the activations for the event.
-    :param tuple n_bins: the number of bins for each dimension (x,y,z,t) in the supplied file.
+    :param list(tuple) n_bins: the number of bins for each dimension (x,y,z,t) in the supplied file. Can contain multiple n_bins tuples.
     :param (int, str) class_type: the number of output classes and a string identifier to specify the exact output classes.
     :param ndarray xs_mean: mean_image of the x (train-) dataset used for zero-centering the data.
     :param None/int swap_4d_channels: for 3.5D, param for the gen to specify, if the default channel (t) should be swapped with another dim.
@@ -127,7 +130,7 @@ def plot_weights_and_activations(f, n_bins, class_type, xs_mean, swap_4d_channel
     """
     Plots the weights of a model and the activations for one event to a .pdf file.
     :param str f: path to a .h5 file that contains images of events. Needed for plotting the activations for the event.
-    :param tuple n_bins: the number of bins for each dimension (x,y,z,t) in the supplied file.
+    :param list(tuple) n_bins: the number of bins for each dimension (x,y,z,t) in the supplied file. Can contain multiple n_bins tuples.
     :param (int, str) class_type: the number of output classes and a string identifier to specify the exact output classes.
     :param ndarray xs_mean: mean_image of the x (train-) dataset used for zero-centering the data.
     :param None/int swap_4d_channels: for 3.5D, param for the gen to specify, if the default channel (t) should be swapped with another dim.

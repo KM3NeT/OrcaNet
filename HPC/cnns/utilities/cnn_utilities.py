@@ -13,13 +13,94 @@ import keras as ks
 
 def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, f_size=None, zero_center_image=None, yield_mc_info=False, swap_col=None):
     """
+    Wrapper for a generator that creates batches of cnn input images ('xs') and labels ('ys').
+    The wrapper is used for separating two possible cases:
+    1) The data for the generator is contained in a single h5 file (gen_batches_from_single_file).
+    2) The data for the generator is contained in multiple h5 files (gen_batches_from_multiple_files).
+    """
+    if len(filepath) > 1:
+        return gen_batches_from_multiple_files(filepath, batchsize, n_bins, class_type, f_size=f_size, zero_center_image=zero_center_image, yield_mc_info=yield_mc_info, swap_col=swap_col)
+
+    else:
+        return gen_batches_from_single_file(filepath[0], batchsize, n_bins[0], class_type, f_size=f_size, zero_center_image=zero_center_image, yield_mc_info=yield_mc_info, swap_col=swap_col)
+
+
+def gen_batches_from_multiple_files(filepath, batchsize, n_bins, class_type, f_size=None, zero_center_image=None, yield_mc_info=False, swap_col=None):
+    """
+    Generator that returns batches of (multiple-) images ('xs') and labels ('ys') from multiple h5 files.
+    :param list filepath: List that contains full filepath of the input h5 files, e.g. '/path/to/file/file.h5'.
+    :param int batchsize: Size of the batches that should be generated. Ideally same as the chunksize in the h5 file.
+    :param tuple n_bins: Number of bins for each dimension (x,y,z,t) in the h5 file.
+    :param (int, str) class_type: Tuple with the umber of output classes and a string identifier to specify the exact output classes.
+                                  I.e. (2, 'muon-CC_to_elec-CC')
+    :param int/None f_size: Specifies the filesize (#images) of the .h5 file if not the whole .h5 file
+                       but a fraction of it (e.g. 10%) should be used for yielding the xs/ys arrays.
+                       This is important if you run fit_generator(epochs>1) with a filesize (and hence # of steps) that is smaller than the .h5 file.
+    :param ndarray zero_center_image: mean_image of the x dataset used for zero-centering.
+    :param bool yield_mc_info: Specifies if mc-infos (y_values) should be yielded as well.
+                               The mc-infos are used for evaluation after training and testing is finished.
+    :param bool/str swap_col: Specifies, if the index of the columns for xs should be swapped. Necessary for 3.5D nets.
+                          Currently available: 'yzt-x' -> [3,1,2,0] from [0,1,2,3]
+    :return: tuple output: Yields a tuple which contains a full batch of images and labels (+ mc_info if yield_mc_info=True).
+    """
+    dimensions_1 = get_dimensions_encoding(n_bins[0], batchsize) # TODO only available with double input for now, not expanded to n-inputs
+    dimensions_2 = get_dimensions_encoding(n_bins[1], batchsize)
+    swap_4d_channels_dict = {'yzt-x_all-t_and_yzt-x_tight-1-t': (0, 2, 3, 4, 1)}
+
+    while 1:
+        f_1 = h5py.File(filepath[0], "r")
+        f_2 = h5py.File(filepath[1], "r")
+        if f_size is None:
+            f_size = len(f_1['y'])
+            warnings.warn('f_size=None could produce unexpected results if the f_size used in fit_generator(steps=int(f_size / batchsize)) with epochs > 1 '
+                          'is not equal to the f_size of the true .h5 file. Should be ok if you use the tb_callback.')
+
+        n_entries = 0
+        while n_entries <= (f_size - batchsize):
+            # create numpy arrays of input data (features)
+            xs_1 = f_1['x'][n_entries : n_entries + batchsize]
+            xs_2 = f_2['x'][n_entries: n_entries + batchsize]
+            xs_1 = np.reshape(xs_1, dimensions_1).astype(np.float32)
+            xs_2 = np.reshape(xs_2, dimensions_2).astype(np.float32)
+
+            if zero_center_image is not None:
+                xs_1 = np.subtract(xs_1, zero_center_image[0])
+                xs_2 = np.subtract(xs_2, zero_center_image[1])
+
+            if swap_col is not None:
+                if swap_col == 'yzt-x_all-t_and_yzt-x_tight-1-t':
+                    xs_1 = np.transpose(xs_1, swap_4d_channels_dict[swap_col])
+                    xs_2 = np.transpose(xs_2, swap_4d_channels_dict[swap_col])
+
+                else: raise ValueError('The argument "swap_col"=' + str(swap_col) + ' is not valid.')
+
+            # and mc info (labels). Since the labels are same (!!) for all the multiple files, use first file for this
+            y_values = f_1['y'][n_entries:n_entries+batchsize]
+            y_values = np.reshape(y_values, (batchsize, y_values.shape[1])) #TODO simplify with (y_values, y_values.shape) ?
+            ys = np.zeros((batchsize, class_type[0]), dtype=np.float32)
+            # encode the labels such that they are all within the same range (and filter the ones we don't want for now)
+            for c, y_val in enumerate(y_values): # Could be vectorized with numba, or use dataflow from tensorpack
+                ys[c] = encode_targets(y_val, class_type)
+
+            # we have read one more batch from this file
+            n_entries += batchsize
+
+            output = ([xs_1, xs_2], ys) if yield_mc_info is False else ([xs_1, xs_2], ys) + (y_values,)
+            yield output
+
+        f_1.close()
+        f_2.close()
+
+
+def gen_batches_from_single_file(filepath, batchsize, n_bins, class_type, f_size=None, zero_center_image=None, yield_mc_info=False, swap_col=None):
+    """
     Generator that returns batches of images ('xs') and labels ('ys') from a h5 file.
     :param string filepath: Full filepath of the input h5 file, e.g. '/path/to/file/file.h5'.
     :param int batchsize: Size of the batches that should be generated. Ideally same as the chunksize in the h5 file.
     :param tuple n_bins: Number of bins for each dimension (x,y,z,t) in the h5 file.
     :param (int, str) class_type: Tuple with the umber of output classes and a string identifier to specify the exact output classes.
                                   I.e. (2, 'muon-CC_to_elec-CC')
-    :param int f_size: Specifies the filesize (#images) of the .h5 file if not the whole .h5 file
+    :param int/None f_size: Specifies the filesize (#images) of the .h5 file if not the whole .h5 file
                        but a fraction of it (e.g. 10%) should be used for yielding the xs/ys arrays.
                        This is important if you run fit_generator(epochs>1) with a filesize (and hence # of steps) that is smaller than the .h5 file.
     :param ndarray zero_center_image: mean_image of the x dataset used for zero-centering.
@@ -45,7 +126,7 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, f_s
             xs = f['x'][n_entries : n_entries + batchsize]
             xs = np.reshape(xs, dimensions).astype(np.float32)
 
-            if zero_center_image is not None: xs = np.subtract(xs, zero_center_image)  # if swap_col is not None, zero_center_image is already swapped // CHANGED!! not anymore
+            if zero_center_image is not None: xs = np.subtract(xs, zero_center_image[0])  # if swap_col is not None, zero_center_image is already swapped // CHANGED!! not anymore
 
             if swap_col is not None:
                 if swap_col == 'yzt-x':
@@ -250,9 +331,9 @@ def load_zero_center_data(train_files, batchsize, n_bins, n_gpu):
     Gets the xs_mean array that can be used for zero-centering.
     The array is either loaded from a previously saved file or it is calculated on the fly.
     Currently only works for a single input training file!
-    :param list((train_filepath, train_filesize)) train_files: list of tuples that contains the trainfiles and their number of rows.
+    :param list(([train_filepath], train_filesize)) train_files: list of tuples that contains the list of trainfiles and their number of rows.
     :param int batchsize: Batchsize that is being used in the data.
-    :param tuple n_bins: Number of bins for each dimension (x,y,z,t) in the tran_file.
+    :param list(tuple) n_bins: Number of bins for each dimension (x,y,z,t) in the tran_file. Can contain multiple n_bins tuples.
     :param int n_gpu: Number of gpu's, used for calculating the available RAM space in get_mean_image().
     :return: ndarray xs_mean: mean_image of the x dataset. Can be used for zero-centering later on.
     """
@@ -260,19 +341,22 @@ def load_zero_center_data(train_files, batchsize, n_bins, n_gpu):
         warnings.warn('More than 1 train file for zero-centering is currently not supported! '
                       'Only the first file is used for calculating the xs_mean_array.')
 
-    filepath = train_files[0][0]
+    xs_mean = []
+    for i, filepath in enumerate(train_files[0][0]):
 
-    # if the file has a shuffle index (e.g. shuffled_6.h5) and a .npy exists for the first shuffled file (shuffled.h5), we don't want to calculate the mean again
-    shuffle_index = re.search('shuffled(.*).h5', filepath)
-    filepath_without_index = re.sub(shuffle_index.group(1), '', filepath)
+        # if the file has a shuffle index (e.g. shuffled_6.h5) and a .npy exists for the first shuffled file (shuffled.h5), we don't want to calculate the mean again
+        shuffle_index = re.search('shuffled(.*).h5', filepath)
+        filepath_without_index = re.sub(shuffle_index.group(1), '', filepath)
 
-    if os.path.isfile(filepath_without_index + '_zero_center_mean.npy') is True:
-        print 'Loading an existing xs_mean_array in order to zero_center the data!'
-        xs_mean = np.load(filepath_without_index + '_zero_center_mean.npy')
-    else:
-        print 'Calculating the xs_mean_array in order to zero_center the data!'
-        dimensions = get_dimensions_encoding(n_bins, batchsize)
-        xs_mean = get_mean_image(filepath, filepath_without_index, dimensions, n_gpu)
+        if os.path.isfile(filepath_without_index + '_zero_center_mean.npy') is True:
+            print 'Loading an existing xs_mean_array in order to zero_center the data!'
+            xs_mean_temp = np.load(filepath_without_index + '_zero_center_mean.npy')
+        else:
+            print 'Calculating the xs_mean_array in order to zero_center the data!'
+            dimensions = get_dimensions_encoding(n_bins[i], batchsize)
+            xs_mean_temp = get_mean_image(filepath, filepath_without_index, dimensions, n_gpu)
+
+        xs_mean.append(xs_mean_temp)
 
     return xs_mean
 
@@ -343,7 +427,7 @@ def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident=''):
     Derives the name of a model based on its number of bins and the class_type tuple.
     The final modelname is defined as 'model_Nd_proj_class_type[1]'.
     E.g. 'model_3d_xyz_muon-CC_to_elec-CC'.
-    :param tuple n_bins: Number of bins for each dimension (x,y,z,t) of the training images.
+    :param list(tuple) n_bins: Number of bins for each dimension (x,y,z,t) of the training images. Can contain multiple n_bins tuples.
     :param (int, str) class_type: Tuple that declares the number of output classes and a string identifier to specify the exact output classes.
                                   I.e. (2, 'muon-CC_to_elec-CC')
     :param str nn_arch: String that declares which neural network model architecture is used.
@@ -353,20 +437,27 @@ def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident=''):
     """
     modelname = 'model_' + nn_arch + '_'
 
-    dim = 4- n_bins.count(1)
     projection = ''
+    for i, bins in enumerate(n_bins):
 
-    if n_bins.count(1) == 0: # for 4D input
-        projection += 'xyz-t' if swap_4d_channels is None else swap_4d_channels
+        dim = 4- bins.count(1)
+        if i > 0: projection += '_and_'
+        projection += str(dim) + 'd_'
 
-    else: # 2D/3D input
-        if n_bins[0] > 1: projection += 'x'
-        if n_bins[1] > 1: projection += 'y'
-        if n_bins[2] > 1: projection += 'z'
-        if n_bins[3] > 1: projection += 't'
+        if bins.count(1) == 0: # for 4D input
+            if swap_4d_channels is not None:
+                projection += swap_4d_channels
+            else:
+                projection += 'xyz-c' if bins[3] == 31 else 'xyz-t'
+
+        else: # 2D/3D input
+            if bins[0] > 1: projection += 'x'
+            if bins[1] > 1: projection += 'y'
+            if bins[2] > 1: projection += 'z'
+            if bins[3] > 1: projection += 't'
 
     str_ident = '_' + str_ident if str_ident is not '' else str_ident
-    modelname += str(dim) + 'd_' + projection + '_' + class_type[1] + str_ident
+    modelname += projection + '_' + class_type[1] + str_ident
 
     return modelname
 

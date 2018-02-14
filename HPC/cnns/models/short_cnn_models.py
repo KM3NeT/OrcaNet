@@ -16,7 +16,7 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels):
     """
     Returns the general dimension (2D/3D), the input dimensions (i.e. bs x 11 x 13 x 18 x channels=1 for 3D)
     and appropriate max_pool_sizes depending on the projection type.
-    :param tuple n_bins: Number of bins (x,y,z,t) of the data.
+    :param list(tuple) n_bins: Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
     :param int batchsize: Batchsize of the fed data.
     :param None/str swap_4d_channels: For 3.5D nets, specifies if the default channel (t) should be swapped with another dim.
     :return: int dim: Dimension of the network (2D/3D).
@@ -25,31 +25,19 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels):
                                   Key: After which convolutional layer a pooling layer be inserted (counts from layer zero!)
                                   Item: Specifies the strides.
     """
-    input_dim = get_dimensions_encoding(n_bins, batchsize) # includes batchsize
+    dim = 4 - n_bins.count(1)
 
-    if n_bins.count(1) == 2: # 2d case
-        dim = 2
-
-        if n_bins[0] == 1 and n_bins[3] == 1:
-            print 'Using a VGG-like 2D CNN with YZ projection'
-            max_pool_sizes = {3: (2,2), 7: (2,2)}
-
-        else:
-            raise IndexError('No suitable 2D projection found in decode_input_dimensions().'
-                             'Please add the projection type with the pooling dict to the function.')
-
-    elif n_bins.count(1) == 1: # 3d case
-        dim = 3
-
-        if n_bins[1] == 1:
+    if n_bins[0].count(1) == 1: # 3d case
+        input_dim = get_dimensions_encoding(n_bins[0], batchsize)  # includes batchsize
+        if n_bins[0][1] == 1:
             print 'Using a VGG-like 3D CNN with XZT projection'
             max_pool_sizes = {1: (1,1,2), 3: (2,2,2), 7: (2,2,2)}
 
-        elif n_bins[3] == 1:
+        elif n_bins[0][3] == 1:
             print 'Using a VGG-like 3D CNN with XYZ projection'
             max_pool_sizes = {3: (2, 2, 2), 7: (2, 2, 2)}
 
-        elif n_bins[0] == 1:
+        elif n_bins[0][0] == 1:
             print 'Using a VGG-like 3D CNN with YZT projection'
             max_pool_sizes = {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}
 
@@ -57,37 +45,55 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels):
             raise IndexError('No suitable 3D projection found in decode_input_dimensions().'
                              'Please add the projection type with the pooling dict to the function.')
 
-    elif n_bins.count(1) == 0:
-        dim = 3
+    elif n_bins[0].count(1) == 0: # 4d case
 
-        if swap_4d_channels is None:
-            print 'Using a VGG-like 3.5D CNN with XYZ data and T channel information.'
-            max_pool_sizes = {3: (2, 2, 2), 7: (2, 2, 2)}
+        if len(n_bins) > 1:
+            if swap_4d_channels == 'yzt-x_all-t_and_yzt-x_tight-1-t':
+                max_pool_sizes = {'net_1': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)},
+                                  'net_2': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}}
+                input_dim = get_dimensions_encoding(n_bins[0], batchsize)  # includes batchsize
+                input_dim = [(input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1]), # yzt-x all
+                             (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1])] # yzt-x tight-1
 
-        elif swap_4d_channels == 'yzt-x':
-            print 'Using a VGG-like 3.5D CNN with YZT data and X channel information.'
-            max_pool_sizes = {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}
-            input_dim = (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1]) # [bs,y,z,t,x]
-
-        elif swap_4d_channels == 'xyz-t_and_yzt-x':
-            max_pool_sizes = {'net_1': {3: (2, 2, 2), 7: (2, 2, 2)},
-                              'net_2': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}}
-            input_dim = [(input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]), # xyz-t
-                         (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1])] # yzt-x
-
-        elif swap_4d_channels == 'xyz-t_and_tyz-x':
-            max_pool_sizes = {'net_1': {3: (2, 2, 2), 7: (2, 2, 2)},
-                              'net_2': {1: (2, 1, 1), 3: (2, 2, 2), 7: (6, 2, 2)}}
-            input_dim = [(input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]), # xyz-t
-                         (input_dim[0], input_dim[4], input_dim[2], input_dim[3], input_dim[1])] # tyz-x
-
-        elif swap_4d_channels == 'conv_lstm': # TODO fix whole function to make it more general and not only 3.5D stuff
-            max_pool_sizes = {1: (2, 2, 2), 5: (2, 2, 2)}
-            input_dim = (input_dim[0], input_dim[4], input_dim[1], input_dim[2], input_dim[3], 1) # t-xyz
+            else:
+                raise IOError('3.5D projection types with len(n_bins) > 1 other than "yzt-x_all-t_and_yzt-x_tight-1-t" are not yet supported.')
 
         else:
-            raise IOError('3.5D projection types other than XYZ-T and YZT-X are not yet supported.'
-                          'Please add the max_pool_sizes dict in the function by yourself.')
+            input_dim = get_dimensions_encoding(n_bins[0], batchsize)  # includes batchsize
+            if swap_4d_channels is None:
+                print 'Using a VGG-like 3.5D CNN with XYZ data and T/C channel information.'
+                max_pool_sizes = {3: (2, 2, 2), 7: (2, 2, 2)}
+
+            elif swap_4d_channels == 'yzt-x':
+                print 'Using a VGG-like 3.5D CNN with YZT data and X channel information.'
+                max_pool_sizes = {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}
+                input_dim = (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1]) # [bs,y,z,t,x]
+
+            elif swap_4d_channels == 'xyz-t_and_yzt-x':
+                max_pool_sizes = {'net_1': {3: (2, 2, 2), 7: (2, 2, 2)},
+                                  'net_2': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}}
+                input_dim = [(input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]), # xyz-t
+                             (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1])] # yzt-x
+
+            elif swap_4d_channels == 'xyz-t_and_tyz-x':
+                max_pool_sizes = {'net_1': {3: (2, 2, 2), 7: (2, 2, 2)},
+                                  'net_2': {1: (2, 1, 1), 3: (2, 2, 2), 7: (6, 2, 2)}}
+                input_dim = [(input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]), # xyz-t
+                             (input_dim[0], input_dim[4], input_dim[2], input_dim[3], input_dim[1])] # tyz-x
+
+            elif swap_4d_channels == 'yzt-x_all-t_and_yzt-x_tight-1-t':
+                max_pool_sizes = {'net_1': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)},
+                                  'net_2': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}}
+                input_dim = [(input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1]), # xyz-t
+                             (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1])] # yzt-x
+
+            elif swap_4d_channels == 'conv_lstm': # TODO fix whole function to make it more general and not only 3.5D stuff
+                max_pool_sizes = {1: (2, 2, 2), 5: (2, 2, 2)}
+                input_dim = (input_dim[0], input_dim[4], input_dim[1], input_dim[2], input_dim[3], 1) # t-xyz
+
+            else:
+                raise IOError('3.5D projection types other than XYZ-T and YZT-X are not yet supported.'
+                              'Please add the max_pool_sizes dict in the function by yourself.')
 
     else:
         raise IOError('Data types other than 2D, 3D or 4D (3.5D actually) are not yet supported. '
@@ -97,12 +103,12 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels):
 
 
 def create_vgg_like_model(n_bins, batchsize, nb_classes=2, n_filters=None, dropout=0, k_size=3, swap_4d_channels=None,
-                          activation='relu', kernel_reg = None):
+                          activation='relu', kernel_reg=None):
     """
     Returns a VGG-like model (stacked conv. layers) with MaxPooling and Dropout if wished.
     The number of convolutional layers can be controlled with the n_filters parameter:
     n_conv_layers = len(n_filters)
-    :param tuple n_bins: Number of bins (x,y,z,t) of the data.
+    :param list(tuple) n_bins: Number of bins (x,y,z,t) of the data. Should only contain one element for this single input net.
     :param int nb_classes: Number of output classes.
     :param int batchsize: Batchsize of the data that will be used with the VGG net.
     :param tuple n_filters: Number of filters for each conv. layer. len(n_filters)=n_conv_layer.
@@ -126,9 +132,11 @@ def create_vgg_like_model(n_bins, batchsize, nb_classes=2, n_filters=None, dropo
 
     x = Flatten()(x)
     x = Dense(256, kernel_initializer='he_normal', kernel_regularizer=kernel_reg)(x)
+    #x = BatchNormalization(axis=-1)(x) # TODO
     x = Activation(activation)(x)
     if dropout > 0.0: x = Dropout(dropout)(x)
     x = Dense(16, kernel_initializer='he_normal', kernel_regularizer=kernel_reg)(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+    #x = BatchNormalization(axis=-1)(x)  # TODO
     x = Activation(activation)(x)
 
     x = Dense(nb_classes, activation='softmax', kernel_initializer='he_normal')(x)
@@ -175,7 +183,7 @@ def create_vgg_like_model_double_input(n_bins, batchsize, nb_classes=2, n_filter
     The two single VGG networks are concatenated after the last flatten layers.
     The number of convolutional layers can be controlled with the n_filters parameter:
     n_conv_layers = len(n_filters)
-    :param tuple n_bins: Number of bins (x,y,z,t) of the data.
+    :param list(tuple) n_bins: Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
     :param int nb_classes: Number of output classes.
     :param int batchsize: Batchsize of the data that will be used with the VGG net.
     :param tuple n_filters: Number of filters for each conv. layer. len(n_filters)=n_conv_layer.
@@ -185,7 +193,7 @@ def create_vgg_like_model_double_input(n_bins, batchsize, nb_classes=2, n_filter
     :param str activation: Type of activation function that should be used. E.g. 'linear', 'relu', 'elu', 'selu'.
     :return: Model model: Keras VGG-like model.
     """
-    if n_filters is None: n_filters = (64,64,64,64,64,128,128,128) #TODO change n_filters maybe
+    if n_filters is None: n_filters = (64,64,64,64,64,128,128,128)
 
     dim, input_dim, max_pool_sizes = decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels)
 
@@ -226,7 +234,7 @@ def create_vgg_like_model_double_input_from_single_nns(n_bins, batchsize, nb_cla
     """
     Returns a double input, VGG-like model (stacked conv. layers) with MaxPooling and Dropout if wished.
     The two single VGG networks are concatenated after the last flatten layers.
-    :param tuple n_bins: Number of bins (x,y,z,t) of the data.
+    :param list(tuple) n_bins: Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
     :param int nb_classes: Number of output classes.
     :param int batchsize: Batchsize of the data that will be used with the VGG net.
     :param (float, float) dropout: Adds dropout if >0.
@@ -236,11 +244,17 @@ def create_vgg_like_model_double_input_from_single_nns(n_bins, batchsize, nb_cla
     """
     dim, input_dim, max_pool_sizes = decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels)
 
-    trained_model_1_path = 'models/trained/backup/VGG-4d-xyz-t-without-run-id-Acc-70-3-dp01-old/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_epoch26.h5'# xyz-t
-    trained_model_2_path = 'models/trained/backup/VGG-4d-yzt-x-without-run-id-Acc-70-9/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_epoch51.h5'# yzt-x
+    if swap_4d_channels == 'yzt-x_all-t_and_yzt-x_tight-1-t':
+        trained_model_1_path = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_only_new_timecut_dp01_epoch_47_file_1.h5'  # yzt-x, timecut_all, old geo
+        trained_model_2_path = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_new_tight_timecut_250_500_dp01_epoch_34_file_1.h5'  # yzt-x, timecut tight-1, old geo
 
-    trained_model_1 = ks.models.load_model(trained_model_1_path)# xyz-t
-    trained_model_2 = ks.models.load_model(trained_model_2_path)# yzt-x
+    else:
+        raise ValueError('The double input combination specified in "swap_4d_channels" is not known, check the function for what is available.')
+    # trained_model_1_path = 'models/trained/backup/VGG-4d-xyz-t-without-run-id-Acc-70-3-dp01-old/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_epoch26.h5'# xyz-t
+    # trained_model_2_path = 'models/trained/backup/VGG-4d-yzt-x-without-run-id-Acc-70-9/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_epoch51.h5'# yzt-x
+
+    trained_model_1 = ks.models.load_model(trained_model_1_path)
+    trained_model_2 = ks.models.load_model(trained_model_2_path)
 
     # model 1
     input_layer_net_1 = Input(shape=input_dim[0][1:], name='input_net_1', dtype=K.floatx()) # have to do that manually
@@ -269,7 +283,7 @@ def create_vgg_like_model_double_input_from_single_nns(n_bins, batchsize, nb_cla
     # concatenate both nets
     x = ks.layers.concatenate([x_1, x_2])
 
-    x = Dense(64, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+    x = Dense(128, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
     x = Dropout(dropout[1])(x)
     x = Dense(16, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
 
@@ -377,7 +391,7 @@ def set_layer_weights(model, trained_model_1, trained_model_2):
 def change_dropout_rate_for_double_input_model(n_bins, batchsize, trained_model, dropout=(0.2, 0.2), trainable=(True, True), swap_4d_channels=None):
     """
     Function that rebuilds a keras model and modifies its dropout rate. Workaround, till layer.rate is fixed to work with Dropout layers.
-    :param tuple n_bins: Number of bins (x,y,z,t) of the data.
+    :param list(tuple) n_bins: Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
     :param int batchsize: Batchsize of the data that will be used with the VGG net.
     :param ks.models.Model trained_model: Trained Keras model, upon which the dropout rate should be changed.
     :param (float, float) dropout: Adds dropout if > 0. First value for the conv block, second value for the dense.
@@ -447,10 +461,10 @@ def set_layer_weights_from_single_trained_model(model, trained_model):
 
 def create_convolutional_lstm(n_bins, batchsize, nb_classes=2, n_filters=None, dropout=0, k_size=3, activation='relu', kernel_reg=None):
     """
-    Returns a VGG-like model (stacked conv. layers) with MaxPooling and Dropout if wished.
+    Returns a VGG-like, convolutional LSTM model (stacked conv. layers + LSTM) with MaxPooling and Dropout if wished.
     The number of convolutional layers can be controlled with the n_filters parameter:
     n_conv_layers = len(n_filters)
-    :param tuple n_bins: Number of bins (x,y,z,t) of the data.
+    :param list(tuple) n_bins: Number of bins (x,y,z,t) of the data.
     :param int nb_classes: Number of output classes.
     :param int batchsize: Batchsize of the data that will be used with the VGG net.
     :param tuple/None n_filters: Number of filters for each conv. layer. len(n_filters)=n_conv_layer.
