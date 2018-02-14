@@ -11,7 +11,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import glob
 
 
-def get_time_parameters(event_hits, mode=('timeslice_relative', None), t_start_margin=0.15, t_end_margin=0.15):
+def get_time_parameters(event_hits, mode=('trigger_cluster', 'all'), t_start_margin=0.15, t_end_margin=0.15):
     """
     Gets the fundamental time parameters in one place for cutting a time residual.
     Later on these parameters cut out a certain time span of events specified by t_start and t_end.
@@ -214,7 +214,7 @@ def compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
                              Currently, only 'time' and 'channel_id' are available.
     :return: appends the 4D histogram to the all_4d_to_4d_hists list. [xyzt]
     """
-    t_start, t_end = get_time_parameters(event_hits, mode=('trigger_cluster', 'all'))
+    t_start, t_end = get_time_parameters(event_hits, mode=('trigger_cluster', 'tight_1'))
 
     if do4d[1] == 'time':
         hist_4d = np.histogramdd(event_hits[:, 0:4], bins=(x_bin_edges, y_bin_edges, z_bin_edges, n_bins[3]),
@@ -224,7 +224,7 @@ def compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     elif do4d[1] == 'channel_id':
         time = event_hits[:, 3]
         event_hits = event_hits[np.logical_and(time >= t_start, time <= t_end)]
-        channel_id = event_hits[:, 4:5]
+        channel_id = event_hits[:, 5:6]
         hist_4d = np.histogramdd(np.concatenate([event_hits[:, 0:3], channel_id], axis=1), bins=(x_bin_edges, y_bin_edges, z_bin_edges, 31),
                                    range=((min(x_bin_edges),max(x_bin_edges)),(min(y_bin_edges),max(y_bin_edges)),
                                           (min(z_bin_edges),max(z_bin_edges)),(np.amin(channel_id), np.amax(channel_id))))

@@ -269,6 +269,8 @@ def submit_concatenate_list_files(savenames, dirpath, p_type, proj_type, chunkin
     """
     if not os.path.exists(dirpath + '/logs/cout'): # check if /logs/cout folder exists, if not create it.
         os.makedirs(dirpath + '/logs/cout')
+    if not os.path.exists(dirpath + '/concatenated/logs'): # check if /concatenated/logs folder exists, if not create it.
+        os.makedirs(dirpath + '/concatenated/logs')
 
     xstr = lambda s: '' if s is None else str(s) # Make str(None) = ''
 

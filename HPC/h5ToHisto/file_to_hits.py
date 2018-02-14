@@ -73,9 +73,10 @@ def get_event_data(event_blob, geo, do_mc_hits, use_calibrated_file, data_cuts, 
     pos_y = hits.pos_y.astype('float32')
     pos_z = hits.pos_z.astype('float32')
     time = hits.time.astype('float32')
+    triggered = hits.triggered.astype('float32')
 
     ax = np.newaxis
-    event_hits = np.concatenate([pos_x[:, ax], pos_y[:, ax], pos_z[:, ax], time[:, ax]], axis=1)
+    event_hits = np.concatenate([pos_x[:, ax], pos_y[:, ax], pos_z[:, ax], time[:, ax], triggered[:, ax]], axis=1)
 
     if do4d[0] is True and do4d[1] == 'channel_id':
         channel_id = hits.channel_id.astype('float32')

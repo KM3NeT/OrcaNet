@@ -186,14 +186,17 @@ def main(n_bins, do2d=False, do2d_pdf=(False, 10), do3d=False, do4d=(True, 'time
         store_histograms_as_hdf5(np.stack([hist_tuple[4] for hist_tuple in all_4d_to_3d_hists]), np.array(mc_infos), 'Results/4dTo3d/h5/rzt/' + filename_output + '_rzt.h5', compression=('gzip', 1))
 
     if do4d[0]:
-        store_histograms_as_hdf5(np.array(all_4d_to_4d_hists), np.array(mc_infos), 'Results/4dTo4d/h5/xyzt/' + filename_output + '_xyzt.h5', compression=('gzip', 1))
+        if do4d[1] == 'channel_id':
+            store_histograms_as_hdf5(np.array(all_4d_to_4d_hists), np.array(mc_infos), 'Results/4dTo4d/h5/xyzt/' + filename_output + '_xyzc.h5', compression=('gzip', 1))
+        else:
+            store_histograms_as_hdf5(np.array(all_4d_to_4d_hists), np.array(mc_infos), 'Results/4dTo4d/h5/xyzt/' + filename_output + '_xyzt.h5', compression=('gzip', 1))
 
 
 if __name__ == '__main__':
-    # main(n_bins=(11,13,18,50), do2d=False, do2d_pdf=(False, 100), do3d=False, do4d=(True, 'time'),
-    #      do_mc_hits=False, use_calibrated_file=True, data_cuts = {'triggered': False, 'energy_lower_limit': 0})
-    main(n_bins=(11,13,18,31), do2d=False, do2d_pdf=(False, 100), do3d=False, do4d=(True, 'channel_id'),
+    main(n_bins=(11,13,18,60), do2d=False, do2d_pdf=(False, 100), do3d=False, do4d=(True, 'time'),
          do_mc_hits=False, use_calibrated_file=True, data_cuts = {'triggered': False, 'energy_lower_limit': 0})
+    # main(n_bins=(11,13,18,31), do2d=False, do2d_pdf=(False, 100), do3d=False, do4d=(True, 'channel_id'),
+    #      do_mc_hits=False, use_calibrated_file=True, data_cuts = {'triggered': False, 'energy_lower_limit': 0})
 
 
 
