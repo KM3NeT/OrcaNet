@@ -31,7 +31,7 @@ def make_performance_array_energy_correct(model, f, n_bins, class_type, batchsiz
     # TODO only works for a single test_file till now
     generator = generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, zero_center_image=xs_mean, yield_mc_info=True, swap_col=swap_4d_channels) # f_size=samples prob not necessary
 
-    if samples is None: samples = len(h5py.File(f, 'r')['y'])
+    if samples is None: samples = len(h5py.File(f[0], 'r')['y']) # TODO fix multi input
     steps = samples/batchsize
 
     arr_energy_correct = None
@@ -112,15 +112,12 @@ def load_pheid_event_selection():
     path = '/home/woody/capn/mppi033h/Code/HPC/cnns/results/plots/pheid_event_selection_txt/' # folder for storing the precut .txts
 
     # Moritz's precuts
-    # particle_type_dict = {'muon-CC': ['muon_cc_3_100_selectedEvents_forMichael_fixed.txt', (14,1)],
-    #                       'elec-CC': ['elec_cc_3_100_selectedEvents_forMichael_fixed.txt', (12,1)]}
-
-    # particle_type_dict = {'muon-CC': ['muon_cc_3_100_selectedEvents_forMichael_01_18.txt', (14,1)],
-    #                       'elec-CC': ['elec_cc_3_100_selectedEvents_forMichael_01_18.txt', (12,1)]}
+    particle_type_dict = {'muon-CC': ['muon_cc_3_100_selectedEvents_forMichael_01_18.txt', (14,1)],
+                          'elec-CC': ['elec_cc_3_100_selectedEvents_forMichael_01_18.txt', (12,1)]}
 
     # # Containment cut
-    particle_type_dict = {'muon-CC': ['muon_cc_3_100_selectedEvents_Rsmaller100_abszsmaller90_forMichael.txt', (14,1)],
-                          'elec-CC': ['elec_cc_3_100_selectedEvents_Rsmaller100_abszsmaller90_forMichael.txt', (12,1)]}
+    # particle_type_dict = {'muon-CC': ['muon_cc_3_100_selectedEvents_Rsmaller100_abszsmaller90_forMichael.txt', (14,1)],
+    #                       'elec-CC': ['elec_cc_3_100_selectedEvents_Rsmaller100_abszsmaller90_forMichael.txt', (12,1)]}
 
     arr_pheid_sel_events = None
     for key in particle_type_dict:
@@ -434,7 +431,15 @@ def make_prob_hist_class(arr_energy_correct, axes, particle_types_dict, particle
 #-- Functions for making property (e.g. bjorken_y) vs accuracy plots --#
 
 def make_property_to_accuracy_plot(arr_energy_correct, property_type, title, filename, e_cut=False, compare_pheid=False):
-
+    """
+    Function that makes property (e.g. energy) vs accuracy plots.
+    :param ndarray(ndim=2) arr_energy_correct: Array that contains the energy, correct, particle_type, is_cc,... and y_pred info for each event.
+    :param str property_type: Specifies which property should be plotted. Currently available: 'bjorken-y'.
+    :param str title: Title of the plots.
+    :param str filename: Full filepath for saving the plots.
+    :param bool e_cut: Specifies if an energy cut should be used. If True, only events from 3-40GeV are selected for the plots.
+    :param bool compare_pheid: Boolean flag that specifies if only events that survive the Pheid precuts should be used in making the plots.
+    """
     if compare_pheid is True:
         arr_energy_correct = arr_energy_correct_select_pheid_events(arr_energy_correct, invert=False)
 
@@ -472,7 +477,16 @@ def make_property_to_accuracy_plot(arr_energy_correct, property_type, title, fil
 
 
 def make_step_plot_1d_property_accuracy_class(prop, arr_energy_correct, axes, particle_types_dict, particle_type, linestyle='-', color='b'):
-
+    """
+    Function for making 1D step plots property vs Accuracy.
+    :param prop:
+    :param arr_energy_correct:
+    :param axes:
+    :param particle_types_dict:
+    :param particle_type:
+    :param linestyle:
+    :param color:
+    """
     class_vector = particle_types_dict[particle_type]
 
     arr_energy_correct_class = select_class(arr_energy_correct, class_vector=class_vector)
@@ -589,7 +603,15 @@ def make_hist_2d_class(prop_1, prop_2, arr_energy_correct, particle_types_dict, 
     plt.close()
 
 
-def calculate_and_plot_correlation(arr_energy_correct, modelname, e_cut_range=(3, 40), compare_pheid=False):
+def calculate_and_plot_correlation(arr_energy_correct, modelname, compare_pheid=False):
+    """
+    Calculates and plots the separability (1-c) plot.
+    :param ndarray(ndim=2) arr_energy_correct: Array that contains the energy, correct, particle_type, is_cc,... and y_pred info for each event.
+    :param str modelname: Name of the model used for plot savenames.
+    :param e_cut_range:
+    :param bool compare_pheid: Boolean flag that specifies if only events that survive the Pheid precuts should be used in making the plots.
+    :return:
+    """
 
     if compare_pheid is True:
         arr_energy_correct = arr_energy_correct_select_pheid_events(arr_energy_correct, invert=False)
@@ -597,14 +619,8 @@ def calculate_and_plot_correlation(arr_energy_correct, modelname, e_cut_range=(3
     particle_types_dict = {'muon-CC': (14, 1), 'a_muon-CC': (-14, 1), 'elec-CC': (12, 1), 'a_elec-CC': (-12, 1)}
 
     bins=40
-    stepsize = 1
-
     correlation_coefficients = []
-
     e_cut_range = np.logspace(0.3, 2, 18)
-
-    #for i in xrange(e_cut_range[1] - e_cut_range[0]):
-        #e_cut_temp = (e_cut_range[0] + i * stepsize, e_cut_range[0] + i * stepsize + stepsize)
 
     n = 0
     for e_cut_temp in zip(e_cut_range[:-1], e_cut_range[1:]):
@@ -635,7 +651,7 @@ def calculate_and_plot_correlation(arr_energy_correct, modelname, e_cut_range=(3
 
         correlation_coeff = 1 - correlation_coeff_enumerator/float(correlation_coeff_denominator)
 
-        average_energy = (e_cut_temp[1] + e_cut_temp[0]) / float(2)
+        average_energy = 10**((np.log10(e_cut_temp[1]) + np.log10(e_cut_temp[0])) / float(2))
 
         correlation_coefficients.append((correlation_coeff, average_energy))
 
@@ -643,7 +659,6 @@ def calculate_and_plot_correlation(arr_energy_correct, modelname, e_cut_range=(3
     # plot the array
 
     fig, axes = plt.subplots()
-
     plt.plot(correlation_coefficients[:, 1], correlation_coefficients[:, 0], 'b', marker='o', lw=0.5, markersize=3, label='Deep Learning')
 
     # data Steffen
@@ -658,20 +673,17 @@ def calculate_and_plot_correlation(arr_energy_correct, modelname, e_cut_range=(3
     plt.grid(True, zorder=0, linestyle='dotted')
 
     axes.legend(loc='center right')
-    title = plt.title('Correlation coefficients for track vs shower PID')
+    title = plt.title('Separability for track vs shower PID')
     title.set_position([.5, 1.04])
 
     plt.yticks(np.arange(0, 1.1, 0.1))
     # plt.xticks(np.arange(0, 110, 10))
     plt.xscale('log')
 
-    plt.savefig('/results/plots/1d/Correlation_Coefficients_' + modelname + '.pdf')
-    plt.savefig('/results/plots/1d/Correlation_Coefficients_' + modelname + '.png', dpi=600)
+    plt.savefig('results/plots/1d/Correlation_Coefficients_' + modelname + '.pdf')
+    plt.savefig('results/plots/1d/Correlation_Coefficients_' + modelname + '.png', dpi=600)
 
     plt.close()
-
-
-
 
 
 #------------- Functions used in making Matplotlib plots -------------#

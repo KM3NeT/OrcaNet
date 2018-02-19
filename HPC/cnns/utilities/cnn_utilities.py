@@ -45,7 +45,7 @@ def gen_batches_from_multiple_files(filepath, batchsize, n_bins, class_type, f_s
     """
     dimensions_1 = get_dimensions_encoding(n_bins[0], batchsize) # TODO only available with double input for now, not expanded to n-inputs
     dimensions_2 = get_dimensions_encoding(n_bins[1], batchsize)
-    swap_4d_channels_dict = {'yzt-x_all-t_and_yzt-x_tight-1-t': (0, 2, 3, 4, 1)}
+    swap_4d_channels_dict = {'yzt-x_all-t_and_yzt-x_tight-1-t': [(0, 2, 3, 4, 1)], 'xyz-t-tight-1-w-geo-fix_and_yzt-x-tight-1-wout-geo-fix': [(0, 2, 3, 4, 1)]}
 
     while 1:
         f_1 = h5py.File(filepath[0], "r")
@@ -69,8 +69,11 @@ def gen_batches_from_multiple_files(filepath, batchsize, n_bins, class_type, f_s
 
             if swap_col is not None:
                 if swap_col == 'yzt-x_all-t_and_yzt-x_tight-1-t':
-                    xs_1 = np.transpose(xs_1, swap_4d_channels_dict[swap_col])
-                    xs_2 = np.transpose(xs_2, swap_4d_channels_dict[swap_col])
+                    xs_1 = np.transpose(xs_1, swap_4d_channels_dict[swap_col][0])
+                    xs_2 = np.transpose(xs_2, swap_4d_channels_dict[swap_col][0])
+
+                elif swap_col == 'xyz-t-tight-1-w-geo-fix_and_yzt-x-tight-1-wout-geo-fix':
+                    xs_2 = np.transpose(xs_2, swap_4d_channels_dict[swap_col][0])
 
                 else: raise ValueError('The argument "swap_col"=' + str(swap_col) + ' is not valid.')
 
@@ -444,7 +447,7 @@ def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident=''):
         if i > 0: projection += '_and_'
         projection += str(dim) + 'd_'
 
-        if bins.count(1) == 0: # for 4D input
+        if bins.count(1) == 0 and i == 0: # for 4D input
             if swap_4d_channels is not None:
                 projection += swap_4d_channels
             else:
