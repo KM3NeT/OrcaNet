@@ -30,9 +30,14 @@ def get_time_parameters(event_hits, mode=('trigger_cluster', 'all'), t_start_mar
         t_mean = np.mean(t, dtype=np.float64)
 
         if mode[1] == 'tight_1':
-            # second try, make a tighter cut
+            # make a tighter cut, 12.5ns / bin
             t_start = t_mean - 250  # trigger-cluster - 350ns
             t_end = t_mean + 500  # trigger-cluster + 850ns
+
+        elif mode[1] == 'tight_2':
+            # make an even tighter cut, 5.8ns / bin
+            t_start = t_mean - 150  # trigger-cluster - 350ns
+            t_end = t_mean + 200  # trigger-cluster + 850ns
 
         else:
             assert mode[1] == 'all'
