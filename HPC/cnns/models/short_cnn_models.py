@@ -25,9 +25,8 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels):
                                   Key: After which convolutional layer a pooling layer be inserted (counts from layer zero!)
                                   Item: Specifies the strides.
     """
-    dim = 4 - n_bins.count(1)
-
     if n_bins[0].count(1) == 1: # 3d case
+        dim = 3
         input_dim = get_dimensions_encoding(n_bins[0], batchsize)  # includes batchsize
         if n_bins[0][1] == 1:
             print 'Using a VGG-like 3D CNN with XZT projection'
@@ -45,7 +44,8 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels):
             raise IndexError('No suitable 3D projection found in decode_input_dimensions().'
                              'Please add the projection type with the pooling dict to the function.')
 
-    elif n_bins[0].count(1) == 0: # 4d case
+    elif n_bins[0].count(1) == 0: # 4d case, 3.5D
+        dim = 3
 
         if len(n_bins) > 1:
             if swap_4d_channels == 'yzt-x_all-t_and_yzt-x_tight-1-t':
