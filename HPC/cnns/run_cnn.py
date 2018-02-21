@@ -295,7 +295,7 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
         if nn_arch is 'WRN': model = create_wide_residual_network(n_bins[0], batchsize, nb_classes=class_type[0], n=1, k=1, dropout=0.2, k_size=3, swap_4d_channels=swap_4d_channels)
 
         elif nn_arch is 'VGG':
-            if swap_4d_channels == 'xyz-t_and_yzt-x' or swap_4d_channels == 'yzt-x_all-t_and_yzt-x_tight-1-t':
+            if swap_4d_channels in {'xyz-t_and_yzt-x', 'yzt-x_all-t_and_yzt-x_tight-1-t', 'xyz-t-tight-1-w-geo-fix_and_yzt-x-tight-1-wout-geo-fix'}:
                 if str_ident == 'double_input_single_train':
                     model = create_vgg_like_model_double_input_from_single_nns(n_bins, batchsize, nb_classes=class_type[0], dropout=(0,0.1), swap_4d_channels=swap_4d_channels)
                 else:
@@ -307,7 +307,7 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
 
         elif nn_arch is 'Conv_LSTM':
             model = create_convolutional_lstm(n_bins, batchsize, nb_classes=class_type[0], dropout=0.1,
-                                              n_filters=None)
+                                              n_filters=(16, 16, 32, 32, 32, 32, 64))
 
         else: raise ValueError('Currently, only "WRN" or "VGG" are available as nn_arch')
     else:
@@ -334,17 +334,16 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
     if mode == 'train':
         lr = None
         while 1:
-            epoch, lr, lr_decay = schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=0.001, manual_mode=(True, 0.0003, 0.07, lr))
+            epoch, lr, lr_decay = schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=0.003, manual_mode=(True, 0.0003, 0.07, lr))
             train_and_test_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean,
                                  epoch, shuffle, lr, lr_decay, tb_logger, swap_4d_channels)
 
     if mode == 'eval':
         # After training is finished, investigate model performance
-        #arr_energy_correct = make_performance_array_energy_correct(model, test_files[0][0], n_bins, class_type, batchsize, xs_mean, swap_4d_channels, samples=None)
-        #np.save('results/plots/saved_predictions/arr_energy_correct_' + modelname + '.npy', arr_energy_correct)
+        arr_energy_correct = make_performance_array_energy_correct(model, test_files[0][0], n_bins, class_type, batchsize, xs_mean, swap_4d_channels, samples=None)
+        np.save('results/plots/saved_predictions/arr_energy_correct_' + modelname + '.npy', arr_energy_correct)
 
-        #arr_energy_correct = np.load('results/plots/saved_predictions/arr_energy_correct_' + modelname + '.npy')
-        arr_energy_correct = np.load('results/plots/saved_predictions/arr_energy_correct_model_VGG_4d_yzt-x_muon-CC_to_elec-CC.npy')
+        arr_energy_correct = np.load('results/plots/saved_predictions/arr_energy_correct_' + modelname + '.npy')
         make_energy_to_accuracy_plot_multiple_classes(arr_energy_correct, title='Classification for muon-CC_and_elec-CC_3-100GeV',
                                                       filename='results/plots/PT_' + modelname, compare_pheid=True) #TODO think about more automatic savenames
         make_prob_hists(arr_energy_correct[:, ], modelname=modelname, compare_pheid=True)
@@ -352,6 +351,12 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
                                        filename='results/plots/PT_bjorken_y_vs_accuracy' + modelname, e_cut=False, compare_pheid=True)
 
         make_hist_2d_property_vs_property(arr_energy_correct, modelname, property_types=('bjorken-y', 'probability'), e_cut=(3, 100), compare_pheid=True)
+        calculate_and_plot_correlation(arr_energy_correct, modelname, compare_pheid=True)
+
+        history = model.evaluate_generator(
+            generate_batches_from_hdf5_file(test_files[0][0], batchsize, n_bins, class_type, swap_col=swap_4d_channels, f_size=test_files[0][1], zero_center_image=xs_mean),
+            steps=int(test_files[0][1] / batchsize), max_queue_size=10)
+        print 'Test sample results: ' + str(history) + ' (' + str(model.metrics_names) + ')'
 
 
 if __name__ == '__main__':
@@ -369,19 +374,15 @@ if __name__ == '__main__':
     # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(48,1), use_scratch_ssd=True,
     #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='only_new_timecut_dp01')
 
-    # execute_cnn(n_bins=[(11,13,18,50)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='Conv_LSTM', batchsize=8, epoch=(10,1), use_scratch_ssd=True,
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='Conv_LSTM', batchsize=8, epoch=(0,1), use_scratch_ssd=True,
     #             n_gpu=(4, 'avolkov'), mode='train', swap_4d_channels='conv_lstm', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='')
 
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(34,1), use_scratch_ssd=True,
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(48,1), use_scratch_ssd=True,
     #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='new_tight_timecut_250_500_dp01')
 
     # #initial lr 0.003
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=64, epoch=(18,1), use_scratch_ssd=True,
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=64, epoch=(32,1), use_scratch_ssd=True,
     #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='new_tight_timecut_250_500_dp01_larger_bs_128')
-
-    # execute_cnn(n_bins=[(11, 13, 18, 50)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(0, 1), n_gpu=(1, 'avolkov'), mode='eval',
-    #             swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='just_for_eval')
-
 
     # xyz-channel, timecut all, has new geo Stefan
     # execute_cnn(n_bins=[(11,13,18,31)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(26,1), use_scratch_ssd=True,
@@ -393,17 +394,28 @@ if __name__ == '__main__':
     # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(14,1), use_scratch_ssd=True,
     #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='xyz_t_test_timecut_all_dp02')
 
-    # xyz-t, time -250+500 tight_1, with geo_fix
+    # xyz-t, time -250+500 tight_1, with geo_fix, dp 0.1
     # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(20,1), use_scratch_ssd=True,
     #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='xyz-t_tight-1_w-geo-fix')
+    # dp 0.05
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(30,1), use_scratch_ssd=True,
+    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='xyz-t_tight-1_w-geo-fix_dp0.05')
+    # bs 64, initial lr = 0.003
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=64, epoch=(15,1), use_scratch_ssd=True,
+    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='xyz-t_tight-1_w-geo-fix_bs64')
+
+    # # precuts train
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(0,1), use_scratch_ssd=True,
+    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='xyz-t_tight-1_w-geo-fix_dp0.1_precuts-train')
+
     # xyz-t, time -250+500 tight_1, without (!!) geo_fix
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(8,1), use_scratch_ssd=True,
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(24,1), use_scratch_ssd=True,
     #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='xyz-t_tight-1_without-geo-fix')
 
 # old file, timeslice relative time cut 50 bins
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/h5/xyzt/concatenated/train_muon-CC_and_elec-CC_each_480_xyzt_shuffled_0.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/h5/xyzt/concatenated/test_muon-CC_and_elec-CC_each_120_xyzt_shuffled.h5
 
-# with run_id but without time corr., new time cut 'all', with appied precuts 04.12.17
+# with run_id but without time corr., new time cut 'all', with applied precuts 04.12.17
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/without_mc_time_fix/h5/xyzt/concatenated/elec-CC_and_muon-CC_xyzt_train_1_to_480_shuffled_0.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/without_mc_time_fix/h5/xyzt/concatenated/elec-CC_and_muon-CC_xyzt_test_481_to_600_shuffled_0.h5
 # with run_id and with new time cut 'all' 05.01.17, without precuts
 # python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/without_mc_time_fix/h5/xyzt/concatenated/elec-CC_and_muon-CC_xyzt_train_1_to_480_shuffled_0.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/without_mc_time_fix/h5/xyzt/concatenated/elec-CC_and_muon-CC_xyzt_test_481_to_600_shuffled_0.h5
@@ -419,6 +431,11 @@ if __name__ == '__main__':
 
 
 # yzt-x_all-t_and_yzt-x_tight-1-t double input
-    execute_cnn(n_bins=[(11,13,18,60), (11,13,18,60)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(0,1), use_scratch_ssd=True,
-                n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x_all-t_and_yzt-x_tight-1-t', zero_center=True, str_ident='double_input_single_train')
+#     execute_cnn(n_bins=[(11,13,18,60), (11,13,18,60)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(0,1), use_scratch_ssd=True,
+#                 n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x_all-t_and_yzt-x_tight-1-t', zero_center=True, str_ident='double_input_single_train')
 # python run_cnn.py -m lists/yzt-x_all-t_and_yzt-x_tight-1-t.list
+
+# xyz-t-tight-1-w-geo-fix_and_yzt-x-tight-1-wout-geo-fix, double input
+    execute_cnn(n_bins=[(11,13,18,60), (11,13,18,60)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(0,1), use_scratch_ssd=True,
+                n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='xyz-t-tight-1-w-geo-fix_and_yzt-x-tight-1-wout-geo-fix', zero_center=True, str_ident='double_input_single_train')
+# python run_cnn.py -m lists/xyz-t-tight-1-w-geo-fix_and_yzt-x-tight-1-wout-geo-fix.list

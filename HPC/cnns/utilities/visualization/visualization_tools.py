@@ -24,10 +24,8 @@ def plot_train_and_test_statistics(modelname):
     # #Epoch # Loss # Accuracy
     log_array_test = np.loadtxt('models/trained/perf_plots/log_test_' + modelname + '.txt', dtype=np.float32, delimiter='\t', skiprows=1, ndmin=2)
 
-    train_batchnr = log_array_train[:, 1]
-    train_loss = log_array_train[:, 2]
-    test_epoch = log_array_test[:, 0]
-    test_loss = log_array_test[:, 1]
+    train_batchnr, train_loss = log_array_train[:, 1], log_array_train[:, 2]
+    test_epoch, test_loss = log_array_test[:, 0], log_array_test[:, 1]
 
     fig, axes = plt.subplots()
 
