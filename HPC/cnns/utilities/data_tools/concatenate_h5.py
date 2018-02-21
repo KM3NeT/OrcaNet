@@ -147,7 +147,7 @@ def load_event_selection():
 
     # Moritz's precuts
     particle_type_dict = {'muon-CC': ['muon_cc_3_100_selectedEvents_forMichael_fixed.txt', (14,1)],
-                          'elec-CC': ['elec_cc_3_100_selectedEvents_forMichael_fixed.txt', (12,1)]}
+                          'elec-CC': ['elec_cc_3_100_selectedEvents_forMichael_fixed.txt', (12,1)]} # TODO old
 
     # Containment cut
     # particle_type_dict = {'muon-CC': ['muon_cc_3_100_selectedEvents_Rsmaller100_abszsmaller90_forMichael.txt', (14,1)],
@@ -198,12 +198,10 @@ def in_nd(a, b, absolute=True, assume_unique=False):
     :return: ndarray(ndim=1): Boolean array that specifies for each row of a if it also exists in b or not.
     """
     if a.dtype!=b.dtype: raise TypeError('The dtype of array a must be equal to the dtype of array b.')
-    a = np.asarray(a, order='C')
-    b = np.asarray(b, order='C')
+    a, b = np.asarray(a, order='C'), np.asarray(b, order='C')
 
     if absolute is True: # we don't care about e.g. particles or antiparticles
-        a = np.absolute(a)
-        b = np.absolute(b)
+        a, b = np.absolute(a), np.absolute(b)
 
     a = a.ravel().view((np.str, a.itemsize * a.shape[1]))
     b = b.ravel().view((np.str, b.itemsize * b.shape[1]))

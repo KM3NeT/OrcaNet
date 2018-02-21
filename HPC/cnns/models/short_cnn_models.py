@@ -208,8 +208,7 @@ def create_vgg_like_model_double_input(n_bins, batchsize, nb_classes=2, n_filter
         x_2 = conv_block(x_2, dim, n_filters[i], k_size=k_size, dropout=dropout, max_pooling=max_pool_sizes['net_2'].get(i), activation=activation)
 
     # flatten both nets
-    x_1 = Flatten()(x_1)
-    x_2 = Flatten()(x_2)
+    x_1, x_2 = Flatten()(x_1), Flatten()(x_2)
 
     # concatenate both nets
     x = ks.layers.concatenate([x_1, x_2])
@@ -249,8 +248,6 @@ def create_vgg_like_model_double_input_from_single_nns(n_bins, batchsize, nb_cla
 
     else:
         raise ValueError('The double input combination specified in "swap_4d_channels" is not known, check the function for what is available.')
-    # trained_model_1_path = 'models/trained/backup/VGG-4d-xyz-t-without-run-id-Acc-70-3-dp01-old/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_epoch26.h5'# xyz-t
-    # trained_model_2_path = 'models/trained/backup/VGG-4d-yzt-x-without-run-id-Acc-70-9/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_epoch51.h5'# yzt-x
 
     trained_model_1 = ks.models.load_model(trained_model_1_path)
     trained_model_2 = ks.models.load_model(trained_model_2_path)
@@ -276,8 +273,7 @@ def create_vgg_like_model_double_input_from_single_nns(n_bins, batchsize, nb_cla
         x_2 = create_layer_from_config(x_2, trained_layer, layer_numbers_net_2, trainable=False, net='2', dropout=dropout[0])
 
     # flatten both nets
-    x_1 = Flatten()(x_1)
-    x_2 = Flatten()(x_2)
+    x_1, x_2 = Flatten()(x_1), Flatten()(x_2)
 
     # concatenate both nets
     x = ks.layers.concatenate([x_1, x_2])
@@ -419,8 +415,7 @@ def change_dropout_rate_for_double_input_model(n_bins, batchsize, trained_model,
         else: break
 
     # flatten both nets and concatenate them
-    x_1 = Flatten()(x_1)
-    x_2 = Flatten()(x_2)
+    x_1, x_2 = Flatten()(x_1), Flatten()(x_2)
     x = ks.layers.concatenate([x_1, x_2])
 
     # rebuild dense layers

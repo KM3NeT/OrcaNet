@@ -17,13 +17,13 @@ from .cnn_utilities import generate_batches_from_hdf5_file
 def make_performance_array_energy_correct(model, f, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, samples=None):
     """
     Creates an energy_correct array based on test_data that specifies for every event, if the model's prediction is True/False.
-    :param ks.model.Model/Sequential model: Fully trained Keras model of a neural network.
+    :param ks.model.Model model: Fully trained Keras model of a neural network.
     :param str f: Filepath of the file that is used for making predctions.
     :param list(tuple) n_bins: The number of bins for each dimension (x,y,z,t) in the testfile. Can contain multiple n_bins tuples.
     :param (int, str) class_type: The number of output classes and a string identifier to specify the exact output classes.
                                   I.e. (2, 'muon-CC_to_elec-CC')
     :param int batchsize: Batchsize that should be used for predicting.
-    :param ndarray xs_mean: mean_image of the x dataset if zero-centering is enabled.
+    :param list(ndarray) xs_mean: mean_image(s) of the x dataset if zero-centering is enabled.
     :param None/str swap_4d_channels: For 4D data input (3.5D models). Specifies, if the channels for the 3.5D net should be swapped in the generator.
     :param None/int samples: Number of events that should be predicted. If samples=None, the whole file will be used.
     :return: ndarray arr_energy_correct: Array that contains the energy, correct, particle_type, is_cc and y_pred info for each event.
@@ -74,8 +74,7 @@ def check_if_prediction_is_correct(y_pred, y_true):
     :return: ndarray(ndim=1) correct: 1D array that specifies if the prediction for the single events is correct (True) or False.
     """
     # TODO loophole if pred has two or more max values per row
-    class_pred = np.argmax(y_pred, axis=1)
-    class_true = np.argmax(y_true, axis=1)
+    class_pred, class_true = np.argmax(y_pred, axis=1), np.argmax(y_true, axis=1)
 
     correct = np.equal(class_pred, class_true)
     return correct
@@ -151,12 +150,10 @@ def in_nd(a, b, absolute=True, assume_unique=False):
     :return: ndarray(ndim=1): Boolean array that specifies for each row of a if it also exists in b or not.
     """
     if a.dtype!=b.dtype: raise TypeError('The dtype of array a must be equal to the dtype of array b.')
-    a = np.asarray(a, order='C')
-    b = np.asarray(b, order='C')
+    a, b = np.asarray(a, order='C'), np.asarray(b, order='C')
 
     if absolute is True: # we don't care about e.g. particles or antiparticles
-        a = np.absolute(a)
-        b = np.absolute(b)
+        a, b = np.absolute(a), np.absolute(b)
 
     a = a.ravel().view((np.str, a.itemsize * a.shape[1]))
     b = b.ravel().view((np.str, b.itemsize * b.shape[1]))
@@ -196,9 +193,7 @@ def print_absolute_performance(arr_energy_correct, print_text='Performance: '):
     n_correct = np.count_nonzero(correct, axis=0) # count how many times the predictions were True
     n_total = arr_energy_correct.shape[0] # count the total number of predictions
     performance = n_correct/float(n_total)
-    print print_text
-    print str(performance *100)
-    print arr_energy_correct.shape
+    print print_text, '\n', str(performance *100), '\n', arr_energy_correct.shape
 
 #-- Utility functions --#
 
@@ -279,7 +274,6 @@ def make_energy_to_accuracy_plot_multiple_classes(arr_energy_correct, title, fil
     plt.minorticks_on()
 
     plt.xlabel('Energy [GeV]')
-    #plt.ylabel('Accuracy')
     plt.ylabel('Fraction of events classified as track')
     plt.ylim((0, 1.05))
     plt.yticks(y_ticks_major)
@@ -339,7 +333,6 @@ def select_class(arr_energy_correct_classes, class_vector):
 
     # Select only the events, where every bool for one event is True
     indices_rows_with_class = np.logical_and(check_arr_for_class[:, 0], check_arr_for_class[:, 1])
-
     selected_rows_of_class = arr_energy_correct_classes[indices_rows_with_class]
 
     return selected_rows_of_class
@@ -480,12 +473,12 @@ def make_step_plot_1d_property_accuracy_class(prop, arr_energy_correct, axes, pa
     """
     Function for making 1D step plots property vs Accuracy.
     :param prop:
-    :param arr_energy_correct:
-    :param axes:
-    :param particle_types_dict:
-    :param particle_type:
-    :param linestyle:
-    :param color:
+    :param ndarray arr_energy_correct: Array that contains the energy, correct, particle_type, is_cc and y_pred info for each event.
+    :param axes: mpl axes of the subplots. The step plot will be plotted onto the axes object.
+    :param dict particle_types_dict: Dictionary that contains the tuple identifiers for different particle types, e.g. 'muon-CC': (14, 1).
+    :param str particle_type: Particle type that should be selected, e.g. 'muon-CC'
+    :param str linestyle: mpl linestyle used for the plot.
+    :param str color: mpl color used for the plot.
     """
     class_vector = particle_types_dict[particle_type]
 
@@ -608,9 +601,7 @@ def calculate_and_plot_correlation(arr_energy_correct, modelname, compare_pheid=
     Calculates and plots the separability (1-c) plot.
     :param ndarray(ndim=2) arr_energy_correct: Array that contains the energy, correct, particle_type, is_cc,... and y_pred info for each event.
     :param str modelname: Name of the model used for plot savenames.
-    :param e_cut_range:
     :param bool compare_pheid: Boolean flag that specifies if only events that survive the Pheid precuts should be used in making the plots.
-    :return:
     """
 
     if compare_pheid is True:
