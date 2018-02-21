@@ -136,8 +136,7 @@ def main(n_bins, do2d=False, do2d_pdf=(False, 10), do3d=False, do4d=(True, 'time
 
     x_bin_edges, y_bin_edges, z_bin_edges = calculate_bin_edges(n_bins, filename_geo_limits)
 
-    all_4d_to_2d_hists, all_4d_to_3d_hists, all_4d_to_4d_hists = [], [], []
-    mc_infos = []
+    all_4d_to_2d_hists, all_4d_to_3d_hists, all_4d_to_4d_hists, mc_infos = [], [], [], []
 
     if do2d_pdf[0] is True: glob.pdf_2d_plots = PdfPages('Results/4dTo2d/' + filename_output + '_plots.pdf')
 

@@ -49,9 +49,7 @@ def get_event_data(event_blob, geo, do_mc_hits, use_calibrated_file, data_cuts, 
     energy = event_blob['McTracks'][p].energy
     is_cc = event_blob['McTracks'][p].is_cc
     bjorkeny = event_blob['McTracks'][p].bjorkeny
-    dir_x = event_blob['McTracks'][p].dir[0]
-    dir_y = event_blob['McTracks'][p].dir[1]
-    dir_z = event_blob['McTracks'][p].dir[2]
+    dir_x, dir_y, dir_z = event_blob['McTracks'][p].dir[0], event_blob['McTracks'][p].dir[1], event_blob['McTracks'][p].dir[2]
     time = event_blob['McTracks'][p].time
 
     event_track = np.array([event_id, particle_type, energy, is_cc, bjorkeny, dir_x, dir_y, dir_z, time, run_id], dtype=np.float32)
@@ -69,9 +67,7 @@ def get_event_data(event_blob, geo, do_mc_hits, use_calibrated_file, data_cuts, 
         hits = hits.__array__[hits.triggered.astype(bool)]
         #hits = hits.triggered_hits # alternative, though it only works for the triggered condition!
 
-    pos_x = hits.pos_x.astype('float32')
-    pos_y = hits.pos_y.astype('float32')
-    pos_z = hits.pos_z.astype('float32')
+    pos_x, pos_y, pos_z = hits.pos_x.astype('float32'), hits.pos_y.astype('float32'), hits.pos_z.astype('float32')
     time = hits.time.astype('float32')
     triggered = hits.triggered.astype('float32')
 
@@ -106,7 +102,6 @@ def get_geometry(filename_geometry, fname_geo_limits):
     # derive maximum and minimum x,y,z coordinates of the geometry input [[first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax]]
     geo_limits = np.nanmin(geo, axis = 0), np.nanmax(geo, axis = 0)
     print 'Detector dimensions [[first_OM_id, xmin, ymin, zmin], [last_OM_id, xmax, ymax, zmax]]: ' + str(geo_limits)
-
 
     if os.path.isfile(filename_geometry) is True:
         geo = kp.Geometry(filename='/home/woody/capn/mppi033h/misc/orca_detectors/fixed/' + filename_geometry)

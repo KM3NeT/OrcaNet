@@ -72,10 +72,7 @@ def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     :param bool do2d_pdf: if True, generate 2D matplotlib pdf histograms.
     :return: appends the 2D histograms to the all_4d_to_2d_hists list.
     """
-    x = event_hits[:, 0]
-    y = event_hits[:, 1]
-    z = event_hits[:, 2]
-    t = event_hits[:, 3]
+    x, y, z, t = event_hits[:, 0], event_hits[:, 1], event_hits[:, 2], event_hits[:, 3]
 
     # analyze time
     t_start, t_end = get_time_parameters(event_hits, mode=('trigger_cluster', 'all'))
@@ -178,10 +175,7 @@ def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     :param list all_4d_to_3d_hists: contains all 3D histogram projections.
     :return: appends the 3D histograms to the all_4d_to_3d_hists list. [xyz, xyt, xzt, yzt, rzt]
     """
-    x = event_hits[:, 0:1]
-    y = event_hits[:, 1:2]
-    z = event_hits[:, 2:3]
-    t = event_hits[:, 3:4]
+    x, y, z, t = event_hits[:, 0:1], event_hits[:, 1:2], event_hits[:, 2:3], event_hits[:, 3:4]
 
     t_start, t_end = get_time_parameters(event_hits, mode=('trigger_cluster', 'all'))
 
