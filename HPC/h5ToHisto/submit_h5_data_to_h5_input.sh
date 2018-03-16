@@ -4,7 +4,7 @@
 #PBS -o /home/woody/capn/mppi033h/logs/submit_h5_to_histo_${PBS_JOBID}_${PBS_ARRAYID}.out -e /home/woody/capn/mppi033h/logs/submit_h5_to_histo_${PBS_JOBID}_${PBS_ARRAYID}.err
 # first non-empty non-comment line ends PBS options
 
-# Submit with 'qsub -t 1-10 submit_h5_data_to_h5_input.sh'
+# Submit with 'qsub -t 1-10 submit_h5_data_to_h5_input.sh' # fix km3pipe six before doing this
 # This script uses the h5_data_to_h5_input.py file in order to convert all 600 (muon/elec/tau) .h5 raw files to .h5 2D/3D projection files (CNN input).
 # The total amount of simulated files for each event type in ORCA is 600 -> file 1-600
 # The files should be converted in batches of files_per_job=60 files per job

@@ -36,8 +36,8 @@ def get_time_parameters(event_hits, mode=('trigger_cluster', 'all'), t_start_mar
 
         elif mode[1] == 'tight_2':
             # make an even tighter cut, 5.8ns / bin
-            t_start = t_mean - 150  # trigger-cluster - 350ns
-            t_end = t_mean + 200  # trigger-cluster + 850ns
+            t_start = t_mean - 150  # trigger-cluster - 150ns
+            t_end = t_mean + 200  # trigger-cluster + 200ns
 
         else:
             assert mode[1] == 'all'
@@ -203,7 +203,7 @@ def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
 def compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_4d_hists, do4d):
     """
     Computes 4D numpy histogram 'images' from the 4D data.
-    :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyzt) data for a certain eventID. [positions_xyz, time, triggered]
+    :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyzt) data for a certain eventID. [positions_xyz, time, triggered, (channel_id)]
     :param ndarray(ndim=1) x_bin_edges: bin edges for the X-direction.
     :param ndarray(ndim=1) y_bin_edges: bin edges for the Y-direction.
     :param ndarray(ndim=1) z_bin_edges: bin edges for the Z-direction.
@@ -213,7 +213,7 @@ def compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
                              Currently, only 'time' and 'channel_id' are available.
     :return: appends the 4D histogram to the all_4d_to_4d_hists list. [xyzt]
     """
-    t_start, t_end = get_time_parameters(event_hits, mode=('trigger_cluster', 'tight_1'))
+    t_start, t_end = get_time_parameters(event_hits, mode=('trigger_cluster', 'tight_2'))
 
     if do4d[1] == 'time':
         hist_4d = np.histogramdd(event_hits[:, 0:4], bins=(x_bin_edges, y_bin_edges, z_bin_edges, n_bins[3]),
