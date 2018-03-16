@@ -12,13 +12,14 @@ from utilities.cnn_utilities import get_dimensions_encoding
 
 #------------- VGG-like model -------------#
 
-def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels):
+def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident = ''):
     """
     Returns the general dimension (2D/3D), the input dimensions (i.e. bs x 11 x 13 x 18 x channels=1 for 3D)
     and appropriate max_pool_sizes depending on the projection type.
     :param list(tuple) n_bins: Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
     :param int batchsize: Batchsize of the fed data.
     :param None/str swap_4d_channels: For 3.5D nets, specifies if the default channel (t) should be swapped with another dim.
+    :param str str_ident: optional string identifier that specifies the projection.
     :return: int dim: Dimension of the network (2D/3D).
     :return: tuple input_dim: dimensions tuple for 2D, 3D or 4D data (ints).
     :return: dict/dict(dict) max_pool_sizes: Dict that specifies the Pooling locations and properties for the VGG net.
@@ -46,8 +47,8 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels):
 
     elif n_bins[0].count(1) == 0: # 4d case, 3.5D
         dim = 3
-
         if len(n_bins) > 1:
+
             if swap_4d_channels == 'yzt-x_all-t_and_yzt-x_tight-1-t':
                 max_pool_sizes = {'net_1': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)},
                                   'net_2': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}}
@@ -55,12 +56,43 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels):
                 input_dim = [(input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1]), # yzt-x all
                              (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1])] # yzt-x tight-1
 
-            elif swap_4d_channels == 'xyz-t-tight-1-w-geo-fix_and_yzt-x-tight-1-wout-geo-fix':
-                max_pool_sizes = {'net_1': {3: (2, 2, 2), 7: (2, 2, 2)},
+            elif swap_4d_channels == 'xyz-t_and_yzt-x' and str_ident != 'multi_input_single_train_tight-1_tight-2':
+                max_pool_sizes = {'net_1': {3: (2, 2, 2), 7: (2, 2, 2)}, # only used if training from scratch
                                   'net_2': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}}
                 input_dim = get_dimensions_encoding(n_bins[0], batchsize)  # includes batchsize
+                input_dim = [(input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]), # xyz-t
+                             (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1])] # yzt-x
+
+            elif swap_4d_channels == 'xyz-t_and_yzt-x' and str_ident == 'multi_input_single_train_tight-1_tight-2':
+                max_pool_sizes = {'net_1': {3: (2, 2, 2), 7: (2, 2, 2)}, # only used if training from scratch
+                                  'net_2': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)},
+                                  'net_3': {3: (2, 2, 2), 7: (2, 2, 2)},
+                                  'net_4': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}}
+                input_dim = get_dimensions_encoding(n_bins[0], batchsize)  # includes batchsize
+                input_dim = [(input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]), # xyz-t
+                             (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1]), # yzt-x
+                             (input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]), # xyz-t
+                             (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1])] # yzt-x
+
+            elif swap_4d_channels == 'xyz-t_and_yzt-x_and_xyt-z' and str_ident == 'multi_input_single_train_tight-1_tight-2':
+                max_pool_sizes = {'net_1': {3: (2, 2, 2), 7: (2, 2, 2)}, # only used if training from scratch
+                                  'net_2': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)},
+                                  'net_3': {3: (2, 2, 2), 7: (2, 2, 2)},
+                                  'net_4': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)},
+                                  'net_5': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}}
+                input_dim = get_dimensions_encoding(n_bins[0], batchsize)  # includes batchsize
+                input_dim = [(input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]), # xyz-t
+                             (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1]), # yzt-x
+                             (input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]), # xyz-t
+                             (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1]), # yzt-x
+                             (input_dim[0], input_dim[1], input_dim[2], input_dim[4], input_dim[3])] # xyt-z
+
+            elif swap_4d_channels is None:
+                max_pool_sizes = {'net_1': {3: (2, 2, 2), 7: (2, 2, 2)},
+                                  'net_2': {3: (2, 2, 2), 7: (2, 2, 2)}}
+                input_dim = get_dimensions_encoding(n_bins[0], batchsize)  # includes batchsize
                 input_dim = [(input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]), # xyz-t tight-1 w-geo-fix
-                             (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1])] # yzt-x tight-1
+                             (input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4])] # xyz-t tight-1
 
             else:
                 raise IOError('3.5D projection types with len(n_bins) > 1 other than "yzt-x_all-t_and_yzt-x_tight-1-t" are not yet supported.')
@@ -69,12 +101,19 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels):
             input_dim = get_dimensions_encoding(n_bins[0], batchsize)  # includes batchsize
             if swap_4d_channels is None:
                 print 'Using a VGG-like 3.5D CNN with XYZ data and T/C channel information.'
-                max_pool_sizes = {3: (2, 2, 2), 7: (2, 2, 2)}
+                #max_pool_sizes = {3: (2, 2, 2), 7: (2, 2, 2)}
+                max_pool_sizes = {5: (2, 2, 2), 9: (2, 2, 2)} # 2 more layers
 
             elif swap_4d_channels == 'yzt-x':
                 print 'Using a VGG-like 3.5D CNN with YZT data and X channel information.'
-                max_pool_sizes = {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}
+                #max_pool_sizes = {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}
+                max_pool_sizes = {2: (1, 1, 2), 5: (2, 2, 2), 9: (2, 2, 2)} # 2 more layers
                 input_dim = (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1]) # [bs,y,z,t,x]
+
+            elif swap_4d_channels == 'xyt-z':
+                print 'Using a VGG-like 3.5D CNN with XYT data and Z channel information.'
+                max_pool_sizes = {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}
+                input_dim = (input_dim[0], input_dim[1], input_dim[2], input_dim[4], input_dim[3]) # [bs,y,z,t,x]
 
             elif swap_4d_channels == 'xyz-t_and_yzt-x':
                 max_pool_sizes = {'net_1': {3: (2, 2, 2), 7: (2, 2, 2)},
@@ -224,75 +263,159 @@ def create_vgg_like_model_double_input(n_bins, batchsize, nb_classes=2, n_filter
     return model
 
 
-def create_vgg_like_model_double_input_from_single_nns(n_bins, batchsize, nb_classes=2, dropout=(0, 0.2), swap_4d_channels=None, activation='relu'):
+def create_vgg_like_model_multi_input_from_single_nns(n_bins, batchsize, str_ident, nb_classes=2, dropout=(0, 0.2), swap_4d_channels=None, activation='relu'):
     """
     Returns a double input, VGG-like model (stacked conv. layers) with MaxPooling and Dropout if wished.
     The two single VGG networks are concatenated after the last flatten layers.
     :param list(tuple) n_bins: Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
-    :param int nb_classes: Number of output classes.
     :param int batchsize: Batchsize of the data that will be used with the VGG net.
+    :param str str_ident: optional string identifier that specifies the input projection type.
+    :param int nb_classes: Number of output classes.
     :param (float, float) dropout: Adds dropout if >0.
     :param None/str swap_4d_channels: For 3.5D nets, specifies if the default channel (t) should be swapped with another dim.
     :param str activation: Type of activation function that should be used. E.g. 'linear', 'relu', 'elu', 'selu'.
     :return: Model model: Keras VGG-like model.
     """
-    dim, input_dim, max_pool_sizes = decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels)
+    dim, input_dim, max_pool_sizes = decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident=str_ident)
+    trained_model_paths = {}
 
-    if swap_4d_channels == 'yzt-x_all-t_and_yzt-x_tight-1-t':
-        trained_model_1_path = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_only_new_timecut_dp01_epoch_47_file_1.h5'  # yzt-x, timecut_all, old geo
-        trained_model_2_path = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_new_tight_timecut_250_500_dp01_epoch_34_file_1.h5'  # yzt-x, timecut tight-1, old geo
+    if swap_4d_channels + str_ident  == 'xyz-t_and_yzt-x' + 'double_input_single_train_tight-1':
+        trained_model_paths[0] = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-1_w-geo-fix_bs64_2-more-layers_epoch_19_file_1.h5'  # xyz-t, timecut tight_1, with geo fix, 2 more layers
+        trained_model_paths[1] = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_new_tight_timecut_250_500_dp01_larger_bs_64_w_geo_fix_epoch_30_file_1.h5'  # yzt-x, timecut tight-1, new geo
 
-    elif swap_4d_channels == 'xyz-t-tight-1-w-geo-fix_and_yzt-x-tight-1-wout-geo-fix':
-        trained_model_1_path = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-1_w-geo-fix_epoch_22_file_1.h5'  # xyz-t, timecut tight_1, with geo fix
-        trained_model_2_path = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_new_tight_timecut_250_500_dp01_epoch_34_file_1.h5'  # yzt-x, timecut tight-1, old geo
+    elif swap_4d_channels is None: # xyz-t tight-1 and xyz-t tight-2
+        trained_model_paths[0] = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-1_w-geo-fix_bs64_epoch_3_file_1.h5'  # xyz-t, timecut tight_1, with geo fix, fully trained epoch 23
+        trained_model_paths[1] = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-2_w-geo-fix_bs64_dp0.1_epoch_3_file_1.h5'  # xyz-t, timecut tight-2, with geo fix, fully trained epoch 36
+
+    elif swap_4d_channels + str_ident == 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2':
+        trained_model_paths[0] = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-1_w-geo-fix_bs64_2-more-layers_epoch_32_file_1.h5' # xyz-t, tight-1, w-geo-fix, 2 more layers
+        trained_model_paths[1] = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_tight-1_w-geo-fix_bs64_dp0.1_2-more-layers_epoch_17_file_1.h5' # yzt-x, tight-1, w-geo-fix, 2 more layers
+        trained_model_paths[2] = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-2_w-geo-fix_bs64_dp0.1_epoch_30_file_1.h5' # xyz-t, tight-2
+        trained_model_paths[3] = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_tight-2_w-geo-fix_bs64_dp0.1_epoch_33_file_1.h5' # yzt-x, tight-2
+
+    elif swap_4d_channels + str_ident == 'xyz-t_and_yzt-x_and_xyt-z' + 'multi_input_single_train_tight-1_tight-2':
+        trained_model_paths[0] = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-1_w-geo-fix_bs64_2-more-layers_epoch_32_file_1.h5' # xyz-t, tight-1, w-geo-fix, 2 more layers
+        trained_model_paths[1] = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_tight-1_w-geo-fix_bs64_dp0.1_2-more-layers_epoch_17_file_1.h5' # yzt-x, tight-1, w-geo-fix, 2 more layers
+        trained_model_paths[2] = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-2_w-geo-fix_bs64_dp0.1_epoch_30_file_1.h5' # xyz-t, tight-2
+        trained_model_paths[3] = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_tight-2_w-geo-fix_bs64_dp0.1_epoch_33_file_1.h5' # yzt-x, tight-2
+        trained_model_paths[4] = 'models/trained/trained_model_VGG_4d_xyt-z_muon-CC_to_elec-CC_xyt-z_tight-1_w-geo-fix_bs64_dp0.1_epoch_33_file_1.h5' # xyt-z, tight-1
 
     else:
         raise ValueError('The double input combination specified in "swap_4d_channels" is not known, check the function for what is available.')
 
-    trained_model_1 = ks.models.load_model(trained_model_1_path)
-    trained_model_2 = ks.models.load_model(trained_model_2_path)
+    n_inputs = len(trained_model_paths)
+    trained_models = {}
+    input_layers = {}
+    layer_numbers = {}
+    x = {}
 
-    # model 1
-    input_layer_net_1 = Input(shape=input_dim[0][1:], name='input_net_1', dtype=K.floatx()) # have to do that manually
-    layer_numbers_net_1 = {'conv': 1, 'batch_norm': 1, 'activation': 1, 'max_pooling': 1, 'dropout': 1}
+    for i in xrange(n_inputs):
+        trained_models[i] = ks.models.load_model(trained_model_paths[i])
 
-    x_1 = create_layer_from_config(input_layer_net_1, trained_model_1.layers[1], layer_numbers_net_1, trainable=False, net='1')
+        input_layers[i] = Input(shape=input_dim[i][1:], name='input_net_' + str(i+1), dtype=K.floatx())
+        layer_numbers[i] = {'conv': 1, 'batch_norm': 1, 'activation': 1, 'max_pooling': 1, 'dropout': 1}
 
-    for trained_layer in trained_model_1.layers[2:]:
-        if 'flatten' in trained_layer.name: break  # we don't want to get anything after the flatten layer
-        x_1 = create_layer_from_config(x_1, trained_layer, layer_numbers_net_1, trainable=False, net='1', dropout=dropout[0])
+        x[i] = create_layer_from_config(input_layers[i], trained_models[i].layers[1], layer_numbers[i], trainable=False, net=str(i+1))
+        for trained_layer in trained_models[i].layers[2:]:
+            if 'flatten' in trained_layer.name: break  # we don't want to get anything after the flatten layer
+            x[i] = create_layer_from_config(x[i], trained_layer, layer_numbers[i], trainable=False, net=str(i+1), dropout=dropout[0])
 
-    # model 2
-    input_layer_net_2 = Input(shape=input_dim[1][1:], name='input_net_2', dtype=K.floatx()) # change input layer name
-    layer_numbers_net_2 = {'conv': 1, 'batch_norm': 1, 'activation': 1, 'max_pooling': 1, 'dropout': 1}
+        x[i] = Flatten()(x[i])
 
-    x_2 = create_layer_from_config(input_layer_net_2, trained_model_2.layers[1], layer_numbers_net_2, trainable=False, net='2')
+    x = ks.layers.concatenate([x[i] for i in x])
 
-    for trained_layer in trained_model_2.layers[2:]:
-        if 'flatten' in trained_layer.name: break # we don't want to get anything after the flatten layer
-        x_2 = create_layer_from_config(x_2, trained_layer, layer_numbers_net_2, trainable=False, net='2', dropout=dropout[0])
-
-    # flatten both nets
-    x_1, x_2 = Flatten()(x_1), Flatten()(x_2)
-
-    # concatenate both nets
-    x = ks.layers.concatenate([x_1, x_2])
-
-    x = Dense(128, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+    x = Dense(256, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
     x = Dropout(dropout[1])(x)
-    x = Dense(16, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+    x = Dense(64, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
 
     x = Dense(nb_classes, activation='softmax', kernel_initializer='he_normal')(x)
 
-    model = Model(inputs=[input_layer_net_1, input_layer_net_2], outputs=x)
-
-    set_layer_weights(model, trained_model_1, trained_model_2) # set weights
+    model = Model(inputs=[input_layers[i] for i in input_layers], outputs=x)
+    set_layer_weights(model, trained_models) # set weights
 
     for layer in model.layers: # freeze trainable batch_norm weights, but not running mean and variance
         if 'batch_norm' in layer.name:
             layer.stateful = True
 
     return model
+
+
+# def create_vgg_like_model_double_input_from_single_nns(n_bins, batchsize, str_ident, nb_classes=2, dropout=(0, 0.2), swap_4d_channels=None, activation='relu'):
+#     """
+#     Returns a double input, VGG-like model (stacked conv. layers) with MaxPooling and Dropout if wished.
+#     The two single VGG networks are concatenated after the last flatten layers.
+#     :param list(tuple) n_bins: Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
+#     :param int nb_classes: Number of output classes.
+#     :param int batchsize: Batchsize of the data that will be used with the VGG net.
+#     :param (float, float) dropout: Adds dropout if >0.
+#     :param None/str swap_4d_channels: For 3.5D nets, specifies if the default channel (t) should be swapped with another dim.
+#     :param str activation: Type of activation function that should be used. E.g. 'linear', 'relu', 'elu', 'selu'.
+#     :return: Model model: Keras VGG-like model.
+#     """
+#     dim, input_dim, max_pool_sizes = decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels)
+#
+#     if swap_4d_channels == 'yzt-x_all-t_and_yzt-x_tight-1-t':
+#         trained_model_1_path = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_only_new_timecut_dp01_epoch_47_file_1.h5'  # yzt-x, timecut_all, old geo
+#         trained_model_2_path = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_new_tight_timecut_250_500_dp01_epoch_34_file_1.h5'  # yzt-x, timecut tight-1, old geo
+#
+#     elif swap_4d_channels + str_ident  == 'xyz-t_and_yzt-x' + 'double_input_single_train_tight-1':
+#         # trained_model_1_path = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-1_w-geo-fix_epoch_22_file_1.h5'  # xyz-t, timecut tight_1, with geo fix
+#         # trained_model_2_path = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_new_tight_timecut_250_500_dp01_epoch_34_file_1.h5'  # yzt-x, timecut tight-1, old geo
+#         # New
+#         trained_model_1_path = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-1_w-geo-fix_bs64_2-more-layers_epoch_19_file_1.h5'  # xyz-t, timecut tight_1, with geo fix, 2 more layers
+#         trained_model_2_path = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_new_tight_timecut_250_500_dp01_larger_bs_64_w_geo_fix_epoch_30_file_1.h5'  # yzt-x, timecut tight-1, new geo
+#
+#     elif swap_4d_channels is None: # xyz-t tight-1 and xyz-t tight-2
+#         trained_model_1_path = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-1_w-geo-fix_bs64_epoch_3_file_1.h5'  # xyz-t, timecut tight_1, with geo fix, fully trained epoch 23
+#         trained_model_2_path = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-2_w-geo-fix_bs64_dp0.1_epoch_3_file_1.h5'  # xyz-t, timecut tight-2, with geo fix, fully trained epoch 36
+#
+#     else:
+#         raise ValueError('The double input combination specified in "swap_4d_channels" is not known, check the function for what is available.')
+#
+#     trained_model_1 = ks.models.load_model(trained_model_1_path)
+#     trained_model_2 = ks.models.load_model(trained_model_2_path)
+#
+#     # model 1
+#     input_layer_net_1 = Input(shape=input_dim[0][1:], name='input_net_1', dtype=K.floatx()) # have to do that manually
+#     layer_numbers_net_1 = {'conv': 1, 'batch_norm': 1, 'activation': 1, 'max_pooling': 1, 'dropout': 1}
+#
+#     x_1 = create_layer_from_config(input_layer_net_1, trained_model_1.layers[1], layer_numbers_net_1, trainable=False, net='1')
+#
+#     for trained_layer in trained_model_1.layers[2:]:
+#         if 'flatten' in trained_layer.name: break  # we don't want to get anything after the flatten layer
+#         x_1 = create_layer_from_config(x_1, trained_layer, layer_numbers_net_1, trainable=False, net='1', dropout=dropout[0])
+#
+#     # model 2
+#     input_layer_net_2 = Input(shape=input_dim[1][1:], name='input_net_2', dtype=K.floatx()) # change input layer name
+#     layer_numbers_net_2 = {'conv': 1, 'batch_norm': 1, 'activation': 1, 'max_pooling': 1, 'dropout': 1}
+#
+#     x_2 = create_layer_from_config(input_layer_net_2, trained_model_2.layers[1], layer_numbers_net_2, trainable=False, net='2')
+#
+#     for trained_layer in trained_model_2.layers[2:]:
+#         if 'flatten' in trained_layer.name: break # we don't want to get anything after the flatten layer
+#         x_2 = create_layer_from_config(x_2, trained_layer, layer_numbers_net_2, trainable=False, net='2', dropout=dropout[0])
+#
+#     # flatten both nets
+#     x_1, x_2 = Flatten()(x_1), Flatten()(x_2)
+#
+#     # concatenate both nets
+#     x = ks.layers.concatenate([x_1, x_2])
+#
+#     x = Dense(128, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+#     x = Dropout(dropout[1])(x)
+#     x = Dense(16, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+#
+#     x = Dense(nb_classes, activation='softmax', kernel_initializer='he_normal')(x)
+#
+#     model = Model(inputs=[input_layer_net_1, input_layer_net_2], outputs=x)
+#
+#     set_layer_weights(model, trained_model_1, trained_model_2) # set weights
+#
+#     for layer in model.layers: # freeze trainable batch_norm weights, but not running mean and variance
+#         if 'batch_norm' in layer.name:
+#             layer.stateful = True
+#
+#     return model
 
 
 def create_layer_from_config(x, trained_layer, layer_numbers, trainable=False, net='', dropout=0):
@@ -340,50 +463,34 @@ def create_layer_from_config(x, trained_layer, layer_numbers, trainable=False, n
     return x
 
 
-def set_layer_weights(model, trained_model_1, trained_model_2):
+def set_layer_weights(model, trained_models):
     """
     Sets the weights of a double input model (until the first flatten layer) based on two pretrained models.
     :param Model model: Keras model instance.
-    :param Model trained_model_1: Pretrained Keras model 1.
-    :param Model trained_model_2: Pretrained Keras model 2.
-    :return:
+    :param dict trained_models: dict that contains references to the Keras model instances of the already pretrained models.
     """
     skip_layers = ['dropout', 'input', 'dense', 'flatten', 'max_pooling', 'activation', 'concatenate']
+    n_models = len(trained_models)
+    trained_layers_w_weights = {}
 
-    # net_1
-    trained_layers_w_weights_net1 = [layer for layer in trained_model_1.layers if 'conv' in layer.name or 'batch_normalization' in layer.name] # still ordered
+    for i in xrange(n_models):
+        trained_layers_w_weights[i] = [layer for layer in trained_models[i].layers if 'conv' in layer.name or 'batch_normalization' in layer.name]  # still ordered
 
-    i=-1
-    for layer in model.layers:
-        if 'net_2' in layer.name: continue
+        j = -1
+        for layer in model.layers:
+            if 'net_' + str(i+1) not in layer.name: continue
 
-        skip = False # workaround of hell...
-        for skip_layer_str in skip_layers:
-            if skip_layer_str in layer.name:
-                skip = True
-        if skip: continue
+            skip = False  # workaround of hell...
+            for skip_layer_str in skip_layers:
+                if skip_layer_str in layer.name:
+                    skip = True
+            if skip: continue
 
-        i += 1
-        layer.set_weights(trained_layers_w_weights_net1[i].get_weights())
-
-    # net_2
-    trained_layers_w_weights_net2 = [layer for layer in trained_model_2.layers if 'conv' in layer.name or 'batch_normalization' in layer.name] # still ordered
-
-    i = -1
-    for layer in model.layers:
-        if 'net_1' in layer.name: continue
-
-        skip = False # workaround of hell...
-        for skip_layer_str in skip_layers:
-            if skip_layer_str in layer.name:
-                skip = True
-        if skip: continue
-
-        i += 1
-        layer.set_weights(trained_layers_w_weights_net2[i].get_weights())
+            j += 1
+            layer.set_weights(trained_layers_w_weights[i][j].get_weights())
 
 
-def change_dropout_rate_for_double_input_model(n_bins, batchsize, trained_model, dropout=(0.2, 0.2), trainable=(True, True), swap_4d_channels=None):
+def change_dropout_rate_for_double_input_model(n_bins, batchsize, trained_model, dropout=(0.1, 0.1), trainable=(True, True), swap_4d_channels=None):
     """
     Function that rebuilds a keras model and modifies its dropout rate. Workaround, till layer.rate is fixed to work with Dropout layers.
     :param list(tuple) n_bins: Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
@@ -397,8 +504,8 @@ def change_dropout_rate_for_double_input_model(n_bins, batchsize, trained_model,
     dim, input_dim, max_pool_sizes = decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels)
 
     # rebuild trained_model based on it's layer config
-    input_layer_net_1 = Input(shape=input_dim[0][1:], name='input_net_1', dtype=K.floatx())  # have to do that manually, xyz-t
-    input_layer_net_2 = Input(shape=input_dim[1][1:], name='input_net_2', dtype=K.floatx())  # change input layer name, yzt-x
+    input_layer_net_1 = Input(shape=input_dim[0][1:], name='input_net_1', dtype=K.floatx())  # have to do that manually
+    input_layer_net_2 = Input(shape=input_dim[1][1:], name='input_net_2', dtype=K.floatx())
 
     layer_numbers_net_1 = {'conv': 1, 'batch_norm': 1, 'activation': 1, 'max_pooling': 1, 'dropout': 1}
     layer_numbers_net_2 = {'conv': 1, 'batch_norm': 1, 'activation': 1, 'max_pooling': 1, 'dropout': 1}
@@ -526,6 +633,7 @@ def conv_block_time_distributed(ip, n_filters, k_size=3, dropout=0, max_pooling=
 
 
 #------------- VGG-like model -------------#
+
 
 
 

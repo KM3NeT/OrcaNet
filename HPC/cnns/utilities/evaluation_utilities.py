@@ -14,7 +14,7 @@ from .cnn_utilities import generate_batches_from_hdf5_file
 
 #------------- Functions used in evaluating the performance of model -------------#
 
-def make_performance_array_energy_correct(model, f, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, samples=None):
+def make_performance_array_energy_correct(model, f, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, samples=None):
     """
     Creates an energy_correct array based on test_data that specifies for every event, if the model's prediction is True/False.
     :param ks.model.Model model: Fully trained Keras model of a neural network.
@@ -25,11 +25,12 @@ def make_performance_array_energy_correct(model, f, n_bins, class_type, batchsiz
     :param int batchsize: Batchsize that should be used for predicting.
     :param list(ndarray) xs_mean: mean_image(s) of the x dataset if zero-centering is enabled.
     :param None/str swap_4d_channels: For 4D data input (3.5D models). Specifies, if the channels for the 3.5D net should be swapped in the generator.
+    :param str str_ident: string identifier that is parsed to the generator. Needed for some projection types.
     :param None/int samples: Number of events that should be predicted. If samples=None, the whole file will be used.
     :return: ndarray arr_energy_correct: Array that contains the energy, correct, particle_type, is_cc and y_pred info for each event.
     """
     # TODO only works for a single test_file till now
-    generator = generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, zero_center_image=xs_mean, yield_mc_info=True, swap_col=swap_4d_channels) # f_size=samples prob not necessary
+    generator = generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, str_ident, zero_center_image=xs_mean, yield_mc_info=True, swap_col=swap_4d_channels) # f_size=samples prob not necessary
 
     if samples is None: samples = len(h5py.File(f[0], 'r')['y']) # TODO fix multi input
     steps = samples/batchsize
@@ -217,8 +218,8 @@ def make_energy_to_accuracy_plot(arr_energy_correct, title, filepath, plot_range
     energy = arr_energy_correct[:, 0]
     correct = arr_energy_correct[:, 1]
 
-    hist_1d_energy = np.histogram(energy, bins=98, range=plot_range)
-    hist_1d_energy_correct = np.histogram(arr_energy_correct[correct == 1, 0], bins=98, range=plot_range)
+    hist_1d_energy = np.histogram(energy, bins=97, range=plot_range)
+    hist_1d_energy_correct = np.histogram(arr_energy_correct[correct == 1, 0], bins=97, range=plot_range)
 
     bin_edges = hist_1d_energy[1]
     hist_1d_energy_accuracy_bins = np.divide(hist_1d_energy_correct[0], hist_1d_energy[0], dtype=np.float32)
@@ -309,8 +310,8 @@ def make_step_plot_1d_energy_accuracy_class(arr_energy_correct, axes, particle_t
     energy_class = arr_energy_correct_class[:, 0]
     correct_class = arr_energy_correct_class[:, 1]
 
-    hist_1d_energy_class = np.histogram(energy_class, bins=98, range=plot_range)
-    hist_1d_energy_correct_class = np.histogram(arr_energy_correct_class[correct_class == 1, 0], bins=98, range=plot_range)
+    hist_1d_energy_class = np.histogram(energy_class, bins=97, range=plot_range)
+    hist_1d_energy_correct_class = np.histogram(arr_energy_correct_class[correct_class == 1, 0], bins=97, range=plot_range)
 
     bin_edges = hist_1d_energy_class[1]
     hist_1d_energy_accuracy_class_bins = np.divide(hist_1d_energy_correct_class[0], hist_1d_energy_class[0], dtype=np.float32) # TODO solve division by zero
@@ -603,7 +604,6 @@ def calculate_and_plot_correlation(arr_energy_correct, modelname, compare_pheid=
     :param str modelname: Name of the model used for plot savenames.
     :param bool compare_pheid: Boolean flag that specifies if only events that survive the Pheid precuts should be used in making the plots.
     """
-
     if compare_pheid is True:
         arr_energy_correct = arr_energy_correct_select_pheid_events(arr_energy_correct, invert=False)
 

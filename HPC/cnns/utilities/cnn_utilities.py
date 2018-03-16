@@ -11,7 +11,7 @@ import keras as ks
 
 #------------- Functions used for supplying images to the GPU -------------#
 
-def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, f_size=None, zero_center_image=None, yield_mc_info=False, swap_col=None):
+def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, str_ident, f_size=None, zero_center_image=None, yield_mc_info=False, swap_col=None):
     """
     Wrapper for a generator that creates batches of cnn input images ('xs') and labels ('ys').
     The wrapper is used for separating two possible cases:
@@ -19,13 +19,13 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, f_s
     2) The data for the generator is contained in multiple h5 files (gen_batches_from_multiple_files).
     """
     if len(filepath) > 1:
-        return gen_batches_from_multiple_files(filepath, batchsize, n_bins, class_type, f_size=f_size, zero_center_image=zero_center_image, yield_mc_info=yield_mc_info, swap_col=swap_col)
+        return gen_batches_from_multiple_files(filepath, batchsize, n_bins, class_type, str_ident, f_size=f_size, zero_center_image=zero_center_image, yield_mc_info=yield_mc_info, swap_col=swap_col)
 
     else:
         return gen_batches_from_single_file(filepath[0], batchsize, n_bins[0], class_type, f_size=f_size, zero_center_image=zero_center_image, yield_mc_info=yield_mc_info, swap_col=swap_col)
 
 
-def gen_batches_from_multiple_files(filepath, batchsize, n_bins, class_type, f_size=None, zero_center_image=None, yield_mc_info=False, swap_col=None):
+def gen_batches_from_multiple_files(filepath, batchsize, n_bins, class_type, str_ident, f_size=None, zero_center_image=None, yield_mc_info=False, swap_col=None):
     """
     Generator that returns batches of (multiple-) images ('xs') and labels ('ys') from multiple h5 files.
     :param list filepath: List that contains full filepath of the input h5 files, e.g. '/path/to/file/file.h5'.
@@ -33,6 +33,7 @@ def gen_batches_from_multiple_files(filepath, batchsize, n_bins, class_type, f_s
     :param tuple n_bins: Number of bins for each dimension (x,y,z,t) in the h5 file.
     :param (int, str) class_type: Tuple with the umber of output classes and a string identifier to specify the exact output classes.
                                   I.e. (2, 'muon-CC_to_elec-CC')
+    :param str str_ident: string identifier that specifies the projection type / model inputs in certain cases.
     :param int/None f_size: Specifies the filesize (#images) of the .h5 file if not the whole .h5 file
                        but a fraction of it (e.g. 10%) should be used for yielding the xs/ys arrays.
                        This is important if you run fit_generator(epochs>1) with a filesize (and hence # of steps) that is smaller than the .h5 file.
@@ -43,43 +44,71 @@ def gen_batches_from_multiple_files(filepath, batchsize, n_bins, class_type, f_s
                           Currently available: 'yzt-x' -> [3,1,2,0] from [0,1,2,3]
     :return: tuple output: Yields a tuple which contains a full batch of images and labels (+ mc_info if yield_mc_info=True).
     """
-    dimensions_1 = get_dimensions_encoding(n_bins[0], batchsize) # TODO only available with double input for now, not expanded to n-inputs
-    dimensions_2 = get_dimensions_encoding(n_bins[1], batchsize)
-    swap_4d_channels_dict = {'yzt-x_all-t_and_yzt-x_tight-1-t': [(0, 2, 3, 4, 1)], 'xyz-t-tight-1-w-geo-fix_and_yzt-x-tight-1-wout-geo-fix': [(0, 2, 3, 4, 1)]}
+    n_files = len(filepath)
+    dimensions = {}
+    for i in xrange(n_files):
+        dimensions[i] = get_dimensions_encoding(n_bins[i], batchsize)
+
+    swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'xyt-z': (0, 1, 2, 4, 3)}
 
     while 1:
-        f_1 = h5py.File(filepath[0], "r")
-        f_2 = h5py.File(filepath[1], "r")
-        if f_size is None:
-            f_size = len(f_1['y'])
+        f = {}
+        for i in xrange(n_files):
+            f[i] = h5py.File(filepath[i], 'r')
+
+        if f_size is None: # Should be same for all files!
+            f_size = len(f[0]['y']) # Take len of first file in filepaths, should be same for all files
             warnings.warn('f_size=None could produce unexpected results if the f_size used in fit_generator(steps=int(f_size / batchsize)) with epochs > 1 '
                           'is not equal to the f_size of the true .h5 file. Should be ok if you use the tb_callback.')
 
         n_entries = 0
         while n_entries <= (f_size - batchsize):
             # create numpy arrays of input data (features)
-            xs_1 = f_1['x'][n_entries : n_entries + batchsize]
-            xs_2 = f_2['x'][n_entries: n_entries + batchsize]
-            xs_1 = np.reshape(xs_1, dimensions_1).astype(np.float32)
-            xs_2 = np.reshape(xs_2, dimensions_2).astype(np.float32)
+            xs = {}
+            xs_list = [] # list of inputs for the Keras NN
+            for i in xrange(n_files):
+                xs[i] = f[i]['x'][n_entries : n_entries + batchsize]
+                xs[i] = np.reshape(xs[i], dimensions[i]).astype(np.float32)
 
             if zero_center_image is not None:
-                xs_1 = np.subtract(xs_1, zero_center_image[0])
-                xs_2 = np.subtract(xs_2, zero_center_image[1])
+                for i in xrange(n_files):
+                    xs[i] = np.subtract(xs[i], zero_center_image[i])
 
             if swap_col is not None:
                 if swap_col == 'yzt-x_all-t_and_yzt-x_tight-1-t':
-                    xs_1 = np.transpose(xs_1, swap_4d_channels_dict[swap_col][0])
-                    xs_2 = np.transpose(xs_2, swap_4d_channels_dict[swap_col][0])
+                    for i in xrange(n_files):
+                        xs[i] = np.transpose(xs[i], swap_4d_channels_dict['yzt-x'])
+
+                elif swap_col + str_ident == 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2':
+                    xs_list.append(xs[0]) # xyz-t tight-1
+                    xs_yzt_x_tight_1 = np.transpose(xs[0], swap_4d_channels_dict['yzt-x']) # yzt-x tight-1
+                    xs_list.append(xs_yzt_x_tight_1)
+                    xs_list.append(xs[1]) # xyz-t tight-2
+                    xs_yzt_x_tight_2 = np.transpose(xs[1], swap_4d_channels_dict['yzt-x']) # yzt-x tight-2
+                    xs_list.append(xs_yzt_x_tight_2)
+
+                elif swap_col + str_ident == 'xyz-t_and_yzt-x_and_xyt-z' + 'multi_input_single_train_tight-1_tight-2':
+                    xs_list.append(xs[0]) # xyz-t tight-1
+                    xs_yzt_x_tight_1 = np.transpose(xs[0], swap_4d_channels_dict['yzt-x']) # yzt-x tight-1
+                    xs_list.append(xs_yzt_x_tight_1)
+                    xs_list.append(xs[1]) # xyz-t tight-2
+                    xs_yzt_x_tight_2 = np.transpose(xs[1], swap_4d_channels_dict['yzt-x']) # yzt-x tight-2
+                    xs_list.append(xs_yzt_x_tight_2)
+                    xs_xyt_z_tight_1 = np.transpose(xs[0], swap_4d_channels_dict['xyt-z']) # xyt-z tight-1
+                    xs_list.append(xs_xyt_z_tight_1)
 
                 elif swap_col == 'xyz-t-tight-1-w-geo-fix_and_yzt-x-tight-1-wout-geo-fix':
-                    xs_2 = np.transpose(xs_2, swap_4d_channels_dict[swap_col][0])
+                    xs[1] = np.transpose(xs[1], swap_4d_channels_dict['yzt-x'])
 
                 else: raise ValueError('The argument "swap_col"=' + str(swap_col) + ' is not valid.')
 
+            else:
+                for i in xrange(n_files):
+                    xs_list.append(xs[i])
+
             # and mc info (labels). Since the labels are same (!!) for all the multiple files, use first file for this
-            y_values = f_1['y'][n_entries:n_entries+batchsize]
-            y_values = np.reshape(y_values, (batchsize, y_values.shape[1])) #TODO simplify with (y_values, y_values.shape) ?
+            y_values = f[0]['y'][n_entries:n_entries+batchsize]
+            y_values = np.reshape(y_values, (batchsize, y_values.shape[1]))
             ys = np.zeros((batchsize, class_type[0]), dtype=np.float32)
             # encode the labels such that they are all within the same range (and filter the ones we don't want for now)
             for c, y_val in enumerate(y_values): # Could be vectorized with numba, or use dataflow from tensorpack
@@ -88,11 +117,11 @@ def gen_batches_from_multiple_files(filepath, batchsize, n_bins, class_type, f_s
             # we have read one more batch from this file
             n_entries += batchsize
 
-            output = ([xs_1, xs_2], ys) if yield_mc_info is False else ([xs_1, xs_2], ys) + (y_values,)
+            output = (xs_list, ys) if yield_mc_info is False else (xs_list, ys) + (y_values,)
             yield output
 
-        f_1.close()
-        f_2.close()
+        for i in xrange(n_files):
+            f[i].close()
 
 
 def gen_batches_from_single_file(filepath, batchsize, n_bins, class_type, f_size=None, zero_center_image=None, yield_mc_info=False, swap_col=None):
@@ -114,7 +143,7 @@ def gen_batches_from_single_file(filepath, batchsize, n_bins, class_type, f_size
     :return: tuple output: Yields a tuple which contains a full batch of images and labels (+ mc_info if yield_mc_info=True).
     """
     dimensions = get_dimensions_encoding(n_bins, batchsize)
-    swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'tyz-x': (0, 4, 2, 3, 1), 't-xyz': (0, 4, 1, 2, 3)}
+    swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'tyz-x': (0, 4, 2, 3, 1), 't-xyz': (0, 4, 1, 2, 3), 'xyt-z': (0, 1, 2, 4, 3)}
 
     while 1:
         f = h5py.File(filepath, "r")
@@ -132,7 +161,7 @@ def gen_batches_from_single_file(filepath, batchsize, n_bins, class_type, f_size
             if zero_center_image is not None: xs = np.subtract(xs, zero_center_image[0])  # if swap_col is not None, zero_center_image is already swapped // CHANGED!! not anymore
 
             if swap_col is not None:
-                if swap_col == 'yzt-x':
+                if swap_col == 'yzt-x' or swap_col == 'xyt-z':
                     xs = np.transpose(xs, swap_4d_channels_dict[swap_col])
                 elif swap_col == 'xyz-t_and_yzt-x':
                     xs_xyz_t = xs
@@ -317,6 +346,13 @@ def encode_targets(y_val, class_type):
             train_y[0] = categorical_type[3]
             if categorical_type[3] != 1:
                 train_y[1] = 1
+
+    elif class_type[1] == 'energy_and_direction':
+        train_y = np.zeros(4, dtype='float32')
+        train_y[0] = y_val[2] # energy
+        train_y[1] = y_val[5] # dir_x
+        train_y[2] = y_val[6] # dir_y
+        train_y[3] = y_val[7] # dir_z
 
     else:
         print "Class type " + str(class_type) + " not supported!"

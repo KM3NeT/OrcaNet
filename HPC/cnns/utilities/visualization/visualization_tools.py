@@ -47,6 +47,8 @@ def plot_train_and_test_statistics(modelname):
     plt.savefig('models/trained/perf_plots/plots/loss_' + modelname + '.pdf')
     plt.savefig('models/trained/perf_plots/plots/loss_' + modelname + '.png', dpi=600)
 
+    plt.close()
+
 
 def get_epoch_xticks(test_epoch, train_batchnr):
     """
@@ -72,7 +74,7 @@ def get_epoch_xticks(test_epoch, train_batchnr):
 
 
 
-def get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels, modelname, epoch, file_no=1, layer_name=None, learning_phase='test'):
+def get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels, modelname, epoch, str_ident, file_no=1, layer_name=None, learning_phase='test'):
     """
     Get the weights of a model and also the activations of the model for a single event.
     :param str f: path to a .h5 file that contains images of events. Needed for plotting the activations for the event.
@@ -82,6 +84,7 @@ def get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels
     :param None/int swap_4d_channels: for 3.5D, param for the gen to specify, if the default channel (t) should be swapped with another dim.
     :param str modelname: Name of the model in order to load it.
     :param int epoch: Epoch of the trained model.
+    :param str str_ident: string identifier that is parsed to the generator. Needed for some projection types.
     :param int file_no: File Number of the trained model in this epoch (if multiple files are trained per epoch).
     :param None/str layer_name: if only the activations of a single layer should be collected.
     :param str learning_phase: string identifier to specify the learning phase during the calculation of the activations.
@@ -89,7 +92,7 @@ def get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels
     """
     lp = 0. if learning_phase == 'test' else 1.
 
-    generator = generate_batches_from_hdf5_file(f, 1, n_bins, class_type, zero_center_image=xs_mean, swap_col=swap_4d_channels, yield_mc_info=True)
+    generator = generate_batches_from_hdf5_file(f, 1, n_bins, class_type, str_ident, zero_center_image=xs_mean, swap_col=swap_4d_channels, yield_mc_info=True)
     model_inputs, ys, y_values = next(generator) # y_values = mc_info for the event
 
     saved_model = ks.models.load_model('models/trained/trained_' + modelname + '_epoch_' + str(epoch) + '_file_' + str(file_no) + '.h5')
@@ -124,7 +127,7 @@ def get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels
     return layer_names, activations, weights, y_values
 
 
-def plot_weights_and_activations(f, n_bins, class_type, xs_mean, swap_4d_channels, modelname, epoch, file_no):
+def plot_weights_and_activations(f, n_bins, class_type, xs_mean, swap_4d_channels, modelname, epoch, file_no, str_ident):
     """
     Plots the weights of a model and the activations for one event to a .pdf file.
     :param str f: path to a .h5 file that contains images of events. Needed for plotting the activations for the event.
@@ -135,9 +138,10 @@ def plot_weights_and_activations(f, n_bins, class_type, xs_mean, swap_4d_channel
     :param str modelname: name of the model.
     :param int epoch: epoch of the model.
     :param int file_no: File Number of the trained model in this epoch (if multiple files are trained per epoch).
+    :param str str_ident: string identifier that is parsed to the get_activations_and_weights function. Needed for some projection types.
     """
     layer_names, activations, weights, y_values = get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels,
-                                                                              modelname, epoch, file_no=file_no,  layer_name=None, learning_phase='test')
+                                                                              modelname, epoch, str_ident, file_no=file_no,  layer_name=None, learning_phase='test')
 
     fig, axes = plt.subplots()
     pdf_activations_and_weights = PdfPages('models/trained/perf_plots/model_stat_plots/act_and_weights_plots_' + modelname + '_epoch' + str(epoch) + '.pdf')
@@ -180,3 +184,4 @@ def plot_weights_and_activations(f, n_bins, class_type, xs_mean, swap_4d_channel
         plt.cla()
 
     pdf_activations_and_weights.close()
+    plt.close()
