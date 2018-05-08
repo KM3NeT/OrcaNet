@@ -17,9 +17,9 @@ def parse_input():
     Parses the user input in order to return the most important information:
     1) directory where the .h5 files that should be concatenated are located 2) the fraction of the data that should be used for the test split
     3) the total number of train files 4) the total number of test files
-    :return: str dirpath: full path of the folder with the .h5 files.
-    :return: float test_fraction: fraction of the total data that should be used for the test data sample.
-    :return: int, int n_train_files, n_test_files: number of concatenated .h5 train/test files.
+    :return str dirpath: full path of the folder with the .h5 files.
+    :return float test_fraction: fraction of the total data that should be used for the test data sample.
+    :return int, int n_train_files, n_test_files: number of concatenated .h5 train/test files.
     :return int n_file_start: specifies the first file number of the .h5 files (standard: 1).
     :return None/int n_files_max: specifies the maximum file number upon which the concatenation should happen.
     :return (bool, int) chunking: specifies if chunks should be used and if yes which size the chunks should have.
