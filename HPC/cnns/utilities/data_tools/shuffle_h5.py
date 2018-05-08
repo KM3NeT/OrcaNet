@@ -25,6 +25,7 @@ def parse_input():
     :return: bool delete_flag: specifies if the old, unshuffled file should be deleted after extracting the data.
     :return: (bool, int) chunking: specifies if chunks should be used and if yes which size the chunks should have.
     :return (None/str, None/int) compress: Tuple that specifies if a compression should be used for saving.
+    :return int n_shuffles: specifies if a file should be shuffled (and saved) multiple times with a different seed each time.
     """
     parser = argparse.ArgumentParser(description='E.g. < python shuffle_h5.py filepath_1 [filepath_2] [...] > \n'
                                                  'Shuffles .h5 files. Requires that each dataset of the files has the same number of rows (axis_0). \n'
@@ -85,7 +86,8 @@ def shuffle_h5(filepath, delete_flag=True, chunking=(False, None), tool=False, c
     :param bool tool: specifies if the function is accessed from the shuffle_h5_tool.
                       In this case, the shuffled .h5 file is returned instead of closed.
     :param (None/str, None/int) compress: Tuple that specifies if a compression should be used for saving. ('gzip', 1)
-    :return: h5py.File output_file_shuffled: returns the shuffled .h5 file object if it is called from the tool.
+    :param int n_shuffles: specifies if a file should be shuffled (and saved) multiple times with a different seed each time.
+    :return h5py.File output_file_shuffled: returns the shuffled .h5 file object if it is called from the tool.
     """
     input_file = h5py.File(filepath, 'r')
     folder_data_array_dict = {}
@@ -113,7 +115,7 @@ def shuffle_h5(filepath, delete_flag=True, chunking=(False, None), tool=False, c
 
             if n == 0:
                 # get a particular seed for the first dataset such that the shuffling is consistent across the datasets
-                r = np.random.RandomState(42) # TODO n_shuffles maybe doesn't sense anymore with a fixed seed!!
+                r = np.random.RandomState(42 + i)
                 state = r.get_state()
                 r.shuffle(dataset)
 
