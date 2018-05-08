@@ -146,8 +146,8 @@ def load_event_selection():
     path = '/home/woody/capn/mppi033h/Code/HPC/cnns/results/plots/pheid_event_selection_txt/' # folder for storing the event cut .txts
 
     # Moritz's precuts
-    particle_type_dict = {'muon-CC': ['muon_cc_3_100_selectedEvents_forMichael_fixed.txt', (14,1)],
-                          'elec-CC': ['elec_cc_3_100_selectedEvents_forMichael_fixed.txt', (12,1)]} # TODO old
+    particle_type_dict = {'muon-CC': ['muon_cc_3_100_selectedEvents_forMichael_01_18.txt', (14,1)],
+                          'elec-CC': ['elec_cc_3_100_selectedEvents_forMichael_01_18.txt', (12,1)]}
 
     # Containment cut
     # particle_type_dict = {'muon-CC': ['muon_cc_3_100_selectedEvents_Rsmaller100_abszsmaller90_forMichael.txt', (14,1)],

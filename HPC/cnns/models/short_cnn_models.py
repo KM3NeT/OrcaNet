@@ -49,21 +49,21 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident =
         dim = 3
         if len(n_bins) > 1:
 
-            if swap_4d_channels == 'yzt-x_all-t_and_yzt-x_tight-1-t':
-                max_pool_sizes = {'net_1': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)},
-                                  'net_2': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}}
-                input_dim = get_dimensions_encoding(n_bins[0], batchsize)  # includes batchsize
-                input_dim = [(input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1]), # yzt-x all
-                             (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1])] # yzt-x tight-1
+            # if swap_4d_channels == 'yzt-x_all-t_and_yzt-x_tight-1-t':
+            #     max_pool_sizes = {'net_1': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)},
+            #                       'net_2': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}}
+            #     input_dim = get_dimensions_encoding(n_bins[0], batchsize)  # includes batchsize
+            #     input_dim = [(input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1]), # yzt-x all
+            #                  (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1])] # yzt-x tight-1
 
-            elif swap_4d_channels == 'xyz-t_and_yzt-x' and str_ident != 'multi_input_single_train_tight-1_tight-2':
+            if swap_4d_channels == 'xyz-t_and_yzt-x' and 'tight-1_tight-2' not in str_ident:
                 max_pool_sizes = {'net_1': {3: (2, 2, 2), 7: (2, 2, 2)}, # only used if training from scratch
                                   'net_2': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}}
                 input_dim = get_dimensions_encoding(n_bins[0], batchsize)  # includes batchsize
                 input_dim = [(input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]), # xyz-t
                              (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1])] # yzt-x
 
-            elif swap_4d_channels == 'xyz-t_and_yzt-x' and str_ident == 'multi_input_single_train_tight-1_tight-2':
+            elif swap_4d_channels == 'xyz-t_and_yzt-x' and 'multi_input_single_train_tight-1_tight-2' in str_ident:
                 max_pool_sizes = {'net_1': {3: (2, 2, 2), 7: (2, 2, 2)}, # only used if training from scratch
                                   'net_2': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)},
                                   'net_3': {3: (2, 2, 2), 7: (2, 2, 2)},
@@ -252,7 +252,7 @@ def create_vgg_like_model_double_input(n_bins, batchsize, nb_classes=2, n_filter
     # concatenate both nets
     x = ks.layers.concatenate([x_1, x_2])
 
-    x = Dense(256, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+    x = Dense(128, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
     if dropout > 0.0: x = Dropout(dropout)(x)
     x = Dense(16, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
 
@@ -279,19 +279,20 @@ def create_vgg_like_model_multi_input_from_single_nns(n_bins, batchsize, str_ide
     dim, input_dim, max_pool_sizes = decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident=str_ident)
     trained_model_paths = {}
 
-    if swap_4d_channels + str_ident  == 'xyz-t_and_yzt-x' + 'double_input_single_train_tight-1':
-        trained_model_paths[0] = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-1_w-geo-fix_bs64_2-more-layers_epoch_19_file_1.h5'  # xyz-t, timecut tight_1, with geo fix, 2 more layers
-        trained_model_paths[1] = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_new_tight_timecut_250_500_dp01_larger_bs_64_w_geo_fix_epoch_30_file_1.h5'  # yzt-x, timecut tight-1, new geo
+    #if swap_4d_channels + str_ident  == 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1':
+    if 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1' in swap_4d_channels + str_ident and 'multi_input_single_train_tight-1_tight-2' not in str_ident:
+        trained_model_paths[0] = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-1_w-geo-fix_bs64_2-more-layers_epoch_32_file_1.h5'  # xyz-t, timecut tight_1, with geo fix, 2 more layers
+        trained_model_paths[1] = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_tight-1_w-geo-fix_bs64_dp0.1_2-more-layers_epoch_30_file_1.h5'  # yzt-x, timecut tight-1, with geo fix, 2 more layers
 
     elif swap_4d_channels is None: # xyz-t tight-1 and xyz-t tight-2
         trained_model_paths[0] = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-1_w-geo-fix_bs64_epoch_3_file_1.h5'  # xyz-t, timecut tight_1, with geo fix, fully trained epoch 23
         trained_model_paths[1] = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-2_w-geo-fix_bs64_dp0.1_epoch_3_file_1.h5'  # xyz-t, timecut tight-2, with geo fix, fully trained epoch 36
 
-    elif swap_4d_channels + str_ident == 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2':
+    elif 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2' in swap_4d_channels + str_ident:
         trained_model_paths[0] = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-1_w-geo-fix_bs64_2-more-layers_epoch_32_file_1.h5' # xyz-t, tight-1, w-geo-fix, 2 more layers
-        trained_model_paths[1] = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_tight-1_w-geo-fix_bs64_dp0.1_2-more-layers_epoch_17_file_1.h5' # yzt-x, tight-1, w-geo-fix, 2 more layers
-        trained_model_paths[2] = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-2_w-geo-fix_bs64_dp0.1_epoch_30_file_1.h5' # xyz-t, tight-2
-        trained_model_paths[3] = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_tight-2_w-geo-fix_bs64_dp0.1_epoch_33_file_1.h5' # yzt-x, tight-2
+        trained_model_paths[1] = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_tight-1_w-geo-fix_bs64_dp0.1_2-more-layers_epoch_31_file_1.h5' # yzt-x, tight-1, w-geo-fix, 2 more layers
+        trained_model_paths[2] = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-2_w-geo-fix_bs64_2-more-layers_epoch_24_file_1.h5' # xyz-t, tight-2
+        trained_model_paths[3] = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_tight-2_w-geo-fix_bs64_dp0.1_2-more-layers_epoch_29_file_1.h5' # yzt-x, tight-2
 
     elif swap_4d_channels + str_ident == 'xyz-t_and_yzt-x_and_xyt-z' + 'multi_input_single_train_tight-1_tight-2':
         trained_model_paths[0] = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-1_w-geo-fix_bs64_2-more-layers_epoch_32_file_1.h5' # xyz-t, tight-1, w-geo-fix, 2 more layers
@@ -324,9 +325,9 @@ def create_vgg_like_model_multi_input_from_single_nns(n_bins, batchsize, str_ide
 
     x = ks.layers.concatenate([x[i] for i in x])
 
-    x = Dense(256, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+    x = Dense(128, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
     x = Dropout(dropout[1])(x)
-    x = Dense(64, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+    x = Dense(32, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
 
     x = Dense(nb_classes, activation='softmax', kernel_initializer='he_normal')(x)
 

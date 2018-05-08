@@ -14,11 +14,11 @@ from .cnn_utilities import generate_batches_from_hdf5_file
 
 #------------- Functions used in evaluating the performance of model -------------#
 
-def make_performance_array_energy_correct(model, f, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, samples=None):
+def make_performance_array_energy_correct(model, test_files, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, modelname, samples=None):
     """
     Creates an energy_correct array based on test_data that specifies for every event, if the model's prediction is True/False.
     :param ks.model.Model model: Fully trained Keras model of a neural network.
-    :param str f: Filepath of the file that is used for making predctions.
+    :param str test_files: List that contains the test files. Format should be [ ( [], ), ... ].
     :param list(tuple) n_bins: The number of bins for each dimension (x,y,z,t) in the testfile. Can contain multiple n_bins tuples.
     :param (int, str) class_type: The number of output classes and a string identifier to specify the exact output classes.
                                   I.e. (2, 'muon-CC_to_elec-CC')
@@ -27,41 +27,46 @@ def make_performance_array_energy_correct(model, f, n_bins, class_type, batchsiz
     :param None/str swap_4d_channels: For 4D data input (3.5D models). Specifies, if the channels for the 3.5D net should be swapped in the generator.
     :param str str_ident: string identifier that is parsed to the generator. Needed for some projection types.
     :param None/int samples: Number of events that should be predicted. If samples=None, the whole file will be used.
-    :return: ndarray arr_energy_correct: Array that contains the energy, correct, particle_type, is_cc and y_pred info for each event.
+    :param str modelname: name of the nn model.
+    :return: ndarray arr_nn_pred: Array that contains the energy, correct, particle_type, is_cc and y_pred info for each event.
     """
-    # TODO only works for a single test_file till now
-    generator = generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, str_ident, zero_center_image=xs_mean, yield_mc_info=True, swap_col=swap_4d_channels) # f_size=samples prob not necessary
+    # get total number of samples
+    cum_number_of_steps = get_cum_number_of_steps(test_files, batchsize)
 
-    if samples is None: samples = len(h5py.File(f[0], 'r')['y']) # TODO fix multi input
-    steps = samples/batchsize
+    arr_nn_pred = None
+    for f_number, f in enumerate(test_files):
+        generator = generate_batches_from_hdf5_file(f[0], batchsize, n_bins, class_type, str_ident, zero_center_image=xs_mean, yield_mc_info=True, swap_col=swap_4d_channels) # f_size=samples prob not necessary
 
-    arr_energy_correct = None
-    for s in xrange(steps):
-        if s % 100 == 0:
-            print 'Predicting in step ' + str(s)
-        xs, y_true, mc_info = next(generator)
-        y_pred = model.predict_on_batch(xs)
+        if samples is None: samples = len(h5py.File(f[0][0], 'r')['y'])
+        steps = samples/batchsize
 
-        # check if the predictions were correct
-        correct = check_if_prediction_is_correct(y_pred, y_true)
-        energy = mc_info[:, 2]
-        particle_type = mc_info[:, 1]
-        is_cc = mc_info[:, 3]
-        event_id = mc_info[:, 0]
-        run_id = mc_info[:, 9]
-        bjorken_y = mc_info[:, 4]
+        arr_nn_pred_row_start = cum_number_of_steps[f_number] * batchsize
+        for s in xrange(steps):
+            if s % 100 == 0:
+                print 'Predicting in step ' + str(s) + ' on file ' + str(f_number)
+            xs, y_true, mc_info = next(generator)
+            y_pred = model.predict_on_batch(xs)
 
-        ax = np.newaxis
+            # check if the predictions were correct
+            correct = check_if_prediction_is_correct(y_pred, y_true)
+            energy = mc_info[:, 2]
+            particle_type = mc_info[:, 1]
+            is_cc = mc_info[:, 3]
+            event_id = mc_info[:, 0]
+            run_id = mc_info[:, 9]
+            bjorken_y = mc_info[:, 4]
 
-        # make a temporary energy_correct array for this batch
-        arr_energy_correct_temp = np.concatenate([energy[:, ax], correct[:, ax], particle_type[:, ax], is_cc[:, ax],
-                                                  y_pred, event_id[:, ax], run_id[:, ax], bjorken_y[:, ax]], axis=1)
+            ax = np.newaxis
+            # make a temporary energy_correct array for this batch
+            arr_nn_pred_temp = np.concatenate([energy[:, ax], correct[:, ax], particle_type[:, ax], is_cc[:, ax],
+                                                      y_pred, event_id[:, ax], run_id[:, ax], bjorken_y[:, ax]], axis=1)
 
-        if arr_energy_correct is None:
-            arr_energy_correct = np.zeros((steps * batchsize, arr_energy_correct_temp.shape[1:2][0]), dtype=np.float32)
-        arr_energy_correct[s*batchsize : (s+1) * batchsize] = arr_energy_correct_temp
+            if arr_nn_pred is None: arr_nn_pred = np.zeros((cum_number_of_steps[-1] * batchsize, arr_nn_pred_temp.shape[1:2][0]), dtype=np.float32)
+            arr_nn_pred[arr_nn_pred_row_start + s*batchsize : arr_nn_pred_row_start + (s+1) * batchsize] = arr_nn_pred_temp
 
-    return arr_energy_correct
+    make_pred_h5_file(arr_nn_pred, filepath='predictions/' + modelname) # TODO check for empty lines
+
+    return arr_nn_pred
 
 
 def check_if_prediction_is_correct(y_pred, y_true):
@@ -79,6 +84,43 @@ def check_if_prediction_is_correct(y_pred, y_true):
 
     correct = np.equal(class_pred, class_true)
     return correct
+
+
+def get_cum_number_of_steps(files, batchsize):
+    """
+    Function that calculates the cumulative number of prediction steps for the single files in the <files> list.
+    Typically used during prediction when the data is split to multiple input files.
+    :param list(tuple(list,int)) files: file list that should have the shape [ ( [], ), ... ]
+    :param int batchsize: batchsize that is used during the prediction
+    """
+    cum_number_of_steps = [0]
+    for f in files:
+        samples = len(h5py.File(f[0][0], 'r')['y'])
+        steps = samples/batchsize
+        cum_number_of_steps.append(steps) # [0, steps_sample_1, steps_sample_1 + steps_sample_2, ...]
+
+    return cum_number_of_steps
+
+
+def make_pred_h5_file(arr_nn_pred, filepath):
+    """
+
+    :param arr_nn_pred:
+    :param filepath:
+    :return:
+    """
+    # pid (particle_type + is_cc), run_id, event_id, y_pred_track
+    print arr_nn_pred.shape
+    arr_nn_output = np.concatenate([arr_nn_pred[:, 2:3], arr_nn_pred[:, 3:4], arr_nn_pred[:, 7:8], arr_nn_pred[:, 6:7], arr_nn_pred[:, 5:6]], axis=1)
+
+    f = h5py.File(filepath + '3-100GeV.h5', 'w')
+    dset = f.create_dataset('nn_output', data=arr_nn_output)
+    dset.attrs['array_contents'] = 'Columns: PID (particle_type + is_cc), run_id, event_id, y_pred_track. \n' \
+                                   'PID info: (12, 0): elec-NC, (12, 1): elec-CC, (14, 1): muon-CC, (16, 1): tau-CC \n' \
+                                   'y_pred_track info: probability of the neural network for this event to be a track'
+    f.close()
+
+
 
 #------------- Functions used in evaluating the performance of model -------------#
 
@@ -111,11 +153,19 @@ def load_pheid_event_selection():
     """
     path = '/home/woody/capn/mppi033h/Code/HPC/cnns/results/plots/pheid_event_selection_txt/' # folder for storing the precut .txts
 
-    # Moritz's precuts
+    #### Precuts
+    # 3-100 GeV
     particle_type_dict = {'muon-CC': ['muon_cc_3_100_selectedEvents_forMichael_01_18.txt', (14,1)],
-                          'elec-CC': ['elec_cc_3_100_selectedEvents_forMichael_01_18.txt', (12,1)]}
+                          'elec-CC': ['elec_cc_3_100_selectedEvents_forMichael_01_18.txt', (12,1)],
+                          'elec-NC': ['elec_nc_3_100_selectedEvents_forMichael.txt', (12, 0)],
+                          'tau-CC': ['tau_cc_3_100_selectedEvents_forMichael.txt', (16, 1)]}
 
-    # # Containment cut
+    # 1-5GeV
+    # particle_type_dict = {'muon-CC': ['muon_cc_1_5_selectedEvents_forMichael.txt', (14,1)],
+    #                       'elec-CC': ['elec_cc_1_5_selectedEvents_forMichael.txt', (12,1)],
+    #                       'elec-NC': ['elec_nc_1_5_selectedEvents_forMichael.txt', (12, 0)]}
+
+    #### Containment cut
     # particle_type_dict = {'muon-CC': ['muon_cc_3_100_selectedEvents_Rsmaller100_abszsmaller90_forMichael.txt', (14,1)],
     #                       'elec-CC': ['elec_cc_3_100_selectedEvents_Rsmaller100_abszsmaller90_forMichael.txt', (12,1)]}
 
@@ -260,12 +310,18 @@ def make_energy_to_accuracy_plot_multiple_classes(arr_energy_correct, title, fil
 
     fig, axes = plt.subplots()
 
-    particle_types_dict = {'muon-CC': (14, 1), 'a_muon-CC': (-14, 1), 'elec-CC': (12, 1), 'a_elec-CC': (-12, 1)}
+    particle_types_dict = {'muon-CC': (14, 1), 'a_muon-CC': (-14, 1), 'elec-CC': (12, 1),
+                           'a_elec-CC': (-12, 1), 'elec-NC': (12, 0), 'a_elec-NC': (-12, 0),
+                           'tau-CC': (16, 1), 'a_tau-CC': (-16, 1)}
 
     make_step_plot_1d_energy_accuracy_class(arr_energy_correct, axes, particle_types_dict, 'muon-CC', plot_range, linestyle='-', color='b')
     make_step_plot_1d_energy_accuracy_class(arr_energy_correct, axes, particle_types_dict, 'a_muon-CC', plot_range, linestyle='--', color='b')
     make_step_plot_1d_energy_accuracy_class(arr_energy_correct, axes, particle_types_dict, 'elec-CC', plot_range, linestyle='-', color='r', invert=True)
     make_step_plot_1d_energy_accuracy_class(arr_energy_correct, axes, particle_types_dict, 'a_elec-CC', plot_range, linestyle='--', color='r', invert=True)
+    make_step_plot_1d_energy_accuracy_class(arr_energy_correct, axes, particle_types_dict, 'elec-NC', plot_range, linestyle='-', color='saddlebrown', invert=True)
+    make_step_plot_1d_energy_accuracy_class(arr_energy_correct, axes, particle_types_dict, 'a_elec-NC', plot_range, linestyle='--', color='saddlebrown', invert=True)
+    make_step_plot_1d_energy_accuracy_class(arr_energy_correct, axes, particle_types_dict, 'tau-CC', plot_range, linestyle='-', color='g', invert=True)
+    make_step_plot_1d_energy_accuracy_class(arr_energy_correct, axes, particle_types_dict, 'a_tau-CC', plot_range, linestyle='--', color='g', invert=True)
 
     axes.legend(loc='center right')
 

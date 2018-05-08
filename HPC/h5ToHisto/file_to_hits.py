@@ -74,7 +74,7 @@ def get_event_data(event_blob, geo, do_mc_hits, use_calibrated_file, data_cuts, 
     ax = np.newaxis
     event_hits = np.concatenate([pos_x[:, ax], pos_y[:, ax], pos_z[:, ax], time[:, ax], triggered[:, ax]], axis=1)
 
-    if do4d[0] is True and do4d[1] == 'channel_id':
+    if do4d[0] is True and do4d[1] == 'channel_id' or do4d[1] == 'xzt-c':
         channel_id = hits.channel_id.astype('float32')
         event_hits = np.concatenate([event_hits, channel_id[:, ax]], axis=1)
 

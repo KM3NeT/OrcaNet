@@ -72,12 +72,14 @@ def calculate_bin_edges_test(geo, y_bin_edge, z_bin_edge):
     print '----------------------------------------------------------------------------------------------'
 
 
-def calculate_bin_edges(n_bins, fname_geo_limits):
+def calculate_bin_edges(n_bins, geo_fix, fname_geo_limits, do4d):
     """
     Calculates the bin edges for the later np.histogramdd actions based on the number of specified bins. 
     This is performed in order to get the same bin size for each event regardless of the fact if all bins have a hit or not.
     :param tuple n_bins: contains the desired number of bins for each dimension. [n_bins_x, n_bins_y, n_bins_z]
+    :param bool geo_fix: declares if the fixed geometry by Stefan should be used (1 DOM / bin).
     :param str fname_geo_limits: filepath of the .txt ORCA geometry file.
+    :param (bool, str) do4d: Tuple that declares if 4D histograms should be created [0] and if yes, what should be used as the 4th dim after xyz.
     :return: ndarray(ndim=1) x_bin_edges, y_bin_edges, z_bin_edges: contains the resulting bin edges for each dimension.
     """
     print "Reading detector geometry in order to calculate the detector dimensions from file " + fname_geo_limits
@@ -89,30 +91,47 @@ def calculate_bin_edges(n_bins, fname_geo_limits):
 
     x_bin_edges = np.linspace(geo_limits[0][1] - 9.95, geo_limits[1][1] + 9.95, num=n_bins[0] + 1) #try to get the lines in the bin center 9.95*2 = average x-separation of two lines
     y_bin_edges = np.linspace(geo_limits[0][2] - 9.75, geo_limits[1][2] + 9.75, num=n_bins[1] + 1) # Delta y = 19.483
-    z_bin_edges = np.linspace(geo_limits[0][3] - 4.665, geo_limits[1][3] + 4.665, num=n_bins[2] + 1) # Delta z = 9.329
+    if do4d[0] is True and do4d[1] == 'xzt-c': # n_bins = [xzt,c]
+        z_bin_edges = np.linspace(geo_limits[0][3] - 4.665, geo_limits[1][3] + 4.665, num=n_bins[1] + 1)  # Delta z = 9.329
+    else: # n_bins = [xyz,t/c]
+        z_bin_edges = np.linspace(geo_limits[0][3] - 4.665, geo_limits[1][3] + 4.665, num=n_bins[2] + 1)  # Delta z = 9.329
 
-    # Gefittete offsets: x,y,factor: factor*(x+x_off)
-    # [6.19, 0.064, 1.0128]
-    # # Stefan's modifications
-    offset_x, offset_y, scale = [6.19, 0.064, 1.0128]
-    x_bin_edges = (x_bin_edges + offset_x )*scale
-    y_bin_edges = (y_bin_edges + offset_y )*scale
+    # ORCA denser detector study
+    #z_bin_edges = np.linspace(37.84 - 7.5, 292.84 + 7.5, num=n_bins[2] + 1)  # 15m vertical
+    #z_bin_edges = np.linspace(37.84 - 6, 241.84 + 6, num=n_bins[2] + 1)  # 12m vertical
+    #z_bin_edges = np.linspace(37.84 - 4.5, 190.84 + 4.5, num=n_bins[2] + 1)  # 9m vertical
+    #z_bin_edges = np.linspace(37.84 - 3, 139.84 + 3, num=n_bins[2] + 1)  # 6m vertical
+    #z_bin_edges = np.linspace(37.84 - 2.25, 114.34 + 2.25, num=n_bins[2] + 1)  # 4.5m vertical
+
+    if geo_fix is True:
+        # Gefittete offsets: x,y,factor: factor*(x+x_off), # # Stefan's modifications:
+        offset_x, offset_y, scale = [6.19, 0.064, 1.0128]
+        x_bin_edges = (x_bin_edges + offset_x )*scale
+        y_bin_edges = (y_bin_edges + offset_y )*scale
 
     #calculate_bin_edges_test(geo, y_bin_edges, z_bin_edges) # test disabled by default. Activate it, if you change the offsets in x/y/z-bin-edges
 
     return x_bin_edges, y_bin_edges, z_bin_edges
 
 
-def main(n_bins, do2d=False, do2d_pdf=(False, 10), do3d=False, do4d=(True, 'time'), do_mc_hits=False, use_calibrated_file=False, data_cuts=None):
+def main(n_bins, geo_fix=True, do2d=False, do2d_pdf=(False, 10), do3d=False, do4d=(True, 'time'),
+         timecut = ('trigger_cluster', 'tight_1'), do_mc_hits=False, use_calibrated_file=False, data_cuts=None):
     """
     Main code. Reads raw .hdf5 files and creates 2D/3D histogram projections that can be used for a CNN
     :param tuple(int) n_bins: Declares the number of bins that should be used for each dimension (x,y,z,t).
+    :param bool geo_fix: declares if the fixed geometry by Stefan should be used (1 DOM / bin).
     :param bool do2d: Declares if 2D histograms should be created.
     :param (bool, int) do2d_pdf: Declares if pdf visualizations of the 2D histograms should be created. Cannot be called if do2d=False.
                                  The event loop will be stopped after the integer specified in the second argument.
     :param bool do3d: Declares if 3D histograms should be created.
     :param (bool, str) do4d: Tuple that declares if 4D histograms should be created [0] and if yes, what should be used as the 4th dim after xyz.
                              Currently, only 'time' and 'channel_id' are available.
+    :param (str, str/None) timecut: Tuple that defines what timecut should be used in hits_to_histograms.py.
+                                    Currently available:
+                                    ('timeslice_relative', None): Cuts out the central 30% of the snapshot.
+                                    ('trigger_cluster', 'all' / 'tight-1' / 'tight-2'): Cuts based on the mean of the triggered hits.
+                                    all: [-350ns, 850ns] -> 20ns / bin (60 bins)
+                                    tight-1: [-250ns, 500ns] -> 12.5ns / bin , tight-2: [-150ns, 200ns] -> 5.8ns / bin
     :param bool do_mc_hits: Declares if hits (False, mc_hits + BG) or mc_hits (True) should be processed
     :param bool use_calibrated_file: Declares if the input file is already calibrated (pos_x/y/z, time) or not.
     :param dict data_cuts: Dictionary that contains information about any possible cuts that should be applied.
@@ -134,7 +153,7 @@ def main(n_bins, do2d=False, do2d_pdf=(False, 10), do3d=False, do4d=(True, 'time
             raise IOError('The .detx file does not exist in the default path </home/woody/capn/mppi033h/misc/orca_detectors/fixed/>! '
                           'Change the path or add the .detx file to the default path.')
 
-    x_bin_edges, y_bin_edges, z_bin_edges = calculate_bin_edges(n_bins, filename_geo_limits)
+    x_bin_edges, y_bin_edges, z_bin_edges = calculate_bin_edges(n_bins, geo_fix, filename_geo_limits, do4d)
 
     all_4d_to_2d_hists, all_4d_to_3d_hists, all_4d_to_4d_hists, mc_infos = [], [], [], []
 
@@ -157,13 +176,13 @@ def main(n_bins, do2d=False, do2d_pdf=(False, 10), do3d=False, do4d=(True, 'time
         mc_infos.append(event_track)
 
         if do2d:
-            compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_2d_hists, event_track, do2d_pdf[0])
+            compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_2d_hists, timecut, event_track, do2d_pdf[0])
 
         if do3d:
-            compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_3d_hists)
+            compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_3d_hists, timecut)
 
         if do4d[0]:
-            compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_4d_hists, do4d)
+            compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_4d_hists, timecut, do4d)
 
         if do2d_pdf[0] is True and i >= do2d_pdf[1]:
             glob.pdf_2d_plots.close()
@@ -192,9 +211,12 @@ def main(n_bins, do2d=False, do2d_pdf=(False, 10), do3d=False, do4d=(True, 'time
 
 
 if __name__ == '__main__':
-    main(n_bins=(11,13,18,60), do2d=False, do2d_pdf=(False, 100), do3d=False, do4d=(True, 'time'),
-         do_mc_hits=False, use_calibrated_file=True, data_cuts = {'triggered': False, 'energy_lower_limit': 0})
+    main(n_bins=(11,13,18,50), geo_fix=False, do2d=False, do2d_pdf=(False, 100), do3d=True, do4d=(False, 'time'),
+         timecut = ('timeslice_relative', None), do_mc_hits=False, use_calibrated_file=True,
+         data_cuts = {'triggered': False, 'energy_lower_limit': 0})
     # main(n_bins=(11,13,18,31), do2d=False, do2d_pdf=(False, 100), do3d=False, do4d=(True, 'channel_id'),
+    #      do_mc_hits=False, use_calibrated_file=True, data_cuts = {'triggered': False, 'energy_lower_limit': 0})
+    # main(n_bins=(11,18,50,31), do2d=False, do2d_pdf=(False, 100), do3d=False, do4d=(True, 'xzt-c'),
     #      do_mc_hits=False, use_calibrated_file=True, data_cuts = {'triggered': False, 'energy_lower_limit': 0})
 
 

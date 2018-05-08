@@ -129,6 +129,7 @@ def plot_mc_hits(savestr='', mean=''):
     plt.hist(mc_hits_time_mean_all_events, bins=100)
     plt.grid(True, zorder=0, linestyle='dotted')
     plt.savefig('./plots/' + savestr + '/' + savestr + '_hist_mc_hits_time_minus_mean' + mean + '_all_events.png')
+
     plt.cla()
 
     # plt.hist(mc_hits_time_mean_all_events, bins=100, range=(-2500, 2500))
@@ -137,7 +138,20 @@ def plot_mc_hits(savestr='', mean=''):
 
     plt.hist(mc_hits_time_mean_all_events, bins=100, range=(-1000, 1500))
     plt.grid(True, zorder=0, linestyle='dotted')
+
+    plt.xlabel('MC-Hit time minus mean time of all triggered hits [ns]')
+    plt.ylabel('Number of hits [#]')
+    title = plt.title('MC-Hit time pattern for tau-neutrino-CC events')
+    title.set_position([.5, 1.04])
+    plt.axvline(x=-250, color='black', linestyle='--', label='Timecut 1')
+    plt.axvline(x=500, color='black', linestyle='--')
+    plt.axvline(x=-150, color='firebrick', linestyle='--', label='Timecut 2')
+    plt.axvline(x=200, color='firebrick', linestyle='--')
+    plt.legend(prop={'size': 12})
+    plt.tight_layout()
+
     plt.savefig('./plots/' + savestr + '/' + savestr + '_hist_mc_hits_time_minus_mean' + mean + '_all_events_zoom_-1000_1500.png')
+    plt.savefig('./plots/' + savestr + '/' + savestr + '_hist_mc_hits_time_minus_mean' + mean + '_all_events_zoom_-1000_1500.pdf')
     plt.cla()
 
 
@@ -151,18 +165,18 @@ if __name__ == '__main__':
                  'tau-CC': 'tau-CC_sample.h5'}
     filename_input = path + filenames[ptype]
 
-    # centered with trigg hits mean
-    get_time_array(filename_input, savestr=ptype)
-    plot(savestr=ptype)
-
-    # centered with mc_hits mean
-    get_time_array_mc_hits(filename_input, savestr=ptype)
-    plot_mc_hits(savestr=ptype)
+    # # centered with trigg hits mean
+    # get_time_array(filename_input, savestr=ptype)
+    # plot(savestr=ptype)
+    #
+    # # centered with mc_hits mean
+    # get_time_array_mc_hits(filename_input, savestr=ptype)
+    # plot_mc_hits(savestr=ptype)
 
     # centered mc_hits with trigg hits mean for each event
-    mean_triggered_time = np.load(ptype + '_mean_triggered_time_arr_each_event.npy')
-    print mean_triggered_time
-    get_time_array_mc_hits(filename_input, savestr=ptype, mean=('trigger', mean_triggered_time))
+    #mean_triggered_time = np.load(ptype + '_mean_triggered_time_arr_each_event.npy')
+    #print mean_triggered_time
+    #get_time_array_mc_hits(filename_input, savestr=ptype, mean=('trigger', mean_triggered_time))
     plot_mc_hits(savestr=ptype, mean='triggered')
 
 

@@ -31,7 +31,7 @@ def plot_train_and_test_statistics(modelname):
 
     # plot loss statistics
     plt.plot(train_batchnr, train_loss, 'b--', zorder=3, label='train', lw=0.5, alpha=0.5)
-    plt.plot(test_epoch, test_loss, 'b', marker='o', zorder=3, label='test', lw=0.5, markersize=3)
+    plt.plot(test_epoch, test_loss, 'b', marker='o', zorder=3, label='val', lw=0.5, markersize=3)
 
     x_ticks_major = get_epoch_xticks(test_epoch, train_batchnr)
     plt.xticks(x_ticks_major)

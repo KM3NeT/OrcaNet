@@ -113,7 +113,7 @@ def shuffle_h5(filepath, delete_flag=True, chunking=(False, None), tool=False, c
 
             if n == 0:
                 # get a particular seed for the first dataset such that the shuffling is consistent across the datasets
-                r = np.random.RandomState(42)
+                r = np.random.RandomState(42) # TODO n_shuffles maybe doesn't sense anymore with a fixed seed!!
                 state = r.get_state()
                 r.shuffle(dataset)
 

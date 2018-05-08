@@ -16,7 +16,7 @@ def get_time_parameters(event_hits, mode=('trigger_cluster', 'all'), t_start_mar
     Gets the fundamental time parameters in one place for cutting a time residual.
     Later on these parameters cut out a certain time span of events specified by t_start and t_end.
     :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyzt) data for a certain eventID. [positions_xyz, time, triggered]
-    :param str mode: type of time cut that is used. Currently available: timeslice_relative and first_triggered.
+    :param tuple(str, str) mode: type of time cut that is used. Currently available: timeslice_relative and first_triggered.
     :param float t_start_margin: Used in timeslice_relative mode. Defines the start time of the selected timespan with t_mean - t_start * t_diff.
     :param float t_end_margin: Used in timeslice_relative mode. Defines the end time of the selected timespan with t_mean + t_start * t_diff.
     :return: float t_start, t_end: absolute start and end time that will be used for the later timespan cut.
@@ -41,7 +41,7 @@ def get_time_parameters(event_hits, mode=('trigger_cluster', 'all'), t_start_mar
 
         else:
             assert mode[1] == 'all'
-            # first try, include nearly all mc_hits from muon-CC and elec-CC
+            # include nearly all mc_hits from muon-CC and elec-CC, 20ns / bin
             t_start = t_mean - 350 # trigger-cluster - 350ns
             t_end = t_mean + 850 # trigger-cluster + 850ns
 
@@ -59,7 +59,7 @@ def get_time_parameters(event_hits, mode=('trigger_cluster', 'all'), t_start_mar
     return t_start, t_end
 
 
-def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_2d_hists, event_track, do2d_pdf):
+def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_2d_hists, timecut, event_track, do2d_pdf):
     """
     Computes 2D numpy histogram 'images' from the 4D data.
     :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyzt) data for a certain eventID. [positions_xyz, time, triggered]
@@ -68,6 +68,7 @@ def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     :param ndarray(ndim=1) z_bin_edges: bin edges for the Z-direction.
     :param tuple n_bins: Contains the number of bins that should be used for each dimension (x,y,z,t).
     :param list all_4d_to_2d_hists: contains all 2D histogram projections.
+    :param (str, str/None) timecut: Tuple that defines what timecut should be used in hits_to_histograms.py.
     :param ndarray(ndim=2) event_track: contains the relevant mc_track info for the event in order to get a nice title for the pdf histos.
     :param bool do2d_pdf: if True, generate 2D matplotlib pdf histograms.
     :return: appends the 2D histograms to the all_4d_to_2d_hists list.
@@ -75,7 +76,7 @@ def compute_4d_to_2d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     x, y, z, t = event_hits[:, 0], event_hits[:, 1], event_hits[:, 2], event_hits[:, 3]
 
     # analyze time
-    t_start, t_end = get_time_parameters(event_hits, mode=('trigger_cluster', 'all'))
+    t_start, t_end = get_time_parameters(event_hits, mode=timecut)
 
     # create histograms for this event
     hist_xy = np.histogram2d(x, y, bins=(x_bin_edges, y_bin_edges))  # hist[0] = H, hist[1] = xedges, hist[2] = yedges
@@ -161,7 +162,7 @@ def convert_2d_numpy_hists_to_pdf_image(hists, t_start, t_end, event_track=None)
     plt.close()
 
 
-def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_3d_hists):
+def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_3d_hists, timecut):
     """
     Computes 3D numpy histogram 'images' from the 4D data.
     Careful: Currently, appending to all_4d_to_3d_hists takes quite a lot of memory (about 200MB for 3500 events).
@@ -173,11 +174,12 @@ def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     :param ndarray(ndim=1) z_bin_edges: bin edges for the Z-direction.
     :param tuple n_bins: Declares the number of bins that should be used for each dimension (x,y,z,t).
     :param list all_4d_to_3d_hists: contains all 3D histogram projections.
+    :param (str, str/None) timecut: Tuple that defines what timecut should be used in hits_to_histograms.py.
     :return: appends the 3D histograms to the all_4d_to_3d_hists list. [xyz, xyt, xzt, yzt, rzt]
     """
     x, y, z, t = event_hits[:, 0:1], event_hits[:, 1:2], event_hits[:, 2:3], event_hits[:, 3:4]
 
-    t_start, t_end = get_time_parameters(event_hits, mode=('trigger_cluster', 'all'))
+    t_start, t_end = get_time_parameters(event_hits, mode=timecut)
 
     hist_xyz = np.histogramdd(event_hits[:, 0:3], bins=(x_bin_edges, y_bin_edges, z_bin_edges))
 
@@ -200,7 +202,7 @@ def compute_4d_to_3d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
                                np.array(hist_rzt[0], dtype=np.uint8)))
 
 
-def compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_4d_hists, do4d):
+def compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edges, n_bins, all_4d_to_4d_hists, timecut, do4d):
     """
     Computes 4D numpy histogram 'images' from the 4D data.
     :param ndarray(ndim=2) event_hits: 2D array that contains the hits (_xyzt) data for a certain eventID. [positions_xyz, time, triggered, (channel_id)]
@@ -209,11 +211,12 @@ def compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
     :param ndarray(ndim=1) z_bin_edges: bin edges for the Z-direction.
     :param tuple n_bins: Declares the number of bins that should be used for each dimension (x,y,z,t).
     :param list all_4d_to_4d_hists: contains all 4D histogram projections.
+    :param (str, str/None) timecut: Tuple that defines what timecut should be used in hits_to_histograms.py.
     :param (bool, str) do4d: Tuple, where [1] declares what should be used as 4th dimension after xyz.
                              Currently, only 'time' and 'channel_id' are available.
     :return: appends the 4D histogram to the all_4d_to_4d_hists list. [xyzt]
     """
-    t_start, t_end = get_time_parameters(event_hits, mode=('trigger_cluster', 'tight_2'))
+    t_start, t_end = get_time_parameters(event_hits, mode=timecut)
 
     if do4d[1] == 'time':
         hist_4d = np.histogramdd(event_hits[:, 0:4], bins=(x_bin_edges, y_bin_edges, z_bin_edges, n_bins[3]),
@@ -227,6 +230,14 @@ def compute_4d_to_4d_histograms(event_hits, x_bin_edges, y_bin_edges, z_bin_edge
         hist_4d = np.histogramdd(np.concatenate([event_hits[:, 0:3], channel_id], axis=1), bins=(x_bin_edges, y_bin_edges, z_bin_edges, 31),
                                    range=((min(x_bin_edges),max(x_bin_edges)),(min(y_bin_edges),max(y_bin_edges)),
                                           (min(z_bin_edges),max(z_bin_edges)),(np.amin(channel_id), np.amax(channel_id))))
+
+    elif do4d[1] == 'xzt-c':
+        time = event_hits[:, 3]
+        event_hits = event_hits[np.logical_and(time >= t_start, time <= t_end)]
+        x, z, t, channel_id = event_hits[:, 0:1], event_hits[:, 2:3], event_hits[:, 3:4], event_hits[:, 5:6]
+        hist_4d = np.histogramdd(np.concatenate([x, z, t, channel_id], axis=1), bins=(x_bin_edges, z_bin_edges, n_bins[2], 31),
+                                   range=((min(x_bin_edges),max(x_bin_edges)),(min(z_bin_edges),max(z_bin_edges)),
+                                          (t_start, t_end),(np.amin(channel_id), np.amax(channel_id))))
 
     else:
         raise ValueError('The parameter in do4d[1] ' + str(do4d[1]) + ' is not available. Currently, only time and channel_id are supported.')
