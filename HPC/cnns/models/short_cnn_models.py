@@ -334,9 +334,9 @@ def create_vgg_like_model_multi_input_from_single_nns(n_bins, batchsize, str_ide
 
     x = ks.layers.concatenate([x[i] for i in x])
 
-    x = Dense(128, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+    x = Dense(128, activation=activation, kernel_initializer='he_normal')(x)
     x = Dropout(dropout[1])(x)
-    x = Dense(32, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+    x = Dense(32, activation=activation, kernel_initializer='he_normal')(x)
 
     x = Dense(nb_classes, activation='softmax', kernel_initializer='he_normal')(x)
 
@@ -524,10 +524,10 @@ def create_convolutional_lstm(n_bins, batchsize, nb_classes=2, n_filters=None, d
 
     if dropout > 0.0: x = Dropout(dropout)(x)
 
-    x = Dense(64, kernel_initializer='he_normal', kernel_regularizer=kernel_reg)(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+    x = Dense(64, kernel_initializer='he_normal', kernel_regularizer=kernel_reg)(x)
     x = Activation(activation)(x)
     if dropout > 0.0: x = Dropout(dropout)(x)
-    x = Dense(16, kernel_initializer='he_normal', kernel_regularizer=kernel_reg)(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+    x = Dense(16, kernel_initializer='he_normal', kernel_regularizer=kernel_reg)(x)
     x = Activation(activation)(x)
 
     x = Dense(nb_classes, activation='softmax', kernel_initializer='he_normal')(x)
