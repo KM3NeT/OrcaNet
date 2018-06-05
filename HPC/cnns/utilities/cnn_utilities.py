@@ -79,7 +79,7 @@ def gen_batches_from_multiple_files(filepath, batchsize, n_bins, class_type, str
                     for i in xrange(n_files):
                         xs[i] = np.transpose(xs[i], swap_4d_channels_dict['yzt-x'])
 
-                elif swap_col + str_ident == 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2':
+                elif 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2' in swap_col + str_ident:
                     xs_list.append(xs[0]) # xyz-t tight-1
                     xs_yzt_x_tight_1 = np.transpose(xs[0], swap_4d_channels_dict['yzt-x']) # yzt-x tight-1
                     xs_list.append(xs_yzt_x_tight_1)
@@ -117,7 +117,14 @@ def gen_batches_from_multiple_files(filepath, batchsize, n_bins, class_type, str
             # we have read one more batch from this file
             n_entries += batchsize
 
-            output = (xs_list, ys) if yield_mc_info is False else (xs_list, ys) + (y_values,)
+            if class_type[1] == 'track-shower':  # categorical problem, the Keras model has a single output
+                output = (xs_list, ys) if yield_mc_info is False else (xs_list, ys) + (y_values,)
+
+            else:  # regression problem, the Keras model has multiple outputs, one for each label
+                n_labels = class_type[0] # could also be inferred from the ys array, shape_1
+                ys_list = [ys[:, i] for i in xrange(n_labels)] # split the labels to individual arrays in a list
+                output = (xs, ys_list) if yield_mc_info is False else (xs, ys_list) + (y_values,)
+
             yield output
 
         for i in xrange(n_files):
@@ -150,7 +157,7 @@ def gen_batches_from_single_file(filepath, batchsize, n_bins, class_type, f_size
         if f_size is None:
             f_size = len(f['y'])
             warnings.warn('f_size=None could produce unexpected results if the f_size used in fit_generator(steps=int(f_size / batchsize)) with epochs > 1 '
-                          'is not equal to the f_size of the true .h5 file. Should be ok if you use the tb_callback.')
+                          'is not equal to the f_size of the true .h5 file. ')
 
         n_entries = 0
         while n_entries <= (f_size - batchsize):
@@ -158,7 +165,7 @@ def gen_batches_from_single_file(filepath, batchsize, n_bins, class_type, f_size
             xs = f['x'][n_entries : n_entries + batchsize]
             xs = np.reshape(xs, dimensions).astype(np.float32)
 
-            if zero_center_image is not None: xs = np.subtract(xs, zero_center_image[0])  # if swap_col is not None, zero_center_image is already swapped // CHANGED!! not anymore
+            if zero_center_image is not None: xs = np.subtract(xs, zero_center_image[0])
 
             if swap_col is not None:
                 if swap_col == 'yzt-x' or swap_col == 'xyt-z':
@@ -182,12 +189,23 @@ def gen_batches_from_single_file(filepath, batchsize, n_bins, class_type, f_size
             # we have read one more batch from this file
             n_entries += batchsize
 
-            if swap_col == 'xyz-t_and_yzt-x':
-                output = ([xs_xyz_t, xs_yzt_x], ys) if yield_mc_info is False else ([xs_xyz_t, xs_yzt_x], ys) + (y_values,)
-            else:
-                output = (xs, ys) if yield_mc_info is False else (xs, ys) + (y_values,)
+            if class_type[1] == 'track-shower': # categorical problem, the Keras model has a single output
+
+                if swap_col == 'xyz-t_and_yzt-x':
+                    output = ([xs_xyz_t, xs_yzt_x], ys) if yield_mc_info is False else ([xs_xyz_t, xs_yzt_x], ys) + (y_values,)
+                else:
+                    output = (xs, ys) if yield_mc_info is False else (xs, ys) + (y_values,)
+
+            else: # regression problem, the Keras model has multiple outputs, one for each label
+                n_labels = class_type[0] # could also be inferred from the ys array, shape_1
+                ys_list = [ys[:, i] for i in xrange(n_labels)] # split the labels to individual arrays in a list
+                if swap_col == 'xyz-t_and_yzt-x':
+                    output = ([xs_xyz_t, xs_yzt_x], ys_list) if yield_mc_info is False else ([xs_xyz_t, xs_yzt_x], ys_list) + (y_values,)
+                else:
+                    output = (xs, ys_list) if yield_mc_info is False else (xs, ys_list) + (y_values,)
 
             yield output
+
         f.close() # this line of code is actually not reached if steps=f_size/batchsize
 
 
@@ -238,7 +256,7 @@ def get_dimensions_encoding(n_bins, batchsize):
         dimensions = (batchsize, n_bins_x, n_bins_y, n_bins_z, 1)
 
     else:
-        print 'Using full 4D data'
+        # print 'Using full 4D data'
         dimensions = (batchsize, n_bins_x, n_bins_y, n_bins_z, n_bins_t)
 
     return dimensions
@@ -268,7 +286,7 @@ def encode_targets(y_val, class_type):
 
         if up_down_class_value == 0:
             print 'Warning: Found an event with dir_z==0. Setting the up-down class randomly.'
-            #TODO maybe [0.5, 0.5], but does it make sense with cat_crossentropy?
+            # maybe [0.5, 0.5], but does it make sense with cat_crossentropy?
             up_down_class_value = np.random.randint(2)
 
         if up_down_class_value == -1: up_down_class_value = 0 # Bring -1,1 values to 0,1
@@ -302,35 +320,17 @@ def encode_targets(y_val, class_type):
 
         return categorical
 
-
-    if class_type[1] == 'muon-CC_to_elec-NC':
-        categorical_type = convert_particle_class_to_categorical(y_val[1], y_val[3], num_classes=4)
-        train_y = np.zeros(class_type[0], dtype='float32') # 1 ([0], [1]) or 2 ([0,1], [1,0]) neurons
-
-        if class_type[0] == 1: # 1 neuron
-            if categorical_type[2] != 0:
-                train_y[0] = categorical_type[2] # =0 if elec-NC, =1 if muon-CC
-
-        else: # 2 neurons
-            assert class_type[0] == 2
-            train_y[0] = categorical_type[0]
-            train_y[1] = categorical_type[2]
-
-    elif class_type[1] == 'muon-CC_to_elec-CC':
+    if class_type[1] == 'track-shower':
+        assert class_type[0] == 2
         categorical_type = convert_particle_class_to_categorical(y_val[1], y_val[3], num_classes=4)
         train_y = np.zeros(class_type[0], dtype='float32')
 
-        if class_type[0] == 1: # 1 neuron
-            if categorical_type[2] != 0:
-                train_y[0] = categorical_type[2] # =0 if elec-CC, =1 if muon-CC
-
-        else: # 2 neurons
-            assert class_type[0] == 2
-            train_y[0] = categorical_type[1]
-            train_y[1] = categorical_type[2]
+        if categorical_type[2] == 1: # only a muon-CC event is a track
+            train_y[1] = 1 # track
+        else:
+            train_y[0] = 1 # shower
 
     elif class_type[1] == 'up_down':
-        #supports both 1 or 2 neurons at the cnn softmax end
         train_y = get_class_up_down_categorical(y_val[7], class_type[0])
 
     elif class_type[1] == 'tau-CC_vs_other_neutrinos':
@@ -347,12 +347,24 @@ def encode_targets(y_val, class_type):
             if categorical_type[3] != 1:
                 train_y[1] = 1
 
+    elif class_type[1] == 'energy':
+        train_y = np.zeros(1, dtype='float32')
+        train_y[0] = y_val[2]
+
     elif class_type[1] == 'energy_and_direction':
         train_y = np.zeros(4, dtype='float32')
         train_y[0] = y_val[2] # energy
         train_y[1] = y_val[5] # dir_x
         train_y[2] = y_val[6] # dir_y
         train_y[3] = y_val[7] # dir_z
+
+    elif class_type[1] == 'energy_and_direction_and_bjorken-y':
+        train_y = np.zeros(5, dtype='float32')
+        train_y[0] = y_val[2] # energy
+        train_y[1] = y_val[5] # dir_x
+        train_y[2] = y_val[6] # dir_y
+        train_y[3] = y_val[7] # dir_z
+        train_y[4] = y_val[4] # bjorken-y
 
     else:
         print "Class type " + str(class_type) + " not supported!"
@@ -376,36 +388,46 @@ def load_zero_center_data(train_files, batchsize, n_bins, n_gpu):
     :param int n_gpu: Number of gpu's, used for calculating the available RAM space in get_mean_image().
     :return: ndarray xs_mean: mean_image of the x dataset. Can be used for zero-centering later on.
     """
-    if len(train_files) > 1:
-        warnings.warn('More than 1 train file for zero-centering is currently not supported! '
-                      'Only the first file is used for calculating the xs_mean_array.')
-
     xs_mean = []
-    for i, filepath in enumerate(train_files[0][0]):
-
+    for i, filepath in enumerate(train_files[0][0]): # loop over multiple input data files for a single event
         # if the file has a shuffle index (e.g. shuffled_6.h5) and a .npy exists for the first shuffled file (shuffled.h5), we don't want to calculate the mean again
-        shuffle_index = re.search('shuffled(.*).h5', filepath)
-        filepath_without_index = re.sub(shuffle_index.group(1), '', filepath)
+        shuffle_index = re.search('(_file_.*)(_shuffled)(.*).h5', filepath)
+        filepath_without_index = re.sub(shuffle_index.group(1) + shuffle_index.group(2) + shuffle_index.group(3), '', filepath)
 
         if os.path.isfile(filepath_without_index + '_zero_center_mean.npy') is True:
             print 'Loading an existing xs_mean_array in order to zero_center the data!'
             xs_mean_temp = np.load(filepath_without_index + '_zero_center_mean.npy')
+
         else:
-            print 'Calculating the xs_mean_array in order to zero_center the data!'
+            print 'Calculating the xs_mean_array in order to zero_center the data! \n' \
+                  'Please note: use_scratch_ssd must be False, otherwise the xs_mean .npy will be saved to the scratch on the ssd!'
             dimensions = get_dimensions_encoding(n_bins[i], batchsize)
-            xs_mean_temp = get_mean_image(filepath, filepath_without_index, dimensions, n_gpu)
+
+            # if the train dataset is split over multiple files, we need to average over the single xs_mean_temp arrays.
+            xs_mean_temp_arr = None
+            for j in xrange(len(train_files)):
+                filepath_j = train_files[j][0][i] # j is the index of the j-th train file, i the index of the i-th projection input
+                xs_mean_temp_step = get_mean_image(filepath_j, dimensions, n_gpu)
+
+                if xs_mean_temp_arr is None:
+                    xs_mean_temp_arr = np.zeros((len(train_files),) + xs_mean_temp_step.shape, dtype=np.float64)
+                xs_mean_temp_arr[j] = xs_mean_temp_step
+
+            xs_mean_temp = np.mean(xs_mean_temp_arr, axis=0, dtype=np.float64).astype(np.float32) if len(train_files) > 1 else xs_mean_temp_arr[0]
+
+            np.save(filepath_without_index + '_zero_center_mean.npy', xs_mean_temp)
+            print 'Saved the xs_mean array with shape', xs_mean_temp.shape, ' to ', filepath_without_index, '_zero_center_mean.npy'
 
         xs_mean.append(xs_mean_temp)
 
     return xs_mean
 
 
-def get_mean_image(filepath, filepath_without_index, dimensions, n_gpu):
+def get_mean_image(filepath, dimensions, n_gpu):
     """
     Returns the mean_image of a xs dataset.
     Calculating still works if xs is larger than the available memory and also if the file is compressed!
     :param str filepath: Filepath of the data upon which the mean_image should be calculated.
-    :param str filepath_without_index: filepath without the number index.
     :param tuple dimensions: Dimensions tuple for 2D, 3D or 4D data.
     :param filepath: Filepath of the input data, used as a str for saving the xs_mean_image.
     :param int n_gpu: Number of used gpu's that is related to how much RAM is available (16G per GPU).
@@ -415,7 +437,6 @@ def get_mean_image(filepath, filepath_without_index, dimensions, n_gpu):
 
     # check available memory and divide the mean calculation in steps
     total_memory = n_gpu * 8e9 # In bytes. Take 1/2 of what is available per GPU (16G), just to make sure.
-    #filesize = os.path.getsize(filepath) # doesn't work for compressed files
     filesize =  get_array_memsize(f['x'])
 
     steps = int(np.ceil(filesize/total_memory))
@@ -438,7 +459,6 @@ def get_mean_image(filepath, filepath_without_index, dimensions, n_gpu):
     xs_mean = np.mean(xs_mean_arr, axis=0, dtype=np.float64).astype(np.float32)
     xs_mean = np.reshape(xs_mean, dimensions[1:]) # give the shape the channels dimension again if not 4D
 
-    np.save(filepath_without_index + '_zero_center_mean.npy', xs_mean)
     return xs_mean
 
 
@@ -535,35 +555,58 @@ class TensorBoardWrapper(ks.callbacks.TensorBoard):
 
 class BatchLevelPerformanceLogger(ks.callbacks.Callback):
     # Gibt loss aus über alle :display batches, gemittelt über die letzten :display batches
-    def __init__(self, display, modelname, steps_per_epoch, epoch):
+    def __init__(self, train_files, batchsize, display, model, modelname, epoch):
         ks.callbacks.Callback.__init__(self)
         self.seen = 0
         self.display = display
-        self.averageLoss = 0
-        self.averageAcc = 0
+        self.cum_loss = 0
+        self.cum_acc = 0
         self.logfile_train_fname = 'models/trained/perf_plots/log_train_' + modelname + '.txt'
         self.logfile_train = None
-        self.steps_per_epoch = steps_per_epoch
-        self.epoch = epoch
+        self.epoch_number = epoch[0]
+        self.f_number = epoch[1]
         self.loglist = []
+        self.n_train_files = len(train_files)
+        self.model = model
 
-    def on_batch_end(self, batch, logs={}):
+        self.cum_metrics = {}
+        for metric in self.model.metrics_names: # set up dict with all model metrics
+            self.cum_metrics[metric] = 0
+
+        self.steps_per_total_epoch, self.steps_cum = 0, [0]
+        for f, f_size in train_files:
+            steps_per_file = int(f_size / batchsize)
+            self.steps_per_total_epoch += steps_per_file
+            self.steps_cum.append(self.steps_cum[-1] + steps_per_file)
+
+    def on_batch_end(self, batch, logs={}): #TODO need to change loss and acc for energy and dir regression
         self.seen += 1
-        self.averageLoss += logs.get('loss')
-        self.averageAcc += logs.get("acc")
+        for metric in self.model.metrics_names: #
+            self.cum_metrics[metric] += logs.get(metric)
+
         if self.seen % self.display == 0:
-            averaged_loss = self.averageLoss / self.display
-            averaged_acc = self.averageAcc / self.display
-            batchnumber_float = (self.seen - self.display / 2.) / float(self.steps_per_epoch) + self.epoch - 1  # start from zero
-            self.loglist.append('\n{0}\t{1}\t{2}\t{3}'.format(self.seen, batchnumber_float, averaged_loss, averaged_acc))
-            self.averageLoss = 0
-            self.averageAcc = 0
 
-    def on_epoch_end(self, batch, logs={}):
+            batchnumber_float = (self.seen - self.display / 2.) / float(self.steps_per_total_epoch) + self.epoch_number - 1 \
+                                + (self.steps_cum [self.f_number-1] / float(self.steps_per_total_epoch)) # offset if the currently trained file is not the first one
+                                #+ (self.f_number-1) * (1/float(self.n_train_files)) # start from zero # only works if all train files have approximately the same number of entries
+
+            self.loglist.append('\n{0}\t{1}'.format(self.seen, batchnumber_float))
+            for metric in self.model.metrics_names:
+                self.loglist.append('\t' + str(self.cum_metrics[metric] / self.display))
+
+            for metric in self.model.metrics_names: #reset accumulated metrics
+                self.cum_metrics[metric] = 0
+
+    def on_epoch_end(self, batch, logs={}): # on epoch end here means that this is called after one fit_generator loop in Keras is finished.
         self.logfile_train = open(self.logfile_train_fname, 'a+')
-        if os.stat(self.logfile_train_fname).st_size == 0: self.logfile_train.write("#Batch\t#Batch_float\tLoss\tAccuracy")
 
-        for batch_statistics in self.loglist: # only write finished epochs to the .txt
+        if os.stat(self.logfile_train_fname).st_size == 0:
+            self.logfile_train.write('#Batch\t#Batch_float\t')
+            for i, metric in enumerate(self.model.metrics_names): # write columns for all losses / metrics
+                self.logfile_train.write(metric)
+                if i + 1 < len(self.model.metrics_names): self.logfile_train.write('\t') # newline \n is already written in the batch_statistics
+
+        for batch_statistics in self.loglist: # only write finished fit_generator calls to the .txt
             self.logfile_train.write(batch_statistics)
 
         self.logfile_train.flush()
