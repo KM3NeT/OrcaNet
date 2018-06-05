@@ -12,42 +12,54 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
 from ..cnn_utilities import generate_batches_from_hdf5_file
+from ..losses import custom_metric_mean_relative_error_5_labels
 
 
-def plot_train_and_test_statistics(modelname):
+def plot_train_and_test_statistics(modelname, model):
     """
     Plots the loss in training/testing based on .txt logfiles.
     :param str modelname: name of the model.
     """
-    # #Batch number # BatchNumber float # Loss # Accuracy
+    # #Batch number # BatchNumber float # Losses # Metrics
     log_array_train = np.loadtxt('models/trained/perf_plots/log_train_' + modelname + '.txt', dtype=np.float32, delimiter='\t', skiprows=1, ndmin=2)
-    # #Epoch # Loss # Accuracy
+    # #Epoch # Losses # Metrics
     log_array_test = np.loadtxt('models/trained/perf_plots/log_test_' + modelname + '.txt', dtype=np.float32, delimiter='\t', skiprows=1, ndmin=2)
 
-    train_batchnr, train_loss = log_array_train[:, 1], log_array_train[:, 2]
-    test_epoch, test_loss = log_array_test[:, 0], log_array_test[:, 1]
+    train_batchnr = log_array_train[:, 1]
+    test_epoch = log_array_test[:, 0]
+    x_ticks_major = get_epoch_xticks(test_epoch, train_batchnr)
 
     fig, axes = plt.subplots()
+    colors = ['#000000', '#332288', '#88CCEE', '#44AA99', '#117733', '#999933', '#DDCC77',
+              '#CC6677', '#882255', '#AA4499', '#661100', '#6699CC', '#AA4466', '#4477AA'] # ref. personal.sron.nl/~pault/
+    pdf_plots = PdfPages('models/trained/perf_plots/plots/loss_' + modelname + '.pdf')
 
-    # plot loss statistics
-    plt.plot(train_batchnr, train_loss, 'b--', zorder=3, label='train', lw=0.5, alpha=0.5)
-    plt.plot(test_epoch, test_loss, 'b', marker='o', zorder=3, label='val', lw=0.5, markersize=3)
+    i = 0
+    for metric_name in model.metrics_names: # metric names have same order as the columns in the log_array_train/test
+        if 'loss' in metric_name:
+            i += 1
+            train_metric_loss = log_array_train[:, 1 + i]
+            test_metric_loss = log_array_test[:, 0 + i]
 
-    x_ticks_major = get_epoch_xticks(test_epoch, train_batchnr)
-    plt.xticks(x_ticks_major)
+            color = colors[i-1]
+            plt.plot(train_batchnr, train_metric_loss, color=color, ls='--', zorder=3, label='train, ' + metric_name, lw=0.5, alpha=0.5)
+            plt.plot(test_epoch, test_metric_loss, color=color, marker='o', zorder=3, label='val, ' + metric_name, lw=0.5, markersize=3)
 
-    axes.legend(loc='upper right')
-    plt.xlabel('Epoch [#]')
-    plt.ylabel('Loss')
-    title = plt.title('Loss for ' + modelname)
-    title.set_position([.5, 1.04])
+            plt.xticks(x_ticks_major)
 
-    plt.grid(True, zorder=0, linestyle='dotted')
+            axes.legend(loc='upper right')
+            plt.xlabel('Epoch [#]')
+            plt.ylabel('Loss')
+            title = plt.title('Loss for ' + modelname)
+            title.set_position([.5, 1.04])
+            plt.grid(True, zorder=0, linestyle='dotted')
 
-    plt.savefig('models/trained/perf_plots/plots/loss_' + modelname + '.pdf')
-    plt.savefig('models/trained/perf_plots/plots/loss_' + modelname + '.png', dpi=600)
+            pdf_plots.savefig(fig)
+            plt.savefig('models/trained/perf_plots/plots/png/loss_' + metric_name + '_' + modelname + '.png', dpi=600)
+            plt.cla()
 
     plt.close()
+    pdf_plots.close()
 
 
 def get_epoch_xticks(test_epoch, train_batchnr):
@@ -95,7 +107,8 @@ def get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels
     generator = generate_batches_from_hdf5_file(f, 1, n_bins, class_type, str_ident, zero_center_image=xs_mean, swap_col=swap_4d_channels, yield_mc_info=True)
     model_inputs, ys, y_values = next(generator) # y_values = mc_info for the event
 
-    saved_model = ks.models.load_model('models/trained/trained_' + modelname + '_epoch_' + str(epoch) + '_file_' + str(file_no) + '.h5')
+    saved_model = ks.models.load_model('models/trained/trained_' + modelname + '_epoch_' + str(epoch) + '_file_' + str(file_no) + '.h5',
+                                       custom_objects={'custom_metric_mean_relative_error_5_labels': custom_metric_mean_relative_error_5_labels})
 
     inp = saved_model.input
 
