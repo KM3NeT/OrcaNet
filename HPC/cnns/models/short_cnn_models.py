@@ -103,6 +103,7 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident =
                 print 'Using a VGG-like 3.5D CNN with XYZ data and T/C channel information.'
                 #max_pool_sizes = {3: (2, 2, 2), 7: (2, 2, 2)}
                 max_pool_sizes = {5: (2, 2, 2), 9: (2, 2, 2)} # 2 more layers
+                #max_pool_sizes = {7: (2, 2, 2), 11: (2, 2, 2)}  # 4 more layers
 
             elif swap_4d_channels == 'yzt-x':
                 print 'Using a VGG-like 3.5D CNN with YZT data and X channel information.'
@@ -136,14 +137,15 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident =
     return dim, input_dim, max_pool_sizes
 
 
-def create_vgg_like_model(n_bins, batchsize, nb_classes=2, n_filters=None, dropout=0, k_size=3, swap_4d_channels=None,
+def create_vgg_like_model(n_bins, batchsize, class_type, n_filters=None, dropout=0, k_size=3, swap_4d_channels=None,
                           activation='relu', kernel_reg=None):
     """
     Returns a VGG-like model (stacked conv. layers) with MaxPooling and Dropout if wished.
     The number of convolutional layers can be controlled with the n_filters parameter:
     n_conv_layers = len(n_filters)
     :param list(tuple) n_bins: Number of bins (x,y,z,t) of the data. Should only contain one element for this single input net.
-    :param int nb_classes: Number of output classes.
+    :param (int, str) class_type: Declares the number of output classes and a string identifier to specify the exact output classes.
+                                  I.e. (2, 'track-shower')
     :param int batchsize: Batchsize of the data that will be used with the VGG net.
     :param tuple n_filters: Number of filters for each conv. layer. len(n_filters)=n_conv_layer.
     :param float dropout: Adds dropout if >0.
@@ -153,6 +155,7 @@ def create_vgg_like_model(n_bins, batchsize, nb_classes=2, n_filters=None, dropo
     :param None/str kernel_reg: if L2 regularization with 1e-4 should be employed. 'l2' to enable the regularization.
     :return: Model model: Keras VGG-like model.
     """
+    nb_classes = class_type[0]
     if n_filters is None: n_filters = (64,64,64,64,64,128,128,128)
     if kernel_reg is 'l2': kernel_reg = l2(0.0001)
 
@@ -166,14 +169,21 @@ def create_vgg_like_model(n_bins, batchsize, nb_classes=2, n_filters=None, dropo
 
     x = Flatten()(x)
     x = Dense(256, kernel_initializer='he_normal', kernel_regularizer=kernel_reg)(x)
-    #x = BatchNormalization(axis=-1)(x) # TODO
     x = Activation(activation)(x)
     if dropout > 0.0: x = Dropout(dropout)(x)
-    x = Dense(16, kernel_initializer='he_normal', kernel_regularizer=kernel_reg)(x) #bias_initializer=ks.initializers.Constant(value=0.1)
-    #x = BatchNormalization(axis=-1)(x)  # TODO
+    x = Dense(16, kernel_initializer='he_normal', kernel_regularizer=kernel_reg)(x)
     x = Activation(activation)(x)
 
-    x = Dense(nb_classes, activation='softmax', kernel_initializer='he_normal')(x)
+    if class_type[1] == 'track-shower': # categorical problem
+        x = Dense(nb_classes, activation='softmax', kernel_initializer='he_normal')(x)
+
+    else: # regression case, one output for each regression label
+        label_names = ['neuron_' + str(i) for i in xrange(class_type[0])]
+        if class_type[1] == 'energy_and_direction_and_bjorken-y':
+            label_names = ('energy', 'dir_x', 'dir_y', 'dir_z', 'bjorken-y')
+        elif class_type[1] == 'energy':
+            label_names = ('energy',)
+        x = [Dense(1, name=name)(x) for name in label_names]
 
     model = Model(inputs=input_layer, outputs=x)
 
@@ -252,9 +262,9 @@ def create_vgg_like_model_double_input(n_bins, batchsize, nb_classes=2, n_filter
     # concatenate both nets
     x = ks.layers.concatenate([x_1, x_2])
 
-    x = Dense(128, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+    x = Dense(128, activation=activation, kernel_initializer='he_normal')(x)
     if dropout > 0.0: x = Dropout(dropout)(x)
-    x = Dense(16, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
+    x = Dense(16, activation=activation, kernel_initializer='he_normal')(x)
 
     x = Dense(nb_classes, activation='softmax', kernel_initializer='he_normal')(x)
 
@@ -279,7 +289,6 @@ def create_vgg_like_model_multi_input_from_single_nns(n_bins, batchsize, str_ide
     dim, input_dim, max_pool_sizes = decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident=str_ident)
     trained_model_paths = {}
 
-    #if swap_4d_channels + str_ident  == 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1':
     if 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1' in swap_4d_channels + str_ident and 'multi_input_single_train_tight-1_tight-2' not in str_ident:
         trained_model_paths[0] = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-1_w-geo-fix_bs64_2-more-layers_epoch_32_file_1.h5'  # xyz-t, timecut tight_1, with geo fix, 2 more layers
         trained_model_paths[1] = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_tight-1_w-geo-fix_bs64_dp0.1_2-more-layers_epoch_30_file_1.h5'  # yzt-x, timecut tight-1, with geo fix, 2 more layers
@@ -339,84 +348,6 @@ def create_vgg_like_model_multi_input_from_single_nns(n_bins, batchsize, str_ide
             layer.stateful = True
 
     return model
-
-
-# def create_vgg_like_model_double_input_from_single_nns(n_bins, batchsize, str_ident, nb_classes=2, dropout=(0, 0.2), swap_4d_channels=None, activation='relu'):
-#     """
-#     Returns a double input, VGG-like model (stacked conv. layers) with MaxPooling and Dropout if wished.
-#     The two single VGG networks are concatenated after the last flatten layers.
-#     :param list(tuple) n_bins: Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
-#     :param int nb_classes: Number of output classes.
-#     :param int batchsize: Batchsize of the data that will be used with the VGG net.
-#     :param (float, float) dropout: Adds dropout if >0.
-#     :param None/str swap_4d_channels: For 3.5D nets, specifies if the default channel (t) should be swapped with another dim.
-#     :param str activation: Type of activation function that should be used. E.g. 'linear', 'relu', 'elu', 'selu'.
-#     :return: Model model: Keras VGG-like model.
-#     """
-#     dim, input_dim, max_pool_sizes = decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels)
-#
-#     if swap_4d_channels == 'yzt-x_all-t_and_yzt-x_tight-1-t':
-#         trained_model_1_path = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_only_new_timecut_dp01_epoch_47_file_1.h5'  # yzt-x, timecut_all, old geo
-#         trained_model_2_path = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_new_tight_timecut_250_500_dp01_epoch_34_file_1.h5'  # yzt-x, timecut tight-1, old geo
-#
-#     elif swap_4d_channels + str_ident  == 'xyz-t_and_yzt-x' + 'double_input_single_train_tight-1':
-#         # trained_model_1_path = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-1_w-geo-fix_epoch_22_file_1.h5'  # xyz-t, timecut tight_1, with geo fix
-#         # trained_model_2_path = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_new_tight_timecut_250_500_dp01_epoch_34_file_1.h5'  # yzt-x, timecut tight-1, old geo
-#         # New
-#         trained_model_1_path = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-1_w-geo-fix_bs64_2-more-layers_epoch_19_file_1.h5'  # xyz-t, timecut tight_1, with geo fix, 2 more layers
-#         trained_model_2_path = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_new_tight_timecut_250_500_dp01_larger_bs_64_w_geo_fix_epoch_30_file_1.h5'  # yzt-x, timecut tight-1, new geo
-#
-#     elif swap_4d_channels is None: # xyz-t tight-1 and xyz-t tight-2
-#         trained_model_1_path = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-1_w-geo-fix_bs64_epoch_3_file_1.h5'  # xyz-t, timecut tight_1, with geo fix, fully trained epoch 23
-#         trained_model_2_path = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-2_w-geo-fix_bs64_dp0.1_epoch_3_file_1.h5'  # xyz-t, timecut tight-2, with geo fix, fully trained epoch 36
-#
-#     else:
-#         raise ValueError('The double input combination specified in "swap_4d_channels" is not known, check the function for what is available.')
-#
-#     trained_model_1 = ks.models.load_model(trained_model_1_path)
-#     trained_model_2 = ks.models.load_model(trained_model_2_path)
-#
-#     # model 1
-#     input_layer_net_1 = Input(shape=input_dim[0][1:], name='input_net_1', dtype=K.floatx()) # have to do that manually
-#     layer_numbers_net_1 = {'conv': 1, 'batch_norm': 1, 'activation': 1, 'max_pooling': 1, 'dropout': 1}
-#
-#     x_1 = create_layer_from_config(input_layer_net_1, trained_model_1.layers[1], layer_numbers_net_1, trainable=False, net='1')
-#
-#     for trained_layer in trained_model_1.layers[2:]:
-#         if 'flatten' in trained_layer.name: break  # we don't want to get anything after the flatten layer
-#         x_1 = create_layer_from_config(x_1, trained_layer, layer_numbers_net_1, trainable=False, net='1', dropout=dropout[0])
-#
-#     # model 2
-#     input_layer_net_2 = Input(shape=input_dim[1][1:], name='input_net_2', dtype=K.floatx()) # change input layer name
-#     layer_numbers_net_2 = {'conv': 1, 'batch_norm': 1, 'activation': 1, 'max_pooling': 1, 'dropout': 1}
-#
-#     x_2 = create_layer_from_config(input_layer_net_2, trained_model_2.layers[1], layer_numbers_net_2, trainable=False, net='2')
-#
-#     for trained_layer in trained_model_2.layers[2:]:
-#         if 'flatten' in trained_layer.name: break # we don't want to get anything after the flatten layer
-#         x_2 = create_layer_from_config(x_2, trained_layer, layer_numbers_net_2, trainable=False, net='2', dropout=dropout[0])
-#
-#     # flatten both nets
-#     x_1, x_2 = Flatten()(x_1), Flatten()(x_2)
-#
-#     # concatenate both nets
-#     x = ks.layers.concatenate([x_1, x_2])
-#
-#     x = Dense(128, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
-#     x = Dropout(dropout[1])(x)
-#     x = Dense(16, activation=activation, kernel_initializer='he_normal')(x) #bias_initializer=ks.initializers.Constant(value=0.1)
-#
-#     x = Dense(nb_classes, activation='softmax', kernel_initializer='he_normal')(x)
-#
-#     model = Model(inputs=[input_layer_net_1, input_layer_net_2], outputs=x)
-#
-#     set_layer_weights(model, trained_model_1, trained_model_2) # set weights
-#
-#     for layer in model.layers: # freeze trainable batch_norm weights, but not running mean and variance
-#         if 'batch_norm' in layer.name:
-#             layer.stateful = True
-#
-#     return model
 
 
 def create_layer_from_config(x, trained_layer, layer_numbers, trainable=False, net='', dropout=0):
@@ -576,7 +507,6 @@ def create_convolutional_lstm(n_bins, batchsize, nb_classes=2, n_filters=None, d
     :param None/str kernel_reg: if L2 regularization with 1e-4 should be employed. 'l2' to enable the regularization.
     :return: Model model: Keras VGG-like model.
     """
-    #if n_filters is None: n_filters = (64,64,64,64,64,128,128,128)
     if n_filters is None: n_filters = (32, 32, 64, 64, 64, 64, 128)
     if kernel_reg is 'l2': kernel_reg = l2(0.0001)
 
@@ -596,11 +526,9 @@ def create_convolutional_lstm(n_bins, batchsize, nb_classes=2, n_filters=None, d
 
     x = Dense(64, kernel_initializer='he_normal', kernel_regularizer=kernel_reg)(x) #bias_initializer=ks.initializers.Constant(value=0.1)
     x = Activation(activation)(x)
-    # #x = BatchNormalization(axis=-1)(x)
     if dropout > 0.0: x = Dropout(dropout)(x)
     x = Dense(16, kernel_initializer='he_normal', kernel_regularizer=kernel_reg)(x) #bias_initializer=ks.initializers.Constant(value=0.1)
     x = Activation(activation)(x)
-    # #x = BatchNormalization(axis=-1)(x)
 
     x = Dense(nb_classes, activation='softmax', kernel_initializer='he_normal')(x)
 
