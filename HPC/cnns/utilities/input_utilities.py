@@ -11,7 +11,7 @@ import argparse
 import h5py
 
 
-def parse_input(use_scratch_ssd):
+def parse_input():
     """
     Parses the user input for running the CNN.
 
@@ -30,9 +30,9 @@ def parse_input(use_scratch_ssd):
     3) train/test: [ ( [train/test_filepath]  , n_rows), ... ]. The outmost list has len 1, but the list inside the tuple has arbitrary length.
        A combination of 2) + 3) (multiple input files for each batch from 3) AND all events split over multiple files) is not yet supported.
 
-    :param bool use_scratch_ssd: specifies if the input files should be copied to the node-local SSD scratch space.
     :return: list(([train_filepaths], train_filesize)) train_files: list of tuples that contains the list(trainfiles) and their number of rows.
     :return: list(([test_filepaths], test_filesize)) test_files: list of tuples that contains the list(testfiles) and their number of rows.
+    :return: bool multiple_inputs: flag that specifies if the -m option of the parser has been used.
     """
     parser = argparse.ArgumentParser(description='E.g. < python run_cnn.py train_filepath test_filepath [...] > \n'
                                                  'Script that runs a CNN. \n'
@@ -89,10 +89,7 @@ def parse_input(use_scratch_ssd):
         train_files = [([args.train_file], h5_get_number_of_rows(args.train_file))]
         test_files = [([args.test_file], h5_get_number_of_rows(args.test_file))]
 
-    if use_scratch_ssd is True:
-        train_files, test_files = use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=multiple_inputs)
-
-    return train_files, test_files
+    return train_files, test_files, multiple_inputs
 
 
 def h5_get_number_of_rows(h5_filepath):
@@ -121,7 +118,7 @@ def use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=False)
     train_files_ssd, test_files_ssd = [], []
     print 'Copying the input train/test data to the node-local SSD scratch folder'
 
-    if multiple_inputs is not None:
+    if multiple_inputs is True:
         # in the case that we need multiple input data files for each batch, e.g. double input model with two different timecuts
         f_paths_train_ssd_temp, f_paths_test_ssd_temp = [], []
 
