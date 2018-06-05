@@ -26,6 +26,7 @@ def parse_input():
     :return (None/str, None/int) compress: Tuple that specifies if a compression should be used for saving.
     :return bool cuts: specifies if cuts should be used during the concatenation process step.
     :return bool tau_test_only: specifies if possible tau files in the dirpath should only be used for the test dataset.
+    :return str ignore_interaction_type: specifies, if a certain interaction type should be ignored in getting the filepaths.
     """
     parser = argparse.ArgumentParser(description='Parses the user input in order to return the most important information:\n'
                                                  '1) directory where the .h5 files that should be concatenated are located\n '
@@ -55,6 +56,9 @@ def parse_input():
                                'The txt files with the cut informationa are specified in the load_event_selection() function of concatenate_h5.py.')
     parser.add_argument('-t', '--tau_test_only', dest='tau_test_only', action='store_true',
                         help = 'specifies if tau files should only be used for the test split.')
+    parser.add_argument('-i', '--ignore_interaction_type', dest='ignore_interaction_type', type=str, nargs='+',
+                        help = 'specifies if files of a certain flavour should be ignored for making the list files. \n'
+                               'Possible options: tau-CC, muon-CC, elec-NC, elec-CC')
     parser.set_defaults(compression=False)
     parser.set_defaults(cuts=False)
     parser.set_defaults(tau_test_only=False)
@@ -90,19 +94,30 @@ def parse_input():
     tau_test_only = None
     if args.tau_test_only: tau_test_only = True
 
-    return dirpath, test_fraction, n_train_files, n_test_files, n_file_start, n_files_max, chunking, compress, cuts, tau_test_only
+    ignore_interaction_type = False
+    if args.ignore_interaction_type: ignore_interaction_type = args.ignore_interaction_type
+
+    return dirpath, test_fraction, n_train_files, n_test_files, n_file_start, n_files_max, chunking, compress, cuts, tau_test_only, ignore_interaction_type
 
 
-def get_filepaths(dirpath):
+def get_filepaths(dirpath, ignore_interaction_type):
     """
     Returns the filepaths of all .h5 files that are located in a specific directory.
     :param str dirpath: path of the directory where the .h5 files are located.
+    :param str ignore_interaction_type: specifies, if a certain interaction type should be ignored in getting the filepaths.
     :return: list filepaths: list with the full filepaths of all .h5 files in the dirpath folder.
     """
     filepaths = []
     for f in os.listdir(dirpath):
         if f.endswith(".h5"):
-            filepaths.append(f)
+            if ignore_interaction_type is not False:
+                #if ignore_interaction_type not in f: filepaths.append(f)
+                if any(ignore_type in f for ignore_type in ignore_interaction_type):
+                    continue
+                else:
+                    filepaths.append(f)
+            else:
+                filepaths.append(f)
 
     filepaths = ns.natsorted(filepaths)
     return filepaths
@@ -125,8 +140,9 @@ def get_particle_types(filepaths):
     # make ptype string for the savenames of the .list files
     ptype_str = ''
     for i in xrange(len(particle_types)):
-        if i == 0:
-            ptype_str += particle_types[0]
+
+        if ptype_str == '':
+            ptype_str += particle_types[i]
         else:
             ptype_str += '_and_' + particle_types[i]
 
@@ -217,7 +233,7 @@ def get_file_split_info_per_interaction_channel(filepaths_per_interaction_type, 
     return n_total_files, range_all, n_test_start_minus_one, n_test_end, range_test, n_train_start, n_train_end, range_train
 
 
-def save_filepaths_to_list(dirpath, filepaths_per_interaction_type, include_range, p_type_str, proj_type, index_f_number, sample_type=''):
+def save_filepaths_to_list(dirpath, filepaths_per_interaction_type, include_range, p_type_str, proj_type, index_f_number, tau_test_only, sample_type=''):
     """
     Saves the filepaths in the list <filepaths> to a .list file.
     The variable 'include_range' can be used to only save filepaths with file numbers in between a certain range.
@@ -236,6 +252,10 @@ def save_filepaths_to_list(dirpath, filepaths_per_interaction_type, include_rang
     n_files = len(include_range[next(iter(include_range))]) - 1 # n_files is same for all interaction types, calculate based on first interaction type
     list_savenames = []
     for i in xrange(n_files):
+
+        if sample_type=='train_' and tau_test_only is True:
+            print p_type_str
+            p_type_str = p_type_str.replace('_and_tau-CC', '')
 
         savename = p_type_str + '_' + proj_type + '_' + sample_type + 'file_' + str(i) + '.list'
         savepath = dirpath + '/' + savename
@@ -275,7 +295,7 @@ def user_input_sanity_check(n_test_files, test_fraction, n_test_start_minus_one,
                 raise ValueError('The train data cannot be split equally with ' + str(n_train_files) + ' train files.')
 
 
-def make_list_files(dirpath, test_fraction, n_train_files, n_test_files, n_file_start, n_files_max, tau_test_only):
+def make_list_files(dirpath, test_fraction, n_train_files, n_test_files, n_file_start, n_files_max, tau_test_only, ignore_interaction_type):
     """
     Makes .list files of .h5 files in a <dirpath> based on a certain test_fraction and a specified number of train/test files.
     :param str dirpath: path of the directory where the .h5 files are located.
@@ -285,11 +305,12 @@ def make_list_files(dirpath, test_fraction, n_train_files, n_test_files, n_file_
     :param int n_file_start: specifies the first file number of the .h5 files (standard: 1).
     :param None/int n_files_max: specifies the maximum file number upon which the concatenation should happen.
     :param bool tau_test_only: specifies if possible tau files in the dirpath should only be used for the test dataset.
+    :param str ignore_interaction_type: specifies, if a certain interaction type should be ignored in getting the filepaths.
     :return: list savenames_tt: list that contains the savenames of all created .list files.
     :return str p_type: string with particle type information for the name of the .list file, e.g. 'elec-CC_and_muon-CC'.
     :return str proj_type: string with the projection type of the .h5 files in the filepath strings, e.g. 'xyzt'.
     """
-    filepaths = get_filepaths(dirpath) # contains all filepaths of the files in the dirpath
+    filepaths = get_filepaths(dirpath, ignore_interaction_type) # contains all filepaths of the files in the dirpath
 
     particle_types, p_type_str = get_particle_types(filepaths)
     filepaths_per_interaction_type = split_filepaths_into_interaction_types(filepaths, particle_types)
@@ -300,9 +321,9 @@ def make_list_files(dirpath, test_fraction, n_train_files, n_test_files, n_file_
     user_input_sanity_check(n_test_files, test_fraction, n_test_start_minus_one, n_test_end,
                             n_train_files, n_train_start, n_train_end, n_total_files)
 
-    #save_filepaths_to_list(dirpath, filepaths_per_interaction_type, range_all, p_type_str, proj_type, index_f_number)
-    savenames_test = save_filepaths_to_list(dirpath, filepaths_per_interaction_type, range_test, p_type_str, proj_type, index_f_number, sample_type='test')
-    savenames_train = save_filepaths_to_list(dirpath, filepaths_per_interaction_type, range_train, p_type_str, proj_type, index_f_number, sample_type='train')
+    tau_ptype_str = '_and_tau-CC' if tau_test_only is True else ''
+    savenames_test = save_filepaths_to_list(dirpath, filepaths_per_interaction_type, range_test, p_type_str + tau_ptype_str, proj_type, index_f_number, tau_test_only, sample_type='test')
+    savenames_train = save_filepaths_to_list(dirpath, filepaths_per_interaction_type, range_train, p_type_str, proj_type, index_f_number, tau_test_only, sample_type='train')
 
     savenames_tt = savenames_train + savenames_test
 
@@ -316,9 +337,9 @@ def make_list_files_and_concatenate():
     2) make all .list files which contains the filepaths of the .h5 files that should be concatenated
     3) make a submit script to concatenate the .h5 files in the .list files.
     """
-    dirpath, test_fraction, n_train_files, n_test_files, n_file_start, n_files_max, chunking, compress, cuts, tau_test_only = parse_input()
+    dirpath, test_fraction, n_train_files, n_test_files, n_file_start, n_files_max, chunking, compress, cuts, tau_test_only, ignore_interaction_type = parse_input()
 
-    savenames_tt, p_type_str, proj_type = make_list_files(dirpath, test_fraction, n_train_files, n_test_files, n_file_start, n_files_max, tau_test_only)
+    savenames_tt, p_type_str, proj_type = make_list_files(dirpath, test_fraction, n_train_files, n_test_files, n_file_start, n_files_max, tau_test_only, ignore_interaction_type)
     submit_concatenate_list_files(savenames_tt, dirpath, p_type_str, proj_type, chunking, compress, cuts)
 
 
@@ -394,7 +415,7 @@ def write_txt_concatenate_files_one_loop(f, savenames, i, n_lists_left, n_cores)
         loop_index += 1
 
         if loop_index <= n_lists_left:
-            and_char = '&' if loop_index < n_lists_left else '' # in order to make execution on multiple cpus at the same time possible #TODO test
+            and_char = '&' if loop_index < n_lists_left else '' # in order to make execution on multiple cpus at the same time possible
             f.write('(time taskset -c ' +  str(loop_index-1) + ' python concatenate_h5.py --list ${projection_path}/${input_list_name_' + str(n) + '} '
                     '${compression} ${cuts} ${chunksize} ${projection_path}/concatenated/${output_list_name_' + str(n) + '} > '
                     '${projection_path}/logs/cout/${output_list_name_' + str(n) + '}.txt) ' + and_char + '\n')
@@ -407,7 +428,7 @@ if __name__ == '__main__':
     make_list_files_and_concatenate()
 
 
-# python make_hist_list_files.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/with_run_id/without_mc_time_fix/h5/xyzt 0.2 1 1 --compression --chunksize 32
+# python make_hist_list_files.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/time_-250+500_geo-fix_60b 0.25 4 1 --compression --chunksize 32
 # submit with e.g. 'qsub -l nodes=1:ppn=4,walltime=02:00:00 submit_concatenate_h5_elec-CC_and_muon-CC_xyzt.sh'
 
 
