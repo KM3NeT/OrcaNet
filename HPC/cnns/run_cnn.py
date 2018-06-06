@@ -156,7 +156,7 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
 
         history_train = fit_model(model, modelname, train_files, f, f_size, file_no, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
                                             shuffle, swap_4d_channels, str_ident, n_events=None, tb_logger=tb_logger)
-        history_test = evaluate_model(model, modelname, test_files, train_files, file_no, batchsize, n_bins, class_type, xs_mean, epoch, swap_4d_channels, str_ident, n_events=None)
+        history_test = evaluate_model(model, modelname, test_files, train_files, batchsize, n_bins, class_type, xs_mean, epoch, swap_4d_channels, str_ident, n_events=None)
 
         save_train_and_test_statistics_to_txt(model, history_train, history_test, modelname, lr, lr_decay, epoch,
                                               f, test_files, batchsize, n_bins, class_type, swap_4d_channels, str_ident)
@@ -400,14 +400,21 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
             calculate_and_plot_separation_pid(arr_nn_pred, modelname, compare_pheid=True)
 
         else: # regression
-            make_2d_energy_resolution_plot(arr_nn_pred, modelname, compare_pheid=(True, '3-100_GeV_prod_energy_comparison'))
-            make_1d_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median_relative', energy_bins=np.linspace(3, 100, 32), compare_pheid=(True, '3-100_GeV_prod_energy_comparison'))
+            if 'energy' in class_type[1]:
+                # DL
+                make_2d_energy_resolution_plot(arr_nn_pred, modelname, compare_pheid=(True, '3-100_GeV_prod_energy_comparison'))
+                make_1d_energy_reco_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median_relative', energy_bins=np.linspace(3,100,32), compare_pheid=(True, '3-100_GeV_prod_energy_comparison'))
 
-            # shallow reco
-            arr_nn_pred = np.load('/home/woody/capn/mppi033h/Data/various/arr_nn_pred.npy')
-            make_2d_energy_resolution_plot(arr_nn_pred, 'shallow_reco', compare_pheid=(True, '3-100_GeV_prod_energy_comparison'))
-            make_1d_metric_vs_energy_plot(arr_nn_pred, 'shallow_reco', metric='median_relative', compare_pheid=(True, '3-100_GeV_prod_energy_comparison'))
+                # shallow reco
+                arr_nn_pred_shallow = np.load('/home/woody/capn/mppi033h/Data/various/arr_nn_pred.npy')
+                make_2d_energy_resolution_plot(arr_nn_pred_shallow, 'shallow_reco', compare_pheid=(True, '3-100_GeV_prod_energy_comparison'))
+                make_1d_energy_reco_metric_vs_energy_plot(arr_nn_pred_shallow, 'shallow_reco', metric='median_relative',  energy_bins=np.linspace(3,100,32), compare_pheid=(True, '3-100_GeV_prod_energy_comparison'))
+            if 'direction' in class_type[1]:
+                # DL
+                make_1d_dir_z_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median_relative', energy_bins=np.linspace(3, 100, 32), compare_pheid=(True, '3-100_GeV_prod_energy_comparison'))
 
+                # shallow reco
+                make_1d_dir_z_metric_vs_energy_plot(arr_nn_pred, 'shallow_reco', metric='median', energy_bins=np.linspace(3, 100, 32), compare_pheid=(True, '3-100_GeV_prod_energy_comparison'))
 
 if __name__ == '__main__':
     # available class_types:
