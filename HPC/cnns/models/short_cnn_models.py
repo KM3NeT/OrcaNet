@@ -215,7 +215,7 @@ def conv_block(ip, dim, n_filters, k_size=3, dropout=0, max_pooling=None, activa
     x = BatchNormalization(axis=channel_axis)(x)
     x = Activation(activation)(x)
 
-    if max_pooling is not None: x = max_pooling_nd(strides=max_pooling, padding='valid')(x)
+    if max_pooling is not None: x = max_pooling_nd(strides=max_pooling, padding='same')(x)
     if dropout > 0.0: x = Dropout(dropout)(x)
 
     return x
