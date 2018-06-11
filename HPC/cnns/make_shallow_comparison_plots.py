@@ -37,7 +37,7 @@ def make_arr_nn_pred():
                            'a_elec-CC': (-12, 1), 'elec-NC': (12, 0), 'a_elec-NC': (-12, 0),
                            'tau-CC': (16, 1), 'a_tau-CC': (-16, 1)}
 
-    arr_nn_pred = np.zeros((sum_arr.shape[0], 16), dtype=np.float32)
+    arr_nn_pred = np.zeros((sum_arr.shape[0], 19), dtype=np.float32)
 
     n_total_events, n_events_muon_cc, n_events_muon_cc_sel, n_events_elec_cc, n_events_elec_cc_sel = 0, 0, 0, 0, 0
     for i in xrange(sum_arr.shape[0]):
@@ -60,7 +60,7 @@ def make_arr_nn_pred():
 
         dusj_is_good = sum_arr[i, 15]
         gandalf_is_good = sum_arr[i, 20]
-        dusj_is_selected = [i, 22]
+        dusj_is_selected = sum_arr[i, 22]
         gandalf_is_selected = sum_arr[i, 23]
 
         n_total_events += 1
@@ -71,8 +71,8 @@ def make_arr_nn_pred():
             if dusj_is_selected:
                 n_events_elec_cc_sel += 1
                 energy_pred = sum_arr[i, 16]
-                dir_x_pred, dir_y_pred, dir_z_pred = sum_arr[i, 13], sum_arr[i, 14], sum_arr[i, 15]
-                bjorken_y_pred = sum_arr[i, 12]
+                dir_x_pred, dir_y_pred, dir_z_pred = sum_arr[i, 12], sum_arr[i, 13], sum_arr[i, 14]
+                bjorken_y_pred = sum_arr[i, 11]
             else:
                 continue
 
@@ -90,7 +90,7 @@ def make_arr_nn_pred():
         else:
             continue
 
-        mc_info = np.array([run_id, event_id, particle_type, is_cc, energy_mc, bjorken_y_mc], dtype=np.float32)
+        mc_info = np.array([run_id, event_id, particle_type, is_cc, energy_mc, bjorken_y_mc, dir_x_mc, dir_y_mc, dir_z_mc], dtype=np.float32)
         y_pred = np.array([energy_pred, dir_x_pred, dir_y_pred, dir_z_pred, bjorken_y_pred], dtype=np.float32)
         y_true = np.array([energy_mc, dir_x_mc, dir_y_mc, dir_z_mc, bjorken_y_mc], dtype=np.float32)
 
@@ -123,12 +123,12 @@ def make_arr_nn_pred():
 
 
 def make_shallow_energy_plots():
-    from utilities.evaluation_utilities import make_2d_energy_resolution_plot, make_1d_metric_vs_energy_plot
+    from utilities.evaluation_utilities import make_2d_energy_resolution_plot, make_1d_energy_reco_metric_vs_energy_plot
 
     arr_nn_pred = np.load('/home/woody/capn/mppi033h/Data/various/arr_nn_pred.npy')
 
     make_2d_energy_resolution_plot(arr_nn_pred, 'shallow_reco', compare_pheid=(True, '3-100_GeV_prod_energy_comparison'))
-    make_1d_metric_vs_energy_plot(arr_nn_pred, 'shallow_reco', metric='median_relative', compare_pheid=(True, '3-100_GeV_prod_energy_comparison'))
+    make_1d_energy_reco_metric_vs_energy_plot(arr_nn_pred, 'shallow_reco', metric='median', energy_bins=np.linspace(3, 100, 32), compare_pheid=(True, '3-100_GeV_prod_energy_comparison'))
 
 
 if __name__ == '__main__':
