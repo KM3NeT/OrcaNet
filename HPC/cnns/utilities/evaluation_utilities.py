@@ -869,7 +869,7 @@ def correct_reco_energy_diff(arr_nn_pred, metric='median'):
         e_pred_cut = energy_pred[e_pred_cut_boolean]
 
         if metric == 'mean':
-            e_pred_cut_mean = np.mean(e_pred_cut)
+            e_pred_cut_mean = np.mean(e_pred_cut) # TODO fix unknown metrics
         else:
             e_pred_cut_mean = np.median(e_pred_cut)
 
@@ -888,7 +888,7 @@ def correct_reco_energy_diff(arr_nn_pred, metric='median'):
     arr_nn_pred_corr[:, 9][is_shower] = np.interp(energy_mc, correction_factors_x, correction_factors_y) * energy_pred
 
 
-    return arr_nn_pred_corr, None
+    return arr_nn_pred_corr # TODO return fit function
 
 
 def get_energy_correction_factor(func, energy_mc):
@@ -899,7 +899,8 @@ def get_energy_correction_factor(func, energy_mc):
 
 
 
-def make_1d_energy_reco_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median_relative', energy_bins=np.linspace(3,100,32), compare_pheid=(False, '3-100_GeV_prod'), correct_energy=(False, 2)):
+def make_1d_energy_reco_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median_relative', energy_bins=np.linspace(3,100,32),
+                                              precuts=(False, '3-100_GeV_prod'), correct_energy=(True, 'median'), compare_shallow=True):
     """
 
     :param arr_nn_pred:
@@ -909,10 +910,10 @@ def make_1d_energy_reco_metric_vs_energy_plot(arr_nn_pred, modelname, metric='me
     :param compare_pheid:
     :return:
     """
-    if compare_pheid[0] is True:
-        arr_nn_pred = arr_nn_pred_select_pheid_events(arr_nn_pred, invert=False, precuts=compare_pheid[1])
+    if precuts[0] is True:
+        arr_nn_pred = arr_nn_pred_select_pheid_events(arr_nn_pred, invert=False, precuts=precuts[1])
     if correct_energy[0] is True:
-        arr_nn_pred, polyfit = correct_reco_energy_diff(arr_nn_pred, degree=correct_energy[1])
+        arr_nn_pred= correct_reco_energy_diff(arr_nn_pred, metric=correct_energy[1])
 
     energy_metric_plot_data_shower, energy_metric_plot_data_track = calculate_plot_data_of_energy_dependent_label(arr_nn_pred, energy_bins=energy_bins, label=('energy', metric))
 
