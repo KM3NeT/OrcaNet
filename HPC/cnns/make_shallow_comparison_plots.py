@@ -68,7 +68,7 @@ def make_arr_nn_pred():
         if (particle_type, is_cc) == ptype_dict['elec-CC'] or (particle_type, is_cc) == ptype_dict['a_elec-CC']: # shower
             n_events_elec_cc += 1
             #if dusj_is_good:
-            if dusj_is_selected:
+            if dusj_is_selected == 1:
                 n_events_elec_cc_sel += 1
                 energy_pred = sum_arr[i, 16]
                 dir_x_pred, dir_y_pred, dir_z_pred = sum_arr[i, 12], sum_arr[i, 13], sum_arr[i, 14]
@@ -79,7 +79,7 @@ def make_arr_nn_pred():
         elif (particle_type, is_cc) == ptype_dict['muon-CC'] or (particle_type, is_cc) == ptype_dict['a_muon-CC']: # track
             n_events_muon_cc += 1
             #if gandalf_is_good:
-            if gandalf_is_selected:
+            if gandalf_is_selected == 1:
                 n_events_muon_cc_sel += 1
                 energy_pred = sum_arr[i, 21]
                 dir_x_pred, dir_y_pred, dir_z_pred = sum_arr[i, 17], sum_arr[i, 18], sum_arr[i, 19]
@@ -132,7 +132,7 @@ def make_shallow_energy_plots():
 
 
 if __name__ == '__main__':
-    #cut_summary_file() # do on tinyfat or woody with 32g
+    cut_summary_file() # do on tinyfat or woody with 32g
     make_arr_nn_pred()
     #make_shallow_energy_plots()
 
