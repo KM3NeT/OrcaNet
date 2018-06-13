@@ -373,6 +373,7 @@ def submit_concatenate_list_files(savenames, dirpath, p_type_str, proj_type, chu
         f.write('compression="' + xstr(compress) + '"\n')
         f.write('cuts="' + xstr(cuts) + '"\n')
         f.write('projection_path="' + dirpath + '"\n')
+        f.write('source activate /home/hpc/capn/mppi033h/.virtualenv/h5_to_histo_env/\n')
         f.write('\n')
         f.write('# lists with files that should be concatenated\n')
 
@@ -417,8 +418,7 @@ def write_txt_concatenate_files_one_loop(f, savenames, i, n_lists_left, n_cores)
         if loop_index <= n_lists_left:
             and_char = '&' if loop_index < n_lists_left else '' # in order to make execution on multiple cpus at the same time possible
             f.write('(time taskset -c ' +  str(loop_index-1) + ' python concatenate_h5.py --list ${projection_path}/${input_list_name_' + str(n) + '} '
-                    '${compression} ${cuts} ${chunksize} ${projection_path}/concatenated/${output_list_name_' + str(n) + '} > '
-                    '${projection_path}/logs/cout/${output_list_name_' + str(n) + '}.txt) ' + and_char + '\n')
+                    '${compression} ${cuts} ${chunksize} ${projection_path}/concatenated/${output_list_name_' + str(n) + '})' + and_char + '\n')
 
     f.write('wait\n')
     f.write('\n')
