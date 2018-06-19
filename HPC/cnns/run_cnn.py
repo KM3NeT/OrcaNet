@@ -143,7 +143,9 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
     Convenience function that trains (fit_generator) and tests (evaluate_generator) a Keras model.
     For documentation of the parameters, confer to the fit_model and evaluate_model functions.
     """
-    epoch, lr, lr_decay = schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=0.003, manual_mode=(False, 0.0003, 0.07, lr)) # begin new training step
+    lr_initial, manual_mode = 0.003, (True, 0.0003, 0.07, lr)
+
+    epoch, lr, lr_decay = schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=lr_initial, manual_mode=manual_mode) # begin new training step
     train_iter_step = 0
     for file_no, (f, f_size) in enumerate(train_files, 1):
 
@@ -152,7 +154,7 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
 
         train_iter_step += 1
 
-        if train_iter_step > 1: epoch, lr, lr_decay = schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=0.003, manual_mode=(False, 0.0003, 0.07, lr))
+        if train_iter_step > 1: epoch, lr, lr_decay = schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=lr_initial, manual_mode=manual_mode)
 
         history_train = fit_model(model, modelname, train_files, f, f_size, file_no, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
                                             shuffle, swap_4d_channels, str_ident, n_events=None, tb_logger=tb_logger)
@@ -341,7 +343,7 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
                 model = create_vgg_like_model_double_input(n_bins, batchsize, nb_classes=class_type[0], dropout=0.2,
                                                                n_filters=(64, 64, 64, 64, 64, 128, 128, 128), swap_4d_channels=swap_4d_channels) # TODO not working for multiple input files
             elif 'multi_input_single_train' in str_ident:
-                model = create_vgg_like_model_multi_input_from_single_nns(n_bins, batchsize, str_ident, nb_classes=class_type[0], dropout=(0,0.2), swap_4d_channels=swap_4d_channels)
+                model = create_vgg_like_model_multi_input_from_single_nns(n_bins, batchsize, str_ident, nb_classes=class_type[0], dropout=(0,0.1), swap_4d_channels=swap_4d_channels)
 
             else:
                 model = create_vgg_like_model(n_bins, batchsize, class_type, dropout=0.1,
@@ -450,8 +452,8 @@ if __name__ == '__main__':
     # python run_cnn.py -l lists/lp/xyz-t_lp_tight-1_train_no_tau.list lists/lp/xyz-t_lp_tight-1_test_no_tau.list
 
     # tight-2, padsame
-    execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(5,3), use_scratch_ssd=True,
-                n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-2_bs64_dp0.1_padsame')
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(5,3), use_scratch_ssd=True,
+    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-2_bs64_dp0.1_padsame')
     # python run_cnn.py -l lists/lp/xyz-t_lp_tight-2_train_no_tau.list lists/lp/xyz-t_lp_tight-2_test_no_tau.list
 
     ## Regression
@@ -512,13 +514,6 @@ if __name__ == '__main__':
     #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='xyz-t_tight-1_w-geo-fix_bs64_dp0.1_2.640mio')
 
 
-
-# tight_1, with geo fix Stefan, 09.02.18
-# python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/time_-250+500_geo-fix_60b/concatenated/without_cuts_all_events/elec-CC_and_muon-CC_xyzt_train_1_to_480_shuffled_0.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/time_-250+500_geo-fix_60b/concatenated/without_cuts_all_events/elec-CC_and_muon-CC_xyzt_test_481_to_600_shuffled_0.h5
-
-# tight_2, with geo fix, 23.02.18
-# python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/time_-150+200-tight-2_w_geo_fix/concatenated/without_cuts_all_events/elec-CC_and_muon-CC_xyzt_train_1_to_480_shuffled_0.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/time_-150+200-tight-2_w_geo_fix/concatenated/without_cuts_all_events/elec-CC_and_muon-CC_xyzt_test_481_to_600_shuffled_0.h5
-
 # xyz-t-tight-1-w-geo-fix_and_yzt-x-tight-1-w-geo-fix, double input, 2 more layers each, later pooling
 #     execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(1,1), use_scratch_ssd=False,
 #                 n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels='xyz-t_and_yzt-x', zero_center=True, str_ident='multi_input_single_train_tight-1_more-layers-both_lr0.0003_dense64-16')
@@ -534,3 +529,9 @@ if __name__ == '__main__':
 # pred
 # python run_cnn.py -m lists/xyz-t_and_yzt-x_tight-1-and-tight-2_pred_ORCA_1-5GeV.list
 # python run_cnn.py -m lists/xyz-t_and_yzt-x_tight-1-and-tight-2_pred_ORCA_3-100GeV.list
+
+
+# lp, xyz-t-tight-1 + tight-2
+    execute_cnn(n_bins=[(11,13,18,60), (11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=32, epoch=(1,1), use_scratch_ssd=False,
+                n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, str_ident='multi_input_single_train_tight-1_tight-2')
+# python run_cnn.py -m lists/lp/xyz-t_lp_tight-1_tight-2_train_no_tau.list lists/lp/xyz-t_lp_tight-1_tight-2_test_no_tau.list
