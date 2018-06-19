@@ -328,8 +328,8 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
     :param (str, str) loss_opt: tuple that contains 1) the loss and 2) the metric during training.
     """
     train_files, test_files, multiple_inputs = parse_input()
-    xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu[0]) if zero_center is True else None # TODO if ssd is true, still loads from woody!
-    if use_scratch_ssd is True: train_files, test_files = use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=multiple_inputs) # TODO check if files already on ssd
+    xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu[0]) if zero_center is True else None
+    if use_scratch_ssd is True: train_files, test_files = use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=multiple_inputs)
     modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident)
 
     if epoch[0] == 0:
@@ -400,34 +400,30 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
             calculate_and_plot_separation_pid(arr_nn_pred, modelname, compare_pheid=True)
 
         else: # regression
-            arr_nn_pred_shallow = np.load('/home/woody/capn/mppi033h/Data/various/arr_nn_pred.npy')
+            arr_nn_pred_shallow = np.load('/home/woody/capn/mppi033h/Data/various/arr_nn_pred_is_good.npy')
+            precuts = (True, '3-100_GeV_prod_energy_comparison_is_good') # '3-100_GeV_prod'
 
             if 'energy' in class_type[1]:
                 # DL
-                make_2d_energy_resolution_plot(arr_nn_pred, modelname, compare_pheid=(True, '3-100_GeV_prod_energy_comparison'), correct_energy=(True, 1))
-                make_1d_energy_reco_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median_relative', energy_bins=np.linspace(3,100,32),
-                                                          compare_pheid=(True, '3-100_GeV_prod_energy_comparison'), correct_energy=(False, 1))
-                make_1d_energy_std_div_e_true_plot(arr_nn_pred, modelname, precuts=(True, '3-100_GeV_prod_energy_comparison'), compare_shallow=True)
+                make_2d_energy_resolution_plot(arr_nn_pred, modelname, compare_pheid=precuts, correct_energy=(True, 'median'))
+                make_1d_energy_reco_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median_relative', precuts=precuts,
+                                                          correct_energy=(True, 'median'), compare_shallow=(True, arr_nn_pred_shallow))
+                make_1d_energy_std_div_e_true_plot(arr_nn_pred, modelname, precuts=precuts, compare_shallow=(True, arr_nn_pred_shallow),
+                                                   correct_energy=(True, 'median'))
 
                 # shallow reco
-                make_2d_energy_resolution_plot(arr_nn_pred_shallow, 'shallow_reco', compare_pheid=(True, '3-100_GeV_prod_energy_comparison'))
-                make_1d_energy_reco_metric_vs_energy_plot(arr_nn_pred_shallow, 'shallow_reco', metric='median_relative',  energy_bins=np.linspace(3,100,32), compare_pheid=(True, '3-100_GeV_prod_energy_comparison'))
-                make_1d_energy_std_div_e_true_plot(arr_nn_pred_shallow, 'shallow_reco', precuts=(True, '3-100_GeV_prod_energy_comparison'))
-                import sys
-                sys.exit()
+                make_2d_energy_resolution_plot(arr_nn_pred_shallow, 'shallow_reco', compare_pheid=precuts)
             if 'direction' in class_type[1]:
                 # DL
-                make_1d_dir_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median', energy_bins=np.linspace(3, 100, 32), compare_pheid=(True, '3-100_GeV_prod_energy_comparison'))
-                make_2d_dir_correlation_plot(arr_nn_pred, modelname, dir_bins=np.linspace(-1, 1, 100), compare_pheid=(False, '3-100_GeV_prod'))
+                make_1d_dir_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median', precuts=precuts, compare_shallow=(True, arr_nn_pred_shallow))
+                make_2d_dir_correlation_plot(arr_nn_pred, modelname, compare_pheid=precuts)
                 # shallow reco
-                make_1d_dir_metric_vs_energy_plot(arr_nn_pred_shallow, 'shallow_reco', metric='median', energy_bins=np.linspace(3, 100, 32), compare_pheid=(True, '3-100_GeV_prod_energy_comparison'))
-                make_2d_dir_correlation_plot(arr_nn_pred_shallow, 'shallow_reco', dir_bins=np.linspace(-1, 1, 100), compare_pheid=(False, '3-100_GeV_prod'))
+
+                make_2d_dir_correlation_plot(arr_nn_pred_shallow, 'shallow_reco', compare_pheid=precuts)
 
             if 'bjorken-y' in class_type[1]:
                 # DL
-                make_1d_bjorken_y_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median', energy_bins=np.linspace(3, 100, 32), compare_pheid=(False, '3-100_GeV_prod'))
-                # shallow reco
-                make_1d_bjorken_y_metric_vs_energy_plot(arr_nn_pred_shallow, 'shallow_reco', metric='median', energy_bins=np.linspace(3, 100, 32), compare_pheid=(False, '3-100_GeV_prod'))
+                make_1d_bjorken_y_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median', precuts=precuts, compare_shallow=(True, arr_nn_pred_shallow))
 
 
 if __name__ == '__main__':
@@ -448,14 +444,14 @@ if __name__ == '__main__':
     #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.1')
 
     # tight-1, pad same
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(2,3), use_scratch_ssd=True,
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(5,3), use_scratch_ssd=True,
     #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.1_padsame')
 
     # python run_cnn.py -l lists/lp/xyz-t_lp_tight-1_train_no_tau.list lists/lp/xyz-t_lp_tight-1_test_no_tau.list
 
     # tight-2, padsame
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(2,3), use_scratch_ssd=True,
-    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-2_bs64_dp0.1_padsame')
+    execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(5,3), use_scratch_ssd=True,
+                n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-2_bs64_dp0.1_padsame')
     # python run_cnn.py -l lists/lp/xyz-t_lp_tight-2_train_no_tau.list lists/lp/xyz-t_lp_tight-2_test_no_tau.list
 
     ## Regression
@@ -480,13 +476,13 @@ if __name__ == '__main__':
     #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.1')
 
     # standard tight-1 as above, but padding same! // 2 additional layers: n_filters=(64, 64, 64, 64, 64, 64, 128, 128, 128, 128), max_pool_sizes = {5: (2, 2, 2), 9: (2, 2, 2)}, bs 64, initial lr = 0.003, tight-1
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(5,4), use_scratch_ssd=True,
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(14,1), use_scratch_ssd=True,
     #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.1_pad_same')
 
     # python run_cnn.py -l lists/lp/xyz-t_lp_tight-1_train_no_tau.list lists/lp/xyz-t_lp_tight-1_test_no_tau.list
 
     # standard tight-2, padsame// 2 additional layers: n_filters=(64, 64, 64, 64, 64, 64, 128, 128, 128, 128), max_pool_sizes = {5: (2, 2, 2), 9: (2, 2, 2)}, bs 64, initial lr = 0.003, tight-1
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(6,1), use_scratch_ssd=True,
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(11,3), use_scratch_ssd=True,
     #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-2_bs64_dp0.1_padsame')
     # python run_cnn.py -l lists/lp/xyz-t_lp_tight-2_train_no_tau.list lists/lp/xyz-t_lp_tight-2_test_no_tau.list
 
@@ -496,8 +492,8 @@ if __name__ == '__main__':
     #             n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.1')
 
     # e+dir+by dp 0.0
-    execute_cnn(n_bins=[(11,13,18,60)], class_type=(5, 'energy_and_direction_and_bjorken-y'), nn_arch='VGG', batchsize=64, epoch=(15,1), use_scratch_ssd=False, loss_opt=('mean_absolute_error', 'mean_squared_error'),
-                n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.0')
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(5, 'energy_and_direction_and_bjorken-y'), nn_arch='VGG', batchsize=64, epoch=(15,1), use_scratch_ssd=False, loss_opt=('mean_absolute_error', 'mean_squared_error'),
+    #             n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.0')
 
     # energy only, this time with dp 0.0 for real!
     # execute_cnn(n_bins=[(11,13,18,60)], class_type=(1, 'energy'), nn_arch='VGG', batchsize=64, epoch=(4,2), use_scratch_ssd=True, loss_opt=('mean_absolute_error', 'mean_squared_error'),
