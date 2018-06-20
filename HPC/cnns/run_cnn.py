@@ -143,7 +143,7 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
     Convenience function that trains (fit_generator) and tests (evaluate_generator) a Keras model.
     For documentation of the parameters, confer to the fit_model and evaluate_model functions.
     """
-    lr_initial, manual_mode = 0.003, (True, 0.0003, 0.07, lr)
+    lr_initial, manual_mode = 0.003, (False, 0.0003, 0.07, lr)
 
     epoch, lr, lr_decay = schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=lr_initial, manual_mode=manual_mode) # begin new training step
     train_iter_step = 0
@@ -394,12 +394,15 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
         arr_nn_pred = np.load('results/plots/saved_predictions/arr_energy_correct_' + modelname + '.npy')
 
         if class_type[1] == 'track-shower': # categorical
+            precuts = (True, '3-100_GeV_prod')  # '3-100_GeV_prod'
+
             make_energy_to_accuracy_plot_multiple_classes(arr_nn_pred, title='Classified as track',
-                                                      filename='results/plots/PT_' + modelname, compare_pheid=True, corr_cut_pred_0=0.4) #TODO think about more automatic savenames
-            # TODO fix code below for more classes
-            make_prob_hists(arr_nn_pred[:, ], modelname=modelname, compare_pheid=True)
-            make_hist_2d_property_vs_property(arr_nn_pred, modelname, property_types=('bjorken-y', 'probability'), e_cut=(3, 100), compare_pheid=True)
-            calculate_and_plot_separation_pid(arr_nn_pred, modelname, compare_pheid=True)
+                                                          filename='results/plots/1d/track_shower/ts_' + modelname,
+                                                          precuts=precuts, corr_cut_pred_0=0.5)
+
+            make_prob_hists(arr_nn_pred[:, ], modelname=modelname, precuts=precuts)
+            make_hist_2d_property_vs_property(arr_nn_pred, modelname, property_types=('bjorken-y', 'probability'), e_cut=(3, 100), precuts=precuts)
+            calculate_and_plot_separation_pid(arr_nn_pred, modelname, precuts=precuts)
 
         else: # regression
             arr_nn_pred_shallow = np.load('/home/woody/capn/mppi033h/Data/various/arr_nn_pred_is_good.npy')
@@ -418,10 +421,10 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
             if 'direction' in class_type[1]:
                 # DL
                 make_1d_dir_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median', precuts=precuts, compare_shallow=(True, arr_nn_pred_shallow))
-                make_2d_dir_correlation_plot(arr_nn_pred, modelname, compare_pheid=precuts)
+                make_2d_dir_correlation_plot(arr_nn_pred, modelname, precuts=precuts)
                 # shallow reco
 
-                make_2d_dir_correlation_plot(arr_nn_pred_shallow, 'shallow_reco', compare_pheid=precuts)
+                make_2d_dir_correlation_plot(arr_nn_pred_shallow, 'shallow_reco', precuts=precuts)
 
             if 'bjorken-y' in class_type[1]:
                 # DL
@@ -446,13 +449,13 @@ if __name__ == '__main__':
     #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.1')
 
     # tight-1, pad same
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(5,3), use_scratch_ssd=True,
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(6,1), use_scratch_ssd=True,
     #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.1_padsame')
 
     # python run_cnn.py -l lists/lp/xyz-t_lp_tight-1_train_no_tau.list lists/lp/xyz-t_lp_tight-1_test_no_tau.list
 
     # tight-2, padsame
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(5,3), use_scratch_ssd=True,
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(6,1), use_scratch_ssd=True,
     #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-2_bs64_dp0.1_padsame')
     # python run_cnn.py -l lists/lp/xyz-t_lp_tight-2_train_no_tau.list lists/lp/xyz-t_lp_tight-2_test_no_tau.list
 
@@ -533,5 +536,5 @@ if __name__ == '__main__':
 
 # lp, xyz-t-tight-1 + tight-2
     execute_cnn(n_bins=[(11,13,18,60), (11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=32, epoch=(1,1), use_scratch_ssd=False,
-                n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, str_ident='multi_input_single_train_tight-1_tight-2')
+                n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels=None, zero_center=True, str_ident='multi_input_single_train_tight-1_tight-2')
 # python run_cnn.py -m lists/lp/xyz-t_lp_tight-1_tight-2_train_no_tau.list lists/lp/xyz-t_lp_tight-1_tight-2_test_no_tau.list

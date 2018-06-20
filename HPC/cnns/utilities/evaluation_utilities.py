@@ -62,8 +62,6 @@ def get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchs
             dir_x, dir_y, dir_z = mc_info[:, 5], mc_info[:, 6], mc_info[:, 7]
 
             # make a temporary energy_correct array for this batch
-            # arr_nn_pred_temp = np.concatenate([energy[:, ax], particle_type[:, ax], is_cc[:, ax],
-            #                                           y_pred, event_id[:, ax], run_id[:, ax], bjorken_y[:, ax], y_true], axis=1)
             arr_nn_pred_temp = np.concatenate([run_id[:, ax], event_id[:, ax], particle_type[:, ax], is_cc[:, ax], energy[:, ax],
                                                bjorken_y[:, ax], dir_x[:, ax], dir_y[:, ax], dir_z[:, ax], y_pred, y_true], axis=1)
 
@@ -243,7 +241,7 @@ def print_absolute_performance(arr_energy_correct, print_text='Performance: '):
     :param ndarray(ndim=2) arr_energy_correct: array from the get_nn_predictions_and_mc_info() function.
     :param str print_text: String that should be used in printing before printing the results.
     """
-    correct = arr_energy_correct[:, 10] # select correct column
+    correct = arr_energy_correct[:, 13] # select correct column
     n_correct = np.count_nonzero(correct, axis=0) # count how many times the predictions were True
     n_total = arr_energy_correct.shape[0] # count the total number of predictions
     performance = n_correct/float(n_total)
@@ -255,7 +253,7 @@ def print_absolute_performance(arr_energy_correct, print_text='Performance: '):
 
 #- Classification -#
 
-def make_energy_to_accuracy_plot_multiple_classes(arr_nn_pred, title, filename, plot_range=(3, 100), compare_pheid=False, corr_cut_pred_0=0.5):
+def make_energy_to_accuracy_plot_multiple_classes(arr_nn_pred, title, filename, plot_range=(3, 100), precuts=(False, '3-100_GeV_prod'), corr_cut_pred_0=0.5):
     """
     Makes a mpl step plot of Energy vs. 'Fraction of events classified as track' for multiple classes.
     Till now only used for muon-CC vs elec-CC.
@@ -263,14 +261,14 @@ def make_energy_to_accuracy_plot_multiple_classes(arr_nn_pred, title, filename, 
     :param str title: Title that should be used in the plot.
     :param str filename: Filename that should be used for saving the plot.
     :param (int, int) plot_range: Tuple that specifies the X-Range of the plot.
-    :param bool compare_pheid: Boolean flag that specifies if only events that survive the Pheid precuts should be used in making the plots.
+    :param tuple precuts: Boolean flag that specifies if only events that survive the Pheid precuts should be used in making the plots. # TODO fix docs
     :param float corr_cut_pred_0: sets the threshold for when an event is classified as class_0.
     """
     arr_nn_pred = get_correct_info_pid(arr_nn_pred, corr_cut_pred_0=corr_cut_pred_0)
 
     print_absolute_performance(arr_nn_pred, print_text='Performance and array_shape without Pheid event selection: ')
-    if compare_pheid is True:
-        arr_nn_pred = arr_nn_pred_select_pheid_events(arr_nn_pred, invert=False)
+    if precuts[0] is True:
+        arr_nn_pred = arr_nn_pred_select_pheid_events(arr_nn_pred, precuts=precuts[1], invert=False)
         print_absolute_performance(arr_nn_pred, print_text='Performance and array_shape with Pheid event selection: ')
 
     fig, axes = plt.subplots()
@@ -303,6 +301,8 @@ def make_energy_to_accuracy_plot_multiple_classes(arr_nn_pred, title, filename, 
     title.set_position([.5, 1.04])
     plt.grid(True, zorder=0, linestyle='dotted')
 
+    plt.text(0.05, 0.92, 'KM3NeT Preliminary', transform=axes.transAxes, weight='bold')
+
     plt.savefig(filename + '_3-100GeV.pdf')
     plt.savefig(filename + '_3-100GeV.png', dpi=600)
 
@@ -321,8 +321,8 @@ def get_correct_info_pid(arr_nn_pred, corr_cut_pred_0=0.5):
     :return: ndarray arr_nn_pred: now has an additional correct column.
     """
 
-    y_pred = arr_nn_pred[:, 5:7]
-    y_true = arr_nn_pred[:, 8:10]
+    y_pred = arr_nn_pred[:, 9:11]
+    y_true = arr_nn_pred[:, 11:13]
     correct = check_if_prediction_is_correct(y_pred, y_true, threshold_pred_0=corr_cut_pred_0)
     arr_nn_pred = np.concatenate([arr_nn_pred, correct[:, np.newaxis]], axis=1)
 
@@ -358,11 +358,14 @@ def make_step_plot_1d_energy_accuracy_class(arr_nn_pred, axes, particle_types_di
     class_vector = particle_types_dict[particle_type]
 
     arr_nn_pred_class = select_class(arr_nn_pred, class_vector=class_vector)
+
+    if arr_nn_pred_class.size == 0: return
+
     energy_class = arr_nn_pred_class[:, 4]
     correct_class = arr_nn_pred_class[:, 13]
 
     hist_1d_energy_class = np.histogram(energy_class, bins=97, range=plot_range)
-    hist_1d_energy_correct_class = np.histogram(arr_nn_pred_class[correct_class == 1, 0], bins=97, range=plot_range)
+    hist_1d_energy_correct_class = np.histogram(arr_nn_pred_class[correct_class == 1, 4], bins=97, range=plot_range)
 
     bin_edges = hist_1d_energy_class[1]
     hist_1d_energy_accuracy_class_bins = np.divide(hist_1d_energy_correct_class[0], hist_1d_energy_class[0], dtype=np.float32) # TODO solve division by zero
@@ -396,12 +399,12 @@ def select_class(arr_nn_pred_classes, class_vector):
 
 #-- Functions for making probability plots --#
 
-def make_prob_hists(arr_nn_pred, modelname, compare_pheid=False):
+def make_prob_hists(arr_nn_pred, modelname, precuts=(False, '3-100_GeV_prod')):
     """
     Function that makes (class-) probability histograms based on the arr_nn_pred.
     :param ndarray(ndim=2) arr_nn_pred: 2D array that contains important information for each event (mc_info + model predictions).
     :param str modelname: Name of the model that is used for saving the plots.
-    :param bool compare_pheid: Boolean flag that specifies if only events that survive the Pheid precuts should be used in making the plots.
+    :param tuple precuts: Boolean flag that specifies if only events that survive the Pheid precuts should be used in making the plots. # TODO fix docs
     """
     def configure_hstack_plot(plot_title, savepath):
         """
@@ -425,11 +428,13 @@ def make_prob_hists(arr_nn_pred, modelname, compare_pheid=False):
         plt.savefig(savepath + '.pdf')
         plt.savefig(savepath + '.png', dpi=600)
 
-    if compare_pheid is True:
-        arr_nn_pred = arr_nn_pred_select_pheid_events(arr_nn_pred, invert=False)
+    if precuts[0] is True:
+        arr_nn_pred = arr_nn_pred_select_pheid_events(arr_nn_pred, precuts=precuts[1], invert=False)
 
     fig, axes = plt.subplots()
-    particle_types_dict = {'muon-CC': (14, 1), 'a_muon-CC': (-14, 1), 'elec-CC': (12, 1), 'a_elec-CC': (-12, 1)}
+    particle_types_dict = {'muon-CC': (14, 1), 'a_muon-CC': (-14, 1), 'elec-CC': (12, 1),
+                           'a_elec-CC': (-12, 1), 'elec-NC': (12, 0), 'a_elec-NC': (-12, 0),
+                           'tau-CC': (16, 1), 'a_tau-CC': (-16, 1)}
 
     # make energy cut, 3-40GeV
     arr_nn_pred_ecut = arr_nn_pred[arr_nn_pred[:, 4] <= 40]
@@ -438,16 +443,25 @@ def make_prob_hists(arr_nn_pred, modelname, compare_pheid=False):
     make_prob_hist_class(arr_nn_pred_ecut, axes, particle_types_dict, 'a_muon-CC', 0, plot_range=(0, 1), color='b', linestyle='--')
     make_prob_hist_class(arr_nn_pred_ecut, axes, particle_types_dict, 'elec-CC', 0, plot_range=(0,1), color='r', linestyle='-')
     make_prob_hist_class(arr_nn_pred_ecut, axes, particle_types_dict, 'a_elec-CC', 0, plot_range=(0, 1), color='r', linestyle='--')
+    make_prob_hist_class(arr_nn_pred_ecut, axes, particle_types_dict, 'elec-NC', 0, plot_range=(0,1), color='saddlebrown', linestyle='-')
+    make_prob_hist_class(arr_nn_pred_ecut, axes, particle_types_dict, 'a_elec-NC', 0, plot_range=(0, 1), color='saddlebrown', linestyle='--')
+    make_prob_hist_class(arr_nn_pred_ecut, axes, particle_types_dict, 'tau-CC', 0, plot_range=(0,1), color='g', linestyle='-')
+    make_prob_hist_class(arr_nn_pred_ecut, axes, particle_types_dict, 'a_tau-CC', 0, plot_range=(0, 1), color='g', linestyle='--')
 
-    configure_hstack_plot(plot_title='Probability to be classified as elec-CC (shower) 3-40GeV', savepath='results/plots/PT_hist1D_prob_shower_' + modelname)
+    configure_hstack_plot(plot_title='Probability to be classified as shower, 3-40GeV', savepath='results/plots/1d/track_shower/ts_prob_shower_' + modelname)
     plt.cla()
 
     make_prob_hist_class(arr_nn_pred_ecut, axes, particle_types_dict, 'muon-CC', 1, plot_range=(0,1), color='b', linestyle='-')
     make_prob_hist_class(arr_nn_pred_ecut, axes, particle_types_dict, 'a_muon-CC', 1, plot_range=(0, 1), color='b', linestyle='--')
     make_prob_hist_class(arr_nn_pred_ecut, axes, particle_types_dict, 'elec-CC', 1, plot_range=(0,1), color='r', linestyle='-')
     make_prob_hist_class(arr_nn_pred_ecut, axes, particle_types_dict, 'a_elec-CC', 1, plot_range=(0, 1), color='r', linestyle='--')
+    make_prob_hist_class(arr_nn_pred_ecut, axes, particle_types_dict, 'elec-NC', 1, plot_range=(0,1), color='saddlebrown', linestyle='-')
+    make_prob_hist_class(arr_nn_pred_ecut, axes, particle_types_dict, 'a_elec-NC', 1, plot_range=(0, 1), color='saddlebrown', linestyle='--')
+    make_prob_hist_class(arr_nn_pred_ecut, axes, particle_types_dict, 'tau-CC', 1, plot_range=(0,1), color='g', linestyle='-')
+    make_prob_hist_class(arr_nn_pred_ecut, axes, particle_types_dict, 'a_tau-CC', 1, plot_range=(0, 1), color='g', linestyle='--')
 
-    configure_hstack_plot(plot_title='Probability to be classified as muon-CC (track) 3-40GeV', savepath='results/plots/PT_hist1D_prob_track_' + modelname)
+
+    configure_hstack_plot(plot_title='Probability to be classified as track, 3-40GeV', savepath='results/plots/1d/track_shower/ts_prob_track_' + modelname)
     plt.cla()
 
 
@@ -467,41 +481,46 @@ def make_prob_hist_class(arr_nn_pred, axes, particle_types_dict, particle_type, 
     ptype_vector = particle_types_dict[particle_type]
     arr_nn_pred_ptype = select_class(arr_nn_pred, class_vector=ptype_vector)
 
+    if arr_nn_pred_ptype.size == 0: return
+
     # prob_class_index = 0/1, 0 is shower, 1 is track
     prob_ptype_class = arr_nn_pred_ptype[:, 9 + prob_class_index]
 
-    axes.hist(prob_ptype_class, bins=40, range=plot_range, normed=True, color=color, label=particle_type, histtype='step', linestyle=linestyle, zorder=3)
+    axes.hist(prob_ptype_class, bins=40, range=plot_range, density=True, color=color, label=particle_type, histtype='step', linestyle=linestyle, zorder=3)
 
 
 #-- Functions for making probability plots --#
 
 #-- Functions for making property (e.g. bjorken_y) vs accuracy plots --#
-#TODO fix arr_nn_pred indices, doesn't work as of now
-def make_property_to_accuracy_plot(arr_energy_correct, property_type, title, filename, e_cut=False, compare_pheid=False):
+
+# TODO doesn't work atm due to changed arr_nn_pred indices
+def make_property_to_accuracy_plot(arr_nn_pred, property_type, title, filename, e_cut=False, precuts=(False, '3-100_GeV_prod')):
     """
     Function that makes property (e.g. energy) vs accuracy plots.
-    :param ndarray(ndim=2) arr_energy_correct: Array that contains the energy, correct, particle_type, is_cc,... and y_pred info for each event.
+    :param ndarray(ndim=2) arr_nn_pred: Array that contains the energy, correct, particle_type, is_cc,... and y_pred info for each event.
     :param str property_type: Specifies which property should be plotted. Currently available: 'bjorken-y'.
     :param str title: Title of the plots.
     :param str filename: Full filepath for saving the plots.
     :param bool e_cut: Specifies if an energy cut should be used. If True, only events from 3-40GeV are selected for the plots.
-    :param bool compare_pheid: Boolean flag that specifies if only events that survive the Pheid precuts should be used in making the plots.
+    :param tuple precuts: Boolean flag that specifies if only events that survive the Pheid precuts should be used in making the plots. # TODO fix docs
     """
-    if compare_pheid is True:
-        arr_energy_correct = arr_nn_pred_select_pheid_events(arr_energy_correct, invert=False)
+    if precuts[0] is True:
+        arr_nn_pred = arr_nn_pred_select_pheid_events(arr_nn_pred, precuts=precuts[1], invert=False)
 
-    if e_cut is True: arr_energy_correct = arr_energy_correct[arr_energy_correct[:, 0] <= 40] # 3-40 GeV
+    if e_cut is True: arr_nn_pred = arr_nn_pred[arr_nn_pred[:, 0] <= 40] # 3-40 GeV
 
     fig, axes = plt.subplots()
 
-    particle_types_dict = {'muon-CC': (14, 1), 'a_muon-CC': (-14, 1), 'elec-CC': (12, 1), 'a_elec-CC': (-12, 1)}
+    particle_types_dict = {'muon-CC': (14, 1), 'a_muon-CC': (-14, 1), 'elec-CC': (12, 1),
+                           'a_elec-CC': (-12, 1), 'elec-NC': (12, 0), 'a_elec-NC': (-12, 0),
+                           'tau-CC': (16, 1), 'a_tau-CC': (-16, 1)}
     properties = {'bjorken-y': {'index': 8, 'n_bins': 10, 'plot_range': (0, 1)}}
     prop = properties[property_type]
 
-    make_step_plot_1d_property_accuracy_class(prop, arr_energy_correct, axes, particle_types_dict, 'muon-CC', linestyle='-', color='b')
-    make_step_plot_1d_property_accuracy_class(prop, arr_energy_correct, axes, particle_types_dict, 'a_muon-CC', linestyle='--', color='b')
-    make_step_plot_1d_property_accuracy_class(prop, arr_energy_correct, axes, particle_types_dict, 'elec-CC', linestyle='-', color='r')
-    make_step_plot_1d_property_accuracy_class(prop, arr_energy_correct, axes, particle_types_dict, 'a_elec-CC', linestyle='--', color='r')
+    make_step_plot_1d_property_accuracy_class(prop, arr_nn_pred, axes, particle_types_dict, 'muon-CC', linestyle='-', color='b')
+    make_step_plot_1d_property_accuracy_class(prop, arr_nn_pred, axes, particle_types_dict, 'a_muon-CC', linestyle='--', color='b')
+    make_step_plot_1d_property_accuracy_class(prop, arr_nn_pred, axes, particle_types_dict, 'elec-CC', linestyle='-', color='r')
+    make_step_plot_1d_property_accuracy_class(prop, arr_nn_pred, axes, particle_types_dict, 'a_elec-CC', linestyle='--', color='r')
 
     axes.legend(loc='center right')
 
@@ -522,7 +541,7 @@ def make_property_to_accuracy_plot(arr_energy_correct, property_type, title, fil
     plt.savefig(filename + '_3-100GeV.pdf')
     plt.savefig(filename + '_3-100GeV.png', dpi=600)
 
-#TODO fix arr_nn_pred indices, doesn't work as of now
+# TODO doesn't work atm due to changed arr_nn_pred indices
 def make_step_plot_1d_property_accuracy_class(prop, arr_energy_correct, axes, particle_types_dict, particle_type, linestyle='-', color='b'):
     """
     Function for making 1D step plots property vs Accuracy.
@@ -537,6 +556,9 @@ def make_step_plot_1d_property_accuracy_class(prop, arr_energy_correct, axes, pa
     class_vector = particle_types_dict[particle_type]
 
     arr_energy_correct_class = select_class(arr_energy_correct, class_vector=class_vector)
+
+    if arr_energy_correct_class.size == 0: return
+
     property_class = arr_energy_correct_class[:, prop['index']]
     correct_class = arr_energy_correct_class[:, 1]
 
@@ -555,70 +577,54 @@ def make_step_plot_1d_property_accuracy_class(prop, arr_energy_correct, axes, pa
 #-- Functions for making property (e.g. bjorken_y) vs accuracy plots --#
 
 #TODO fix arr_nn_pred indices, doesn't work as of now
-def make_hist_2d_property_vs_property(arr_nn_pred, modelname, property_types=('bjorken-y', 'probability'), e_cut=(3, 100), compare_pheid=False):
+def make_hist_2d_property_vs_property(arr_nn_pred, modelname, property_types=('bjorken-y', 'probability'), e_cut=(3, 100), precuts=(False, '3-100_GeV_prod')):
     """
 
     :param arr_nn_pred:
     :param modelname:
     :param property_types:
     :param e_cut:
-    :param compare_pheid:
+    :param precuts:
     :return:
     """
-    if compare_pheid is True:
-        arr_nn_pred = arr_nn_pred_select_pheid_events(arr_nn_pred, invert=False)
+    if precuts[0] is True:
+        arr_nn_pred = arr_nn_pred_select_pheid_events(arr_nn_pred, precuts=precuts[1], invert=False)
 
-    particle_types_dict = {'muon-CC': (14, 1), 'a_muon-CC': (-14, 1), 'elec-CC': (12, 1), 'a_elec-CC': (-12, 1)}
+    particle_types_dict = {'muon-CC': (14, 1), 'a_muon-CC': (-14, 1), 'elec-CC': (12, 1),
+                           'a_elec-CC': (-12, 1), 'elec-NC': (12, 0), 'a_elec-NC': (-12, 0),
+                           'tau-CC': (16, 1), 'a_tau-CC': (-16, 1)}
     properties = {'bjorken-y': {'index': 5, 'n_bins': 20, 'label': 'Bjorken-y'},
-                  'probability': {'index': 7, 'n_bins': 20, 'label': 'Probability for track class'}} # probability: index 4 -> elec-CC, index 5 -> muon-CC
+                  'probability': {'index': 10, 'n_bins': 20, 'label': 'Probability for being a track'}} # probability: index 4 -> elec-CC, index 5 -> muon-CC
     prop_1, prop_2 = properties[property_types[0]], properties[property_types[1]]
 
-    if not os.path.exists('results/plots/2d/' + modelname):
-        os.makedirs('results/plots/2d/' + modelname)
 
-    make_hist_2d_class(prop_1, prop_2, arr_nn_pred, particle_types_dict, e_cut, 'muon-CC',
-                       savepath='results/plots/2d/' + modelname + '/hist_2d_muon-CC_' + property_types[0] + '_vs_' + property_types[1] + '_e_cut_' + str(e_cut))
-    make_hist_2d_class(prop_1, prop_2, arr_nn_pred, particle_types_dict, e_cut, 'a_muon-CC',
-                       savepath='results/plots/2d/' + modelname + '/hist_2d_a_muon-CC_' + property_types[0] + '_vs_' + property_types[1] + '_e_cut_' + str(e_cut))
-    make_hist_2d_class(prop_1, prop_2, arr_nn_pred, particle_types_dict, e_cut, 'elec-CC',
-                       savepath='results/plots/2d/' + modelname + '/hist_2d_elec-CC_' + property_types[0] + '_vs_' + property_types[1] + '_e_cut_' + str(e_cut))
-    make_hist_2d_class(prop_1, prop_2, arr_nn_pred, particle_types_dict, e_cut, 'a_elec-CC',
-                       savepath='results/plots/2d/' + modelname + '/hist_2d_a_elec-CC_' + property_types[0] + '_vs_' + property_types[1] + '_e_cut_' + str(e_cut))
-
+    for key in iter(particle_types_dict.keys()):
+        make_hist_2d_class(prop_1, prop_2, arr_nn_pred, particle_types_dict, e_cut, key,
+                           savepath='results/plots/2d/track_shower/hist_2d_' + key + '_' + property_types[0] + '_vs_'
+                                    + property_types[1] + '_e_cut_' + str(e_cut[0]) + '_' + str(e_cut[1]) + '_' + modelname)
 
     # make multiple cuts in range
-    e_cut_range = (3, 40)
-    stepsize = 1
+    e_cut_range, stepsize = (3, 40), 1
 
-    pdf_file_muon_CC = mpl.backends.backend_pdf.PdfPages('results/plots/2d/' + modelname + '/hist_2d_muon-CC_'
-                                                         + property_types[0] + '_vs_' + property_types[1] + '_e_cut_' + 'multiple.pdf')
-    pdf_file_a_muon_CC = mpl.backends.backend_pdf.PdfPages('results/plots/2d/' + modelname + '/hist_2d_a_muon-CC_'
-                                                           + property_types[0] + '_vs_' + property_types[1] + '_e_cut_' + 'multiple.pdf')
-    pdf_file_elec_CC = mpl.backends.backend_pdf.PdfPages('results/plots/2d/' + modelname + '/hist_2d_elec-CC_'
-                                                         + property_types[0] + '_vs_' + property_types[1] + '_e_cut_' + 'multiple.pdf')
-    pdf_file_a_elec_CC = mpl.backends.backend_pdf.PdfPages('results/plots/2d/' + modelname + '/hist_2d_a_elec-CC_'
-                                                           + property_types[0] + '_vs_' + property_types[1] + '_e_cut_' + 'multiple.pdf')
+    pdf_pages = {}
+
+    for key in iter(particle_types_dict.keys()):
+        pdf_pages[key] = mpl.backends.backend_pdf.PdfPages('results/plots/2d/track_shower/hist_2d_' + key + '_'
+                                                         + property_types[0] + '_vs_' + property_types[1] + '_e_cut_'
+                                                           + str(e_cut[0]) + '_' + str(e_cut[1]) + '_multiple_' + modelname + '.pdf')
 
     for i in xrange(e_cut_range[1] - e_cut_range[0]):
         e_cut_temp = (e_cut_range[0] + i*stepsize, e_cut_range[0] + i * stepsize + stepsize)
-
-        make_hist_2d_class(prop_1, prop_2, arr_nn_pred, particle_types_dict, e_cut_temp, 'muon-CC', pdf_file=pdf_file_muon_CC)
-        make_hist_2d_class(prop_1, prop_2, arr_nn_pred, particle_types_dict, e_cut_temp, 'a_muon-CC', pdf_file=pdf_file_a_muon_CC)
-        make_hist_2d_class(prop_1, prop_2, arr_nn_pred, particle_types_dict, e_cut_temp, 'elec-CC', pdf_file=pdf_file_elec_CC)
-        make_hist_2d_class(prop_1, prop_2, arr_nn_pred, particle_types_dict, e_cut_temp, 'a_elec-CC', pdf_file=pdf_file_a_elec_CC)
+        for key in iter(particle_types_dict.keys()):
+            make_hist_2d_class(prop_1, prop_2, arr_nn_pred, particle_types_dict, e_cut_temp, key, pdf_file=pdf_pages[key])
 
     for i in xrange(e_cut_range[1] - e_cut_range[0]):
         e_cut_temp = (e_cut_range[0] + i*stepsize, e_cut_range[0] + i * stepsize + stepsize)
+        for key in iter(particle_types_dict.keys()):
+            make_hist_2d_class(prop_1, prop_2, arr_nn_pred, particle_types_dict, e_cut_temp, key, pdf_file=pdf_pages[key], log=True)
 
-        make_hist_2d_class(prop_1, prop_2, arr_nn_pred, particle_types_dict, e_cut_temp, 'muon-CC', pdf_file=pdf_file_muon_CC, log=True)
-        make_hist_2d_class(prop_1, prop_2, arr_nn_pred, particle_types_dict, e_cut_temp, 'a_muon-CC', pdf_file=pdf_file_a_muon_CC, log=True)
-        make_hist_2d_class(prop_1, prop_2, arr_nn_pred, particle_types_dict, e_cut_temp, 'elec-CC', pdf_file=pdf_file_elec_CC, log=True)
-        make_hist_2d_class(prop_1, prop_2, arr_nn_pred, particle_types_dict, e_cut_temp, 'a_elec-CC', pdf_file=pdf_file_a_elec_CC, log=True)
-
-    pdf_file_muon_CC.close()
-    pdf_file_a_muon_CC.close()
-    pdf_file_elec_CC.close()
-    pdf_file_a_elec_CC.close()
+    for key in iter(pdf_pages.keys()):
+        pdf_pages[key].close()
 
 #TODO fix arr_nn_pred indices, doesn't work as of now
 def make_hist_2d_class(prop_1, prop_2, arr_nn_pred, particle_types_dict, e_cut, particle_type, savepath='', pdf_file=None, log=False):
@@ -640,6 +646,8 @@ def make_hist_2d_class(prop_1, prop_2, arr_nn_pred, particle_types_dict, e_cut, 
     class_vector = particle_types_dict[particle_type]
 
     arr_nn_pred_class = select_class(arr_nn_pred, class_vector=class_vector)
+
+    if arr_nn_pred_class.size == 0: return
 
     property_1_class = arr_nn_pred_class[:, prop_1['index']]
     property_2_class = arr_nn_pred_class[:, prop_2['index']]
@@ -669,15 +677,15 @@ def make_hist_2d_class(prop_1, prop_2, arr_nn_pred, particle_types_dict, e_cut, 
     plt.close()
 
 # TODO add KM3NeT preliminary
-def calculate_and_plot_separation_pid(arr_nn_pred, modelname, compare_pheid=False):
+def calculate_and_plot_separation_pid(arr_nn_pred, modelname, precuts=(False, '3-100_GeV_prod')):
     """
     Calculates and plots the separability (1-c) plot.
     :param ndarray(ndim=2) arr_nn_pred: array that contains important information for each event (mc_info + model predictions).
     :param str modelname: Name of the model used for plot savenames.
-    :param bool compare_pheid: Boolean flag that specifies if only events that survive the Pheid precuts should be used in making the plots.
+    :param tuple precuts: Boolean flag that specifies if only events that survive the Pheid precuts should be used in making the plots. # TODO fix docs
     """
-    if compare_pheid is True:
-        arr_nn_pred = arr_nn_pred_select_pheid_events(arr_nn_pred, invert=False)
+    if precuts[0] is True:
+        arr_nn_pred = arr_nn_pred_select_pheid_events(arr_nn_pred, precuts=precuts[1], invert=False)
 
     particle_types_dict = {'muon-CC': (14, 1), 'a_muon-CC': (-14, 1), 'elec-CC': (12, 1), 'a_elec-CC': (-12, 1)}
 
@@ -742,9 +750,10 @@ def calculate_and_plot_separation_pid(arr_nn_pred, modelname, compare_pheid=Fals
     plt.yticks(np.arange(0, 1.1, 0.1))
     # plt.xticks(np.arange(0, 110, 10))
     plt.xscale('log')
+    plt.text(0.05, 0.92, 'KM3NeT Preliminary', transform=axes.transAxes, weight='bold')
 
-    plt.savefig('results/plots/1d/Correlation_Coefficients_' + modelname + '.pdf')
-    plt.savefig('results/plots/1d/Correlation_Coefficients_' + modelname + '.png', dpi=600)
+    plt.savefig('results/plots/1d/track_shower/Correlation_Coefficients_' + modelname + '.pdf')
+    plt.savefig('results/plots/1d/track_shower/Correlation_Coefficients_' + modelname + '.png', dpi=600)
 
     plt.close()
 
@@ -1217,17 +1226,17 @@ def make_1d_dir_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median', e
     pdf_plots.close()
 
 
-def make_2d_dir_correlation_plot(arr_nn_pred, modelname, dir_bins=np.linspace(-1,1,100), compare_pheid=(False, '3-100_GeV_prod')):
+def make_2d_dir_correlation_plot(arr_nn_pred, modelname, dir_bins=np.linspace(-1,1,100), precuts=(False, '3-100_GeV_prod')):
     """
 
     :param arr_nn_pred:
     :param modelname:
     :param dir_bins:
-    :param compare_pheid:
+    :param precuts:
     :return:
     """
-    if compare_pheid[0] is True:
-        arr_nn_pred = arr_nn_pred_select_pheid_events(arr_nn_pred, invert=False, precuts=compare_pheid[1])
+    if precuts[0] is True:
+        arr_nn_pred = arr_nn_pred_select_pheid_events(arr_nn_pred, invert=False, precuts=precuts[1])
 
     labels = {'dir_x': {'reco_index': 10, 'mc_index':6}, 'dir_y': {'reco_index': 11, 'mc_index':7},
               'dir_z': {'reco_index': 12, 'mc_index':8}}
