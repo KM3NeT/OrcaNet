@@ -84,26 +84,30 @@ def parse_input():
         train_files_temp, test_files_temp = [], []
 
         for line in open(args.listfile_multiple[0]):
-            line = line.rstrip('\n')
 
-            if line == '': # newline separator which specifies that one set of different cnn input files has been finished
+            if line == '\n': # newline separator which specifies that one set of different cnn input files has been finished
                 # append one tuple (len > 1) to the train_files list for a certain datasplit number (e.g. file_0)
                 train_files.append((train_files_temp, h5_get_number_of_rows(train_files_temp[0])))
                 train_files_temp = []
                 continue
 
+            line = line.rstrip('\n')
             train_files_temp.append(line)
 
-        for line in open(args.listfile_multiple[1]):
-            line = line.rstrip('\n')
+        train_files.append((train_files_temp, h5_get_number_of_rows(train_files_temp[0])))
 
-            if line == '':  # newline separator which specifies that one set of different cnn input files has been finished
+        for line in open(args.listfile_multiple[1]):
+
+            if line == '\n':  # newline separator which specifies that one set of different cnn input files has been finished
                 # append one tuple (len > 1) to the train_files list for a certain datasplit number (e.g. file_0)
                 test_files.append((test_files_temp, h5_get_number_of_rows(test_files_temp[0])))
                 test_files_temp = []
                 continue
 
+            line = line.rstrip('\n')
             test_files_temp.append(line)
+
+        test_files.append((test_files_temp, h5_get_number_of_rows(test_files_temp[0]))) # save temp to test_files for the last dataset block
 
     else:
         train_files = [([args.train_file], h5_get_number_of_rows(args.train_file))]
