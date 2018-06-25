@@ -367,7 +367,7 @@ def submit_concatenate_list_files(savenames, dirpath, p_type_str, proj_type, chu
         f.write('#\n')
         f.write('#PBS -o /home/woody/capn/mppi033h/logs/submit_concatenate_h5_${PBS_JOBID}.out -e /home/woody/capn/mppi033h/logs/submit_concatenate_h5_${PBS_JOBID}.err\n')
         f.write('\n')
-        f.write('CodeFolder="/home/woody/capn/mppi033h/Code/HPC/cnns/utilities/data_tools"\n')
+        f.write('CodeFolder="/home/woody/capn/mppi033h/Code/OrcaNet/cnns/utilities/data_tools"\n')
         f.write('cd ${CodeFolder}\n')
         f.write('chunksize="' + xstr(chunking) + '"\n')
         f.write('compression="' + xstr(compress) + '"\n')
