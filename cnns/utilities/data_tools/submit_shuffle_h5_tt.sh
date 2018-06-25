@@ -6,7 +6,7 @@
 # submit with 'qsub -l nodes=1:ppn=4:sl32g,walltime=01:01:00 submit_shuffle_h5_tt.sh'
 # Don't forget to create the logs/cout folder in the projection_path (concatenated/logs/cout)!
 
-CodeFolder=/home/woody/capn/mppi033h/Code/HPC/cnns/utilities/data_tools
+CodeFolder=/home/woody/capn/mppi033h/Code/OrcaNet/cnns/utilities/data_tools
 cd ${CodeFolder}
 source activate /home/hpc/capn/mppi033h/.virtualenv/h5_to_histo_env/
 
