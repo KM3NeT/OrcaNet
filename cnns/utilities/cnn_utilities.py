@@ -399,7 +399,7 @@ def load_zero_center_data(train_files, batchsize, n_bins, n_gpu):
             xs_mean_temp = np.load(filepath_without_index + '_zero_center_mean.npy')
 
         else:
-            print 'Calculating the xs_mean_array in order to zero_center the data! \n'
+            print 'Calculating the xs_mean_array in order to zero_center the data!'
             dimensions = get_dimensions_encoding(n_bins[i], batchsize)
 
             # if the train dataset is split over multiple files, we need to average over the single xs_mean_temp arrays.
