@@ -412,7 +412,7 @@ def make_prob_hists(arr_nn_pred, modelname, precuts=(False, '3-100_GeV_prod')):
         :param str plot_title: Title that should be used for the plot.
         :param str savepath: path that should be used for saving the plot.
         """
-        axes.legend(loc='upper center')
+        axes.legend(loc='upper center', ncol=2)
         plt.grid(True, zorder=0, linestyle='dotted')
         #plt.yscale('log')
 
@@ -420,7 +420,7 @@ def make_prob_hists(arr_nn_pred, modelname, precuts=(False, '3-100_GeV_prod')):
         plt.xticks(x_ticks_major)
         plt.minorticks_on()
 
-        plt.xlabel('Probability')
+        plt.xlabel('OrcaNet probability')
         plt.ylabel('Normed Quantity')
         title = plt.title(plot_title)
         title.set_position([.5, 1.04])
@@ -486,7 +486,10 @@ def make_prob_hist_class(arr_nn_pred, axes, particle_types_dict, particle_type, 
     # prob_class_index = 0/1, 0 is shower, 1 is track
     prob_ptype_class = arr_nn_pred_ptype[:, 9 + prob_class_index]
 
-    axes.hist(prob_ptype_class, bins=40, range=plot_range, density=True, color=color, label=particle_type, histtype='step', linestyle=linestyle, zorder=3)
+    label = {'muon-CC': r'$\nu_{\mu}-CC$', 'a_muon-CC': r'$\overline{\nu}_{\mu}-CC$', 'elec-CC': r'$\nu_{e}-CC$', 'a_elec-CC': r'$\overline{\nu}_{e}-CC$',
+             'elec-NC': r'$\nu_{e}-NC$', 'a_elec-NC': r'$\overline{\nu}_{e}-NC$', 'tau-CC': r'$\nu_{\tau}-CC$', 'a_tau-CC': r'$\overline{\nu}_{\tau}-CC$'}
+
+    axes.hist(prob_ptype_class, bins=40, range=plot_range, density=True, color=color, label=label[particle_type], histtype='step', linestyle=linestyle, zorder=3)
 
 
 #-- Functions for making probability plots --#
