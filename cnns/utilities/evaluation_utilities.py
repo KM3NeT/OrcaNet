@@ -137,7 +137,7 @@ def load_pheid_event_selection(precuts='3-100_GeV_prod'):
     :return ndarray(ndim=2) arr_pheid_sel_events: 2D array that contains [particle_type, is_cc, event_id, run_id]
                                                    for each event that survives the precuts.
     """
-    path = 'cnns/results/plots/pheid_event_selection_txt/' # folder for storing the precut .txts
+    path = 'results/plots/pheid_event_selection_txt/' # folder for storing the precut .txts
 
     #### Precuts
     if precuts == '3-100_GeV_prod':
