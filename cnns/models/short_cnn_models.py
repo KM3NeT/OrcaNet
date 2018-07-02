@@ -29,11 +29,8 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident =
     if n_bins[0].count(1) == 1: # 3d case
         dim = 3
         input_dim = get_dimensions_encoding(n_bins[0], batchsize)  # includes batchsize
-        if n_bins[0][1] == 1:
-            print 'Using a VGG-like 3D CNN with XZT projection'
-            max_pool_sizes = {1: (1,1,2), 3: (2,2,2), 7: (2,2,2)}
 
-        elif n_bins[0][3] == 1:
+        if n_bins[0][3] == 1:
             print 'Using a VGG-like 3D CNN with XYZ projection'
             max_pool_sizes = {3: (2, 2, 2), 7: (2, 2, 2)}
 
@@ -48,13 +45,6 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident =
     elif n_bins[0].count(1) == 0: # 4d case, 3.5D
         dim = 3
         if len(n_bins) > 1:
-
-            # if swap_4d_channels == 'yzt-x_all-t_and_yzt-x_tight-1-t':
-            #     max_pool_sizes = {'net_1': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)},
-            #                       'net_2': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}}
-            #     input_dim = get_dimensions_encoding(n_bins[0], batchsize)  # includes batchsize
-            #     input_dim = [(input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1]), # yzt-x all
-            #                  (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1])] # yzt-x tight-1
 
             if swap_4d_channels == 'xyz-t_and_yzt-x' and 'tight-1_tight-2' not in str_ident:
                 max_pool_sizes = {'net_1': {3: (2, 2, 2), 7: (2, 2, 2)}, # only used if training from scratch
@@ -73,19 +63,6 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident =
                              (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1]), # yzt-x
                              (input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]), # xyz-t
                              (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1])] # yzt-x
-
-            elif swap_4d_channels == 'xyz-t_and_yzt-x_and_xyt-z' and str_ident == 'multi_input_single_train_tight-1_tight-2':
-                max_pool_sizes = {'net_1': {3: (2, 2, 2), 7: (2, 2, 2)}, # only used if training from scratch
-                                  'net_2': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)},
-                                  'net_3': {3: (2, 2, 2), 7: (2, 2, 2)},
-                                  'net_4': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)},
-                                  'net_5': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}}
-                input_dim = get_dimensions_encoding(n_bins[0], batchsize)  # includes batchsize
-                input_dim = [(input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]), # xyz-t
-                             (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1]), # yzt-x
-                             (input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]), # xyz-t
-                             (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1]), # yzt-x
-                             (input_dim[0], input_dim[1], input_dim[2], input_dim[4], input_dim[3])] # xyt-z
 
             elif swap_4d_channels is None:
                 max_pool_sizes = {'net_1': {5: (2, 2, 2), 9: (2, 2, 2)},
@@ -111,11 +88,6 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident =
                 max_pool_sizes = {2: (1, 1, 2), 5: (2, 2, 2), 9: (2, 2, 2)} # 2 more layers
                 input_dim = (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1]) # [bs,y,z,t,x]
 
-            elif swap_4d_channels == 'xyt-z':
-                print 'Using a VGG-like 3.5D CNN with XYT data and Z channel information.'
-                max_pool_sizes = {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}
-                input_dim = (input_dim[0], input_dim[1], input_dim[2], input_dim[4], input_dim[3]) # [bs,y,z,t,x]
-
             elif swap_4d_channels == 'xyz-t_and_yzt-x':
                 max_pool_sizes = {'net_1': {3: (2, 2, 2), 7: (2, 2, 2)},
                                   'net_2': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}}
@@ -131,8 +103,8 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident =
                               'Please add the max_pool_sizes dict in the function by yourself.')
 
     else:
-        raise IOError('Data types other than 2D, 3D or 4D (3.5D actually) are not yet supported. '
-                      'Please specify a 2D, 3D or 4D n_bins tuple.')
+        raise IOError('Data types other than 3D or 4D (3.5D actually) are not yet supported. '
+                      'Please specify a 3D or 4D n_bins tuple.')
 
     return dim, input_dim, max_pool_sizes
 
@@ -168,10 +140,10 @@ def create_vgg_like_model(n_bins, batchsize, class_type, n_filters=None, dropout
         x = conv_block(x, dim, n_filters[i], k_size=k_size, dropout=dropout, max_pooling=max_pool_sizes.get(i), activation=activation, kernel_reg=kernel_reg)
 
     x = Flatten()(x)
-    x = Dense(256, kernel_initializer='he_normal', kernel_regularizer=kernel_reg)(x)
+    x = Dense(128, kernel_initializer='he_normal', kernel_regularizer=kernel_reg)(x)
     x = Activation(activation)(x)
     if dropout > 0.0: x = Dropout(dropout)(x)
-    x = Dense(16, kernel_initializer='he_normal', kernel_regularizer=kernel_reg)(x)
+    x = Dense(32, kernel_initializer='he_normal', kernel_regularizer=kernel_reg)(x)
     x = Activation(activation)(x)
 
     if class_type[1] == 'track-shower': # categorical problem
@@ -295,21 +267,14 @@ def create_vgg_like_model_multi_input_from_single_nns(n_bins, batchsize, str_ide
         trained_model_paths[1] = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_tight-1_w-geo-fix_bs64_dp0.1_2-more-layers_epoch_30_file_1.h5'  # yzt-x, timecut tight-1, with geo fix, 2 more layers
 
     elif swap_4d_channels is '': # xyz-t tight-1 and xyz-t tight-2
-        trained_model_paths[0] = 'models/trained/trained_model_VGG_4d_xyz-t_track-shower_lp_tight-1_bs64_dp0.1_pad_same_epoch_15_file_1.h5'  # lp, xyz-t, timecut tight_1, fully trained epoch 15, file 1
-        trained_model_paths[1] = 'models/trained/trained_model_VGG_4d_xyz-t_track-shower_lp_tight-2_bs64_dp0.1_padsame_epoch_12_file_1.h5'  # lp, xyz-t, timecut tight-2, fully trained epoch 12, file 1
+        trained_model_paths[0] = 'models/trained/trained_model_VGG_4d_xyz-t_track-shower_lp_tight-1_bs64_dp0.1_pad_same_epoch_16_file_1.h5'  # lp, xyz-t, timecut tight_1, fully trained epoch 16, file 1
+        trained_model_paths[1] = 'models/trained/trained_model_VGG_4d_xyz-t_track-shower_lp_tight-2_bs64_dp0.1_padsame_epoch_13_file_1.h5'  # lp, xyz-t, timecut tight-2, fully trained epoch 13, file 1
 
     elif 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2' in swap_4d_channels + str_ident:
-        trained_model_paths[0] = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-1_w-geo-fix_bs64_2-more-layers_epoch_32_file_1.h5' # xyz-t, tight-1, w-geo-fix, 2 more layers
-        trained_model_paths[1] = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_tight-1_w-geo-fix_bs64_dp0.1_2-more-layers_epoch_31_file_1.h5' # yzt-x, tight-1, w-geo-fix, 2 more layers
-        trained_model_paths[2] = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-2_w-geo-fix_bs64_2-more-layers_epoch_24_file_1.h5' # xyz-t, tight-2
-        trained_model_paths[3] = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_tight-2_w-geo-fix_bs64_dp0.1_2-more-layers_epoch_29_file_1.h5' # yzt-x, tight-2
-
-    elif swap_4d_channels + str_ident == 'xyz-t_and_yzt-x_and_xyt-z' + 'multi_input_single_train_tight-1_tight-2':
-        trained_model_paths[0] = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-1_w-geo-fix_bs64_2-more-layers_epoch_32_file_1.h5' # xyz-t, tight-1, w-geo-fix, 2 more layers
-        trained_model_paths[1] = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_tight-1_w-geo-fix_bs64_dp0.1_2-more-layers_epoch_17_file_1.h5' # yzt-x, tight-1, w-geo-fix, 2 more layers
-        trained_model_paths[2] = 'models/trained/trained_model_VGG_4d_xyz-t_muon-CC_to_elec-CC_xyz-t_tight-2_w-geo-fix_bs64_dp0.1_epoch_30_file_1.h5' # xyz-t, tight-2
-        trained_model_paths[3] = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_tight-2_w-geo-fix_bs64_dp0.1_epoch_33_file_1.h5' # yzt-x, tight-2
-        trained_model_paths[4] = 'models/trained/trained_model_VGG_4d_xyt-z_muon-CC_to_elec-CC_xyt-z_tight-1_w-geo-fix_bs64_dp0.1_epoch_33_file_1.h5' # xyt-z, tight-1
+        trained_model_paths[0] = 'models/trained/trained_model_VGG_4d_xyz-t_track-shower_lp_tight-1_bs64_dp0.1_pad_same_epoch_16_file_1.h5'  # lp, xyz-t, timecut tight-1, fully trained epoch 16, file 1
+        trained_model_paths[2] = 'models/trained/trained_model_VGG_4d_xyz-t_track-shower_lp_tight-2_bs64_dp0.1_padsame_epoch_13_file_1.h5'  # lp, xyz-t, timecut tight-2, fully trained epoch 13, file 1
+        trained_model_paths[1] = 'models/trained/trained_model_VGG_4d_yzt-x_track-shower_lp_tight-1_bs64_dp0.1_padsame_epoch_10_file_3.h5' # lp, yzt-x, timecut tight-1, fully trained epoch 10, file 3
+        trained_model_paths[3] = 'models/trained/trained_model_VGG_4d_yzt-x_track-shower_lp_tight-2_bs64_dp0.1_padsame_epoch_11_file_2.h5' # lp, yzt-x, timecut tight-2, fully trained epoch 11, file 2
 
     else:
         raise ValueError('The double input combination specified in "swap_4d_channels" is not known, check the function for what is available.')
