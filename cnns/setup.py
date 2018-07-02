@@ -5,7 +5,7 @@ setup(
     name='cnns',
     version='1.0',
     description='Runs CNNs',
-    url='https://github.com/ViaFerrata/DL_pipeline_TauAppearance/tree/master/HPC/cnns',
+    url='https://github.com/ViaFerrata/OrcaNet/tree/master/cnns',
     author='Michael Moser',
     author_email='mmoser@km3net.de',
     license='AGPL',
