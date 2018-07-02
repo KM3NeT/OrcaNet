@@ -347,7 +347,7 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
 
             else:
                 model = create_vgg_like_model(n_bins, batchsize, class_type, dropout=0.1,
-                                              #n_filters=(64, 64, 64, 64, 64, 64, 64, 64, 128, 128, 128, 128), swap_4d_channels=swap_4d_channels) # 4 more layers
+                                              #n_filters=(64,64,64,64,64,128,128,128), swap_4d_channels=swap_4d_channels) # standard
                                               n_filters=(64, 64, 64, 64, 64, 64, 128, 128, 128, 128), swap_4d_channels=swap_4d_channels) # 2 more layers
 
         elif nn_arch is 'Conv_LSTM':
@@ -394,7 +394,7 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
         arr_nn_pred = np.load('results/plots/saved_predictions/arr_energy_correct_' + modelname + '.npy')
 
         if class_type[1] == 'track-shower': # categorical
-            precuts = (True, '3-100_GeV_prod')  # '3-100_GeV_prod'
+            precuts = (False, '3-100_GeV_prod')  # '3-100_GeV_prod'
 
             make_energy_to_accuracy_plot_multiple_classes(arr_nn_pred, title='Classified as track',
                                                           filename='results/plots/1d/track_shower/ts_' + modelname,
@@ -444,18 +444,14 @@ if __name__ == '__main__':
     ###############
 
     ### Larger Production
-    # tight-1
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(4,1), use_scratch_ssd=True,
-    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.1')
-
-    # tight-1, pad same
-    execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(7,1), use_scratch_ssd=True,
-                n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.1_padsame')
+    # tight-1, pad valid, dense 128
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(0,1), use_scratch_ssd=True,
+    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.1_pad-valid')
     # python run_cnn.py -l lists/lp/xyz-t_lp_tight-1_train_no_tau.list lists/lp/xyz-t_lp_tight-1_test_no_tau.list
 
-    # tight-2, padsame
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(7,1), use_scratch_ssd=True,
-    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-2_bs64_dp0.1_padsame')
+    # tight-2, pad valid, dense 128
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(0,1), use_scratch_ssd=True,
+    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-2_bs64_dp0.1_pad-valid')
     # python run_cnn.py -l lists/lp/xyz-t_lp_tight-2_train_no_tau.list lists/lp/xyz-t_lp_tight-2_test_no_tau.list
 
     ## Regression
@@ -479,15 +475,14 @@ if __name__ == '__main__':
     # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(8,4), use_scratch_ssd=True,
     #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.1')
 
-    # standard tight-1 as above, but padding same! // 2 additional layers: n_filters=(64, 64, 64, 64, 64, 64, 128, 128, 128, 128), max_pool_sizes = {5: (2, 2, 2), 9: (2, 2, 2)}, bs 64, initial lr = 0.003, tight-1
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(14,1), use_scratch_ssd=True,
-    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.1_pad_same')
-
+    # standard tight-1 as above, padding valid, but 128 first dense! // 2 additional layers: n_filters=(64, 64, 64, 64, 64, 64, 128, 128, 128, 128), max_pool_sizes = {5: (2, 2, 2), 9: (2, 2, 2)}, bs 64, initial lr = 0.003, tight-1
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(0,1), use_scratch_ssd=True,
+    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.1_pad-valid_dense-128')
     # python run_cnn.py -l lists/lp/xyz-t_lp_tight-1_train_no_tau.list lists/lp/xyz-t_lp_tight-1_test_no_tau.list
 
     # standard tight-2, padsame// 2 additional layers: n_filters=(64, 64, 64, 64, 64, 64, 128, 128, 128, 128), max_pool_sizes = {5: (2, 2, 2), 9: (2, 2, 2)}, bs 64, initial lr = 0.003, tight-1
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(11,3), use_scratch_ssd=True,
-    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-2_bs64_dp0.1_padsame')
+    execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(0,1), use_scratch_ssd=True,
+                n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-2_bs64_dp0.1_pad-valid_dense-128')
     # python run_cnn.py -l lists/lp/xyz-t_lp_tight-2_train_no_tau.list lists/lp/xyz-t_lp_tight-2_test_no_tau.list
 
     ######## REGRESSION, Larger Production
@@ -511,9 +506,27 @@ if __name__ == '__main__':
 
 
     #####------------- DENSER DETECTOR STUDY
-    # xyz-t, n_samples = 880000 -> factor 0.26 less -> 1/4, bs 64, dp0.1/0.2, initial lr = 0.003, tight-1
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=64, epoch=(25,1), use_scratch_ssd=True,
-    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='xyz-t_tight-1_w-geo-fix_bs64_dp0.1_2.640mio')
+    # xyz-t, tight-1, n_samples = 843000
+    # 15m
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(9,1), use_scratch_ssd=False,
+    #             n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='denser_detector_15m_vert')
+    # python run_cnn.py /home/woody/capn/mppi033h/Data/denser_detector_study/15m/concatenated/elec-CC_and_muon-CC_xyzt_train_file_0_shuffled_0.h5 /home/woody/capn/mppi033h/Data/denser_detector_study/15m/concatenated/elec-CC_and_muon-CC_xyzt_test_file_0.h5
+    # 12m
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(10,1), use_scratch_ssd=False,
+    #             n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='denser_detector_12m_vert')
+    # python run_cnn.py /home/woody/capn/mppi033h/Data/denser_detector_study/12m/concatenated/elec-CC_and_muon-CC_xyzt_train_file_0_shuffled_0.h5 /home/woody/capn/mppi033h/Data/denser_detector_study/12m/concatenated/elec-CC_and_muon-CC_xyzt_test_file_0.h5
+    # 9m
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(18,1), use_scratch_ssd=False,
+    #             n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='denser_detector_9m_vert')
+    # python run_cnn.py /home/woody/capn/mppi033h/Data/denser_detector_study/9m/concatenated/elec-CC_and_muon-CC_xyzt_train_file_0_shuffled_0.h5 /home/woody/capn/mppi033h/Data/denser_detector_study/9m/concatenated/elec-CC_and_muon-CC_xyzt_test_file_0.h5
+    # 6m
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(5,1), use_scratch_ssd=False,
+    #             n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='denser_detector_6m_vert')
+    # python run_cnn.py /home/woody/capn/mppi033h/Data/denser_detector_study/6m/concatenated/elec-CC_and_muon-CC_xyzt_train_file_0_shuffled_0.h5 /home/woody/capn/mppi033h/Data/denser_detector_study/6m/concatenated/elec-CC_and_muon-CC_xyzt_test_file_0.h5
+    # 4.5m
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(9,1), use_scratch_ssd=False,
+    #             n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='denser_detector_4p5m_vert')
+    # python run_cnn.py /home/woody/capn/mppi033h/Data/denser_detector_study/4p5m/concatenated/elec-CC_and_muon-CC_xyzt_train_file_0_shuffled_0.h5 /home/woody/capn/mppi033h/Data/denser_detector_study/4p5m/concatenated/elec-CC_and_muon-CC_xyzt_test_file_0.h5
 
 
 # xyz-t-tight-1-w-geo-fix_and_yzt-x-tight-1-w-geo-fix, double input, 2 more layers each, later pooling
@@ -536,4 +549,11 @@ if __name__ == '__main__':
 # lp, xyz-t-tight-1 + tight-2
 #     execute_cnn(n_bins=[(11,13,18,60), (11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=32, epoch=(1,1), use_scratch_ssd=False,
 #                 n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels=None, zero_center=True, str_ident='multi_input_single_train_tight-1_tight-2')
+# python run_cnn.py -m lists/lp/xyz-t_lp_tight-1_tight-2_train_no_tau.list lists/lp/xyz-t_lp_tight-1_tight-2_test_no_tau.list
+
+# lp, xyz-t, yzt-x, tight-1 + tight-2
+#     execute_cnn(n_bins=[(11,13,18,60), (11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=32, epoch=(0,1), use_scratch_ssd=False,
+#                 n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='xyz-t_and_yzt-x', zero_center=True, str_ident='multi_input_single_train_tight-1_tight-2_lr_0.0003')
+#     execute_cnn(n_bins=[(11, 13, 18, 60), (11, 13, 18, 60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=32, epoch=(0, 1), use_scratch_ssd=False,
+#                 n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='xyz-t_and_yzt-x', zero_center=True, str_ident='multi_input_single_train_tight-1_tight-2_lr_0.003')
 # python run_cnn.py -m lists/lp/xyz-t_lp_tight-1_tight-2_train_no_tau.list lists/lp/xyz-t_lp_tight-1_tight-2_test_no_tau.list
