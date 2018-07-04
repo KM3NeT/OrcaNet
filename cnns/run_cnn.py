@@ -547,13 +547,13 @@ if __name__ == '__main__':
 
 
 # lp, xyz-t-tight-1 + tight-2
-#     execute_cnn(n_bins=[(11,13,18,60), (11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=32, epoch=(0,1), use_scratch_ssd=False,
-#                 n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, str_ident='multi_input_single_train_tight-1_tight-2_new_try_lr0.0003')
+    execute_cnn(n_bins=[(11,13,18,60), (11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=32, epoch=(0,1), use_scratch_ssd=False,
+                n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, str_ident='multi_input_single_train_tight-1_tight-2_new_try_lr0.0003')
 # python run_cnn.py -m lists/lp/xyz-t_lp_tight-1_tight-2_train_no_tau.list lists/lp/xyz-t_lp_tight-1_tight-2_test_no_tau.list
 
 # lp, xyz-t, yzt-x, tight-1 + tight-2
-    execute_cnn(n_bins=[(11,13,18,60), (11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=32, epoch=(0,1), use_scratch_ssd=False,
-                n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='xyz-t_and_yzt-x', zero_center=True, str_ident='multi_input_single_train_tight-1_tight-2_lr_0.0003')
+#     execute_cnn(n_bins=[(11,13,18,60), (11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=32, epoch=(0,1), use_scratch_ssd=False,
+#                 n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='xyz-t_and_yzt-x', zero_center=True, str_ident='multi_input_single_train_tight-1_tight-2_lr_0.0003')
 #     execute_cnn(n_bins=[(11, 13, 18, 60), (11, 13, 18, 60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=32, epoch=(0, 1), use_scratch_ssd=False,
 #                 n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='xyz-t_and_yzt-x', zero_center=True, str_ident='multi_input_single_train_tight-1_tight-2_lr_0.003')
 # python run_cnn.py -m lists/lp/xyz-t_lp_tight-1_tight-2_train_no_tau.list lists/lp/xyz-t_lp_tight-1_tight-2_test_no_tau.list
