@@ -87,19 +87,6 @@ def gen_batches_from_multiple_files(filepath, batchsize, n_bins, class_type, str
                     xs_yzt_x_tight_2 = np.transpose(xs[1], swap_4d_channels_dict['yzt-x']) # yzt-x tight-2
                     xs_list.append(xs_yzt_x_tight_2)
 
-                elif swap_col + str_ident == 'xyz-t_and_yzt-x_and_xyt-z' + 'multi_input_single_train_tight-1_tight-2':
-                    xs_list.append(xs[0]) # xyz-t tight-1
-                    xs_yzt_x_tight_1 = np.transpose(xs[0], swap_4d_channels_dict['yzt-x']) # yzt-x tight-1
-                    xs_list.append(xs_yzt_x_tight_1)
-                    xs_list.append(xs[1]) # xyz-t tight-2
-                    xs_yzt_x_tight_2 = np.transpose(xs[1], swap_4d_channels_dict['yzt-x']) # yzt-x tight-2
-                    xs_list.append(xs_yzt_x_tight_2)
-                    xs_xyt_z_tight_1 = np.transpose(xs[0], swap_4d_channels_dict['xyt-z']) # xyt-z tight-1
-                    xs_list.append(xs_xyt_z_tight_1)
-
-                elif swap_col == 'xyz-t-tight-1-w-geo-fix_and_yzt-x-tight-1-wout-geo-fix':
-                    xs[1] = np.transpose(xs[1], swap_4d_channels_dict['yzt-x'])
-
                 else: raise ValueError('The argument "swap_col"=' + str(swap_col) + ' is not valid.')
 
             else:
@@ -502,7 +489,7 @@ def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident=''):
         if i > 0: projection += '_and_'
         projection += str(dim) + 'd_'
 
-        if bins.count(1) == 0 and i == 0: # for 4D input
+        if bins.count(1) == 0 and i == 0: # for 4D input # TODO FIX BUG XYZT AFTER NAME
             if swap_4d_channels is not None:
                 projection += swap_4d_channels
             else:
