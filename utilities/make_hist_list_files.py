@@ -133,7 +133,7 @@ def get_particle_types(filepaths):
     # get all particle_types
     particle_types = []
     for f in filepaths:
-        p_type = f.split('_')[3]  # index for particle_type in filename
+        p_type = f.split('_')[3]  # index for particle_type in filename # TODO fix from 4 to 3
         if p_type not in particle_types:
             particle_types.append(p_type)
 
