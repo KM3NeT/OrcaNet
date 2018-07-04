@@ -4,7 +4,8 @@
 
 import keras as ks
 from keras.models import Model
-from keras.layers import Input, Dense, Dropout, Activation, Flatten, Convolution3D, BatchNormalization, MaxPooling3D, Convolution2D, MaxPooling2D, TimeDistributed, CuDNNLSTM
+from keras.layers import Input, Dense, Dropout, Activation, Flatten, Convolution3D, BatchNormalization, MaxPooling3D,\
+                         Convolution2D, MaxPooling2D, TimeDistributed, CuDNNLSTM, Concatenate, Lambda
 from keras import backend as K
 from keras.regularizers import l2
 
@@ -139,25 +140,48 @@ def create_vgg_like_model(n_bins, batchsize, class_type, n_filters=None, dropout
     for i in xrange(1, len(n_filters)):
         x = conv_block(x, dim, n_filters[i], k_size=k_size, dropout=dropout, max_pooling=max_pool_sizes.get(i), activation=activation, kernel_reg=kernel_reg)
 
-    x = Flatten()(x)
-    x = Dense(128, kernel_initializer='he_normal', kernel_regularizer=kernel_reg)(x)
-    x = Activation(activation)(x)
+    conv_output_flat = Flatten()(x)
+
+    x = Dense(128, kernel_initializer='he_normal', kernel_regularizer=kernel_reg, activation=activation)(conv_output_flat)
     if dropout > 0.0: x = Dropout(dropout)(x)
-    x = Dense(32, kernel_initializer='he_normal', kernel_regularizer=kernel_reg)(x)
-    x = Activation(activation)(x)
+    x = Dense(32, kernel_initializer='he_normal', kernel_regularizer=kernel_reg, activation=activation)(x)
+
+    outputs = []
 
     if class_type[1] == 'track-shower': # categorical problem
         x = Dense(nb_classes, activation='softmax', kernel_initializer='he_normal')(x)
+        outputs.append(x)
 
     else: # regression case, one output for each regression label
-        label_names = ['neuron_' + str(i) for i in xrange(class_type[0])]
-        if class_type[1] == 'energy_and_direction_and_bjorken-y':
-            label_names = ('energy', 'dir_x', 'dir_y', 'dir_z', 'bjorken-y')
-        elif class_type[1] == 'energy':
-            label_names = ('energy',)
-        x = [Dense(1, name=name)(x) for name in label_names]
 
-    model = Model(inputs=input_layer, outputs=x)
+        if class_type[1] == 'energy_dir_bjorken-y_vertex_and_errors':
+            label_names = ('energy', 'dir_x', 'dir_y', 'dir_z', 'bjorken-y', 'vertex_x', 'vertex_y', 'vertex_z', 'vertex_t')
+            outputs_without_error = [Dense(1, name=name)(x) for name in label_names] # outputs without errors
+            outputs += outputs_without_error
+
+            # build second dense network for errors
+            # TODO gradient stop here
+            conv_output_flat_stop_grad = Lambda(lambda a: K.stop_gradient(a))(conv_output_flat)
+            x_err = Dense(128, kernel_initializer='he_normal', kernel_regularizer=kernel_reg, activation=activation)(conv_output_flat_stop_grad)
+            if dropout > 0.0: x_err = Dropout(dropout)(x_err)
+            x_err = Dense(32, kernel_initializer='he_normal', kernel_regularizer=kernel_reg, activation=activation)(x_err)
+
+            for i, label in enumerate(label_names):
+                output_label = outputs_without_error[i]
+                output_label_error = Dense(1, activation='relu', name=label + '_error_temp')(x_err)
+                output_label_merged = Concatenate(name=label + '_error')([output_label, output_label_error])
+                outputs.append(output_label_merged)
+
+        else:
+            label_names = ['neuron_' + str(i) for i in xrange(class_type[0])]
+            if class_type[1] == 'energy_and_direction_and_bjorken-y':
+                label_names = ('energy', 'dir_x', 'dir_y', 'dir_z', 'bjorken-y')
+            elif class_type[1] == 'energy':
+                label_names = ('energy',)
+            x = [Dense(1, name=name)(x) for name in label_names]
+            outputs.append(x)
+
+    model = Model(inputs=input_layer, outputs=outputs)
 
     return model
 
@@ -267,8 +291,8 @@ def create_vgg_like_model_multi_input_from_single_nns(n_bins, batchsize, str_ide
         trained_model_paths[1] = 'models/trained/trained_model_VGG_4d_yzt-x_muon-CC_to_elec-CC_tight-1_w-geo-fix_bs64_dp0.1_2-more-layers_epoch_30_file_1.h5'  # yzt-x, timecut tight-1, with geo fix, 2 more layers
 
     elif swap_4d_channels is '': # xyz-t tight-1 and xyz-t tight-2
-        trained_model_paths[0] = 'models/trained/trained_model_VGG_4d_xyz-t_track-shower_lp_tight-1_bs64_dp0.1_pad_same_epoch_16_file_1.h5'  # lp, xyz-t, timecut tight_1, fully trained epoch 16, file 1
-        trained_model_paths[1] = 'models/trained/trained_model_VGG_4d_xyz-t_track-shower_lp_tight-2_bs64_dp0.1_padsame_epoch_13_file_1.h5'  # lp, xyz-t, timecut tight-2, fully trained epoch 13, file 1
+        trained_model_paths[0] = 'models/trained/trained_model_VGG_4d_xyz-t_track-shower_lp_tight-1_bs64_dp0.1_pad_same_epoch_15_file_1.h5'  # lp, xyz-t, timecut tight_1, fully trained epoch 16, file 1
+        trained_model_paths[1] = 'models/trained/trained_model_VGG_4d_xyz-t_track-shower_lp_tight-2_bs64_dp0.1_padsame_epoch_12_file_1.h5'  # lp, xyz-t, timecut tight-2, fully trained epoch 13, file 1
 
     elif 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2' in swap_4d_channels + str_ident:
         trained_model_paths[0] = 'models/trained/trained_model_VGG_4d_xyz-t_track-shower_lp_tight-1_bs64_dp0.1_pad_same_epoch_16_file_1.h5'  # lp, xyz-t, timecut tight-1, fully trained epoch 16, file 1
@@ -295,6 +319,14 @@ def create_vgg_like_model_multi_input_from_single_nns(n_bins, batchsize, str_ide
         for trained_layer in trained_models[i].layers[2:]:
             if 'flatten' in trained_layer.name: break  # we don't want to get anything after the flatten layer
             x[i] = create_layer_from_config(x[i], trained_layer, layer_numbers[i], trainable=False, net=str(i+1), dropout=dropout[0])
+
+        # # TODO temp remove
+        # if i == 1 or i == 3:
+        #     x[i] = MaxPooling3D(strides=(2,2,2), padding='same')(x[i])
+        #
+        # if i == 0 or i == 2:
+        #     x[i] = MaxPooling3D(strides=(2,2,2), padding='same')(x[i])
+
 
         x[i] = Flatten()(x[i])
 
