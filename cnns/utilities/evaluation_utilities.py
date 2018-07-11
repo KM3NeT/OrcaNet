@@ -68,7 +68,7 @@ def get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchs
             if arr_nn_pred is None: arr_nn_pred = np.zeros((cum_number_of_steps[-1] * batchsize, arr_nn_pred_temp.shape[1:2][0]), dtype=np.float32)
             arr_nn_pred[arr_nn_pred_row_start + s*batchsize : arr_nn_pred_row_start + (s+1) * batchsize] = arr_nn_pred_temp
 
-    make_pred_h5_file(arr_nn_pred, filepath='predictions/' + modelname) # TODO check for empty lines
+    # make_pred_h5_file(arr_nn_pred, filepath='predictions/' + modelname) # TODO check for empty lines
 
     return arr_nn_pred
 
@@ -81,10 +81,10 @@ def get_cum_number_of_steps(files, batchsize):
     :param int batchsize: batchsize that is used during the prediction
     """
     cum_number_of_steps = [0]
-    for f in files:
+    for i, f in enumerate(files):
         samples = len(h5py.File(f[0][0], 'r')['y'])
         steps = samples/batchsize
-        cum_number_of_steps.append(steps) # [0, steps_sample_1, steps_sample_1 + steps_sample_2, ...]
+        cum_number_of_steps.append(cum_number_of_steps[i] + steps) # [0, steps_sample_1, steps_sample_1 + steps_sample_2, ...]
 
     return cum_number_of_steps
 
@@ -144,8 +144,8 @@ def load_pheid_event_selection(precuts='3-100_GeV_prod'):
         # 3-100 GeV
         particle_type_dict = {'muon-CC': ['muon_cc_3_100_selectedEvents_forMichael_01_18.txt', (14,1)],
                               'elec-CC': ['elec_cc_3_100_selectedEvents_forMichael_01_18.txt', (12,1)],
-                              'elec-NC': ['elec_nc_3_100_selectedEvents_forMichael.txt', (12, 0)],
-                              'tau-CC': ['tau_cc_3_100_selectedEvents_forMichael.txt', (16, 1)]}
+                              'elec-NC': ['elec_nc_3_100_selectedEvents_forMichael_fixed.txt', (12, 0)],
+                              'tau-CC': ['tau_cc_3_100_selectedEvents_forMichael_fixed.txt', (16, 1)]}
 
     elif precuts == '1-5_GeV_prod':
         # 1-5 GeV
