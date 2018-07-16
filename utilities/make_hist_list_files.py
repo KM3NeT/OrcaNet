@@ -254,7 +254,6 @@ def save_filepaths_to_list(dirpath, filepaths_per_interaction_type, include_rang
     for i in xrange(n_files):
 
         if sample_type=='train_' and tau_test_only is True:
-            print p_type_str
             p_type_str = p_type_str.replace('_and_tau-CC', '')
 
         savename = p_type_str + '_' + proj_type + '_' + sample_type + 'file_' + str(i) + '.list'
