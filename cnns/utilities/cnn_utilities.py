@@ -160,18 +160,20 @@ def gen_batches_from_single_file(filepath, batchsize, n_bins, class_type, f_size
                 elif swap_col == 'xyz-t_and_yzt-x':
                     xs_xyz_t = xs
                     xs_yzt_x = np.transpose(xs, swap_4d_channels_dict['yzt-x'])
-                elif swap_col == 'conv_lstm':
-                    xs = np.transpose(xs, swap_4d_channels_dict['t-xyz'])
-                    xs = xs.reshape(xs.shape + (1,))
                 else: raise ValueError('The argument "swap_col"=' + str(swap_col) + ' is not valid.')
 
             # and mc info (labels)
             y_values = f['y'][n_entries:n_entries+batchsize]
             y_values = np.reshape(y_values, (batchsize, y_values.shape[1])) #TODO simplify with (y_values, y_values.shape) ?
-            ys = np.zeros((batchsize, class_type[0]), dtype=np.float32)
-            # encode the labels such that they are all within the same range (and filter the ones we don't want for now)
-            for c, y_val in enumerate(y_values): # Could be vectorized with numba, or use dataflow from tensorpack
-                ys[c] = encode_targets(y_val, class_type)
+
+            if class_type[1] == 'energy_dir_bjorken-y_and_errors_dir_new_loss':
+                ys = get_regression_labels(y_values)
+
+            else:
+                ys = np.zeros((batchsize, class_type[0]), dtype=np.float32)
+                # encode the labels such that they are all within the same range (and filter the ones we don't want for now)
+                for c, y_val in enumerate(y_values): # Could be vectorized with numba, or use dataflow from tensorpack
+                    ys[c] = encode_targets(y_val, class_type)
 
             # we have read one more batch from this file
             n_entries += batchsize
@@ -182,6 +184,9 @@ def gen_batches_from_single_file(filepath, batchsize, n_bins, class_type, f_size
                     output = ([xs_xyz_t, xs_yzt_x], ys) if yield_mc_info is False else ([xs_xyz_t, xs_yzt_x], ys) + (y_values,)
                 else:
                     output = (xs, ys) if yield_mc_info is False else (xs, ys) + (y_values,)
+
+            elif class_type[1] == 'energy_dir_bjorken-y_and_errors_dir_new_loss': #TODO make this the general approach for regression problems, give a dict, delete else below
+                output = (xs, ys) if yield_mc_info is False else (xs, ys) + (y_values,)
 
             else: # regression problem, the Keras model has multiple outputs, one for each label
                 n_labels = class_type[0] # could also be inferred from the ys array, shape_1
@@ -248,6 +253,26 @@ def get_dimensions_encoding(n_bins, batchsize):
 
     return dimensions
 
+
+def get_regression_labels(y_values):
+
+    ys = dict()
+
+    y_values = y_values.astype(np.float32)
+
+    # normalize dirs
+    dir = y_values[:, 5:8]
+    normalized_dir = dir / np.linalg.norm(dir)
+
+    ys['dir'] = normalized_dir
+    ys['energy'] = y_values[:, 2:3]
+    ys['bjorken-y'] = y_values[:, 4:5]
+
+    ys['dir_error'] = normalized_dir
+    ys['energy_error'] = y_values[:, 2:3]
+    ys['bjorken-y_error'] = y_values[:, 4:5]
+
+    return ys
 
 def encode_targets(y_val, class_type):
     """
@@ -352,6 +377,28 @@ def encode_targets(y_val, class_type):
         train_y[2] = y_val[6] # dir_y
         train_y[3] = y_val[7] # dir_z
         train_y[4] = y_val[4] # bjorken-y
+
+    elif class_type[1] == 'energy_dir_bjorken-y_and_errors_dir_new_loss':
+
+        train_y_dir, train_y_dir_error = np.zeros(3, dtype='float32'), np.zeros(3, dtype='float32')
+        train_y_energy, train_y_energy_error = np.zeros(1, dtype='float32'), np.zeros(1, dtype='float32')
+        train_y_bjorken_y, train_y_bjorken_y_error = np.zeros(1, dtype='float32'), np.zeros(1, dtype='float32')
+
+        train_y_dir[0] = y_val[5] # dir_x
+        train_y_dir[1] = y_val[6] # dir_y
+        train_y_dir[2] = y_val[7] # dir_z
+        train_y_energy[0] = y_val[2] # energy
+        train_y_bjorken_y[0] = y_val[4] # bjorken-y
+
+        # workaround that is needed for the uncertainty outputs
+        train_y_dir_error[0] = y_val[5] # dir_x
+        train_y_dir_error[1] = y_val[6] # dir_y
+        train_y_dir_error[2] = y_val[7] # dir_z
+        train_y_energy_error[0] = y_val[2] # energy
+        train_y_bjorken_y_error[0] = y_val[4] # bjorken-y
+
+        train_y = [train_y_dir, train_y_dir_error, train_y_energy, train_y_energy_error,
+                   train_y_bjorken_y, train_y_bjorken_y_error]
 
     else:
         print "Class type " + str(class_type) + " not supported!"
