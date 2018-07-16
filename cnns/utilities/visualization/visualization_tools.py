@@ -4,7 +4,7 @@ Visualization tools used with Keras.
 1) Makes performance graphs for training and testing.
 2) Visualizes activations for Keras models
 """
-
+import inspect
 import numpy as np
 import keras as ks
 import keras.backend as K
@@ -12,13 +12,14 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
 from ..cnn_utilities import generate_batches_from_hdf5_file
-from ..losses import custom_metric_mean_relative_error_5_labels
+from .. import losses
 
 
 def plot_train_and_test_statistics(modelname, model):
     """
     Plots the loss in training/testing based on .txt logfiles.
     :param str modelname: name of the model.
+    :param ks.model.Model model: Keras model of the neural network.
     """
     # #Batch number # BatchNumber float # Losses # Metrics
     log_array_train = np.loadtxt('models/trained/perf_plots/log_train_' + modelname + '.txt', dtype=np.float32, delimiter='\t', skiprows=1, ndmin=2)
@@ -34,11 +35,14 @@ def plot_train_and_test_statistics(modelname, model):
               '#CC6677', '#882255', '#AA4499', '#661100', '#6699CC', '#AA4466', '#4477AA'] # ref. personal.sron.nl/~pault/
     pdf_plots = PdfPages('models/trained/perf_plots/plots/loss_' + modelname + '.pdf')
 
+    skip_n_first_batches, batchlogger_display = 500, 100
+    first_line = skip_n_first_batches / batchlogger_display
+
     i = 0
     for metric_name in model.metrics_names: # metric names have same order as the columns in the log_array_train/test
         if 'loss' in metric_name:
             i += 1
-            train_metric_loss = log_array_train[:, 1 + i]
+            train_metric_loss = log_array_train[first_line:, 1 + i] # skip a certain number of train batches for better y scale
             test_metric_loss = log_array_test[:, 0 + i]
 
             color = colors[i-1]
@@ -107,8 +111,13 @@ def get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels
     generator = generate_batches_from_hdf5_file(f, 1, n_bins, class_type, str_ident, zero_center_image=xs_mean, swap_col=swap_4d_channels, yield_mc_info=True)
     model_inputs, ys, y_values = next(generator) # y_values = mc_info for the event
 
+    loss_functions = iter(inspect.getmembers(losses, inspect.isfunction)) # contains ['loss_func_name', loss_func, 'loss_func_2_name', ...]
+    custom_objects = {}
+    for loss_func_name in loss_functions:
+        custom_objects[loss_func_name] = next(loss_functions)
+
     saved_model = ks.models.load_model('models/trained/trained_' + modelname + '_epoch_' + str(epoch) + '_file_' + str(file_no) + '.h5',
-                                       custom_objects={'custom_metric_mean_relative_error_5_labels': custom_metric_mean_relative_error_5_labels})
+                                       custom_objects=custom_objects)
 
     inp = saved_model.input
 
@@ -134,7 +143,7 @@ def get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels
 
     layer_outputs = [func(list_inputs)[0] for func in funcs]
     activations = []
-    for layer_activations in layer_outputs: #TODO layer_outputs == activations??
+    for layer_activations in layer_outputs:
         activations.append(layer_activations)
 
     return layer_names, activations, weights, y_values
