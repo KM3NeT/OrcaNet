@@ -160,7 +160,6 @@ def create_vgg_like_model(n_bins, batchsize, class_type, n_filters=None, dropout
             outputs += outputs_without_error
 
             # build second dense network for errors
-            # TODO gradient stop here
             conv_output_flat_stop_grad = Lambda(lambda a: K.stop_gradient(a))(conv_output_flat)
             x_err = Dense(128, kernel_initializer='he_normal', kernel_regularizer=kernel_reg, activation=activation)(conv_output_flat_stop_grad)
             if dropout > 0.0: x_err = Dropout(dropout)(x_err)
@@ -170,6 +169,26 @@ def create_vgg_like_model(n_bins, batchsize, class_type, n_filters=None, dropout
                 output_label = outputs_without_error[i]
                 output_label_error = Dense(1, activation='relu', name=label + '_error_temp')(x_err)
                 output_label_merged = Concatenate(name=label + '_error')([output_label, output_label_error])
+                outputs.append(output_label_merged)
+
+        elif class_type[1] == 'energy_dir_bjorken-y_and_errors_dir_new_loss':
+            label_names = ('dir', 'e', 'by')
+            for name in label_names:
+                n_neurons = 1 if name != 'dir' else 3
+                output_label = Dense(n_neurons, name=name)(x)
+                outputs.append(output_label)
+
+            # build second dense network for errors
+            conv_output_flat_stop_grad = Lambda(lambda a: K.stop_gradient(a))(conv_output_flat)
+            x_err = Dense(128, kernel_initializer='he_normal', kernel_regularizer=kernel_reg, activation=activation)(conv_output_flat_stop_grad)
+            if dropout > 0.0: x_err = Dropout(dropout)(x_err)
+            x_err = Dense(32, kernel_initializer='he_normal', kernel_regularizer=kernel_reg, activation=activation)(x_err)
+
+            for i, name in enumerate(label_names):
+                n_neurons = 1 if name != 'dir' else 3
+                output_label_error = Dense(n_neurons, activation='relu', name=name + '_err_temp', bias_initializer='ones')(x_err)
+                # second stop_gradient through the concat layer into the dense_nn of the labels is in the err_loss function
+                output_label_merged = Concatenate(name=name + '_err')([outputs[i], output_label_error])
                 outputs.append(output_label_merged)
 
         else:
@@ -320,14 +339,6 @@ def create_vgg_like_model_multi_input_from_single_nns(n_bins, batchsize, str_ide
             if 'flatten' in trained_layer.name: break  # we don't want to get anything after the flatten layer
             x[i] = create_layer_from_config(x[i], trained_layer, layer_numbers[i], trainable=False, net=str(i+1), dropout=dropout[0])
 
-        # # TODO temp remove
-        # if i == 1 or i == 3:
-        #     x[i] = MaxPooling3D(strides=(2,2,2), padding='same')(x[i])
-        #
-        # if i == 0 or i == 2:
-        #     x[i] = MaxPooling3D(strides=(2,2,2), padding='same')(x[i])
-
-
         x[i] = Flatten()(x[i])
 
     x = ks.layers.concatenate([x[i] for i in x])
@@ -420,7 +431,7 @@ def set_layer_weights(model, trained_models):
             layer.set_weights(trained_layers_w_weights[i][j].get_weights())
 
 
-def change_dropout_rate_for_double_input_model(n_bins, batchsize, trained_model, dropout=(0.1, 0.1), trainable=(True, True), swap_4d_channels=None):
+def change_dropout_rate_for_multi_input_model(n_bins, batchsize, trained_model, dropout=(0.1, 0.1), trainable=(True, True), swap_4d_channels=None): # TODO fix for multi input
     """
     Function that rebuilds a keras model and modifies its dropout rate. Workaround, till layer.rate is fixed to work with Dropout layers.
     :param list(tuple) n_bins: Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
