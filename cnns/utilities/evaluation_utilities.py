@@ -34,12 +34,18 @@ def get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchs
     cum_number_of_steps = get_cum_number_of_steps(test_files, batchsize)
     ax = np.newaxis
 
-    arr_nn_pred = None
+    arr_nn_pred, samples_f = None, None
     for f_number, f in enumerate(test_files):
-        generator = generate_batches_from_hdf5_file(f[0], batchsize, n_bins, class_type, str_ident, zero_center_image=xs_mean, yield_mc_info=True, swap_col=swap_4d_channels) # f_size=samples prob not necessary
 
-        if samples is None: samples = len(h5py.File(f[0][0], 'r')['y'])
-        steps = samples/batchsize
+        if samples is None:
+            test_file = h5py.File(f[0][0], 'r')
+            samples_f = test_file['y'].shape[0]
+            test_file.close()
+        else:
+            samples_f = samples
+        steps = samples_f/batchsize
+
+        generator = generate_batches_from_hdf5_file(f[0], batchsize, n_bins, class_type, str_ident, zero_center_image=xs_mean, yield_mc_info=True, swap_col=swap_4d_channels) # f_size=samples prob not necessary
 
         arr_nn_pred_row_start = cum_number_of_steps[f_number] * batchsize
         for s in xrange(steps):
@@ -68,7 +74,7 @@ def get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchs
             if arr_nn_pred is None: arr_nn_pred = np.zeros((cum_number_of_steps[-1] * batchsize, arr_nn_pred_temp.shape[1:2][0]), dtype=np.float32)
             arr_nn_pred[arr_nn_pred_row_start + s*batchsize : arr_nn_pred_row_start + (s+1) * batchsize] = arr_nn_pred_temp
 
-    # make_pred_h5_file(arr_nn_pred, filepath='predictions/' + modelname) # TODO check for empty lines
+    make_pred_h5_file(arr_nn_pred, filepath='predictions/' + modelname, mc_prod='1-5GeV')
 
     return arr_nn_pred
 
@@ -82,7 +88,7 @@ def get_cum_number_of_steps(files, batchsize):
     """
     cum_number_of_steps = [0]
     for i, f in enumerate(files):
-        samples = len(h5py.File(f[0][0], 'r')['y'])
+        samples = h5py.File(f[0][0], 'r')['y'].shape[0]
         steps = samples/batchsize
         cum_number_of_steps.append(cum_number_of_steps[i] + steps) # [0, steps_sample_1, steps_sample_1 + steps_sample_2, ...]
 
@@ -96,14 +102,13 @@ def make_pred_h5_file(arr_nn_pred, filepath, mc_prod='3-100GeV'):
     :param str mc_prod: optional parameter that specifies which mc prod is used. E.g. 3-100GeV or 1-5GeV.
     :param str filepath: filepath that should be used for saving the .h5 file.
     """
-    #TODO fix for new
-    arr_nn_output = np.concatenate([arr_nn_pred[:, 0:1], arr_nn_pred[:, 1:2], arr_nn_pred[:, 2:3], arr_nn_pred[:, 3:4], arr_nn_pred[:, 10:11]], axis=1)
+    arr_nn_output = np.concatenate([arr_nn_pred[:, 0:1], arr_nn_pred[:, 1:2], arr_nn_pred[:, 2:3], arr_nn_pred[:, 3:4], arr_nn_pred[:, 9:10]], axis=1)
 
     f = h5py.File(filepath + mc_prod + '.h5', 'w')
     dset = f.create_dataset('nn_output', data=arr_nn_output)
-    dset.attrs['array_contents'] = 'Columns: run_id, event_id, PID (particle_type + is_cc), y_pred_track. \n' \
-                                   'PID info: (12, 0): elec-NC, (12, 1): elec-CC, (14, 1): muon-CC, (16, 1): tau-CC \n' \
-                                   'y_pred_track info: probability of the neural network for this event to be a track'
+    dset.attrs['array_contents'] = 'Columns: run_id, event_id, PID (particle_type + is_cc), y_pred_track. ' \
+                                   'PID info: (12, 0): elec-NC, (12, 1): elec-CC, (14, 1): muon-CC, (16, 1): tau-CC. ' \
+                                   'y_pred_track info: probability of the neural network for this event to be a track.'
     f.close()
 
 
@@ -380,16 +385,18 @@ def make_step_plot_1d_energy_accuracy_class(arr_nn_pred, axes, particle_types_di
     axes.step(bin_edges, hist_1d_energy_accuracy_class_bins_leading_zero, where='pre', linestyle=linestyle, color=color, label=label[particle_type], zorder=3)
 
 
-def select_class(arr_nn_pred_classes, class_vector):
+def select_class(arr_nn_pred_classes, class_vector, invert=False):
     """
     Selects the rows in an arr_nn_pred_classes array that correspond to a certain class_vector.
     :param arr_nn_pred_classes: array that contains important information for each event (mc_info + model predictions).
     :param (int, int) class_vector: Specifies the class that is used for filtering the array. E.g. (14,1) for muon-CC.
+    :param bool invert: Specifies, if the specified class should be selected (standard, False) or deselected (True).
     """
     check_arr_for_class = arr_nn_pred_classes[:, 2:4] == class_vector  # returns a bool for each of the class_vector entries
 
     # Select only the events, where every bool for one event is True
     indices_rows_with_class = np.logical_and(check_arr_for_class[:, 0], check_arr_for_class[:, 1])
+    if invert is True: indices_rows_with_class = np.invert(indices_rows_with_class)
     selected_rows_of_class = arr_nn_pred_classes[indices_rows_with_class]
 
     return selected_rows_of_class
@@ -690,7 +697,8 @@ def calculate_and_plot_separation_pid(arr_nn_pred, modelname, precuts=(False, '3
     if precuts[0] is True:
         arr_nn_pred = arr_nn_pred_select_pheid_events(arr_nn_pred, precuts=precuts[1], invert=False)
 
-    particle_types_dict = {'muon-CC': (14, 1), 'a_muon-CC': (-14, 1), 'elec-CC': (12, 1), 'a_elec-CC': (-12, 1)}
+    particle_types_dict = {'muon-CC': (14, 1), 'a_muon-CC': (-14, 1), 'elec-CC': (12, 1), 'a_elec-CC': (-12, 1),
+                           'elec-NC': (12, 0), 'a_elec-NC': (-12, 0)}
 
     bins=40
     correlation_coefficients = []
