@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
 from ..cnn_utilities import generate_batches_from_hdf5_file
-from .. import losses
+from ..losses import get_all_loss_functions
 
 
 def plot_train_and_test_statistics(modelname, model):
@@ -89,7 +89,6 @@ def get_epoch_xticks(test_epoch, train_batchnr):
     return x_ticks_major
 
 
-
 def get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels, modelname, epoch, str_ident, file_no=1, layer_name=None, learning_phase='test'):
     """
     Get the weights of a model and also the activations of the model for a single event.
@@ -111,11 +110,7 @@ def get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels
     generator = generate_batches_from_hdf5_file(f, 1, n_bins, class_type, str_ident, zero_center_image=xs_mean, swap_col=swap_4d_channels, yield_mc_info=True)
     model_inputs, ys, y_values = next(generator) # y_values = mc_info for the event
 
-    loss_functions = iter(inspect.getmembers(losses, inspect.isfunction)) # contains ['loss_func_name', loss_func, 'loss_func_2_name', ...]
-    custom_objects = {}
-    for loss_func_name in loss_functions:
-        custom_objects[loss_func_name] = next(loss_functions)
-
+    custom_objects = get_all_loss_functions()
     saved_model = ks.models.load_model('models/trained/trained_' + modelname + '_epoch_' + str(epoch) + '_file_' + str(file_no) + '.h5',
                                        custom_objects=custom_objects)
 

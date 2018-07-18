@@ -1,6 +1,17 @@
 import keras.backend as K
 import tensorflow as tf
 import math
+import inspect
+import sys
+
+
+def get_all_loss_functions():
+    loss_functions = iter(inspect.getmembers(sys.modules[__name__], inspect.isfunction)) # contains ['loss_func_name', loss_func, 'loss_func_2_name', ...]
+    custom_objects = {}
+    for loss_func_name in loss_functions:
+        custom_objects[loss_func_name] = next(loss_functions)
+
+    return custom_objects
 
 
 def mean_relative_error_energy(y_true, y_pred):
