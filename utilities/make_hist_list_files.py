@@ -123,45 +123,58 @@ def get_filepaths(dirpath, ignore_interaction_type):
     return filepaths
 
 
-def get_particle_types(filepaths):
+def get_particle_types_and_energies(filepaths, index_ptype=3, index_energy_range=4):
     """
     Gets the information which particle types are included in the filepaths files.
     :param list filepaths: list with the full filepaths of various .h5 files.
+    :param index_ptype:
+    :param index_energy_range:
     :return list particle_types: list that contains the single particle types as strings, e.g. ['muon-CC', 'elec-CC', ...].
     :return str ptype_str: string with particle type information, e.g. 'elec-CC_and_muon-CC' if strings with both type are given.
     """
     # get all particle_types
-    particle_types = []
+    particle_types, particle_types_and_energies = [], []
+
     for f in filepaths:
-        p_type = f.split('_')[3]  # index for particle_type in filename # TODO fix from 4 to 3
+        p_type = f.split('_')[index_ptype]  # index for particle_type in filename
+        energy_range = f.split('_')[index_energy_range]
         if p_type not in particle_types:
             particle_types.append(p_type)
+
+        p_type_and_energy = p_type + '_' + energy_range
+        p_type_and_energy = p_type_and_energy.rsplit('GeV', 1)[0] + 'GeV'
+        if p_type_and_energy not in particle_types_and_energies:
+            particle_types_and_energies.append(p_type_and_energy)
 
     # make ptype string for the savenames of the .list files
     ptype_str = ''
     for i in xrange(len(particle_types)):
-
         if ptype_str == '':
             ptype_str += particle_types[i]
         else:
             ptype_str += '_and_' + particle_types[i]
 
-    return particle_types, ptype_str
+    return particle_types_and_energies, ptype_str
 
 
-def split_filepaths_into_interaction_types(filepaths, particle_types):
+def split_filepaths_into_interaction_types(filepaths, particle_types_and_energies):
     """
     Splits the filepath list into a dict of lists which contain the filepaths for each particle type.
     :param filepaths: list with the full filepaths of various .h5 files, can contain multiple particle types.
-    :param list particle_types: list that contains the single particle types as strings.
+    :param list particle_types_and_energies: list that contains the single particle types and energies as strings.
     :return: dict(list) filepaths_per_interaction_type: dict that contains the filepaths for each particle type.
-                                                        E.g. {'muon-CC': [filepaths for muon-CC files], ...}.
+                                                        E.g. {'muon-CC_3-100GeV': [filepaths for muon-CC files], ...}.
     """
     filepaths_per_interaction_type = {}
-    for interaction_type in particle_types:
+    for interaction_type in particle_types_and_energies:
+        particle_type = interaction_type.split('_')[0]
+        energy_range = interaction_type.split('_')[1]
+
         fpath_temp_list = []
         for fpath in filepaths:
-            if interaction_type in fpath: fpath_temp_list.append(fpath)
+            if particle_type in fpath and energy_range in fpath:
+                fpath_temp_list.append(fpath)
+
         filepaths_per_interaction_type[interaction_type] = fpath_temp_list
 
     return filepaths_per_interaction_type
@@ -221,7 +234,7 @@ def get_file_split_info_per_interaction_channel(filepaths_per_interaction_type, 
         n_train_end[interaction_type] = n_total_files[interaction_type]
         range_train[interaction_type] = np.linspace(n_train_start[interaction_type], n_train_end[interaction_type], n_train_files + 1, dtype=np.int)  # [1,2,3,4,5....,480]
 
-        if interaction_type == 'tau-CC' and tau_test_only is True:
+        if 'tau-CC' in interaction_type and tau_test_only is True:
             # fix tau-CC to be only included in the test split
             n_test_end[interaction_type] = n_total_files[interaction_type]
             range_test[interaction_type] = np.linspace(n_test_start_minus_one[interaction_type], n_test_end[interaction_type],
@@ -311,11 +324,14 @@ def make_list_files(dirpath, test_fraction, n_train_files, n_test_files, n_file_
     """
     filepaths = get_filepaths(dirpath, ignore_interaction_type) # contains all filepaths of the files in the dirpath
 
-    particle_types, p_type_str = get_particle_types(filepaths)
-    filepaths_per_interaction_type = split_filepaths_into_interaction_types(filepaths, particle_types)
+    particle_types_and_energies, p_type_str = get_particle_types_and_energies(filepaths)
+
+    filepaths_per_interaction_type = split_filepaths_into_interaction_types(filepaths, particle_types_and_energies)
+
     index_f_number, proj_type = get_f_properties(filepaths_per_interaction_type)
 
-    n_total_files, range_all, n_test_start_minus_one, n_test_end, range_test, n_train_start, n_train_end, range_train = get_file_split_info_per_interaction_channel(filepaths_per_interaction_type, index_f_number, n_train_files, n_test_files, n_files_max, n_file_start, test_fraction, tau_test_only)
+    n_total_files, range_all, n_test_start_minus_one, n_test_end, range_test, n_train_start, n_train_end, range_train = \
+    get_file_split_info_per_interaction_channel(filepaths_per_interaction_type, index_f_number, n_train_files, n_test_files, n_files_max, n_file_start, test_fraction, tau_test_only)
 
     user_input_sanity_check(n_test_files, test_fraction, n_test_start_minus_one, n_test_end,
                             n_train_files, n_train_start, n_train_end, n_total_files)
