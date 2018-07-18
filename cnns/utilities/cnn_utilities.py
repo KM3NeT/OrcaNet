@@ -255,14 +255,17 @@ def get_dimensions_encoding(n_bins, batchsize):
 
 
 def get_regression_labels(y_values):
+    """
 
+    :param y_values:
+    :return:
+    """
     ys = dict()
-
     y_values = y_values.astype(np.float32)
 
     # normalize dirs
-    dir = y_values[:, 5:8]
-    normalized_dir = dir / np.linalg.norm(dir)
+    dirs = y_values[:, 5:8]
+    normalized_dir = dirs / np.linalg.norm(dirs)
 
     ys['dir'] = normalized_dir
     ys['energy'] = y_values[:, 2:3]
@@ -359,17 +362,6 @@ def encode_targets(y_val, class_type):
             if categorical_type[3] != 1:
                 train_y[1] = 1
 
-    elif class_type[1] == 'energy':
-        train_y = np.zeros(1, dtype='float32')
-        train_y[0] = y_val[2]
-
-    elif class_type[1] == 'energy_and_direction':
-        train_y = np.zeros(4, dtype='float32')
-        train_y[0] = y_val[2] # energy
-        train_y[1] = y_val[5] # dir_x
-        train_y[2] = y_val[6] # dir_y
-        train_y[3] = y_val[7] # dir_z
-
     elif class_type[1] == 'energy_and_direction_and_bjorken-y':
         train_y = np.zeros(5, dtype='float32')
         train_y[0] = y_val[2] # energy
@@ -377,28 +369,6 @@ def encode_targets(y_val, class_type):
         train_y[2] = y_val[6] # dir_y
         train_y[3] = y_val[7] # dir_z
         train_y[4] = y_val[4] # bjorken-y
-
-    elif class_type[1] == 'energy_dir_bjorken-y_and_errors_dir_new_loss':
-
-        train_y_dir, train_y_dir_error = np.zeros(3, dtype='float32'), np.zeros(3, dtype='float32')
-        train_y_energy, train_y_energy_error = np.zeros(1, dtype='float32'), np.zeros(1, dtype='float32')
-        train_y_bjorken_y, train_y_bjorken_y_error = np.zeros(1, dtype='float32'), np.zeros(1, dtype='float32')
-
-        train_y_dir[0] = y_val[5] # dir_x
-        train_y_dir[1] = y_val[6] # dir_y
-        train_y_dir[2] = y_val[7] # dir_z
-        train_y_energy[0] = y_val[2] # energy
-        train_y_bjorken_y[0] = y_val[4] # bjorken-y
-
-        # workaround that is needed for the uncertainty outputs
-        train_y_dir_error[0] = y_val[5] # dir_x
-        train_y_dir_error[1] = y_val[6] # dir_y
-        train_y_dir_error[2] = y_val[7] # dir_z
-        train_y_energy_error[0] = y_val[2] # energy
-        train_y_bjorken_y_error[0] = y_val[4] # bjorken-y
-
-        train_y = [train_y_dir, train_y_dir_error, train_y_energy, train_y_energy_error,
-                   train_y_bjorken_y, train_y_bjorken_y_error]
 
     else:
         print "Class type " + str(class_type) + " not supported!"
