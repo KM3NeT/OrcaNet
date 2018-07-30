@@ -23,15 +23,84 @@ from utilities.evaluation_utilities import *
 from utilities.losses import *
 from utilities.losses import get_all_loss_functions
 
+# for debugging
+# from tensorflow.python import debug as tf_debug
+# K.set_session(tf_debug.LocalCLIDebugWrapperSession(tf.Session()))
 
-def parallelize_model_to_n_gpus(model, n_gpu, batchsize):
+
+def build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4d_channels, str_ident, modelname, custom_objects):
+    """
+    Function that either loads or builds (epoch = 0) a Keras nn model.
+    :param (int, int) epoch: Epoch (nr_epoch, nr_train_file) of the model if it has been trained before.
+    :param str nn_arch: Specifies, which nn architecture should be used ("VGG" or "WRN").
+    :param list(tuple) n_bins: Number of bins for each dimension (x,y,z,t) in both the train- and test_files.
+                               Can contain multiple n_bins tuples.
+    :param int batchsize: Batchsize that is used in the training.
+    :param (int, str) class_type: Tuple with the number of output classes and a string identifier to specify the output classes.
+    :param None/int swap_4d_channels: For 3.5D. Specifies, if the default channel (t) should be swapped with another dim.
+    :param str str_ident: String identifier for the projection type / model input that is parsed to the image generator.
+                          Needed for some specific models.
+    :param str modelname: Name of the model.
+    :param dict custom_objects: Custom objects variable that contains custom loss functions for loading nn models.
+    :return: ks.models model: Keras nn instance.
+    """
+    if epoch[0] == 0:
+        if nn_arch is 'WRN': model = create_wide_residual_network(n_bins[0], batchsize, nb_classes=class_type[0], n=1, k=1, dropout=0.2, k_size=3, swap_4d_channels=swap_4d_channels)
+
+        elif nn_arch is 'VGG':
+            if 'multi_input_single_train' in str_ident:
+                model = create_vgg_like_model_multi_input_from_single_nns(n_bins, batchsize, str_ident, nb_classes=class_type[0], dropout=(0,0.1), swap_4d_channels=swap_4d_channels)
+
+            else:
+                model = create_vgg_like_model(n_bins, batchsize, class_type, dropout=0.0,
+                                              n_filters=(64, 64, 64, 64, 64, 64, 128, 128, 128, 128), swap_4d_channels=swap_4d_channels) # 2 more layers
+
+        else: raise ValueError('Currently, only "WRN" or "VGG" are available as nn_arch')
+    else:
+        model = ks.models.load_model('models/trained/trained_' + modelname + '_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5', custom_objects=custom_objects)
+
+    # plot model, install missing packages with conda install if it throws a module error
+    ks.utils.plot_model(model, to_file='./models/model_plots/' + modelname + '.png', show_shapes=True, show_layer_names=True)
+
+    return model
+
+
+def get_optimizer_info(loss_opt, optimizer='adam'):
+    """
+    Returns optimizer information for the training procedure.
+    :param tuple loss_opt: Tuple with len=3.
+                           loss_opt[0]: dict with loss functions that should be used for each nn output.
+                           loss_opt[1]: dict with metrics that should be used for each nn output.
+                           loss_opt[2]: dict with loss weights that should be used for each sub-loss.
+    :param str optimizer: Specifies, if "Adam" or "SGD" should be used as optimizer.
+    :return: dict loss_functions: cf. loss_opt[0]
+    :return: dict metrics: cf. loss_opt[1]
+    :return: dict loss_weight: cf. loss_opt[2]
+    :return: ks.optimizers optimizer: Keras optimizer instance, either "Adam" or "SGD".
+    """
+    sgd = ks.optimizers.SGD(momentum=0.9, decay=0, nesterov=True)
+    adam = ks.optimizers.Adam(beta_1=0.9, beta_2=0.999, epsilon=0.1, decay=0.0) # epsilon=1 for deep networks
+    optimizer = adam if optimizer == 'adam' else sgd
+
+    loss_functions = loss_opt[0]
+    metrics = loss_opt[1] if not loss_opt[1] is None else []
+    loss_weight = loss_opt[2]
+
+    return loss_functions, metrics, loss_weight, optimizer
+
+
+def parallelize_model_to_n_gpus(model, n_gpu, batchsize, loss_functions, optimizer, metrics, loss_weight):
     """
     Parallelizes the nn-model to multiple gpu's.
     Currently, up to 4 GPU's at Tiny-GPU are supported.
     :param ks.model.Model/Sequential model: Keras model of a neural network.
     :param (int/str) n_gpu: Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov').
     :param int batchsize: original batchsize that should be used for training/testing the nn.
-    :return: int batchsize, float lr: new batchsize/lr scaled by the number of used gpu's.
+    :param tuple loss_functions: dict with loss functions that should be used for each nn output.
+    :param optimizer: Keras optimizer instance (e.g. SGD or Adam).
+    :param metrics: dict with metrics that should be used for each nn output.
+    :param loss_weight: dict with loss weights that should be used for each sub-loss.
+    :return: ks.models model, int batchsize: multi_gpu model and new batchsize scaled by the number of used gpu's.
     """
     if n_gpu[1] == 'avolkov':
         if n_gpu[0] == 1:
@@ -48,13 +117,15 @@ def parallelize_model_to_n_gpus(model, n_gpu, batchsize):
             model = make_parallel(model, gpus_list, usenccl=False, initsync=True, syncopt=False, enqueue=False)
             print_mgpu_modelsummary(model)
 
+            model.compile(loss=loss_functions, optimizer=optimizer, metrics=metrics, loss_weights=loss_weight)  # TODO check if necessary
+
             return model, batchsize
 
     else:
         raise ValueError('Currently, no multi_gpu mode other than "avolkov" is available.')
 
 
-def schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=0.001, manual_mode=(False, None, 0.0, None)):
+def schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=0.003, manual_mode=(False, None, 0.0, None)):
     """
     Function that schedules a learning rate during training.
     If manual_mode[0] is False, the current lr will be automatically calculated if the training is resumed, based on the epoch variable.
@@ -127,11 +198,11 @@ def get_new_learning_rate(epoch, lr_initial, n_train_files, n_gpu):
     for i in xrange(n_lr_decays):
 
         if lr_temp > 0.0003:
-            lr_decay = 0.07
+            lr_decay = 0.02 # standard for PID: 0.07, standard for regression: 0.02
         elif 0.0003 >= lr_temp > 0.0001:
-            lr_decay = 0.04
+            lr_decay = 0.01 # standard for PID: 0.04, standard for regression: 0.01
         else:
-            lr_decay = 0.02
+            lr_decay = 0.005 # standard for PID: 0.02, standard for regression: 0.005
 
         lr_temp = lr_temp * (1 - float(lr_decay))
 
@@ -144,10 +215,12 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
     Convenience function that trains (fit_generator) and tests (evaluate_generator) a Keras model.
     For documentation of the parameters, confer to the fit_model and evaluate_model functions.
     """
-    lr_initial, manual_mode = 0.003, (False, 0.0003, 0.07, lr)
+    lr_initial, manual_mode = 0.005, (False, 0.0003, 0.07, lr)
+    test_after_n_train_files = 5
 
     epoch, lr, lr_decay = schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=lr_initial, manual_mode=manual_mode) # begin new training step
-    train_iter_step = 0
+    history_test = None
+    train_iter_step = 0 # loop n
     for file_no, (f, f_size) in enumerate(train_files, 1):
 
         if file_no < epoch[1]:
@@ -159,10 +232,13 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
 
         history_train = fit_model(model, modelname, train_files, f, f_size, file_no, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
                                             shuffle, swap_4d_channels, str_ident, n_events=None, tb_logger=tb_logger)
-        history_test = evaluate_model(model, modelname, test_files, train_files, batchsize, n_bins, class_type, xs_mean, epoch, swap_4d_channels, str_ident, n_events=None)
 
-        save_train_and_test_statistics_to_txt(model, history_train, history_test, modelname, lr, lr_decay, epoch,
-                                              f, test_files, batchsize, n_bins, class_type, swap_4d_channels, str_ident)
+        # test after the first and else after every 5th file
+        if file_no % test_after_n_train_files == 0:
+            history_test = evaluate_model(model, modelname, test_files, train_files, batchsize, n_bins, class_type, xs_mean, epoch, swap_4d_channels, str_ident, n_events=None)
+
+        history_test = save_train_and_test_statistics_to_txt(model, history_train, history_test, modelname, lr, lr_decay, epoch,
+                                                             f, test_files, batchsize, n_bins, class_type, swap_4d_channels, str_ident)
         plot_train_and_test_statistics(modelname, model)
         plot_weights_and_activations(test_files[0][0], n_bins, class_type, xs_mean, swap_4d_channels, modelname, epoch[0], file_no, str_ident)
 
@@ -221,7 +297,7 @@ def fit_model(model, modelname, train_files, f, f_size, file_no, test_files, bat
         generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, str_ident, f_size=f_size, zero_center_image=xs_mean, swap_col=swap_4d_channels),
         steps_per_epoch=int(f_size / batchsize), epochs=1, verbose=1, max_queue_size=10,
         validation_data=validation_data, validation_steps=validation_steps, callbacks=callbacks)
-    model.save("models/trained/trained_" + modelname + '_epoch_' + str(epoch[0]) + '_file_' + str(file_no) + '.h5')
+    model.save('models/trained/trained_' + modelname + '_epoch_' + str(epoch[0]) + '_file_' + str(file_no) + '.h5')
 
     return history
 
@@ -246,7 +322,7 @@ def evaluate_model(model, modelname, test_files, train_files, batchsize, n_bins,
     for i, (f, f_size) in enumerate(test_files):
         print 'Testing on file ', i, ',', str(f)
 
-        if n_events is not None: f_size = n_events  # for testing
+        if n_events is not None: f_size = n_events  # for testing purposes
 
         history = model.evaluate_generator(
             generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, str_ident, swap_col=swap_4d_channels, f_size=f_size, zero_center_image=xs_mean),
@@ -254,7 +330,8 @@ def evaluate_model(model, modelname, test_files, train_files, batchsize, n_bins,
         print 'Test sample results: ' + str(history) + ' (' + str(model.metrics_names) + ')'
         histories.append(history)
 
-    history_averaged = [sum(e)/float(len(e)) for e in histories] if len(histories) > 1 else histories[0] # average over all test files if necessary
+    history_averaged = [sum(col) / float(len(col)) for col in zip(*histories)] if len(histories) > 1 else histories[0] # average over all test files if necessary
+    print history_averaged
 
     # Save test log
     steps_per_total_epoch, steps_cum = 0, [0] # get this for the epoch_number_float in the logfile
@@ -274,6 +351,7 @@ def evaluate_model(model, modelname, test_files, train_files, batchsize, n_bins,
             logfile.write('\t') if i + 1 < len(model.metrics_names) else logfile.write('\n') #
 
     logfile.write(str(epoch_number_float) + '\t')
+
     for i in xrange(len(model.metrics_names)):
         logfile.write(str(history_averaged[i]))
         logfile.write('\t') if i + 1 < len(model.metrics_names) else logfile.write('\n')
@@ -285,8 +363,8 @@ def save_train_and_test_statistics_to_txt(model, history_train, history_test, mo
                                           test_files, batchsize, n_bins, class_type, swap_4d_channels, str_ident):
     """
     Function for saving various information during training and testing to a .txt file.
+    :return:
     """
-
     with open('models/trained/train_logs/log_' + modelname + '.txt', 'a+') as f_out:
         f_out.write('--------------------------------------------------------------------------------------------------------\n')
         f_out.write('\n')
@@ -294,16 +372,95 @@ def save_train_and_test_statistics_to_txt(model, history_train, history_test, mo
         f_out.write('Decayed learning rate to ' + str(lr) + ' before epoch ' + str(epoch[0]) +
                     ' and file ' + str(epoch[1]) + ' (minus ' + str(lr_decay) + ')\n')
         f_out.write('Trained in epoch ' + str(epoch) + ' on file ' + str(epoch[1]) + ', ' + str(train_file) + '\n')
-        f_out.write('Tested in epoch ' + str(epoch) + ', file ' + str(epoch[1]) + ' on test_files ' + str(test_files) + '\n')
-        f_out.write('History for training and testing: \n')
+        if history_test is not None:
+            f_out.write('Tested in epoch ' + str(epoch) + ', file ' + str(epoch[1]) + ' on test_files ' + str(test_files) + '\n')
+        f_out.write('History for training / testing: \n')
         f_out.write('Train: ' + str(history_train.history) + '\n')
-        f_out.write('Test: ' + str(history_test) + ' (' + str(model.metrics_names) + ')' + '\n')
+        if history_test is not None:
+            f_out.write('Test: ' + str(history_test) + ' (' + str(model.metrics_names) + ')' + '\n')
         f_out.write('\n')
         f_out.write('Additional Info:\n')
         f_out.write('Batchsize=' + str(batchsize) + ', n_bins=' + str(n_bins) +
                     ', class_type=' + str(class_type) + '\n' +
                     'swap_4d_channels=' + str(swap_4d_channels) + ', str_ident=' + str_ident + '\n')
         f_out.write('\n')
+
+    return None
+
+
+def predict_and_investigate_model_performance(model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
+                                              str_ident, modelname, xs_mean):
+    """
+    Function that 1) makes predictions based on a Keras nn model and 2) investigates the performance of the model based on the predictions.
+    :param ks.model model: Keras nn model instance.
+    :param list(([test_filepaths], test_filesize)) test_files: list of tuples that contains the list(testfiles) and their number of rows.
+    :param list(tuple) n_bins: Declares the number of bins for each dimension (x,y,z,t) in the train- and testfiles. Can contain multiple n_bins tuples.
+    :param int batchsize: Batchsize that is used in the training.
+    :param (int, str) class_type: Tuple with the number of output classes and a string identifier to specify the output classes.
+    :param None/int swap_4d_channels: For 3.5D. Specifies, if the default channel (t) should be swapped with another dim.
+    :param str str_ident: String identifier for the projection type / model input that is parsed to the image generator.
+                          Needed for some specific models.
+    :param str modelname: Name of the model.
+    :param ndarray xs_mean: Mean image of the x dataset. Can be used for zero-centering.
+    """
+    # After training is finished, investigate model performance
+    # for layer in model.layers: # freeze trainable batch_norm weights, but not running mean and variance
+    #     if 'batch_norm' in layer.name:
+    #         layer.stateful = False
+    #arr_nn_pred = get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, modelname, samples=None)
+    # np.save('results/plots/saved_predictions/arr_energy_correct_' + modelname + '_stateful_false_1-5GeV.npy', arr_nn_pred)
+
+    # arr_nn_pred = np.load('results/plots/saved_predictions/arr_energy_correct_' + modelname + '.npy')
+    arr_nn_pred = np.load(
+        'results/plots/saved_predictions/arr_energy_correct_' + modelname + '_stateful_false_1-5GeV.npy')  # best PID model
+    # arr_nn_pred = np.load('results/plots/saved_predictions/arr_energy_correct_model_VGG_4d_xyz-t_and_yzt-x_and_4d_xyzt_track-shower_multi_input_single_train_tight-1_tight-2_lr_0.003_tr_st_test_st_stateful_false.npy')
+
+    # arr_nn_pred = np.load('results/plots/saved_predictions/arr_energy_correct_model_VGG_4d_xyz-t_and_yzt-x_and_4d_xyzt_track-shower_multi_input_single_train_tight-1_tight-2_lr_0.003_tr_st_test_st_stateful_true_stateful_true_arr_nn_pred_1-100GeV_minus_3-5GeV-low-e-prod_-precuts.npy') # best PID model
+
+    if class_type[1] == 'track-shower':  # categorical
+        precuts = (False, '3-100_GeV_prod')  # '3-100_GeV_prod'
+        # precuts = (True, '3-100_GeV_prod_and_1-5_GeV_prod')
+
+        make_energy_to_accuracy_plot_multiple_classes(arr_nn_pred, title='Classified as track',
+                                                      filename='results/plots/1d/track_shower/ts_' + modelname,
+                                                      precuts=precuts, corr_cut_pred_0=0.4)
+
+        make_prob_hists(arr_nn_pred, modelname=modelname, precuts=precuts)
+        make_hist_2d_property_vs_property(arr_nn_pred, modelname, property_types=('bjorken-y', 'probability'),
+                                          e_cut=(3, 100), precuts=precuts)
+        calculate_and_plot_separation_pid(arr_nn_pred, modelname, precuts=precuts)
+
+    else:  # regression
+        arr_nn_pred_shallow = np.load('/home/woody/capn/mppi033h/Data/various/arr_nn_pred_is_good.npy')
+        precuts = (True, '3-100_GeV_prod_energy_comparison_is_good')  # '3-100_GeV_prod'
+
+        if 'energy' in class_type[1]:
+            # DL
+            make_2d_energy_resolution_plot(arr_nn_pred, modelname, compare_pheid=precuts,
+                                           correct_energy=(True, 'median'))
+            make_1d_energy_reco_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median_relative', precuts=precuts,
+                                                      correct_energy=(True, 'median'),
+                                                      compare_shallow=(True, arr_nn_pred_shallow))
+            make_1d_energy_std_div_e_true_plot(arr_nn_pred, modelname, precuts=precuts,
+                                               compare_shallow=(True, arr_nn_pred_shallow),
+                                               correct_energy=(True, 'median'))
+
+            # shallow reco
+            make_2d_energy_resolution_plot(arr_nn_pred_shallow, 'shallow_reco', compare_pheid=precuts)
+        if 'direction' in class_type[1]:
+            # DL
+            make_1d_dir_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median', precuts=precuts,
+                                              compare_shallow=(True, arr_nn_pred_shallow))
+            make_2d_dir_correlation_plot(arr_nn_pred, modelname, precuts=precuts)
+            # shallow reco
+
+            make_2d_dir_correlation_plot(arr_nn_pred_shallow, 'shallow_reco', precuts=precuts)
+
+        if 'bjorken-y' in class_type[1]:
+            # DL
+            make_1d_bjorken_y_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median', precuts=precuts,
+                                                    compare_shallow=(True, arr_nn_pred_shallow))
+
 
 
 def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None,
@@ -318,7 +475,7 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
     :param str nn_arch: Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
     :param int batchsize: Batchsize that should be used for the cnn.
     :param (int, int) epoch: Declares if a previously trained model or a new model (=0) should be loaded.
-    :param (int/str) n_gpu: Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov').
+    :param (int, str) n_gpu: Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov').
     :param str mode: Specifies what the function should do - train & test a model or evaluate a 'finished' model?
                      Currently, there are two modes available: 'train' & 'eval'.
     :param None/str swap_4d_channels: For 4D data input (3.5D models). Specifies, if the channels for the 3.5D net should be swapped.
@@ -329,7 +486,7 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
     :param bool tb_logger: Declares if a tb_callback should be used during training (takes longer to train due to overhead!).
     :param str str_ident: Optional str identifier that gets appended to the modelname. Useful when training models which would have the same modelname.
                           Also used for defining models and projections!
-    :param (str, str) loss_opt: tuple that contains 1) the loss and 2) the metric during training.
+    :param (dict, dict, dict) loss_opt: tuple that contains 1) the loss_functions,  2) the metrics and 3) the loss_weights.
     """
     train_files, test_files, multiple_inputs = parse_input()
     xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu[0]) if zero_center is True else None
@@ -337,111 +494,26 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
     modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident)
     custom_objects = get_all_loss_functions()
 
-    if epoch[0] == 0:
-        if nn_arch is 'WRN': model = create_wide_residual_network(n_bins[0], batchsize, nb_classes=class_type[0], n=1, k=1, dropout=0.2, k_size=3, swap_4d_channels=swap_4d_channels)
+    model = build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4d_channels, str_ident, modelname, custom_objects)
+    loss_functions, metrics, loss_weight, optimizer = get_optimizer_info(loss_opt, optimizer='adam')
 
-        elif nn_arch is 'VGG':
-            input_modes = {'xyz-t_and_yzt-x', 'yzt-x_all-t_and_yzt-x_tight-1-t', 'xyz-t-tight-1-w-geo-fix_and_yzt-x-tight-1-wout-geo-fix'}
-            if swap_4d_channels in input_modes and 'multi_input_single_train' not in str_ident:
-                model = create_vgg_like_model_double_input(n_bins, batchsize, nb_classes=class_type[0], dropout=0.2,
-                                                               n_filters=(64, 64, 64, 64, 64, 128, 128, 128), swap_4d_channels=swap_4d_channels) # TODO not working for multiple input files
-            elif 'multi_input_single_train' in str_ident:
-                model = create_vgg_like_model_multi_input_from_single_nns(n_bins, batchsize, str_ident, nb_classes=class_type[0], dropout=(0,0.1), swap_4d_channels=swap_4d_channels)
-
-            else:
-                model = create_vgg_like_model(n_bins, batchsize, class_type, dropout=0.1,
-                                              #n_filters=(64,64,64,64,64,128,128,128), swap_4d_channels=swap_4d_channels) # standard
-                                              n_filters=(64, 64, 64, 64, 64, 64, 128, 128, 128, 128), swap_4d_channels=swap_4d_channels) # 2 more layers
-
-        elif nn_arch is 'Conv_LSTM':
-            model = create_convolutional_lstm(n_bins, batchsize, nb_classes=class_type[0], dropout=0.1,
-                                              n_filters=(32, 32, 64, 64, 64, 64, 128, 128))
-
-        else: raise ValueError('Currently, only "WRN" or "VGG" are available as nn_arch')
-    else:
-        model = ks.models.load_model('models/trained/trained_' + modelname + '_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5',
-                                     custom_objects=custom_objects)
-
-    # plot model, install missing packages with conda install if it throws a module error
-    ks.utils.plot_model(model, to_file='./models/model_plots/' + modelname + '.png', show_shapes=True, show_layer_names=True)
-
-    sgd = ks.optimizers.SGD(momentum=0.9, decay=0, nesterov=True)
-    adam = ks.optimizers.Adam(beta_1=0.9, beta_2=0.999, epsilon=0.1, decay=0.0) # epsilon=1 for deep networks
-    optimizer = adam # Choose optimizer, only used if epoch == 0
-
-    # if epoch[0] == 1 and 'multi_input_single_train' in str_ident:
-    #     loss, optimizer = model.loss, model.optimizer
-    #     model = change_dropout_rate_for_multi_input_model(n_bins, batchsize, model, dropout=(0.1, 0.1), trainable=(True, True), swap_4d_channels=swap_4d_channels)
-    #     model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy'])
-
-    # for layer in model.layers: # freeze trainable batch_norm weights, but not running mean and variance
-    #     if 'batch_norm' in layer.name:
-    #         layer.stateful = True
-
-    model, batchsize = parallelize_model_to_n_gpus(model, n_gpu, batchsize) #TODO compile after restart????
-    metrics = [loss_opt[1]] if not loss_opt[1] is None else []
-    loss_weight = loss_opt[2]
-
-    if n_gpu[0] > 1: model.compile(loss=loss_opt[0], optimizer=optimizer, metrics=metrics, loss_weights=loss_weight) # TODO check
-
+    model, batchsize = parallelize_model_to_n_gpus(model, n_gpu, batchsize, loss_functions, optimizer, metrics, loss_weight)
     model.summary()
 
-    if epoch[0] == 0: model.compile(loss=loss_opt[0], optimizer=optimizer, metrics=metrics, loss_weights=loss_weight)
+    if epoch[0] == 0: model.compile(loss=loss_functions, optimizer=optimizer, metrics=metrics, loss_weights=loss_weight)
 
     if mode == 'train':
         lr = None
         while 1:
-            epoch, lr = train_and_test_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean,
-                                 epoch, shuffle, lr, tb_logger, swap_4d_channels, str_ident, n_gpu)
+            epoch, lr = train_and_test_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type,
+                                             xs_mean, epoch, shuffle, lr, tb_logger, swap_4d_channels, str_ident, n_gpu)
 
-    if mode == 'eval':
+    elif mode == 'eval':
+        predict_and_investigate_model_performance(model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
+                                                  str_ident, modelname, xs_mean)
 
-        # After training is finished, investigate model performance
-        for layer in model.layers: # freeze trainable batch_norm weights, but not running mean and variance
-            if 'batch_norm' in layer.name:
-                layer.stateful = True
-        arr_nn_pred = get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, modelname, samples=None)
-        np.save('results/plots/saved_predictions/arr_energy_correct_' + modelname + '_stateful_true_1-5GeV.npy', arr_nn_pred)
-
-        #arr_nn_pred = np.load('results/plots/saved_predictions/arr_energy_correct_' + modelname + '.npy')
-        arr_nn_pred = np.load('results/plots/saved_predictions/arr_energy_correct_' + modelname + '_stateful_true_1-5GeV.npy') # best PID model
-
-        if class_type[1] == 'track-shower': # categorical
-            precuts = (True, '3-100_GeV_prod')  # '3-100_GeV_prod'
-
-            make_energy_to_accuracy_plot_multiple_classes(arr_nn_pred, title='Classified as track',
-                                                          filename='results/plots/1d/track_shower/ts_' + modelname,
-                                                          precuts=precuts, corr_cut_pred_0=0.4)
-
-            make_prob_hists(arr_nn_pred, modelname=modelname, precuts=precuts)
-            make_hist_2d_property_vs_property(arr_nn_pred, modelname, property_types=('bjorken-y', 'probability'), e_cut=(3, 100), precuts=precuts)
-            calculate_and_plot_separation_pid(arr_nn_pred, modelname, precuts=precuts)
-
-        else: # regression
-            arr_nn_pred_shallow = np.load('/home/woody/capn/mppi033h/Data/various/arr_nn_pred_is_good.npy')
-            precuts = (True, '3-100_GeV_prod_energy_comparison_is_good') # '3-100_GeV_prod'
-
-            if 'energy' in class_type[1]:
-                # DL
-                make_2d_energy_resolution_plot(arr_nn_pred, modelname, compare_pheid=precuts, correct_energy=(True, 'median'))
-                make_1d_energy_reco_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median_relative', precuts=precuts,
-                                                          correct_energy=(True, 'median'), compare_shallow=(True, arr_nn_pred_shallow))
-                make_1d_energy_std_div_e_true_plot(arr_nn_pred, modelname, precuts=precuts, compare_shallow=(True, arr_nn_pred_shallow),
-                                                   correct_energy=(True, 'median'))
-
-                # shallow reco
-                make_2d_energy_resolution_plot(arr_nn_pred_shallow, 'shallow_reco', compare_pheid=precuts)
-            if 'direction' in class_type[1]:
-                # DL
-                make_1d_dir_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median', precuts=precuts, compare_shallow=(True, arr_nn_pred_shallow))
-                make_2d_dir_correlation_plot(arr_nn_pred, modelname, precuts=precuts)
-                # shallow reco
-
-                make_2d_dir_correlation_plot(arr_nn_pred_shallow, 'shallow_reco', precuts=precuts)
-
-            if 'bjorken-y' in class_type[1]:
-                # DL
-                make_1d_bjorken_y_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median', precuts=precuts, compare_shallow=(True, arr_nn_pred_shallow))
+    else:
+        raise ValueError('Mode "', str(mode), '" is not known. Needs to be "train" or "eval".')
 
 
 if __name__ == '__main__':
@@ -499,59 +571,29 @@ if __name__ == '__main__':
     # e+dir+by dp 0.0
     # execute_cnn(n_bins=[(11,13,18,60)], class_type=(5, 'energy_and_direction_and_bjorken-y'), nn_arch='VGG', batchsize=64, epoch=(15,1), use_scratch_ssd=False, loss_opt=('mean_absolute_error', 'mean_squared_error'),
     #             n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.0')
+    # python run_cnn.py -l lists/lp/xyz-t_lp_tight-1_train_muon-CC_and_elec-CC_even_split.list lists/lp/xyz-t_lp_tight-1_test_muon-CC_and_elec-CC_even_split.list # OLD
 
     # e+dir+by dp 0.0, with new loss functions + errors
-    # losses = {'dir': loss_direction, 'energy': 'mean_absolute_error', 'by': 'mean_absolute_error',
-    #           'dir_err': loss_uncertainty_gaussian_likelihood_dir,
-    #           'e_err': loss_uncertainty_gaussian_likelihood,
-    #           'by_err': loss_uncertainty_gaussian_likelihood}
-    # loss_weights = {'dir': 2, 'energy': 1, 'bjorken-y': 4, 'dir_error': 1e-2, 'energy_error': 1e-2, 'bjorken-y_error': 1e-2} #loss_weights = None
-    # # TODO loss weights # TODO class_type[0] specifies the number of keras outputs in the model! not the number of labels!
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(6, 'energy_dir_bjorken-y_and_errors_dir_new_loss'), nn_arch='VGG', batchsize=64, epoch=(0,1), use_scratch_ssd=False, loss_opt=[losses, None, loss_weights],
+    losses = {'dir': 'mean_absolute_error', 'e': 'mean_absolute_error', 'by': 'mean_absolute_error',
+              'dir_err': loss_uncertainty_gaussian_likelihood_dir,
+              'e_err': loss_uncertainty_gaussian_likelihood,
+              'by_err': loss_uncertainty_gaussian_likelihood}
+    # loss_weights = {'dir': 6, 'e': 1, 'by': 10, 'dir_err': 1, 'e_err': 1, 'by_err': 1}
+    # mae dir, mae en
+    # execute_cnn(n_bins=[(11,13,18,300)], class_type=(6, 'energy_dir_bjorken-y_and_errors_dir_new_loss'), nn_arch='VGG', batchsize=64, epoch=(5,12), use_scratch_ssd=False, loss_opt=[losses, None, loss_weights],
     #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.0_errors')
 
-    # python run_cnn.py -l lists/lp/xyz-t_lp_tight-1_train_muon-CC_and_elec-CC_even_split.list lists/lp/xyz-t_lp_tight-1_test_muon-CC_and_elec-CC_even_split.list
+    # mae dir, mae en, n_filters=(256, 128, 64, 64, 64, 64, 128, 128, 128, 128), mae en , not mre as specified in str_ident
+    # execute_cnn(n_bins=[(11,13,18,300)], class_type=(6, 'energy_dir_bjorken-y_and_errors_dir_new_loss'), nn_arch='VGG', batchsize=64, epoch=(3,10), use_scratch_ssd=False, loss_opt=[losses, None, loss_weights],
+    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.0_errors_mre_e_more_filters')
 
+    # mae dir, mae en, standard filter, different loss weights
+    loss_weights = {'dir': 30, 'e': 1, 'by': 15, 'dir_err': 1, 'e_err': 1, 'by_err': 1}
+    execute_cnn(n_bins=[(11,13,18,300)], class_type=(6, 'energy_dir_bjorken-y_and_errors_dir_new_loss'), nn_arch='VGG', batchsize=64, epoch=(0,1), use_scratch_ssd=False, loss_opt=[losses, None, loss_weights],
+                n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.0_errors_dir_more_loss-w')
 
-    #####------------- DENSER DETECTOR STUDY
-    # xyz-t, tight-1, n_samples = 843000
-    # 15m
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(9,1), use_scratch_ssd=False,
-    #             n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='denser_detector_15m_vert')
-    # python run_cnn.py /home/woody/capn/mppi033h/Data/denser_detector_study/15m/concatenated/elec-CC_and_muon-CC_xyzt_train_file_0_shuffled_0.h5 /home/woody/capn/mppi033h/Data/denser_detector_study/15m/concatenated/elec-CC_and_muon-CC_xyzt_test_file_0.h5
-    # 12m
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(10,1), use_scratch_ssd=False,
-    #             n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='denser_detector_12m_vert')
-    # python run_cnn.py /home/woody/capn/mppi033h/Data/denser_detector_study/12m/concatenated/elec-CC_and_muon-CC_xyzt_train_file_0_shuffled_0.h5 /home/woody/capn/mppi033h/Data/denser_detector_study/12m/concatenated/elec-CC_and_muon-CC_xyzt_test_file_0.h5
-    # 9m
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(18,1), use_scratch_ssd=False,
-    #             n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='denser_detector_9m_vert')
-    # python run_cnn.py /home/woody/capn/mppi033h/Data/denser_detector_study/9m/concatenated/elec-CC_and_muon-CC_xyzt_train_file_0_shuffled_0.h5 /home/woody/capn/mppi033h/Data/denser_detector_study/9m/concatenated/elec-CC_and_muon-CC_xyzt_test_file_0.h5
-    # 6m
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(5,1), use_scratch_ssd=False,
-    #             n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='denser_detector_6m_vert')
-    # python run_cnn.py /home/woody/capn/mppi033h/Data/denser_detector_study/6m/concatenated/elec-CC_and_muon-CC_xyzt_train_file_0_shuffled_0.h5 /home/woody/capn/mppi033h/Data/denser_detector_study/6m/concatenated/elec-CC_and_muon-CC_xyzt_test_file_0.h5
-    # 4.5m
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(9,1), use_scratch_ssd=False,
-    #             n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='denser_detector_4p5m_vert')
-    # python run_cnn.py /home/woody/capn/mppi033h/Data/denser_detector_study/4p5m/concatenated/elec-CC_and_muon-CC_xyzt_train_file_0_shuffled_0.h5 /home/woody/capn/mppi033h/Data/denser_detector_study/4p5m/concatenated/elec-CC_and_muon-CC_xyzt_test_file_0.h5
-
-
-# xyz-t-tight-1-w-geo-fix_and_yzt-x-tight-1-w-geo-fix, double input, 2 more layers each, later pooling
-#     execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(1,1), use_scratch_ssd=False,
-#                 n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels='xyz-t_and_yzt-x', zero_center=True, str_ident='multi_input_single_train_tight-1_more-layers-both_lr0.0003_dense64-16')
-# python run_cnn.py /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/time_-250+500_geo-fix_60b/concatenated/elec-CC_and_muon-CC_xyzt_train_1_to_480_shuffled_0.h5 /home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5_input_projections_3-100GeV/4dTo4d/time_-250+500_geo-fix_60b/concatenated/elec-CC_and_muon-CC_xyzt_test_481_to_600_shuffled_0.h5
-
-# python run_cnn.py -m lists/xyz-t-tight-1-w-geo-fix_and_xyz-t-tight-2-w-geo-fix.list
-
-# xyz-t-tight-1 + tight-2 and yzt-x-tight-1 + tight-2, quadruple input
-#     execute_cnn(n_bins=[(11,13,18,60), (11,13,18,60)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(1,1), use_scratch_ssd=False,
-#                 n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels='xyz-t_and_yzt-x', zero_center=True, str_ident='multi_input_single_train_tight-1_tight-2_2-more-layers-everywhere')
-# python run_cnn.py -m lists/xyz-t_and_yzt-x_tight-1-and-tight-2.list
-# python run_cnn.py -m lists/xyz-t_and_yzt-x_tight-1-and-tight-2_with-precuts.list
-# pred
-# python run_cnn.py -m lists/xyz-t_and_yzt-x_tight-1-and-tight-2_pred_ORCA_1-5GeV.list
-# python run_cnn.py -m lists/xyz-t_and_yzt-x_tight-1-and-tight-2_pred_ORCA_3-100GeV.list
+    # python run_cnn.py -l lists/lp/all_e/xyz-t_lp_e_1-100_t-all_train_e-CC_mu-CC.list lists/lp/all_e/xyz-t_lp_e_1-100_t-all_test_e-CC_mu-CC.list
+    # python run_cnn.py -l lists/lp/all_e/xyz-t_lp_e_1-100_t-all_train_e-CC_mu-CC.list lists/lp/all_e/xyz-t_lp_e_1-100_t-all_test_e-CC_mu-CC_half.list
 
 
 # lp, xyz-t-tight-1 + tight-2
@@ -562,8 +604,8 @@ if __name__ == '__main__':
 # lp, xyz-t, yzt-x, tight-1 + tight-2
 #     execute_cnn(n_bins=[(11,13,18,60), (11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=32, epoch=(0,1), use_scratch_ssd=False,
 #                 n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='xyz-t_and_yzt-x', zero_center=True, str_ident='multi_input_single_train_tight-1_tight-2_lr_0.0003')
-    execute_cnn(n_bins=[(11, 13, 18, 60), (11, 13, 18, 60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=32, epoch=(1,1), use_scratch_ssd=False,
-                n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels='xyz-t_and_yzt-x', zero_center=True, str_ident='multi_input_single_train_tight-1_tight-2_lr_0.003_tr_st_test_st')
+#     execute_cnn(n_bins=[(11, 13, 18, 60), (11, 13, 18, 60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=32, epoch=(1,1), use_scratch_ssd=False,
+#                 n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels='xyz-t_and_yzt-x', zero_center=True, str_ident='multi_input_single_train_tight-1_tight-2_lr_0.003_tr_st_test_st')
 # python run_cnn.py -m lists/lp/xyz-t_lp_tight-1_tight-2_train_no_tau.list lists/lp/xyz-t_lp_tight-1_tight-2_test_no_tau.list
 # python run_cnn.py -m lists/lp/xyz-t_lp_tight-1_tight-2_train_no_tau.list lists/lp/xyz-t_lp_tight-1_tight-2_test_all_tau.list
 # pred 1-5 GeV
