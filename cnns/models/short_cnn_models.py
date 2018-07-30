@@ -154,24 +154,7 @@ def create_vgg_like_model(n_bins, batchsize, class_type, n_filters=None, dropout
 
     else: # regression case, one output for each regression label
 
-        if class_type[1] == 'energy_dir_bjorken-y_vertex_and_errors':
-            label_names = ('energy', 'dir_x', 'dir_y', 'dir_z', 'bjorken-y', 'vertex_x', 'vertex_y', 'vertex_z', 'vertex_t')
-            outputs_without_error = [Dense(1, name=name)(x) for name in label_names] # outputs without errors
-            outputs += outputs_without_error
-
-            # build second dense network for errors
-            conv_output_flat_stop_grad = Lambda(lambda a: K.stop_gradient(a))(conv_output_flat)
-            x_err = Dense(128, kernel_initializer='he_normal', kernel_regularizer=kernel_reg, activation=activation)(conv_output_flat_stop_grad)
-            if dropout > 0.0: x_err = Dropout(dropout)(x_err)
-            x_err = Dense(32, kernel_initializer='he_normal', kernel_regularizer=kernel_reg, activation=activation)(x_err)
-
-            for i, label in enumerate(label_names):
-                output_label = outputs_without_error[i]
-                output_label_error = Dense(1, activation='relu', name=label + '_error_temp')(x_err)
-                output_label_merged = Concatenate(name=label + '_error')([output_label, output_label_error])
-                outputs.append(output_label_merged)
-
-        elif class_type[1] == 'energy_dir_bjorken-y_and_errors_dir_new_loss':
+        if class_type[1] == 'energy_dir_bjorken-y_and_errors_dir_new_loss':
             label_names = ('dir', 'e', 'by')
             for name in label_names:
                 n_neurons = 1 if name != 'dir' else 3
@@ -182,11 +165,13 @@ def create_vgg_like_model(n_bins, batchsize, class_type, n_filters=None, dropout
             conv_output_flat_stop_grad = Lambda(lambda a: K.stop_gradient(a))(conv_output_flat)
             x_err = Dense(128, kernel_initializer='he_normal', kernel_regularizer=kernel_reg, activation=activation)(conv_output_flat_stop_grad)
             if dropout > 0.0: x_err = Dropout(dropout)(x_err)
+            x_err = Dense(64, kernel_initializer='he_normal', kernel_regularizer=kernel_reg, activation=activation)(x_err)
+            if dropout > 0.0: x_err = Dropout(dropout)(x_err)
             x_err = Dense(32, kernel_initializer='he_normal', kernel_regularizer=kernel_reg, activation=activation)(x_err)
 
             for i, name in enumerate(label_names):
                 n_neurons = 1 if name != 'dir' else 3
-                output_label_error = Dense(n_neurons, activation='relu', name=name + '_err_temp', bias_initializer='ones')(x_err)
+                output_label_error = Dense(n_neurons, activation='linear', name=name + '_err_temp')(x_err)
                 # second stop_gradient through the concat layer into the dense_nn of the labels is in the err_loss function
                 output_label_merged = Concatenate(name=name + '_err')([outputs[i], output_label_error])
                 outputs.append(output_label_merged)
@@ -197,8 +182,7 @@ def create_vgg_like_model(n_bins, batchsize, class_type, n_filters=None, dropout
                 label_names = ('energy', 'dir_x', 'dir_y', 'dir_z', 'bjorken-y')
             elif class_type[1] == 'energy':
                 label_names = ('energy',)
-            x = [Dense(1, name=name)(x) for name in label_names]
-            outputs.append(x)
+            outputs = [Dense(1, name=name)(x) for name in label_names]
 
     model = Model(inputs=input_layer, outputs=outputs)
 
