@@ -26,10 +26,6 @@ def plot_train_and_test_statistics(modelname, model):
     # #Epoch # Losses # Metrics
     log_array_test = np.loadtxt('models/trained/perf_plots/log_test_' + modelname + '.txt', dtype=np.float32, delimiter='\t', skiprows=1, ndmin=2)
 
-    train_batchnr = log_array_train[:, 1]
-    test_epoch = log_array_test[:, 0]
-    x_ticks_major = get_epoch_xticks(test_epoch, train_batchnr)
-
     fig, axes = plt.subplots()
     colors = ['#000000', '#332288', '#88CCEE', '#44AA99', '#117733', '#999933', '#DDCC77',
               '#CC6677', '#882255', '#AA4499', '#661100', '#6699CC', '#AA4466', '#4477AA'] # ref. personal.sron.nl/~pault/
@@ -37,6 +33,11 @@ def plot_train_and_test_statistics(modelname, model):
 
     skip_n_first_batches, batchlogger_display = 500, 100
     first_line = skip_n_first_batches / batchlogger_display
+
+    train_batchnr = log_array_train[first_line:, 1]
+    test_epoch = log_array_test[:, 0]
+
+    x_ticks_major = get_epoch_xticks(test_epoch, train_batchnr)
 
     i = 0
     for metric_name in model.metrics_names: # metric names have same order as the columns in the log_array_train/test
@@ -50,6 +51,9 @@ def plot_train_and_test_statistics(modelname, model):
             plt.plot(test_epoch, test_metric_loss, color=color, marker='o', zorder=3, label='val, ' + metric_name, lw=0.5, markersize=3)
 
             plt.xticks(x_ticks_major)
+            test_metric_min_to_max = np.amax(test_metric_loss) - np.amin(test_metric_loss)
+            y_lim = (np.amin(test_metric_loss) - 0.15 * test_metric_min_to_max, np.amax(test_metric_loss) - 0.15 * test_metric_min_to_max)
+            plt.ylim(y_lim)
 
             axes.legend(loc='upper right')
             plt.xlabel('Epoch [#]')
