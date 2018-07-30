@@ -265,15 +265,16 @@ def get_regression_labels(y_values):
 
     # normalize dirs
     dirs = y_values[:, 5:8]
-    normalized_dir = dirs / np.linalg.norm(dirs)
+    norm = np.linalg.norm(dirs, axis=1)
+    normalized_dir = dirs / np.reshape(norm, (norm.shape[0], 1)) # actually, the mc dirs are already normed. just for safety
 
     ys['dir'] = normalized_dir
-    ys['energy'] = y_values[:, 2:3]
-    ys['bjorken-y'] = y_values[:, 4:5]
+    ys['e'] = y_values[:, 2:3]
+    ys['by'] = y_values[:, 4:5]
 
-    ys['dir_error'] = normalized_dir
-    ys['energy_error'] = y_values[:, 2:3]
-    ys['bjorken-y_error'] = y_values[:, 4:5]
+    ys['dir_err'] = normalized_dir
+    ys['e_err'] = y_values[:, 2:3]
+    ys['by_err'] = y_values[:, 4:5]
 
     return ys
 
@@ -582,9 +583,9 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
             self.steps_per_total_epoch += steps_per_file
             self.steps_cum.append(self.steps_cum[-1] + steps_per_file)
 
-    def on_batch_end(self, batch, logs={}): #TODO need to change loss and acc for energy and dir regression
+    def on_batch_end(self, batch, logs={}):
         self.seen += 1
-        for metric in self.model.metrics_names: #
+        for metric in self.model.metrics_names:
             self.cum_metrics[metric] += logs.get(metric)
 
         if self.seen % self.display == 0:
