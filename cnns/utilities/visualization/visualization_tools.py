@@ -52,7 +52,7 @@ def plot_train_and_test_statistics(modelname, model):
 
             plt.xticks(x_ticks_major)
             test_metric_min_to_max = np.amax(test_metric_loss) - np.amin(test_metric_loss)
-            y_lim = (np.amin(test_metric_loss) - 0.15 * test_metric_min_to_max, np.amax(test_metric_loss) - 0.15 * test_metric_min_to_max)
+            y_lim = (np.amin(test_metric_loss) - 0.15 * test_metric_min_to_max, np.amax(test_metric_loss) + 0.15 * test_metric_min_to_max)
             plt.ylim(y_lim)
 
             axes.legend(loc='upper right')
