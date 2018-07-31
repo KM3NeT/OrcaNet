@@ -219,7 +219,6 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
     test_after_n_train_files = 5
 
     epoch, lr, lr_decay = schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=lr_initial, manual_mode=manual_mode) # begin new training step
-    history_test = None
     train_iter_step = 0 # loop n
     for file_no, (f, f_size) in enumerate(train_files, 1):
 
@@ -233,12 +232,14 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
         history_train = fit_model(model, modelname, train_files, f, f_size, file_no, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
                                             shuffle, swap_4d_channels, str_ident, n_events=None, tb_logger=tb_logger)
 
+        history_test = None
         # test after the first and else after every 5th file
-        if file_no % test_after_n_train_files == 0:
-            history_test = evaluate_model(model, modelname, test_files, train_files, batchsize, n_bins, class_type, xs_mean, epoch, swap_4d_channels, str_ident, n_events=None)
+        if file_no == 1 or file_no % test_after_n_train_files == 0:
+            history_test = evaluate_model(model, modelname, test_files, train_files, batchsize, n_bins, class_type,
+                                          xs_mean, epoch, swap_4d_channels, str_ident, n_events=None)
 
-        history_test = save_train_and_test_statistics_to_txt(model, history_train, history_test, modelname, lr, lr_decay, epoch,
-                                                             f, test_files, batchsize, n_bins, class_type, swap_4d_channels, str_ident)
+        save_train_and_test_statistics_to_txt(model, history_train, history_test, modelname, lr, lr_decay, epoch,
+                                              f, test_files, batchsize, n_bins, class_type, swap_4d_channels, str_ident)
         plot_train_and_test_statistics(modelname, model)
         plot_weights_and_activations(test_files[0][0], n_bins, class_type, xs_mean, swap_4d_channels, modelname, epoch[0], file_no, str_ident)
 
@@ -363,7 +364,6 @@ def save_train_and_test_statistics_to_txt(model, history_train, history_test, mo
                                           test_files, batchsize, n_bins, class_type, swap_4d_channels, str_ident):
     """
     Function for saving various information during training and testing to a .txt file.
-    :return:
     """
     with open('models/trained/train_logs/log_' + modelname + '.txt', 'a+') as f_out:
         f_out.write('--------------------------------------------------------------------------------------------------------\n')
@@ -385,8 +385,6 @@ def save_train_and_test_statistics_to_txt(model, history_train, history_test, mo
                     'swap_4d_channels=' + str(swap_4d_channels) + ', str_ident=' + str_ident + '\n')
         f_out.write('\n')
 
-    return None
-
 
 def predict_and_investigate_model_performance(model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
                                               str_ident, modelname, xs_mean):
@@ -407,7 +405,7 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
     # for layer in model.layers: # freeze trainable batch_norm weights, but not running mean and variance
     #     if 'batch_norm' in layer.name:
     #         layer.stateful = False
-    #arr_nn_pred = get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, modelname, samples=None)
+    # arr_nn_pred = get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, modelname, samples=None)
     # np.save('results/plots/saved_predictions/arr_energy_correct_' + modelname + '_stateful_false_1-5GeV.npy', arr_nn_pred)
 
     # arr_nn_pred = np.load('results/plots/saved_predictions/arr_energy_correct_' + modelname + '.npy')
@@ -460,7 +458,6 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
             # DL
             make_1d_bjorken_y_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median', precuts=precuts,
                                                     compare_shallow=(True, arr_nn_pred_shallow))
-
 
 
 def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None,
@@ -578,19 +575,19 @@ if __name__ == '__main__':
               'dir_err': loss_uncertainty_gaussian_likelihood_dir,
               'e_err': loss_uncertainty_gaussian_likelihood,
               'by_err': loss_uncertainty_gaussian_likelihood}
-    # loss_weights = {'dir': 6, 'e': 1, 'by': 10, 'dir_err': 1, 'e_err': 1, 'by_err': 1}
+    loss_weights = {'dir': 6, 'e': 1, 'by': 10, 'dir_err': 1, 'e_err': 1, 'by_err': 1}
     # mae dir, mae en
-    # execute_cnn(n_bins=[(11,13,18,300)], class_type=(6, 'energy_dir_bjorken-y_and_errors_dir_new_loss'), nn_arch='VGG', batchsize=64, epoch=(5,12), use_scratch_ssd=False, loss_opt=[losses, None, loss_weights],
+    # execute_cnn(n_bins=[(11,13,18,300)], class_type=(6, 'energy_dir_bjorken-y_and_errors_dir_new_loss'), nn_arch='VGG', batchsize=64, epoch=(6,19), use_scratch_ssd=False, loss_opt=[losses, None, loss_weights],
     #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.0_errors')
 
     # mae dir, mae en, n_filters=(256, 128, 64, 64, 64, 64, 128, 128, 128, 128), mae en , not mre as specified in str_ident
-    # execute_cnn(n_bins=[(11,13,18,300)], class_type=(6, 'energy_dir_bjorken-y_and_errors_dir_new_loss'), nn_arch='VGG', batchsize=64, epoch=(3,10), use_scratch_ssd=False, loss_opt=[losses, None, loss_weights],
-    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.0_errors_mre_e_more_filters')
+    execute_cnn(n_bins=[(11,13,18,300)], class_type=(6, 'energy_dir_bjorken-y_and_errors_dir_new_loss'), nn_arch='VGG', batchsize=64, epoch=(4,8), use_scratch_ssd=False, loss_opt=[losses, None, loss_weights],
+                n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.0_errors_mre_e_more_filters')
 
     # mae dir, mae en, standard filter, different loss weights
-    loss_weights = {'dir': 30, 'e': 1, 'by': 15, 'dir_err': 1, 'e_err': 1, 'by_err': 1}
-    execute_cnn(n_bins=[(11,13,18,300)], class_type=(6, 'energy_dir_bjorken-y_and_errors_dir_new_loss'), nn_arch='VGG', batchsize=64, epoch=(0,1), use_scratch_ssd=False, loss_opt=[losses, None, loss_weights],
-                n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.0_errors_dir_more_loss-w')
+    # loss_weights = {'dir': 30, 'e': 1, 'by': 15, 'dir_err': 1, 'e_err': 1, 'by_err': 1}
+    # execute_cnn(n_bins=[(11,13,18,300)], class_type=(6, 'energy_dir_bjorken-y_and_errors_dir_new_loss'), nn_arch='VGG', batchsize=64, epoch=(0,1), use_scratch_ssd=False, loss_opt=[losses, None, loss_weights],
+    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.0_errors_dir_more_loss-w')
 
     # python run_cnn.py -l lists/lp/all_e/xyz-t_lp_e_1-100_t-all_train_e-CC_mu-CC.list lists/lp/all_e/xyz-t_lp_e_1-100_t-all_test_e-CC_mu-CC.list
     # python run_cnn.py -l lists/lp/all_e/xyz-t_lp_e_1-100_t-all_train_e-CC_mu-CC.list lists/lp/all_e/xyz-t_lp_e_1-100_t-all_test_e-CC_mu-CC_half.list
