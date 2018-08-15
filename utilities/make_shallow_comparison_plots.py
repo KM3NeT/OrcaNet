@@ -7,6 +7,9 @@ import numpy as np
 
 
 def cut_summary_file():
+    """
+
+    """
     col_names = {}
     fpath_col_names = '/home/woody/capn/mppi033h/Data/various/pid_result_shiftedVertexEventSelection_withDeepLearningTrackScore_column_names.txt'
 
@@ -21,7 +24,8 @@ def cut_summary_file():
                col_names['dusj_best_DusjOrcaUsingProbabilitiesFinalFit_BjorkenY'], col_names['dusj_dir_x'],
                col_names['dusj_dir_y'], col_names['dusj_dir_z'], col_names['dusj_is_good'],
                col_names['dusj_energy_corrected'], col_names['gandalf_dir_x'], col_names['gandalf_dir_y'],
-               col_names['gandalf_dir_z'], col_names['gandalf_is_good'], col_names['gandalf_energy_corrected'], col_names['dusj_is_selected'], col_names['gandalf_is_selected'])
+               col_names['gandalf_dir_z'], col_names['gandalf_is_good'], col_names['gandalf_energy_corrected'], col_names['dusj_is_selected'],
+               col_names['gandalf_is_selected'], col_names['frame_index'])
 
     summary_file_arr = np.genfromtxt('/home/woody/capn/mppi033h/Data/various/pid_result_shiftedVertexEventSelection_withDeepLearningTrackScore.meta', delimiter=' ', usecols=usecols)
     boolean_is_neutrino = summary_file_arr[:,7] == True
@@ -31,11 +35,12 @@ def cut_summary_file():
 
 
 def make_arr_nn_pred():
+    """
 
+    """
     sum_arr = np.load('/home/woody/capn/mppi033h/Data/various/summary_file_cut.npy')
-    ptype_dict = {'muon-CC': (14, 1), 'a_muon-CC': (-14, 1), 'elec-CC': (12, 1),
-                           'a_elec-CC': (-12, 1), 'elec-NC': (12, 0), 'a_elec-NC': (-12, 0),
-                           'tau-CC': (16, 1), 'a_tau-CC': (-16, 1)}
+    ptype_dict = {'muon-CC': (14, 1), 'a_muon-CC': (-14, 1), 'elec-CC': (12, 1), 'a_elec-CC': (-12, 1),
+                  'elec-NC': (12, 0), 'a_elec-NC': (-12, 0), 'tau-CC': (16, 1), 'a_tau-CC': (-16, 1)}
 
     arr_nn_pred = np.zeros((sum_arr.shape[0], 19), dtype=np.float32)
 
@@ -49,14 +54,12 @@ def make_arr_nn_pred():
             continue
 
         run_id = sum_arr[i, 9]
-        event_id = sum_arr[i, 5]
+        event_id = sum_arr[i, 5] # index 5: old event_id, index 24: new event_id, counts all generated mc events
         particle_type = sum_arr[i, 10]
         is_cc = sum_arr[i, 6]
         energy_mc = sum_arr[i, 4]
         bjorken_y_mc = sum_arr[i, 0]
         dir_x_mc, dir_y_mc, dir_z_mc = sum_arr[i, 1], sum_arr[i, 2], sum_arr[i, 3]
-
-        if energy_mc < 3: print energy_mc
 
         dusj_is_good = sum_arr[i, 15]
         gandalf_is_good = sum_arr[i, 20]
@@ -67,28 +70,25 @@ def make_arr_nn_pred():
 
         if (particle_type, is_cc) == ptype_dict['elec-CC'] or (particle_type, is_cc) == ptype_dict['a_elec-CC']: # shower
             n_events_elec_cc += 1
-            if dusj_is_good == 1:
-            #if dusj_is_selected == 1:
+            #if dusj_is_good == 1:
+            if dusj_is_selected == 1:
                 n_events_elec_cc_sel += 1
                 energy_pred = sum_arr[i, 16]
-                if energy_pred < 0:
-                    continue
                 dir_x_pred, dir_y_pred, dir_z_pred = sum_arr[i, 12], sum_arr[i, 13], sum_arr[i, 14]
                 bjorken_y_pred = sum_arr[i, 11]
 
-                if energy_pred < 0:
-                    print energy_pred, energy_mc, dir_x_pred, dir_y_pred, dir_z_pred
             else:
                 continue
 
         elif (particle_type, is_cc) == ptype_dict['muon-CC'] or (particle_type, is_cc) == ptype_dict['a_muon-CC']: # track
             n_events_muon_cc += 1
-            if gandalf_is_good == 1:
-            #if gandalf_is_selected == 1:
+            #if gandalf_is_good == 1:
+            if gandalf_is_selected == 1:
                 n_events_muon_cc_sel += 1
                 energy_pred = sum_arr[i, 21]
                 dir_x_pred, dir_y_pred, dir_z_pred = sum_arr[i, 17], sum_arr[i, 18], sum_arr[i, 19]
-                bjorken_y_pred = np.array(0, dtype=np.float32) # not available for gandalf
+                bjorken_y_pred = np.array(0.25715, dtype=np.float32) # not available for gandalf, use median of by_true
+
             else:
                 continue
 
@@ -111,7 +111,7 @@ def make_arr_nn_pred():
 
     # remove lines with only 0 entries
     arr_nn_pred = arr_nn_pred[~(arr_nn_pred==0).all(1)]
-    np.save('/home/woody/capn/mppi033h/Data/various/arr_nn_pred_is_good.npy', arr_nn_pred)
+    np.save('/home/woody/capn/mppi033h/Data/various/arr_nn_pred_old_evt_id.npy', arr_nn_pred)
 
     # save cut info (run_id, evt_id) to txt
     boolean_muon_cc = np.abs(arr_nn_pred[:, 2:4]) == np.array([14, 1])
@@ -123,17 +123,8 @@ def make_arr_nn_pred():
 
     run_and_evt_id_muon_cc = arr_nn_pred_muon_cc[:, 0:2].astype('int')
     run_and_evt_id_elec_cc = arr_nn_pred_elec_cc[:, 0:2].astype('int')
-    np.savetxt('/home/woody/capn/mppi033h/Data/various/cuts_shallow_3_100_muon_cc_is_good.txt', run_and_evt_id_muon_cc, delimiter=' ', fmt="%d", header='run_id event_id', newline='\n')
-    np.savetxt('/home/woody/capn/mppi033h/Data/various/cuts_shallow_3_100_elec_cc_is_good.txt', run_and_evt_id_elec_cc, delimiter=' ', fmt="%d", header='run_id event_id', newline='\n')
-
-
-def make_shallow_energy_plots():
-    from utilities.evaluation_utilities import make_2d_energy_resolution_plot, make_1d_energy_reco_metric_vs_energy_plot
-
-    arr_nn_pred = np.load('/home/woody/capn/mppi033h/Data/various/arr_nn_pred.npy')
-
-    make_2d_energy_resolution_plot(arr_nn_pred, 'shallow_reco', compare_pheid=(True, '3-100_GeV_prod_energy_comparison'))
-    make_1d_energy_reco_metric_vs_energy_plot(arr_nn_pred, 'shallow_reco', metric='median', energy_bins=np.linspace(3, 100, 32), compare_pheid=(True, '3-100_GeV_prod_energy_comparison'))
+    np.savetxt('/home/woody/capn/mppi033h/Data/various/cuts_shallow_3_100_muon_cc_old_evt_id.txt', run_and_evt_id_muon_cc, delimiter=' ', fmt="%d", header='run_id event_id', newline='\n')
+    np.savetxt('/home/woody/capn/mppi033h/Data/various/cuts_shallow_3_100_elec_cc_old_evt_id.txt', run_and_evt_id_elec_cc, delimiter=' ', fmt="%d", header='run_id event_id', newline='\n')
 
 
 if __name__ == '__main__':
