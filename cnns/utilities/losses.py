@@ -10,7 +10,9 @@ def get_all_loss_functions():
     Functions that returns a dict with all relevant loss functions in this file.
     :return dict custom_objects
     """
-    custom_objects = {'loss_direction': loss_direction, 'loss_uncertainty_gaussian_likelihood': loss_uncertainty_gaussian_likelihood,
+    custom_objects = {'loss_direction': loss_direction, 'loss_uncertainty_mse': loss_uncertainty_mse,
+                      'loss_uncertainty_mae': loss_uncertainty_mae,
+                      'loss_uncertainty_gaussian_likelihood': loss_uncertainty_gaussian_likelihood,
                       'loss_uncertainty_gaussian_likelihood_dir': loss_uncertainty_gaussian_likelihood_dir,
                       'loss_mean_relative_error_energy': loss_mean_relative_error_energy}
     return custom_objects
@@ -25,6 +27,38 @@ def loss_mean_relative_error_energy(y_true, y_pred):
     """
     mre = K.abs(y_pred - y_true)/y_true
     return mre
+
+
+def loss_uncertainty_mae(y_true, y_pred):
+    """
+
+    :param y_true:
+    :param y_pred:
+    :return:
+    """
+    # order in y_pred: 1) pred label 2) pred label error
+    y_pred_label = K.stop_gradient(y_pred[:, 0]) # prevent that the gradient flows back over the label network
+    y_pred_label_std = y_pred[:, 1]
+    y_true_label = y_true[:, 0]
+
+    loss = K.abs(y_pred_label_std - K.abs(y_true_label - y_pred_label)) # (s - |y_true - y_pred|)
+    return loss
+
+
+def loss_uncertainty_mse(y_true, y_pred):
+    """
+
+    :param y_true:
+    :param y_pred:
+    :return:
+    """
+    # order in y_pred: 1) pred label 2) pred label error
+    y_pred_label = K.stop_gradient(y_pred[:, 0]) # prevent that the gradient flows back over the label network
+    y_pred_label_std = y_pred[:, 1]
+    y_true_label = y_true[:, 0]
+
+    loss = K.pow(y_pred_label_std - K.abs(y_true_label - y_pred_label), 2) # (s - |y_true - y_pred|)**2
+    return loss
 
 
 def loss_uncertainty_gaussian_likelihood(y_true, y_pred):
