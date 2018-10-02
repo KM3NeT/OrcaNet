@@ -65,6 +65,11 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident =
                              (input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]), # xyz-t
                              (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1])] # yzt-x
 
+            elif swap_4d_channels == 'xyz-t_and_xyz-c_single_input':
+                max_pool_sizes = {5: (2, 2, 2), 9: (2, 2, 2)}  # 2 more layers ; same as swap_4d_channels=None for len(n_bins)=1
+                input_dim = get_dimensions_encoding(n_bins[0], batchsize)
+                input_dim = (input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4] + 31)
+
             elif swap_4d_channels is None:
                 max_pool_sizes = {'net_1': {5: (2, 2, 2), 9: (2, 2, 2)},
                                   'net_2': {5: (2, 2, 2), 9: (2, 2, 2)}}
@@ -154,11 +159,10 @@ def create_vgg_like_model(n_bins, batchsize, class_type, n_filters=None, dropout
 
     else: # regression case, one output for each regression label
 
-        if class_type[1] == 'energy_dir_bjorken-y_and_errors_dir_new_loss':
-            label_names = ('dir', 'e', 'by')
+        if class_type[1] == 'energy_dir_bjorken-y_errors':
+            label_names = ('e', 'dir_x', 'dir_y', 'dir_z', 'by')
             for name in label_names:
-                n_neurons = 1 if name != 'dir' else 3
-                output_label = Dense(n_neurons, name=name)(x)
+                output_label = Dense(1, name=name)(x)
                 outputs.append(output_label)
 
             # build second dense network for errors
@@ -170,8 +174,7 @@ def create_vgg_like_model(n_bins, batchsize, class_type, n_filters=None, dropout
             x_err = Dense(32, kernel_initializer='he_normal', kernel_regularizer=kernel_reg, activation=activation)(x_err)
 
             for i, name in enumerate(label_names):
-                n_neurons = 1 if name != 'dir' else 3
-                output_label_error = Dense(n_neurons, activation='linear', name=name + '_err_temp')(x_err)
+                output_label_error = Dense(1, activation='linear', name=name + '_err_temp')(x_err)
                 # second stop_gradient through the concat layer into the dense_nn of the labels is in the err_loss function
                 output_label_merged = Concatenate(name=name + '_err')([outputs[i], output_label_error])
                 outputs.append(output_label_merged)
