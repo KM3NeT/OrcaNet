@@ -3,6 +3,7 @@
 """Utility code for the evaluation of a network's performance after training."""
 
 import os
+import math
 import h5py
 import numpy as np
 import keras as ks
@@ -16,7 +17,7 @@ from .cnn_utilities import generate_batches_from_hdf5_file
 
 def get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, modelname, samples=None):
     """
-    Creates an energy_correct array based on test_data that specifies for every event, if the model's prediction is True/False.
+    Creates an arr_nn_pred array based on the test_data.
     :param ks.model.Model model: Fully trained Keras model of a neural network.
     :param str test_files: List that contains the test files. Format should be [ ( [], ), ... ].
     :param list(tuple) n_bins: The number of bins for each dimension (x,y,z,t) in the testfile. Can contain multiple n_bins tuples.
@@ -54,9 +55,14 @@ def get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchs
             xs, y_true, mc_info = next(generator)
             y_pred = model.predict_on_batch(xs)
 
-            if class_type[1] == 'energy_and_direction_and_bjorken-y': # y_pred and y_true is a list with the 1d arrays energy, dir, ...
+            if class_type[1] == 'energy_and_direction_and_bjorken-y':
+                # TODO temp old 60b prod
+                y_pred = np.concatenate([y_pred[0], y_pred[1], y_pred[2], y_pred[3], y_pred[4]], axis=1)
+                y_true = np.concatenate([y_true['energy'], y_true['dir_x'], y_true['dir_y'], y_true['dir_z'], y_true['bjorken-y']], axis=1) # dont need to save y_true err input
+
+            elif class_type[1] == 'energy_dir_bjorken-y_errors':
                 y_pred = np.concatenate(y_pred, axis=1)
-                y_true = np.concatenate([label_arr[:, ax] for label_arr in y_true], axis=1)
+                y_true = np.concatenate([y_true['e'], y_true['dir_x'], y_true['dir_y'], y_true['dir_z'], y_true['by']], axis=1) # dont need to save y_true err input
 
             # check if the predictions were correct
             energy = mc_info[:, 2]
@@ -74,7 +80,7 @@ def get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchs
             if arr_nn_pred is None: arr_nn_pred = np.zeros((cum_number_of_steps[-1] * batchsize, arr_nn_pred_temp.shape[1:2][0]), dtype=np.float32)
             arr_nn_pred[arr_nn_pred_row_start + s*batchsize : arr_nn_pred_row_start + (s+1) * batchsize] = arr_nn_pred_temp
 
-    make_pred_h5_file(arr_nn_pred, filepath='predictions/' + modelname, mc_prod='1-5GeV')
+    # make_pred_h5_file(arr_nn_pred, filepath='predictions/' + modelname, mc_prod='3-100GeV')
 
     return arr_nn_pred
 
@@ -102,15 +108,23 @@ def make_pred_h5_file(arr_nn_pred, filepath, mc_prod='3-100GeV'):
     :param str mc_prod: optional parameter that specifies which mc prod is used. E.g. 3-100GeV or 1-5GeV.
     :param str filepath: filepath that should be used for saving the .h5 file.
     """
-    arr_nn_output = np.concatenate([arr_nn_pred[:, 0:1], arr_nn_pred[:, 1:2], arr_nn_pred[:, 2:3], arr_nn_pred[:, 3:4], arr_nn_pred[:, 9:10]], axis=1)
+    run_id = arr_nn_pred[:, 0:1]
+    event_id = arr_nn_pred[:, 1:2]
+    particle_type = arr_nn_pred[:, 2:3]
+    is_cc = arr_nn_pred[:, 3:4]
+    y_pred_track = arr_nn_pred[:, 9:10]
 
-    f = h5py.File(filepath + mc_prod + '.h5', 'w')
+    arr_nn_output = np.concatenate([run_id, event_id, particle_type, is_cc, y_pred_track], axis=1)
+
+    f = h5py.File(filepath + '_' + mc_prod + '.h5', 'w')
     dset = f.create_dataset('nn_output', data=arr_nn_output)
     dset.attrs['array_contents'] = 'Columns: run_id, event_id, PID (particle_type + is_cc), y_pred_track. ' \
                                    'PID info: (12, 0): elec-NC, (12, 1): elec-CC, (14, 1): muon-CC, (16, 1): tau-CC. ' \
                                    'y_pred_track info: probability of the neural network for this event to be a track.'
     f.close()
-
+    #arr_nn_output = np.rec.fromarrays([run_id, event_id, particle_type, is_cc, y_pred_track],
+    #                                  dtype=[('run_id','f4'),('event_id','f4'),('particle_type','f4'),('is_cc','f4'),
+    #                                  ('y_pred_track','f4')])
 
 #------------- Functions used in evaluating the performance of model -------------#
 
@@ -137,7 +151,7 @@ def add_pid_column_to_array(array, particle_type_dict, key):
 
 def load_pheid_event_selection(precuts='3-100_GeV_prod'):
     """
-    Loads the pheid event that survive the precuts from a .txt file, adds a pid column to them and returns it.
+    Loads the pheid events that survive the precuts from a .txt file, adds a pid column to them and returns it.
     :param str precuts: specifies, which precuts should be loaded.
     :return ndarray(ndim=2) arr_pheid_sel_events: 2D array that contains [particle_type, is_cc, event_id, run_id]
                                                    for each event that survives the precuts.
@@ -146,50 +160,88 @@ def load_pheid_event_selection(precuts='3-100_GeV_prod'):
 
     #### Precuts
     if precuts == '3-100_GeV_prod':
-        # 3-100 GeV
-        particle_type_dict = {'muon-CC': ['muon_cc_3_100_selectedEvents_forMichael_01_18.txt', (14,1)],
-                              'elec-CC': ['elec_cc_3_100_selectedEvents_forMichael_01_18.txt', (12,1)],
-                              'elec-NC': ['elec_nc_3_100_selectedEvents_forMichael_fixed.txt', (12, 0)],
-                              'tau-CC': ['tau_cc_3_100_selectedEvents_forMichael_fixed.txt', (16, 1)]}
+        particle_type_dict = {'muon-CC': [['muon_cc_3_100_selectedShifted.txt'], (14,1)],
+                              'elec-CC': [['elec_cc_3_100_selectedShifted.txt'], (12,1)],
+                              'elec-NC': [['elec_nc_3_100_selectedShifted.txt'], (12, 0)],
+                              'tau-CC': [['tau_cc_3_100_selectedShifted.txt'], (16, 1)]}
 
     elif precuts == '1-5_GeV_prod':
-        # 1-5 GeV
-        particle_type_dict = {'muon-CC': ['muon_cc_1_5_selectedEvents_forMichael.txt', (14,1)],
-                              'elec-CC': ['elec_cc_1_5_selectedEvents_forMichael.txt', (12,1)],
-                              'elec-NC': ['elec_nc_1_5_selectedEvents_forMichael.txt', (12, 0)]}
+        particle_type_dict = {'muon-CC': [['muon_cc_1_5_selectedShifted.txt'], (14,1)],
+                              'elec-CC': [['elec_cc_1_5_selectedShifted.txt'], (12,1)],
+                              'elec-NC': [['elec_nc_1_5_selectedShifted.txt'], (12, 0)]}
 
     elif precuts == '3-100_GeV_containment_cut':
-        # 3-100 GeV Containment cut
-        particle_type_dict = {'muon-CC': ['muon_cc_3_100_selectedEvents_Rsmaller100_abszsmaller90_forMichael.txt', (14,1)],
-                              'elec-CC': ['elec_cc_3_100_selectedEvents_Rsmaller100_abszsmaller90_forMichael.txt', (12,1)]}
+        particle_type_dict = {'muon-CC': [['old/muon_cc_3_100_selectedEvents_Rsmaller100_abszsmaller90_forMichael.txt'], (14,1)],
+                              'elec-CC': [['old/elec_cc_3_100_selectedEvents_Rsmaller100_abszsmaller90_forMichael.txt'], (12,1)]}
 
     elif precuts == '3-100_GeV_prod_energy_comparison':
-        path = '/home/woody/capn/mppi033h/Data/various/'
-        particle_type_dict = {'muon-CC': ['cuts_shallow_3_100_muon_cc.txt', (14,1)],
-                              'elec-CC': ['cuts_shallow_3_100_elec_cc.txt', (12,1)]}
+        path = '/home/woody/capn/mppi033h/Data/various/cuts_txt_files/'
+        particle_type_dict = {'muon-CC': [['cuts_shallow_3_100_muon_cc.txt'], (14,1)],
+                              'elec-CC': [['cuts_shallow_3_100_elec_cc.txt'], (12,1)]}
+
+    elif precuts == '3-100_GeV_prod_energy_comparison_old_evt_id':
+        path = '/home/woody/capn/mppi033h/Data/various/cuts_txt_files/'
+        particle_type_dict = {'muon-CC': [['cuts_shallow_3_100_muon_cc_old_evt_id.txt'], (14,1)],
+                              'elec-CC': [['cuts_shallow_3_100_elec_cc_old_evt_id.txt'], (12,1)]}
 
     elif precuts == '3-100_GeV_prod_energy_comparison_is_good':
-        path = '/home/woody/capn/mppi033h/Data/various/'
-        particle_type_dict = {'muon-CC': ['cuts_shallow_3_100_muon_cc_is_good.txt', (14,1)],
-                              'elec-CC': ['cuts_shallow_3_100_elec_cc_is_good.txt', (12,1)]}
+        path = '/home/woody/capn/mppi033h/Data/various/cuts_txt_files/'
+        particle_type_dict = {'muon-CC': [['cuts_shallow_3_100_muon_cc_is_good.txt'], (14,1)],
+                              'elec-CC': [['cuts_shallow_3_100_elec_cc_is_good.txt'], (12,1)]}
+
+    elif precuts == 'regr_3-100_GeV_prod_and_1-3_GeV_prod':
+        path = '/home/woody/capn/mppi033h/Data/various/cuts_txt_files/'
+        particle_type_dict = {'muon-CC': [['cuts_shallow_3_100_muon-cc.txt', 'cuts_shallow_1_3_muon-cc.txt'], (14,1)],
+                              'elec-CC': [['cuts_shallow_3_100_elec-cc.txt', 'cuts_shallow_1_3_elec-cc.txt'], (12,1)],
+                              'elec-NC': [['cuts_shallow_3_100_elec-nc.txt', 'cuts_shallow_1_3_elec-nc.txt'], (12,0)],
+                              'tau-CC': [['cuts_shallow_3_100_tau-cc.txt'], (16,1)]}
 
     else:
         raise ValueError('The specified precuts option "' + str(precuts) + '" is not available.')
 
     arr_pheid_sel_events = None
     for key in particle_type_dict:
-        txt_file = particle_type_dict[key][0]
+        for i, txt_file in enumerate(particle_type_dict[key][0]):
 
-        if arr_pheid_sel_events is None:
-            arr_pheid_sel_events = np.loadtxt(path + txt_file, dtype=np.float32)
-            arr_pheid_sel_events = add_pid_column_to_array(arr_pheid_sel_events, particle_type_dict, key)
-        else:
-            temp_pheid_sel_events = np.loadtxt(path + txt_file, dtype=np.float32)
-            temp_pheid_sel_events = add_pid_column_to_array(temp_pheid_sel_events, particle_type_dict, key)
+            if arr_pheid_sel_events is None:
+                arr_pheid_sel_events = np.loadtxt(path + txt_file, dtype=np.float32)
+                arr_pheid_sel_events = add_pid_column_to_array(arr_pheid_sel_events, particle_type_dict, key)
 
-            arr_pheid_sel_events = np.concatenate((arr_pheid_sel_events, temp_pheid_sel_events), axis=0)
+                # add prod col, i=0 for 3-100GeV and i=1 for 1-5 GeV
+                if precuts == '1-5_GeV_prod': i = 1 # in the case of PID with these precuts, TODO fix
+
+                arr_pheid_sel_events = np.concatenate([arr_pheid_sel_events, np.full((arr_pheid_sel_events.shape[0], 1), i, dtype=np.float32)], axis=1)
+
+            else:
+                temp_pheid_sel_events = np.loadtxt(path + txt_file, dtype=np.float32)
+                temp_pheid_sel_events = add_pid_column_to_array(temp_pheid_sel_events, particle_type_dict, key)
+
+                # add prod col, i=0 for 3-100GeV and i=1 for 1-5 GeV
+                if precuts == '1-5_GeV_prod': i = 1
+
+                temp_pheid_sel_events = np.concatenate([temp_pheid_sel_events, np.full((temp_pheid_sel_events.shape[0], 1), i, dtype=np.float32)], axis=1)
+
+                arr_pheid_sel_events = np.concatenate((arr_pheid_sel_events, temp_pheid_sel_events), axis=0)
 
     return arr_pheid_sel_events
+
+
+def add_prod_column_to_cut_arr_nn_pred(cut_arr_nn_pred, arr_nn_pred_e_col):
+    """
+    Important: don't change the order (axis_0) for the cut_arr_nn_pred!
+    :param cut_arr_nn_pred:
+    :param arr_nn_pred_e_col:
+    :return:
+    """
+    # add new column with placeholder zeros to the array
+    zeros = np.zeros((cut_arr_nn_pred.shape[0], 1), dtype=np.float32)
+    cut_arr_nn_pred = np.concatenate([cut_arr_nn_pred, zeros], axis=1) # 0,1,2,3,4: run_id, event_id, particle_type, is_cc, zeros
+
+    # yields array with 0 = > 3 GeV (3-100 GeV prod) and 1 = < 3 GeV (1-5 GeV prod)
+    boolean_is_low_e_prod = arr_nn_pred_e_col < 3
+    cut_arr_nn_pred[:, 4] = boolean_is_low_e_prod.astype(np.float32) # index 4 is the last column
+
+    return cut_arr_nn_pred # now with prod col
 
 
 def in_nd(a, b, absolute=True, assume_unique=False):
@@ -201,7 +253,7 @@ def in_nd(a, b, absolute=True, assume_unique=False):
     :param ndarray(ndim=2) b: array upon which the rows of a are checked.
     :param bool absolute: Specifies if absolute() should be called on the arrays before applying in_nd.
                      Useful when e.g. in_nd shouldn't care about particle (+) or antiparticle (-).
-    :param bool assume_unique: ff True, the input arrays are both assumed to be unique, which can speed up the calculation.
+    :param bool assume_unique: if True, the input arrays are both assumed to be unique, which can speed up the calculation.
     :return: ndarray(ndim=1): Boolean array that specifies for each row of a if it also exists in b or not.
     """
     if a.dtype!=b.dtype: raise TypeError('The dtype of array a must be equal to the dtype of array b.')
@@ -225,13 +277,15 @@ def arr_nn_pred_select_pheid_events(arr_nn_pred, invert=False, precuts='3-100_Ge
     :return ndarray(ndim=2) arr_nn_pred: same array, but after applying the Pheid precuts on it.
                                                  (events that don't survive the precuts are missing!)
     """
-    pheid_evt_run_id = load_pheid_event_selection(precuts=precuts)
+    arr_sel_events = load_pheid_event_selection(precuts=precuts)
+    cut_arr_nn_pred = arr_nn_pred[:, [0, 1, 2, 3]] # 0,1,2,3: run_id, event_id, particle_type, is_cc
+    cut_arr_nn_pred = add_prod_column_to_cut_arr_nn_pred(cut_arr_nn_pred, arr_nn_pred[:, 4])
 
-    evt_run_id_in_pheid = in_nd(arr_nn_pred[:, [0, 1, 2, 3]], pheid_evt_run_id, absolute=True)  # 0,1,2,3: run_id, event_id, particle_type, is_cc
+    bool_evt_run_id_in_selection = in_nd(cut_arr_nn_pred, arr_sel_events, absolute=True)
 
-    if invert is True: evt_run_id_in_pheid = np.invert(evt_run_id_in_pheid)
+    if invert is True: bool_evt_run_id_in_selection = np.invert(bool_evt_run_id_in_selection)
 
-    arr_nn_pred = arr_nn_pred[evt_run_id_in_pheid] # apply boolean in_pheid selection to the array
+    arr_nn_pred = arr_nn_pred[bool_evt_run_id_in_selection] # apply boolean in_pheid selection to the array
 
     return arr_nn_pred
 
@@ -258,7 +312,7 @@ def print_absolute_performance(arr_energy_correct, print_text='Performance: '):
 
 #- Classification -#
 
-def make_energy_to_accuracy_plot_multiple_classes(arr_nn_pred, title, filename, plot_range=(3, 100), precuts=(False, '3-100_GeV_prod'), corr_cut_pred_0=0.5):
+def make_energy_to_accuracy_plot_multiple_classes(arr_nn_pred, title, filename, plot_range=(1, 100), precuts=(False, '3-100_GeV_prod'), corr_cut_pred_0=0.5):
     """
     Makes a mpl step plot of Energy vs. 'Fraction of events classified as track' for multiple classes.
     Till now only used for muon-CC vs elec-CC.
@@ -347,7 +401,7 @@ def check_if_prediction_is_correct(y_pred, y_true, threshold_pred_0=0.5):
     correct = binary_is_pred_0_pred == binary_is_pred_0_true
     return correct
 
-#TODO add KM3Net preliminary
+
 def make_step_plot_1d_energy_accuracy_class(arr_nn_pred, axes, particle_types_dict, particle_type, plot_range=(3, 100), linestyle='-', color='b', invert=False):
     """
     Makes a mpl 1D step plot with Energy vs. Accuracy for a certain input class (e.g. a_muon-CC).
@@ -369,8 +423,8 @@ def make_step_plot_1d_energy_accuracy_class(arr_nn_pred, axes, particle_types_di
     energy_class = arr_nn_pred_class[:, 4]
     correct_class = arr_nn_pred_class[:, 13]
 
-    hist_1d_energy_class = np.histogram(energy_class, bins=97, range=plot_range)
-    hist_1d_energy_correct_class = np.histogram(arr_nn_pred_class[correct_class == 1, 4], bins=97, range=plot_range)
+    hist_1d_energy_class = np.histogram(energy_class, bins=99, range=plot_range) # TODO standard 97
+    hist_1d_energy_correct_class = np.histogram(arr_nn_pred_class[correct_class == 1, 4], bins=99, range=plot_range) # TODO, 97
 
     bin_edges = hist_1d_energy_class[1]
     hist_1d_energy_accuracy_class_bins = np.divide(hist_1d_energy_correct_class[0], hist_1d_energy_class[0], dtype=np.float32) # TODO solve division by zero
@@ -686,7 +740,7 @@ def make_hist_2d_class(prop_1, prop_2, arr_nn_pred, particle_types_dict, e_cut, 
     plt.clf()
     plt.close()
 
-# TODO add KM3NeT preliminary
+
 def calculate_and_plot_separation_pid(arr_nn_pred, modelname, precuts=(False, '3-100_GeV_prod')):
     """
     Calculates and plots the separability (1-c) plot.
@@ -773,60 +827,59 @@ def calculate_and_plot_separation_pid(arr_nn_pred, modelname, precuts=(False, '3
 
 #- Regression -#
 
-def make_2d_energy_resolution_plot(arr_nn_pred, modelname, energy_bins=np.arange(3,101,1), compare_pheid=(False, '3-100_GeV_prod'), correct_energy=(False, 'median')):
+def make_2d_energy_resolution_plot(arr_nn_pred, modelname, energy_bins=np.arange(1,101,1), precuts=(False, '3-100_GeV_prod'), correct_energy=(False, 'median')):
     """
 
     :param arr_nn_pred:
     :param modelname:
     :param energy_bins:
-    :param compare_pheid:
+    :param precuts:
     :param correct_energy:
     :return:
     """
-    if compare_pheid[0] is True:
-        arr_nn_pred = arr_nn_pred_select_pheid_events(arr_nn_pred, invert=False, precuts=compare_pheid[1])
+    if precuts[0] is True:
+        arr_nn_pred = arr_nn_pred_select_pheid_events(arr_nn_pred, invert=False, precuts=precuts[1])
     if correct_energy[0] is True:
         arr_nn_pred = correct_reco_energy(arr_nn_pred, metric=correct_energy[1])
 
-    energy_mc = arr_nn_pred[:, 4]
-    energy_pred = arr_nn_pred[:, 9]
-    is_track, is_shower = get_boolean_track_and_shower_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3])
+    ic_list = {'muon-CC': {'title': 'Track like (' + r'$\nu_{\mu}-CC$)'},
+               'elec-CC': {'title': 'Shower like (' + r'$\nu_{e}-CC$)'},
+               'elec-NC': {'title': 'Track like (' + r'$\nu_{e}-NC$)'},
+               'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
 
-    hist_2d_energy_track = np.histogram2d(energy_mc[is_track], energy_pred[is_track], energy_bins)
-    hist_2d_energy_shower = np.histogram2d(energy_mc[is_shower], energy_pred[is_shower], energy_bins)
-    bin_edges_energy = hist_2d_energy_shower[1] # doesn't matter if we take shower/track and x/y, bin edges are same for all of them
+    energy_mc = arr_nn_pred[:, 4] # TODO make config file to get the indices
+    energy_pred = arr_nn_pred[:, 9]
 
     fig, ax = plt.subplots()
     pdf_plots = mpl.backends.backend_pdf.PdfPages('results/plots/2d/energy/energy_resolution_' + modelname + '.pdf')
 
-    # Format in classical numpy convention: x along first dim (vertical), y along second dim (horizontal)
-    # transpose to get typical cartesian convention: y along first dim (vertical), x along second dim (horizontal)
-    energy_res_track = ax.pcolormesh(bin_edges_energy, bin_edges_energy, hist_2d_energy_track[0].T,
-                                     norm=mpl.colors.LogNorm(vmin=1, vmax=hist_2d_energy_track[0].T.max()))
+    for ic in ic_list.iterkeys():
+        is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], ic)
+        if bool(np.any(is_ic, axis=0)) is False: continue
 
-    reco_name = 'OrcaNet: ' if modelname != 'shallow_reco' else 'Standard Reco: '
-    title = plt.title(reco_name + 'Track like events (' + r'$\nu_{\mu}-CC$)')
-    title.set_position([.5, 1.04])
-    cbar1 = fig.colorbar(energy_res_track, ax=ax)
-    cbar1.ax.set_ylabel('Number of events')
-    ax.set_xlabel('True energy (GeV)'), ax.set_ylabel('Reconstructed energy (GeV)')
-    plt.tight_layout()
+        hist_2d_energy_ic = np.histogram2d(energy_mc[is_ic], energy_pred[is_ic], energy_bins)
+        bin_edges_energy = hist_2d_energy_ic[1]
 
-    pdf_plots.savefig(fig)
-    cbar1.remove()
-    energy_res_track.remove()
+        # Format in classical numpy convention: x along first dim (vertical), y along second dim (horizontal)
+        # transpose to get typical cartesian convention: y along first dim (vertical), x along second dim (horizontal)
+        energy_res_ic = ax.pcolormesh(bin_edges_energy, bin_edges_energy, hist_2d_energy_ic[0].T,
+                                     norm=mpl.colors.LogNorm(vmin=1, vmax=hist_2d_energy_ic[0].T.max()))
 
-    energy_res_shower = ax.pcolormesh(bin_edges_energy, bin_edges_energy, hist_2d_energy_shower[0].T, norm=mpl.colors.LogNorm(vmin=1, vmax=hist_2d_energy_shower[0].T.max()))
-    plt.title(reco_name + 'Shower like events (' + r'$\nu_{e}-CC$)')
+        reco_name = 'OrcaNet: ' if modelname != 'shallow_reco' else 'Standard Reco: '
+        title = plt.title(reco_name + ic_list[ic]['title'])
+        title.set_position([.5, 1.04])
+        cbar = fig.colorbar(energy_res_ic, ax=ax)
+        cbar.ax.set_ylabel('Number of events')
+        y_label = 'Corrected reconstructed energy (GeV)' if correct_energy[0] is True and ic not in ['muon-CC'] else 'Reconstructed energy (GeV)'
+        ax.set_xlabel('True energy (GeV)'), ax.set_ylabel(y_label)
+        plt.tight_layout()
 
-    if correct_energy[0] is True or modelname == 'shallow_reco':
-        ax.set_ylabel('Corrected reconstructed energy (GeV)')
+        pdf_plots.savefig(fig)
+        cbar.remove() # TODO still necessary?
+        ax.cla()
 
-    cbar2 = fig.colorbar(energy_res_shower, ax=ax)
-    cbar2.ax.set_ylabel('Number of events')
-
-    pdf_plots.savefig(fig)
     pdf_plots.close()
+    plt.close()
 
 
 def get_boolean_track_and_shower_separation(particle_type, is_cc):
@@ -842,32 +895,47 @@ def get_boolean_track_and_shower_separation(particle_type, is_cc):
     # track: muon/a-muon CC --> 14, True
     # shower: elec/a-elec; muon/a-muon NC
     # particle type, i.e. elec/muon/tau (12, 14, 16). Negative values for antiparticles.
-    # In my dataset, there are actually no NC events
-
+    # TODO fix taus
     abs_particle_type = np.abs(particle_type)
     track = np.logical_and(abs_particle_type == 14, is_cc == True)
-    shower = np.logical_or(np.logical_and(abs_particle_type == 14, is_cc == False),
-                           abs_particle_type == 12)
+    shower = np.logical_or(abs_particle_type == 16, abs_particle_type == 12)
 
     return track, shower
 
 
-def correct_reco_energy(arr_nn_pred, metric='median'):
+def get_boolean_interaction_channel_separation(particle_type, is_cc, interaction_channel):
     """
 
+    :param particle_type:
+    :param is_cc:
+    :param str interaction_channel:
+    :return:
+    """
+    ic_dict = {'muon-CC': (14, 1), 'elec-CC': (12, 1), 'elec-NC': (12, 0), 'tau-CC': (16, 1)}
+    if interaction_channel not in ic_dict.keys():
+        raise ValueError('The interaction_channel ' + str(interaction_channel) + ' is not known.')
+
+    abs_ptype = np.abs(particle_type)
+    boolean_interaction_channel = np.logical_and(abs_ptype == ic_dict[interaction_channel][0], is_cc == ic_dict[interaction_channel][1])
+
+    return boolean_interaction_channel
+
+
+def correct_reco_energy(arr_nn_pred, metric='median'):
+    """
+    Evaluates the correction factors based on e-CC events, applies them to ALL shower events (e-CC, e-NC, tau-CC)
     :param arr_nn_pred:
     :param metric:
     :return:
     """
     is_track, is_shower = get_boolean_track_and_shower_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3])
+    is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], 'elec-CC')
 
-    energy_mc = arr_nn_pred[:, 4][is_shower]
-    energy_pred = arr_nn_pred[:, 9][is_shower]
+    energy_mc, energy_pred = arr_nn_pred[:, 4][is_ic], arr_nn_pred[:, 9][is_ic]
 
-    arr_nn_pred_corr = np.copy(arr_nn_pred)
+    arr_nn_pred_corr = np.copy(arr_nn_pred) # TODO still necessary?
 
-    correction_factors_x = []
-    correction_factors_y = []
+    correction_factors_x, correction_factors_y = [], []
 
     e_range = np.logspace(np.log(3)/np.log(2),np.log(100)/np.log(2),50,base=2)
     n_ranges = e_range.shape[0] - 1
@@ -890,14 +958,17 @@ def correct_reco_energy(arr_nn_pred, metric='median'):
         correction_factors_y.append(correction_factor)
 
     # linear interpolation of correction factors
+    #correction_factor_en_pred = np.interp(energy_pred, correction_factors_x, correction_factors_y)
+    energy_pred_orig_shower = arr_nn_pred[:, 9][is_shower]
+    correction_factor_en_pred = np.interp(energy_pred_orig_shower, correction_factors_x, correction_factors_y)
 
-    correction_factor_en_pred = np.interp(energy_pred, correction_factors_x, correction_factors_y)
-    arr_nn_pred_corr[:, 9][is_shower] = energy_pred + (- correction_factor_en_pred) * energy_pred # apply correction
+    # apply correction to ALL shower ic's (including all taus atm)
+    arr_nn_pred_corr[:, 9][is_shower] = energy_pred_orig_shower + (- correction_factor_en_pred) * energy_pred_orig_shower
 
     return arr_nn_pred_corr
 
 
-def make_1d_energy_reco_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median_relative', energy_bins=np.linspace(3,100,32),
+def make_1d_energy_reco_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median_relative', energy_bins=np.linspace(1,100,32),
                                               precuts=(False, '3-100_GeV_prod'), correct_energy=(True, 'median'), compare_shallow=(False, None)):
     """
 
@@ -919,95 +990,108 @@ def make_1d_energy_reco_metric_vs_energy_plot(arr_nn_pred, modelname, metric='me
         arr_nn_pred_shallow = compare_shallow[1]
         if precuts[0] is True:
             arr_nn_pred_shallow = arr_nn_pred_select_pheid_events(arr_nn_pred_shallow, invert=False, precuts=precuts[1])
-        energy_metric_plot_data_shallow = calculate_plot_data_of_energy_dependent_label(
-        arr_nn_pred_shallow, energy_bins=energy_bins, label=('energy', metric))
 
-    energy_metric_plot_data = calculate_plot_data_of_energy_dependent_label(arr_nn_pred, energy_bins=energy_bins, label=('energy', metric))
-    energy_metric_plot_data_shower, energy_metric_plot_data_track = energy_metric_plot_data[0], energy_metric_plot_data[1]
+    ic_list = {'muon-CC': {'title': 'Track like (' + r'$\nu_{\mu}-CC$)'},
+               'elec-CC': {'title': 'Shower like (' + r'$\nu_{e}-CC$)'},
+               'elec-NC': {'title': 'Track like (' + r'$\nu_{e}-NC$)'},
+               'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
 
     fig, ax = plt.subplots()
-
-    bins = energy_metric_plot_data_track[0]
-    metric_track = energy_metric_plot_data_track[1]
-    metric_shower = energy_metric_plot_data_shower[1]
-
     pdf_plots = mpl.backends.backend_pdf.PdfPages('results/plots/1d/energy/energy_resolution_' + modelname + '.pdf')
 
-    ax.step(bins, metric_track, linestyle="-", where='post', label='OrcaNet')
-    if compare_shallow[0] is True: ax.step(bins, energy_metric_plot_data_shallow[1][1], linestyle="-", where='post', label='Standard Reco')
+    for ic in ic_list.iterkeys():
 
-    reco_name = 'OrcaNet: ' if modelname != 'shallow_reco' else 'Standard Reco: '
-    x_ticks_major = np.arange(0, 101, 10)
-    ax.set_xticks(x_ticks_major)
-    ax.minorticks_on()
-    title = plt.title(reco_name + 'Track like (' + r'$\nu_{\mu}-CC$)')
-    title.set_position([.5, 1.04])
-    ax.set_xlabel('True energy (GeV)'), ax.set_ylabel('Median relative error (energy)')
-    ax.grid(True)
-    ax.legend(loc='upper right')
+        energy_metric_plot_data_ic = calc_plot_data_of_energy_dependent_label(arr_nn_pred, ic, energy_bins=energy_bins, label=('energy', metric))
+        if energy_metric_plot_data_ic is None: continue # ic not contained in the arr_nn_pred
 
-    pdf_plots.savefig(fig)
-    ax.cla()
+        bins, metric_ic = energy_metric_plot_data_ic[0], energy_metric_plot_data_ic[1]
 
+        ax.step(bins, metric_ic, linestyle="-", where='post', label='OrcaNet')
 
-    ax.step(bins, metric_shower, linestyle="-", where='post', label='OrcaNet')
-    if compare_shallow[0] is True: ax.step(bins, energy_metric_plot_data_shallow[0][1], linestyle="-", where='post', label='Standard Reco')
+        if compare_shallow[0] is True:
+            energy_metric_plot_data_shallow_ic = calc_plot_data_of_energy_dependent_label(arr_nn_pred_shallow, ic, energy_bins=energy_bins,
+                                                                                          label=('energy', metric))
+            ax.step(bins, energy_metric_plot_data_shallow_ic[1], linestyle="-", where='post', label='Standard Reco')
 
-    ax.set_xticks(x_ticks_major)
-    ax.minorticks_on()
-    title = plt.title(reco_name + 'Shower like (' + r'$\nu_{e}-CC$)')
-    title.set_position([.5, 1.04])
-    corr = 'corrected ' if correct_energy[0] is True else ''
-    ax.set_xlabel('True energy (GeV)'), ax.set_ylabel('Median relative error (' + corr + 'energy)')
-    ax.grid(True)
-    ax.legend(loc='upper right')
+        reco_name = 'OrcaNet: ' if modelname != 'shallow_reco' else 'Standard Reco: '
+        x_ticks_major = np.arange(0, 101, 10)
+        ax.set_xticks(x_ticks_major)
+        ax.minorticks_on()
+        title = plt.title(reco_name + ic_list[ic]['title'])
+        title.set_position([.5, 1.04])
+        y_label = 'Median relative error (corrected energy)' if correct_energy[0] is True and ic not in ['muon-CC'] else 'Median relative error (energy)'
+        ax.set_xlabel('True energy (GeV)'), ax.set_ylabel(y_label)
 
-    pdf_plots.savefig(fig)
+        ax.grid(True)
+        ax.legend(loc='upper right')
+
+        pdf_plots.savefig(fig)
+        ax.cla()
 
     plt.close()
     pdf_plots.close()
 
 
-def calculate_plot_data_of_energy_dependent_label(arr_nn_pred, energy_bins=np.linspace(3,100,20), label=('energy', 'median_relative')):
+def calc_plot_data_of_energy_dependent_label(arr_nn_pred, interaction_channel, energy_bins=np.linspace(1, 100, 20), label=('energy', 'median_relative')):
     """
-    Generate binned statistics for the energy mae, or the relative mae. Separately for track and shower events.
+    Generate binned statistics for the energy mae, or the relative mae. Separately for different interaction channels.
     :param arr_nn_pred:
+    :param interaction_channel
     :param energy_bins:
     :param label:
     :return:
     """
-    labels = {'energy': {'reco_index': 9, 'mc_index': 4}, 'dir_x': {'reco_index': 10, 'mc_index':6},
-              'dir_y': {'reco_index': 11, 'mc_index':7}, 'dir_z': {'reco_index': 12, 'mc_index':8},
-              'bjorken_y': {'reco_index': 13, 'mc_index':5}}
+    is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], interaction_channel)
+    if bool(np.any(is_ic, axis=0)) is False:
+        return None # if ic is not contained in the arr_nn_pred
+    else:
+        arr_nn_pred = arr_nn_pred[is_ic]
+
+    labels = {'energy': {'reco_index': 9, 'mc_index': 4}, 'dir_x': {'reco_index': 10, 'mc_index': 6},
+              'dir_y': {'reco_index': 11, 'mc_index': 7}, 'dir_z': {'reco_index': 12, 'mc_index': 8},
+              'azimuth': {'reco_index': None, 'mc_index': None}, 'zenith': {'reco_index': None, 'mc_index': None},
+              'bjorken_y': {'reco_index': 13, 'mc_index': 5}}
     label_name, metric = label[0], label[1]
-    mc_label = arr_nn_pred[:, labels[label_name]['mc_index']]
-    reco_label = arr_nn_pred[:, labels[label_name]['reco_index']] # reconstruction results for the chosen label
 
-    is_track, is_shower = get_boolean_track_and_shower_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3])
+    if label_name == 'azimuth' or label_name == 'zenith':
+        dir_mc_index_range = (labels['dir_x']['mc_index'], labels['dir_z']['mc_index'] + 1)
+        dir_pred_index_range = (labels['dir_x']['reco_index'],  labels['dir_z']['reco_index'] + 1)
+        dir_mc = arr_nn_pred[:, dir_mc_index_range[0] : dir_mc_index_range[1]]
+        dir_pred = arr_nn_pred[:, dir_pred_index_range[0]: dir_pred_index_range[1]]
 
-    if label_name == 'energy' or label_name == 'bjorken_y':
+        if label_name == 'azimuth':
+            # atan2(y,x)
+            mc_label, reco_label = np.arctan2(dir_mc[:, 1], dir_mc[:, 0]), np.arctan2(dir_pred[:, 1], dir_pred[:, 0])  # atan2(y,x)
+        else: # zenith
+            # atan2(z, sqrt(x**2 + y**2))
+            mc_label = np.arctan2(dir_mc[:, 2], np.sqrt(np.power(dir_mc[:, 0], 2) + np.power(dir_mc[:, 1], 2)))
+            reco_label = np.arctan2(dir_pred[:, 2], np.sqrt(np.power(dir_pred[:, 0], 2) + np.power(dir_pred[:, 1], 2)))
+
+    else:
+        mc_label = arr_nn_pred[:, labels[label_name]['mc_index']]
+        reco_label = arr_nn_pred[:, labels[label_name]['reco_index']] # reconstruction results for the chosen label
+
+    if label_name  in ['energy', 'bjorken_y', 'azimuth', 'zenith']:
         err = np.abs(reco_label - mc_label)
+
     elif label_name in ['dir_x', 'dir_y', 'dir_z']:
         reco_label_list = []
-        for i in xrange(reco_label.shape[0]):
+        for i in xrange(reco_label.shape[0]): # TODO remove, not necessary?
             dir = reco_label[i]
             if dir < -1: dir = -1
             if dir > 1: dir = 1
             reco_label_list.append(dir)
 
         reco_label = np.array(reco_label_list)
-
-        #err = np.abs(np.arccos(-reco_label), - np.arccos(-mc_label))
         err = np.abs(reco_label - mc_label)
+
     else:
         raise ValueError('The label' + str(label[0]) + ' is not available.')
 
-    mc_energy = arr_nn_pred[:, 4]
-    energy_to_label_performance_plot_data_shower = bin_error_in_energy_bins(energy_bins, mc_energy[is_shower], err[is_shower], operation=metric)
-    energy_to_label_performance_plot_data_track = bin_error_in_energy_bins(energy_bins, mc_energy[is_track], err[is_track], operation=metric)
-    energy_to_label_performance_plot_data = [energy_to_label_performance_plot_data_shower, energy_to_label_performance_plot_data_track]
+    mc_energy = arr_nn_pred[:, labels['energy']['mc_index']]
+    energy_to_label_performance_plot_data_ic = bin_error_in_energy_bins(energy_bins, mc_energy, err, operation=metric)
 
-    return energy_to_label_performance_plot_data
+    return energy_to_label_performance_plot_data_ic
 
 
 def bin_error_in_energy_bins(energy_bins, mc_energy, err, operation='median_relative'):
@@ -1058,7 +1142,7 @@ def bin_error_in_energy_bins(energy_bins, mc_energy, err, operation='median_rela
     return energy_binned_err_plot_data
 
 
-def make_1d_energy_std_div_e_true_plot(arr_nn_pred, modelname, energy_bins=np.linspace(3,100,49), precuts=(False, '3-100_GeV_prod'),
+def make_1d_energy_std_div_e_true_plot(arr_nn_pred, modelname, energy_bins=np.linspace(1,100,49), precuts=(False, '3-100_GeV_prod'),
                                        compare_shallow=(False, None), correct_energy=(False, 'median')):
     """
 
@@ -1075,92 +1159,82 @@ def make_1d_energy_std_div_e_true_plot(arr_nn_pred, modelname, energy_bins=np.li
     if correct_energy[0] is True:
         arr_nn_pred = correct_reco_energy(arr_nn_pred, metric=correct_energy[1])
 
-    std_rel_track, std_rel_shower = get_std_rel_plot_data(arr_nn_pred, energy_bins)
-
     if compare_shallow[0] is True:
         arr_nn_pred_shallow = compare_shallow[1]
         if precuts[0] is True:
             arr_nn_pred_shallow = arr_nn_pred_select_pheid_events(arr_nn_pred_shallow, invert=False, precuts=precuts[1])
-        std_rel_track_shallow, std_rel_shower_shallow = get_std_rel_plot_data(arr_nn_pred_shallow, energy_bins)
-        print std_rel_shower_shallow
+
+    ic_list = {'muon-CC': {'title': 'Track like (' + r'$\nu_{\mu}-CC$)'},
+               'elec-CC': {'title': 'Shower like (' + r'$\nu_{e}-CC$)'},
+               'elec-NC': {'title': 'Track like (' + r'$\nu_{e}-NC$)'},
+               'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
 
     fig, ax = plt.subplots()
-
     pdf_plots = mpl.backends.backend_pdf.PdfPages('results/plots/1d/energy/energy_std_rel_' + modelname + '.pdf')
 
-    ax.step(energy_bins, std_rel_track, linestyle="-", where='post', label='OrcaNet')
-    if compare_shallow[0] is True: ax.step(energy_bins, std_rel_track_shallow, linestyle="-", where='post', label='Standard Reco')
+    for ic in ic_list.iterkeys():
+        std_rel_ic = get_std_rel_plot_data(arr_nn_pred, ic, energy_bins)
+        if std_rel_ic is None: continue  # ic not contained in the arr_nn_pred
 
-    reco_name = 'OrcaNet: ' if modelname != 'shallow_reco' else 'Standard Reco: '
-    x_ticks_major = np.arange(0, 101, 10)
-    ax.set_xticks(x_ticks_major)
-    ax.minorticks_on()
-    title = plt.title(reco_name + 'Track like (' + r'$\nu_{\mu}-CC$)')
-    title.set_position([.5, 1.04])
-    ax.set_xlabel('True energy (GeV)'), ax.set_ylabel(r'$\sigma / E_{true}$')
-    ax.grid(True)
+        ax.step(energy_bins, std_rel_ic, linestyle="-", where='post', label='OrcaNet')
 
-    ax.legend(loc='upper right')
-    pdf_plots.savefig(fig)
-    ax.cla()
+        if compare_shallow[0] is True:
+            std_rel_ic_shallow= get_std_rel_plot_data(arr_nn_pred_shallow, ic, energy_bins)
+            ax.step(energy_bins, std_rel_ic_shallow, linestyle="-", where='post', label='Standard Reco')
 
-    ax.step(energy_bins, std_rel_shower, linestyle="-", where='post', label='OrcaNet')
-    if compare_shallow[0] is True: ax.step(energy_bins, std_rel_shower_shallow, linestyle="-", where='post', label='Standard Reco')
+        reco_name = 'OrcaNet: ' if modelname != 'shallow_reco' else 'Standard Reco: '
+        x_ticks_major = np.arange(0, 101, 10)
+        ax.set_xticks(x_ticks_major)
+        ax.minorticks_on()
+        title = plt.title(reco_name + ic_list[ic]['title'])
+        title.set_position([.5, 1.04])
+        y_label = r'$\sigma / E_{true}$ (corrected energy)' if correct_energy[0] is True and ic not in ['muon-CC'] else r'$\sigma / E_{true}$'
+        ax.set_xlabel('True energy (GeV)'), ax.set_ylabel(y_label)
+        ax.grid(True)
 
-    ax.set_xticks(x_ticks_major)
-    ax.minorticks_on()
-    title = plt.title(reco_name + 'Shower like (' + r'$\nu_{e}-CC$)')
-    title.set_position([.5, 1.04])
-    corr = ' (corrected energy)' if correct_energy[0] is True else ''
-    ax.set_xlabel('True energy (GeV)'), ax.set_ylabel(r'$\sigma / E_{true}$' + corr)
-    ax.grid(True)
-
-    ax.legend(loc='upper right')
-    pdf_plots.savefig(fig)
+        ax.legend(loc='upper right')
+        pdf_plots.savefig(fig)
+        ax.cla()
 
     plt.close()
     pdf_plots.close()
 
 
-def get_std_rel_plot_data(arr_nn_pred, energy_bins):
+def get_std_rel_plot_data(arr_nn_pred, ic, energy_bins):
     """
 
     :param arr_nn_pred:
+    :param ic
     :param energy_bins:
     :return:
     """
     energy_mc = arr_nn_pred[:, 4]
     energy_pred = arr_nn_pred[:, 9]
-    print np.amax(energy_mc)
-    print np.amin(energy_mc)
-    print np.amax(energy_pred)
-    print np.amin(energy_pred)
-    is_track, is_shower = get_boolean_track_and_shower_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3])
 
-    energy_mc_track, energy_mc_shower = energy_mc[is_track], energy_mc[is_shower]
-    energy_pred_track, energy_pred_shower = energy_pred[is_track], energy_pred[is_shower]
+    is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], ic)
+    if bool(np.any(is_ic, axis=0)) is False:
+        return None # if ic is not contained in the arr_nn_pred
 
-    std_rel_track, std_rel_shower = [], [] # y-axis of the plot
+    energy_mc_ic, energy_pred_ic = energy_mc[is_ic], energy_pred[is_ic]
+
+    std_rel_ic = [] # y-axis of the plot
     for i in xrange(energy_bins.shape[0] -1):
         e_range_low, e_range_high = energy_bins[i], energy_bins[i+1]
         e_range_mean = (e_range_low + e_range_high)/ float(2)
 
-        e_pred_track_cut_boolean = np.logical_and(e_range_low < energy_mc_track, energy_mc_track <= e_range_high)
-        e_pred_shower_cut_boolean = np.logical_and(e_range_low < energy_mc_shower, energy_mc_shower <= e_range_high)
-        e_pred_track_cut = energy_pred_track[e_pred_track_cut_boolean]
-        e_pred_shower_cut = energy_pred_shower[e_pred_shower_cut_boolean]
+        e_pred_ic_cut_boolean = np.logical_and(e_range_low < energy_mc_ic, energy_mc_ic <= e_range_high)
+        e_pred_ic_cut = energy_pred_ic[e_pred_ic_cut_boolean]
 
-        std_track_temp, std_shower_temp = np.std(e_pred_track_cut), np.std(e_pred_shower_cut)
-        std_rel_track.append(std_track_temp / float(e_range_mean))
-        std_rel_shower.append(std_shower_temp / float(e_range_mean))
+        std_ic_temp = np.std(e_pred_ic_cut)
+        std_rel_ic.append(std_ic_temp / float(e_range_mean))
 
     # fix for mpl
-    std_rel_track.append(std_rel_track[-1]), std_rel_shower.append(std_rel_shower[-1])
+    std_rel_ic.append(std_rel_ic[-1])
 
-    return std_rel_track, std_rel_shower
+    return std_rel_ic
 
 
-def make_1d_dir_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median', energy_bins=np.linspace(3,100,32),
+def make_1d_dir_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median', energy_bins=np.linspace(1,100,32),
                                       precuts=(False, '3-100_GeV_prod'), compare_shallow=(False, None)):
     """
 
@@ -1179,65 +1253,53 @@ def make_1d_dir_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median', e
         if precuts[0] is True:
             arr_nn_pred_shallow = arr_nn_pred_select_pheid_events(arr_nn_pred_shallow, invert=False, precuts=precuts[1])
 
-    directions = ['dir_x', 'dir_y', 'dir_z']
+    #directions = ['dir_x', 'dir_y', 'dir_z', 'azimuth', 'zenith']
+    directions = {'vector': ['dir_x', 'dir_y', 'dir_z'], 'spherical': ['azimuth', 'zenith']}
+    ic_list = {'muon-CC': {'title': 'Track like (' + r'$\nu_{\mu}-CC$)'},
+               'elec-CC': {'title': 'Shower like (' + r'$\nu_{e}-CC$)'},
+               'elec-NC': {'title': 'Track like (' + r'$\nu_{e}-NC$)'},
+               'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
 
     fig, ax = plt.subplots()
-
     pdf_plots = mpl.backends.backend_pdf.PdfPages('results/plots/1d/dir/dir_resolution_' + modelname + '.pdf')
     reco_name = 'OrcaNet: ' if modelname != 'shallow_reco' else 'Standard Reco: '
 
-    for i, direction in enumerate(directions):
+    for ic in ic_list.iterkeys():
+        for key, list_dirs in directions.iteritems():
+            dir_plot_data_ic = {}
 
-        dir_plot_data = calculate_plot_data_of_energy_dependent_label(arr_nn_pred, energy_bins=energy_bins, label=(direction, metric))
-        dir_plot_data_shower, dir_plot_data_track = dir_plot_data[0], dir_plot_data[1]
-        if compare_shallow[0] is True:
-            dir_plot_data_shallow = calculate_plot_data_of_energy_dependent_label(arr_nn_pred_shallow, energy_bins=energy_bins, label=(direction, metric))
+            for dir_coord in list_dirs:
+                dir_plot_data_ic[dir_coord] = calc_plot_data_of_energy_dependent_label(arr_nn_pred, ic, energy_bins=energy_bins,
+                                                                            label=(dir_coord, metric))
+            # continue if the specified interaction channel is not contained in any element of the dict
+            if dir_plot_data_ic[dir_plot_data_ic.keys()[0]] is None: continue
 
-        bins = dir_plot_data_track[0]
-        dir_perf_track = dir_plot_data_track[1]
+            for dir_coord in list_dirs:
+                bins, dir_perf_ic = dir_plot_data_ic[dir_coord][0], dir_plot_data_ic[dir_coord][1]
+                ax.step(bins, dir_perf_ic, linestyle="-", where='post', label='DL ' + dir_coord)
 
-        ax.step(bins, dir_perf_track, linestyle="-", where='post', label='DL ' + direction) # track
-        if compare_shallow[0] is True: ax.step(bins, dir_plot_data_shallow[1][1], linestyle="-", where='post', label='Std ' + direction)
+                if compare_shallow[0] is True:
+                    dir_plot_data_shallow_ic = calc_plot_data_of_energy_dependent_label(arr_nn_pred_shallow, ic, energy_bins=energy_bins,
+                                                                                        label=(dir_coord, metric))
+                    ax.step(bins, dir_plot_data_shallow_ic[1], linestyle="-", where='post', label='Std ' + dir_coord)
 
-        x_ticks_major = np.arange(0, 101, 10)
-        ax.set_xticks(x_ticks_major)
-        ax.minorticks_on()
-        title = plt.title(reco_name + 'Track like (' + r'$\nu_{\mu}-CC$)')
-        title.set_position([.5, 1.04])
-        ax.set_xlabel('True energy (GeV)'), ax.set_ylabel('Median error dir')
-        ax.grid(True)
-        ax.legend(loc='upper right')
+            x_ticks_major = np.arange(0, 101, 10)
+            ax.set_xticks(x_ticks_major)
+            ax.minorticks_on()
+            title = plt.title(reco_name + ic_list[ic]['title'])
+            title.set_position([.5, 1.04])
+            ax.set_xlabel('True energy (GeV)'), ax.set_ylabel('Median error dir')
+            ax.grid(True)
+            ax.legend(loc='upper right')
 
-    pdf_plots.savefig(fig)
-    ax.cla()
-
-    for i, direction in enumerate(directions):
-        dir_plot_data = calculate_plot_data_of_energy_dependent_label(arr_nn_pred,energy_bins=energy_bins,label=(direction, metric))
-        dir_plot_data_shower, dir_plot_data_track = dir_plot_data[0], dir_plot_data[1]
-        if compare_shallow[0] is True:
-            dir_plot_data_shallow = calculate_plot_data_of_energy_dependent_label(arr_nn_pred_shallow, energy_bins=energy_bins, label=(direction, metric))
-
-        bins = dir_plot_data_track[0]
-        dir_perf_shower = dir_plot_data_shower[1]
-
-        ax.step(bins, dir_perf_shower, linestyle="-", where='post', label='DL ' + direction) # shower
-        if compare_shallow[0] is True: ax.step(bins, dir_plot_data_shallow[0][1], linestyle="-", where='post', label='Std ' + direction)
-
-        ax.set_xticks(x_ticks_major)
-        ax.minorticks_on()
-        title = plt.title(reco_name + 'Shower like (' + r'$\nu_{e}-CC$)')
-        title.set_position([.5, 1.04])
-        ax.set_xlabel('True energy (GeV)'), ax.set_ylabel('Median error dir')
-        ax.grid(True)
-        ax.legend(loc='upper right')
-
-    pdf_plots.savefig(fig)
+            pdf_plots.savefig(fig)
+            ax.cla()
 
     plt.close()
     pdf_plots.close()
 
 
-def make_2d_dir_correlation_plot(arr_nn_pred, modelname, dir_bins=np.linspace(-1,1,100), precuts=(False, '3-100_GeV_prod')):
+def make_2d_dir_correlation_plot(arr_nn_pred, modelname, precuts=(False, '3-100_GeV_prod')):
     """
 
     :param arr_nn_pred:
@@ -1251,28 +1313,42 @@ def make_2d_dir_correlation_plot(arr_nn_pred, modelname, dir_bins=np.linspace(-1
 
     labels = {'dir_x': {'reco_index': 10, 'mc_index':6}, 'dir_y': {'reco_index': 11, 'mc_index':7},
               'dir_z': {'reco_index': 12, 'mc_index':8}}
+    ic_list = {'muon-CC': {'title': 'Track like (' + r'$\nu_{\mu}-CC$)'},
+               'elec-CC': {'title': 'Shower like (' + r'$\nu_{e}-CC$)'},
+               'elec-NC': {'title': 'Track like (' + r'$\nu_{e}-NC$)'},
+               'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
 
     fig, ax = plt.subplots()
     pdf_plots = mpl.backends.backend_pdf.PdfPages('results/plots/2d/dir/dir_correlation_' + modelname + '.pdf')
 
-    is_track, is_shower = get_boolean_track_and_shower_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3])
+    for ic in ic_list.iterkeys():
+        is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], ic)
+        if bool(np.any(is_ic, axis=0)) is False: continue
 
-    plot_2d_dir_correlation(arr_nn_pred, is_track, is_shower, 'dir_x', labels, dir_bins, fig, ax, pdf_plots, modelname)
-    plot_2d_dir_correlation(arr_nn_pred, is_track, is_shower, 'dir_y', labels, dir_bins, fig, ax, pdf_plots, modelname)
-    plot_2d_dir_correlation(arr_nn_pred, is_track, is_shower, 'dir_z', labels, dir_bins, fig, ax, pdf_plots, modelname)
+        ic_title = ic_list[ic]['title']
+
+        # dir_x, dir_y, dir_z plots
+        dir_bins = np.linspace(-1, 1, 100)
+        plot_2d_dir_correlation(arr_nn_pred, is_ic, ic_title, 'dir_x', labels, dir_bins, fig, ax, pdf_plots, modelname)
+        plot_2d_dir_correlation(arr_nn_pred, is_ic, ic_title, 'dir_y', labels, dir_bins, fig, ax, pdf_plots, modelname)
+        plot_2d_dir_correlation(arr_nn_pred, is_ic, ic_title, 'dir_z', labels, dir_bins, fig, ax, pdf_plots, modelname)
+
+        # azimuth and zenith plots
+        pi = math.pi
+        dir_bins_azimuth, dir_bins_zenith = np.linspace(-pi, pi, 100), np.linspace(-pi/float(2), pi/float(2), 100)
+        plot_2d_dir_correlation(arr_nn_pred, is_ic, ic_title, 'azimuth', labels, dir_bins_azimuth, fig, ax, pdf_plots, modelname)
+        plot_2d_dir_correlation(arr_nn_pred, is_ic, ic_title, 'zenith', labels, dir_bins_zenith, fig, ax, pdf_plots, modelname)
 
     plt.close()
     pdf_plots.close()
 
 
-#-Regression -#
-
-def plot_2d_dir_correlation(arr_nn_pred, is_track, is_shower, label, labels, dir_bins, fig, ax, pdf_plots, modelname):
+def plot_2d_dir_correlation(arr_nn_pred, is_ic, ic_title, label, labels, dir_bins, fig, ax, pdf_plots, modelname):
     """
 
     :param arr_nn_pred:
-    :param is_track:
-    :param is_shower:
+    :param is_ic:
+    :param ic_title:
     :param label:
     :param labels:
     :param dir_bins:
@@ -1284,40 +1360,68 @@ def plot_2d_dir_correlation(arr_nn_pred, is_track, is_shower, label, labels, dir
     """
     reco_name = 'OrcaNet: ' if modelname != 'shallow_reco' else 'Standard Reco: '
 
-    dir_mc = arr_nn_pred[:, labels[label]['mc_index']]
-    dir_pred = arr_nn_pred[:, labels[label]['reco_index']]
+    if label == 'azimuth' or label == 'zenith':
+        dir_mc_index_range = (labels['dir_x']['mc_index'], labels['dir_z']['mc_index'] + 1)
+        dir_pred_index_range = (labels['dir_x']['reco_index'],  labels['dir_z']['reco_index'] + 1)
+        dir_mc = arr_nn_pred[:, dir_mc_index_range[0] : dir_mc_index_range[1]]
+        dir_pred = arr_nn_pred[:, dir_pred_index_range[0]: dir_pred_index_range[1]]
 
-    hist_2d_dir_shower = np.histogram2d(dir_mc[is_shower], dir_pred[is_shower], dir_bins)
-    hist_2d_dir_track = np.histogram2d(dir_mc[is_track], dir_pred[is_track], dir_bins)
-    bin_edges_dir = hist_2d_dir_shower[1] # doesn't matter if we take shower/track and x/y, bin edges are same for all of them
+    else:
+        dir_mc = arr_nn_pred[:, labels[label]['mc_index']]
+        dir_pred = arr_nn_pred[:, labels[label]['reco_index']]
 
-    dir_corr_track = ax.pcolormesh(bin_edges_dir, bin_edges_dir, hist_2d_dir_track[0].T,
-                                     norm=mpl.colors.LogNorm(vmin=1, vmax=hist_2d_dir_track[0].T.max()))
+    if label == 'azimuth':
+        dir_mc, dir_pred = np.arctan2(dir_mc[:, 1], dir_mc[:, 0]), np.arctan2(dir_pred[:, 1], dir_pred[:, 0]) # atan2(y,x)
+        plt.plot([-math.pi,math.pi], [-math.pi,math.pi], 'k-', lw=1, zorder=10)
 
-    title = plt.title(reco_name + 'Track like events (' + r'$\nu_{\mu}-CC$)')
+    if label == 'zenith':
+        # atan2(z, sqrt(x**2 + y**2))
+        dir_mc = np.arctan2(dir_mc[:, 2], np.sqrt(np.power(dir_mc[:, 0], 2) + np.power(dir_mc[:, 1], 2)))
+        dir_pred = np.arctan2(dir_pred[:, 2], np.sqrt(np.power(dir_pred[:, 0], 2) + np.power(dir_pred[:, 1], 2)))
+
+    hist_2d_dir_ic = np.histogram2d(dir_mc[is_ic], dir_pred[is_ic], dir_bins)
+    bin_edges_dir = hist_2d_dir_ic[1]
+
+    dir_corr_ic = ax.pcolormesh(bin_edges_dir, bin_edges_dir, hist_2d_dir_ic[0].T,
+                                     norm=mpl.colors.LogNorm(vmin=1, vmax=hist_2d_dir_ic[0].T.max()))
+
+    plot_line_through_the_origin(label)
+
+    title = plt.title(reco_name + ic_title)
     title.set_position([.5, 1.04])
-    cbar1 = fig.colorbar(dir_corr_track, ax=ax)
-    cbar1.ax.set_ylabel('Number of events')
+    cbar = fig.colorbar(dir_corr_ic, ax=ax)
+    cbar.ax.set_ylabel('Number of events')
     ax.set_xlabel('True direction [' + label + ']'), ax.set_ylabel('Reconstructed direction [' + label + ']')
     plt.tight_layout()
 
     pdf_plots.savefig(fig)
-    cbar1.remove()
-    dir_corr_track.remove()
+    cbar.remove() # TODO still necessary or cleaned by plt.cla()?
 
-    dir_corr_shower = ax.pcolormesh(bin_edges_dir, bin_edges_dir, hist_2d_dir_shower[0].T,
-                                    norm=mpl.colors.LogNorm(vmin=1, vmax=hist_2d_dir_shower[0].T.max()))
-    plt.title(reco_name + 'Shower like events (' + r'$\nu_{e}-CC$)')
-
-    cbar2 = fig.colorbar(dir_corr_shower, ax=ax)
-    cbar2.ax.set_ylabel('Number of events')
-
-    pdf_plots.savefig(fig)
-    cbar2.remove()
     plt.cla()
 
 
-def make_1d_bjorken_y_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median', energy_bins=np.linspace(3,100,32),
+def plot_line_through_the_origin(label): # TODO add to all 2d plots
+    """
+
+    :param label:
+    :return:
+    """
+    pi = math.pi
+
+    if label == 'azimuth':
+        plt.plot([-pi, pi], [-pi, pi], 'k-', lw=1, zorder=10)
+
+    elif label == 'zenith':
+        plt.plot([-pi/float(2),pi/float(2)], [-pi/float(2),pi/float(2)], 'k-', lw=1, zorder=10)
+
+    elif label == 'bjorken-y':
+        plt.plot([0,1], [0,1], 'k-', lw=1, zorder=10)
+
+    else:
+        plt.plot([-1,1], [-1,1], 'k-', lw=1, zorder=10)
+
+
+def make_1d_bjorken_y_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median', energy_bins=np.linspace(1,100,32),
                                             precuts=(False, '3-100_GeV_prod'), compare_shallow=(False, None)):
     """
 
@@ -1335,60 +1439,314 @@ def make_1d_bjorken_y_metric_vs_energy_plot(arr_nn_pred, modelname, metric='medi
         arr_nn_pred_shallow = compare_shallow[1]
         if precuts[0] is True:
             arr_nn_pred_shallow = arr_nn_pred_select_pheid_events(arr_nn_pred_shallow, invert=False, precuts=precuts[1])
-        bjorken_y_metric_plot_data_shallow = calculate_plot_data_of_energy_dependent_label(arr_nn_pred_shallow, energy_bins=energy_bins,
-                                                                                           label=('bjorken_y', metric))
+        # correct by to 1 for e-NC events
+        abs_particle_type, is_cc = np.abs(arr_nn_pred_shallow[:, 2]), arr_nn_pred_shallow[:, 3]
+        is_e_nc = np.logical_and(abs_particle_type == 12, is_cc == 0)
+        arr_nn_pred_shallow[is_e_nc, 5] = 1
 
-    bjorken_y_metric_plot_data = calculate_plot_data_of_energy_dependent_label(arr_nn_pred, energy_bins=energy_bins, label=('bjorken_y', metric))
-    bjorken_y_metric_plot_data_shower, bjorken_y_metric_plot_data_track = bjorken_y_metric_plot_data[0], bjorken_y_metric_plot_data[1]
+    ic_list = {'muon-CC': {'title': 'Track like (' + r'$\nu_{\mu}-CC$)'},
+               'elec-CC': {'title': 'Shower like (' + r'$\nu_{e}-CC$)'},
+               'elec-NC': {'title': 'Shower like (' + r'$\nu_{e}-NC$)'},
+               'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
 
     fig, ax = plt.subplots()
-
-    bins = bjorken_y_metric_plot_data_track[0]
-    metric_track = bjorken_y_metric_plot_data_track[1]
-    metric_shower = bjorken_y_metric_plot_data_shower[1]
-
     pdf_plots = mpl.backends.backend_pdf.PdfPages('results/plots/1d/bjorken_y/bjorken_y_' + modelname + '.pdf')
 
-    ax.step(bins, metric_track, linestyle="-", where='post', label='OrcaNet') # track
-    if compare_shallow[0] is True: ax.step(bins, bjorken_y_metric_plot_data_shallow[1][1], linestyle="-", where='post', label='Standard Reco')
+    # correct by to 1 for e-NC events
+    abs_particle_type, is_cc = np.abs(arr_nn_pred[:, 2]), arr_nn_pred[:, 3]
+    is_e_nc = np.logical_and(abs_particle_type == 12, is_cc == 0)
+    arr_nn_pred[is_e_nc, 5] = 1
 
-    reco_name = 'OrcaNet: ' if modelname != 'shallow_reco' else 'Standard Reco: '
-    x_ticks_major = np.arange(0, 101, 10)
-    ax.set_xticks(x_ticks_major)
-    ax.minorticks_on()
-    title = plt.title(reco_name + 'Track like (' + r'$\nu_{\mu}-CC$)')
-    title.set_position([.5, 1.04])
-    ax.set_xlabel('True energy (GeV)'), ax.set_ylabel('Median error bjorken-y')
-    ax.grid(True)
-    ax.legend(loc='upper right')
+    for ic in ic_list.iterkeys():
 
-    pdf_plots.savefig(fig)
-    ax.cla()
+        by_metric_plot_data_ic = calc_plot_data_of_energy_dependent_label(arr_nn_pred, ic, energy_bins=energy_bins, label=('bjorken_y', metric))
+        if by_metric_plot_data_ic is None: continue
 
-    ax.step(bins, metric_shower, linestyle="-", where='post', label='OrcaNet') # shower
-    if compare_shallow[0] is True: ax.step(bins, bjorken_y_metric_plot_data_shallow[0][1], linestyle="-", where='post', label='Standard Reco')
+        bins, metric_ic = by_metric_plot_data_ic[0], by_metric_plot_data_ic[1]
+        ax.step(bins, metric_ic, linestyle="-", where='post', label='OrcaNet')
 
-    ax.set_xticks(x_ticks_major)
-    ax.minorticks_on()
-    title = plt.title(reco_name + 'Shower like (' + r'$\nu_{e}-CC$)')
-    title.set_position([.5, 1.04])
-    ax.set_xlabel('True energy (GeV)'), ax.set_ylabel('Median error bjorken-y')
-    ax.grid(True)
-    ax.legend(loc='upper right')
+        if compare_shallow[0] is True:
+            by_metric_plot_data_shallow_ic = calc_plot_data_of_energy_dependent_label(arr_nn_pred_shallow, ic, energy_bins=energy_bins,
+                                                                                      label=('bjorken_y', metric))
+            print by_metric_plot_data_shallow_ic[1] # TODO check what happens if e-NC
+            ax.step(bins, by_metric_plot_data_shallow_ic[1], linestyle="-", where='post', label='Standard Reco')
 
-    pdf_plots.savefig(fig)
+        reco_name = 'OrcaNet: ' if modelname != 'shallow_reco' else 'Standard Reco: '
+        x_ticks_major = np.arange(0, 101, 10)
+        ax.set_xticks(x_ticks_major)
+        ax.minorticks_on()
+        title = plt.title(reco_name + ic_list[ic]['title'])
+        title.set_position([.5, 1.04])
+        ax.set_xlabel('True energy (GeV)'), ax.set_ylabel('Median error bjorken-y')
+        ax.grid(True)
+        ax.legend(loc='upper right')
+
+        pdf_plots.savefig(fig)
+        ax.cla()
 
     plt.close()
     pdf_plots.close()
 
 
+def make_2d_bjorken_y_resolution_plot(arr_nn_pred, modelname, by_bins=np.linspace(0,1,101), precuts=(False, '3-100_GeV_prod')):
+    """
+
+    :param arr_nn_pred:
+    :param modelname:
+    :param by_bins:
+    :param precuts:
+    :return:
+    """
+    if precuts[0] is True:
+        arr_nn_pred = arr_nn_pred_select_pheid_events(arr_nn_pred, invert=False, precuts=precuts[1])
+
+    ic_list = {'muon-CC': {'title': 'Track like (' + r'$\nu_{\mu}-CC$)'},
+               'elec-CC': {'title': 'Shower like (' + r'$\nu_{e}-CC$)'},
+               'elec-NC': {'title': 'Track like (' + r'$\nu_{e}-NC$)'},
+               'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
+
+    fig, ax = plt.subplots()
+    pdf_plots = mpl.backends.backend_pdf.PdfPages('results/plots/2d/bjorken-y/bjorken-y_resolution_' + modelname + '.pdf')
+
+    #arr_nn_pred = arr_nn_pred[arr_nn_pred[:, 4] > 3]
+
+    # correct by to 1 for e-NC events
+    abs_particle_type, is_cc = np.abs(arr_nn_pred[:, 2]), arr_nn_pred[:, 3]
+    is_e_nc = np.logical_and(abs_particle_type == 12, is_cc == 0)
+    arr_nn_pred[is_e_nc, 5] = 1
+
+    by_mc = arr_nn_pred[:, 5]
+    by_pred = arr_nn_pred[:, 13]
+
+    for ic in ic_list.iterkeys():
+
+        is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], ic)
+        if bool(np.any(is_ic, axis=0)) is False: continue
+
+        hist_2d_by_ic = np.histogram2d(by_mc[is_ic], by_pred[is_ic], by_bins)
+        bin_edges_by = hist_2d_by_ic[1]
+
+        # Format in classical numpy convention: x along first dim (vertical), y along second dim (horizontal)
+        # transpose to get typical cartesian convention: y along first dim (vertical), x along second dim (horizontal)
+        by_res_ic = ax.pcolormesh(bin_edges_by, bin_edges_by, hist_2d_by_ic[0].T,
+                                         norm=mpl.colors.LogNorm(vmin=1, vmax=hist_2d_by_ic[0].T.max()))
+
+        plot_line_through_the_origin('bjorken-y')
+
+        reco_name = 'OrcaNet: ' if modelname != 'shallow_reco' else 'Standard Reco: '
+        title = plt.title(reco_name + ic_list[ic]['title'])
+        title.set_position([.5, 1.04])
+        cbar = fig.colorbar(by_res_ic, ax=ax)
+        cbar.ax.set_ylabel('Number of events')
+        ax.set_xlabel('True bjorken-y'), ax.set_ylabel('Reconstructed bjorken-y (GeV)')
+        plt.tight_layout()
+
+        pdf_plots.savefig(fig)
+        cbar.remove() # TODO still necessary or cleaned by plt.cla()?
+
+        ax.cla()
+
+    plt.close()
+    pdf_plots.close()
+
+
+# error plots
+
+def make_1d_reco_err_div_by_std_plot(arr_nn_pred, modelname, precuts=(False, '3-100_GeV_prod')):
+    """
+
+    :param arr_nn_pred:
+    :param modelname:
+    :param precuts:
+    :return:
+    """
+    if precuts[0] is True:
+        arr_nn_pred = arr_nn_pred_select_pheid_events(arr_nn_pred, invert=False, precuts=precuts[1])
+
+    # do this for energy, bj-y, dir_x, dir_y, dir_z
+    # 1d (y_true - y_reco) / std_reco
+    fig, ax = plt.subplots()
+    pdf_plots = mpl.backends.backend_pdf.PdfPages('results/plots/1d/errors/1d_std_errors_reco_err_div_by_std_' + modelname + '.pdf')
+
+    plot_1d_reco_err_div_by_std_for_label(arr_nn_pred, fig, ax, pdf_plots, 'energy')
+    plot_1d_reco_err_div_by_std_for_label(arr_nn_pred, fig, ax, pdf_plots, 'bjorken-y')
+    plot_1d_reco_err_div_by_std_for_label(arr_nn_pred, fig, ax, pdf_plots, 'dir_x')
+    plot_1d_reco_err_div_by_std_for_label(arr_nn_pred, fig, ax, pdf_plots, 'dir_y')
+    plot_1d_reco_err_div_by_std_for_label(arr_nn_pred, fig, ax, pdf_plots, 'dir_z')
+
+    plt.close()
+    pdf_plots.close()
+
+
+def plot_1d_reco_err_div_by_std_for_label(arr_nn_pred, fig, ax, pdf_plots, label):
+    """
+
+    :param arr_nn_pred:
+    :param fig:
+    :param ax:
+    :param pdf_plots:
+    :param label:
+    :return:
+    """
+    labels = {'energy': {'index_label_true': 4, 'index_label_pred': 9, 'index_label_std': 15},
+              'bjorken-y': {'index_label_true': 5, 'index_label_pred': 13, 'index_label_std': 23},
+              'dir_x': {'index_label_true': 6, 'index_label_pred': 10, 'index_label_std': 17},
+              'dir_y': {'index_label_true': 7, 'index_label_pred': 11, 'index_label_std': 19},
+              'dir_z': {'index_label_true': 8, 'index_label_pred': 12, 'index_label_std': 21}}
+
+    label_true = arr_nn_pred[:, labels[label]['index_label_true']]
+    label_pred = arr_nn_pred[:, labels[label]['index_label_pred']]
+    label_std_pred = arr_nn_pred[:, labels[label]['index_label_std']]
+
+    label_std_pred = label_std_pred * 1.253 # TODO correction with mse training
+
+    pred_err_div_by_std = np.divide(label_true - label_pred, np.abs(label_std_pred))
+    exclude_outliers = np.logical_and(pred_err_div_by_std > -10, pred_err_div_by_std < 10)
+
+    print np.std(pred_err_div_by_std[exclude_outliers])
+
+    #plt.hist(pred_err_div_by_std, bins=100, label=label, range=(-0.5, 0.5))
+    plt.hist(pred_err_div_by_std[exclude_outliers], bins=100, label=label)
+
+    title = plt.title('Gausian Likelihood errors for ' + label)
+    title.set_position([.5, 1.04])
+    ax.set_xlabel(r'$(y_{\mathrm{true}} - y_{\mathrm{pred}})/ \sigma_{\mathrm{pred}}$'), ax.set_ylabel('Counts [#]')
+    ax.grid(True)
+
+    pdf_plots.savefig(fig)
+    ax.cla()
+
+
+def make_1d_reco_err_to_reco_residual_plot(arr_nn_pred, modelname, precuts=(False, '3-100_GeV_prod')):
+    """
+
+    :param arr_nn_pred:
+    :param modelname:
+    :param precuts:
+    :return:
+    """
+    if precuts[0] is True:
+        arr_nn_pred = arr_nn_pred_select_pheid_events(arr_nn_pred, invert=False, precuts=precuts[1])
+
+    fig, ax = plt.subplots()
+    pdf_plots = mpl.backends.backend_pdf.PdfPages('results/plots/1d/errors/1d_reco_errors_to_reco_residual_' + modelname + '.pdf')
+
+    # correct by to 1 for e-NC events
+    abs_particle_type, is_cc = np.abs(arr_nn_pred[:, 2]), arr_nn_pred[:, 3]
+    is_e_nc = np.logical_and(abs_particle_type == 12, is_cc == 0)
+    arr_nn_pred[is_e_nc, 5] = 1
+
+    n_x_bins = 50
+    plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, pdf_plots, 'energy')
+    plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, pdf_plots, 'bjorken-y')
+    plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, pdf_plots, 'dir_x')
+    plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, pdf_plots, 'dir_y')
+    plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, pdf_plots, 'dir_z')
+    #plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, pdf_plots, 'azimuth')
+    #plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, pdf_plots, 'zenith')
+
+    plt.close()
+    pdf_plots.close()
+
+
+def plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, pdf_plots, label):
+    """
+
+    :param arr_nn_pred:
+    :param n_x_bins:
+    :param fig:
+    :param ax:
+    :param pdf_plots:
+    :param label:
+    :return:
+    """
+    labels = {'energy': {'index_label_true': 4, 'index_label_pred': 9, 'index_label_std': 15},
+              'bjorken-y': {'index_label_true': 5, 'index_label_pred': 13, 'index_label_std': 23},
+              'dir_x': {'index_label_true': 6, 'index_label_pred': 10, 'index_label_std': 17},
+              'dir_y': {'index_label_true': 7, 'index_label_pred': 11, 'index_label_std': 19},
+              'dir_z': {'index_label_true': 8, 'index_label_pred': 12, 'index_label_std': 21}}
+
+    ic_list = {'muon-CC': {'title': 'Track like (' + r'$\nu_{\mu}-CC$)'},
+               'elec-CC': {'title': 'Shower like (' + r'$\nu_{e}-CC$)'},
+               'elec-NC': {'title': 'Track like (' + r'$\nu_{e}-NC$)'},
+               'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
+
+    for ic in ic_list.iterkeys():
+        is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], ic)
+        if bool(np.any(is_ic, axis=0)) is False: continue
+
+        if label == 'azimuth':
+            # atan2(y,x)
+            label_true = np.arctan2(arr_nn_pred[is_ic][:, labels['dir_y']['index_label_true']], arr_nn_pred[is_ic][:, labels['dir_x']['index_label_true']])
+            label_pred = np.arctan2(arr_nn_pred[is_ic][:, labels['dir_y']['index_label_pred']], arr_nn_pred[is_ic][:, labels['dir_x']['index_label_pred']])
+
+            # TODO does this even make sense??
+            correction = 1.253
+            label_std_pred = np.arctan2(arr_nn_pred[is_ic][:, labels['dir_y']['index_label_std']] * correction,
+                                        arr_nn_pred[is_ic][:, labels['dir_x']['index_label_std']] * correction)
+
+        elif label == 'zenith':
+            # atan2(z, sqrt(x**2 + y**2))
+            label_true = np.arctan2(arr_nn_pred[is_ic][:, labels['dir_z']['index_label_true']],
+                                    np.sqrt(np.power(arr_nn_pred[is_ic][:, labels['dir_x']['index_label_true']], 2) +
+                                            np.power(arr_nn_pred[is_ic][:, labels['dir_y']['index_label_true']], 2)))
+            label_pred = np.arctan2(arr_nn_pred[is_ic][:, labels['dir_z']['index_label_pred']],
+                                    np.sqrt(np.power(arr_nn_pred[is_ic][:, labels['dir_x']['index_label_pred']], 2) +
+                                            np.power(arr_nn_pred[is_ic][:, labels['dir_y']['index_label_pred']], 2)))
+
+            # TODO does this even make sense?? Answer: no
+            correction = 1.253
+            label_std_pred = np.arctan2(arr_nn_pred[is_ic][:, labels['dir_z']['index_label_std']] * correction,
+                                    np.sqrt(np.power(arr_nn_pred[is_ic][:, labels['dir_x']['index_label_std']] * correction, 2) +
+                                            np.power(arr_nn_pred[is_ic][:, labels['dir_y']['index_label_std']] * correction, 2)))
+
+        else:
+            label_true = arr_nn_pred[is_ic][:, labels[label]['index_label_true']]
+            label_pred = arr_nn_pred[is_ic][:, labels[label]['index_label_pred']]
+            label_std_pred = arr_nn_pred[is_ic][:, labels[label]['index_label_std']]
+
+            label_std_pred = label_std_pred * 1.253  # TODO correction with mse training
+            label_std_pred = np.abs(label_std_pred) #TODO necessary?
+
+        std_pred_range = (np.amin(label_std_pred), np.amax(label_std_pred))
+        x_bins_std_pred = np.linspace(std_pred_range[0], std_pred_range[1], n_x_bins + 1)
+
+        x, y = [], []
+        for i in xrange(x_bins_std_pred.shape[0] - 1): # same as n_x_bins
+            label_std_pred_low, label_std_pred_high = x_bins_std_pred[i], x_bins_std_pred[i+1]
+            label_std_pred_mean = (label_std_pred_low + label_std_pred_high) / float(2)
+
+            label_std_pred_cut_boolean = np.logical_and(label_std_pred_low < label_std_pred, label_std_pred <= label_std_pred_high)
+            if np.count_nonzero(label_std_pred_cut_boolean) < 100:
+                continue
+
+            residuals_std = np.std(label_true[label_std_pred_cut_boolean] - label_pred[label_std_pred_cut_boolean])
+
+            x.append(label_std_pred_mean)
+            y.append(residuals_std)
+
+        plt.scatter(x, y, s=20, lw=0.75, c='blue', marker='+')
+
+        #title = plt.title(label + r': reconstructed $\sigma$ to true $\sigma$')
+        title = plt.title(ic_list[ic]['title'] + ': ' + label)
+        title.set_position([.5, 1.04])
+        ax.set_xlabel(r'Estimated uncertainty $\sigma_{pred}$ [GeV]'), ax.set_ylabel('Standard deviation of residuals [GeV]')
+        ax.grid(True)
+
+        pdf_plots.savefig(fig)
+        ax.cla()
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #------------- Functions used in making Matplotlib plots -------------#
-
-
-
-
-
-
-
-
