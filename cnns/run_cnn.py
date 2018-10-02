@@ -198,11 +198,11 @@ def get_new_learning_rate(epoch, lr_initial, n_train_files, n_gpu):
     for i in xrange(n_lr_decays):
 
         if lr_temp > 0.0003:
-            lr_decay = 0.02 # standard for PID: 0.07, standard for regression: 0.02
+            lr_decay = 0.07 # standard for PID: 0.07, standard for regression: 0.02
         elif 0.0003 >= lr_temp > 0.0001:
-            lr_decay = 0.01 # standard for PID: 0.04, standard for regression: 0.01
+            lr_decay = 0.04 # standard for PID: 0.04, standard for regression: 0.01
         else:
-            lr_decay = 0.005 # standard for PID: 0.02, standard for regression: 0.005
+            lr_decay = 0.02 # standard for PID: 0.02, standard for regression: 0.005
 
         lr_temp = lr_temp * (1 - float(lr_decay))
 
@@ -215,8 +215,8 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
     Convenience function that trains (fit_generator) and tests (evaluate_generator) a Keras model.
     For documentation of the parameters, confer to the fit_model and evaluate_model functions.
     """
-    lr_initial, manual_mode = 0.005, (False, 0.0003, 0.07, lr)
-    test_after_n_train_files = 5
+    lr_initial, manual_mode = 0.005, (True, 0.0003, 0.07, lr)
+    test_after_n_train_files = 2
 
     epoch, lr, lr_decay = schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=lr_initial, manual_mode=manual_mode) # begin new training step
     train_iter_step = 0 # loop n
@@ -332,7 +332,6 @@ def evaluate_model(model, modelname, test_files, train_files, batchsize, n_bins,
         histories.append(history)
 
     history_averaged = [sum(col) / float(len(col)) for col in zip(*histories)] if len(histories) > 1 else histories[0] # average over all test files if necessary
-    print history_averaged
 
     # Save test log
     steps_per_total_epoch, steps_cum = 0, [0] # get this for the epoch_number_float in the logfile
@@ -401,63 +400,69 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
     :param str modelname: Name of the model.
     :param ndarray xs_mean: Mean image of the x dataset. Can be used for zero-centering.
     """
-    # After training is finished, investigate model performance
-    # for layer in model.layers: # freeze trainable batch_norm weights, but not running mean and variance
+    # for layer in model.layers: # temp
     #     if 'batch_norm' in layer.name:
     #         layer.stateful = False
     # arr_nn_pred = get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, modelname, samples=None)
-    # np.save('results/plots/saved_predictions/arr_energy_correct_' + modelname + '_stateful_false_1-5GeV.npy', arr_nn_pred)
+    # np.save('results/plots/saved_predictions/arr_energy_correct_' + modelname + '.npy', arr_nn_pred)
+    arr_nn_pred = np.load('results/plots/saved_predictions/arr_energy_correct_' + modelname + '.npy')
 
-    # arr_nn_pred = np.load('results/plots/saved_predictions/arr_energy_correct_' + modelname + '.npy')
-    arr_nn_pred = np.load(
-        'results/plots/saved_predictions/arr_energy_correct_' + modelname + '_stateful_false_1-5GeV.npy')  # best PID model
-    # arr_nn_pred = np.load('results/plots/saved_predictions/arr_energy_correct_model_VGG_4d_xyz-t_and_yzt-x_and_4d_xyzt_track-shower_multi_input_single_train_tight-1_tight-2_lr_0.003_tr_st_test_st_stateful_false.npy')
-
-    # arr_nn_pred = np.load('results/plots/saved_predictions/arr_energy_correct_model_VGG_4d_xyz-t_and_yzt-x_and_4d_xyzt_track-shower_multi_input_single_train_tight-1_tight-2_lr_0.003_tr_st_test_st_stateful_true_stateful_true_arr_nn_pred_1-100GeV_minus_3-5GeV-low-e-prod_-precuts.npy') # best PID model
+    #arr_nn_pred = np.load('results/plots/saved_predictions/arr_nn_pred_' + modelname + '_final_stateful_false.npy')
+    #arr_nn_pred = np.load('results/plots/saved_predictions//arr_nn_pred_model_VGG_4d_xyz-t_and_yzt-x_and_4d_xyzt_track-shower_multi_input_single_train_tight-1_tight-2_lr_0.003_tr_st_test_st_final_stateful_false_1-100GeV_precut.npy')
 
     if class_type[1] == 'track-shower':  # categorical
-        precuts = (False, '3-100_GeV_prod')  # '3-100_GeV_prod'
-        # precuts = (True, '3-100_GeV_prod_and_1-5_GeV_prod')
+        precuts = (False, '3-100_GeV_prod')
 
-        make_energy_to_accuracy_plot_multiple_classes(arr_nn_pred, title='Classified as track',
-                                                      filename='results/plots/1d/track_shower/ts_' + modelname,
-                                                      precuts=precuts, corr_cut_pred_0=0.4)
+        make_energy_to_accuracy_plot_multiple_classes(arr_nn_pred, title='Classified as track', filename='results/plots/1d/track_shower/ts_' + modelname,
+                                                      precuts=precuts, corr_cut_pred_0=0.5)
 
         make_prob_hists(arr_nn_pred, modelname=modelname, precuts=precuts)
         make_hist_2d_property_vs_property(arr_nn_pred, modelname, property_types=('bjorken-y', 'probability'),
-                                          e_cut=(3, 100), precuts=precuts)
+                                          e_cut=(1, 100), precuts=precuts)
         calculate_and_plot_separation_pid(arr_nn_pred, modelname, precuts=precuts)
 
     else:  # regression
-        arr_nn_pred_shallow = np.load('/home/woody/capn/mppi033h/Data/various/arr_nn_pred_is_good.npy')
-        precuts = (True, '3-100_GeV_prod_energy_comparison_is_good')  # '3-100_GeV_prod'
+        arr_nn_pred_shallow = np.load('/home/woody/capn/mppi033h/Data/various/arr_nn_pred.npy')
+        precuts = (True, 'regr_3-100_GeV_prod_and_1-3_GeV_prod')
 
         if 'energy' in class_type[1]:
+            print 'Generating plots for energy performance investigations'
+
             # DL
-            make_2d_energy_resolution_plot(arr_nn_pred, modelname, compare_pheid=precuts,
+            make_2d_energy_resolution_plot(arr_nn_pred, modelname, precuts=precuts,
                                            correct_energy=(True, 'median'))
             make_1d_energy_reco_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median_relative', precuts=precuts,
-                                                      correct_energy=(True, 'median'),
-                                                      compare_shallow=(True, arr_nn_pred_shallow))
+                                                      correct_energy=(True, 'median'), compare_shallow=(True, arr_nn_pred_shallow))
             make_1d_energy_std_div_e_true_plot(arr_nn_pred, modelname, precuts=precuts,
-                                               compare_shallow=(True, arr_nn_pred_shallow),
-                                               correct_energy=(True, 'median'))
-
+                                               compare_shallow=(True, arr_nn_pred_shallow), correct_energy=(True, 'median'))
             # shallow reco
-            make_2d_energy_resolution_plot(arr_nn_pred_shallow, 'shallow_reco', compare_pheid=precuts)
-        if 'direction' in class_type[1]:
+            make_2d_energy_resolution_plot(arr_nn_pred_shallow, 'shallow_reco', precuts=precuts)
+
+        if 'dir' in class_type[1]:
+            print 'Generating plots for directional performance investigations'
+
             # DL
             make_1d_dir_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median', precuts=precuts,
                                               compare_shallow=(True, arr_nn_pred_shallow))
             make_2d_dir_correlation_plot(arr_nn_pred, modelname, precuts=precuts)
             # shallow reco
-
             make_2d_dir_correlation_plot(arr_nn_pred_shallow, 'shallow_reco', precuts=precuts)
 
         if 'bjorken-y' in class_type[1]:
+            print 'Generating plots for bjorken-y performance investigations'
+
             # DL
             make_1d_bjorken_y_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median', precuts=precuts,
                                                     compare_shallow=(True, arr_nn_pred_shallow))
+            make_2d_bjorken_y_resolution_plot(arr_nn_pred, modelname, precuts=precuts)
+            # shallow reco
+            make_2d_bjorken_y_resolution_plot(arr_nn_pred_shallow, 'shallow_reco', precuts=precuts)
+
+        if 'errors' in class_type[1]:
+            print 'Generating plots for error performance investigations'
+
+            make_1d_reco_err_div_by_std_plot(arr_nn_pred, modelname, precuts=precuts) # TODO take precuts from above?
+            make_1d_reco_err_to_reco_residual_plot(arr_nn_pred, modelname, precuts=precuts)
 
 
 def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None,
@@ -483,7 +488,7 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
     :param bool tb_logger: Declares if a tb_callback should be used during training (takes longer to train due to overhead!).
     :param str str_ident: Optional str identifier that gets appended to the modelname. Useful when training models which would have the same modelname.
                           Also used for defining models and projections!
-    :param (dict, dict, dict) loss_opt: tuple that contains 1) the loss_functions,  2) the metrics and 3) the loss_weights.
+    :param (dict, dict/None, dict) loss_opt: tuple that contains 1) the loss_functions,  2) the metrics and 3) the loss_weights.
     """
     train_files, test_files, multiple_inputs = parse_input()
     xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu[0]) if zero_center is True else None
@@ -497,6 +502,7 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
     model, batchsize = parallelize_model_to_n_gpus(model, n_gpu, batchsize, loss_functions, optimizer, metrics, loss_weight)
     model.summary()
 
+    #model.compile(loss=loss_functions, optimizer=model.optimizer, metrics=model.metrics, loss_weights=loss_weight)
     if epoch[0] == 0: model.compile(loss=loss_functions, optimizer=optimizer, metrics=metrics, loss_weights=loss_weight)
 
     if mode == 'train':
@@ -566,37 +572,103 @@ if __name__ == '__main__':
 
     ######## REGRESSION, Larger Production
     # e+dir+by dp 0.0
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(5, 'energy_and_direction_and_bjorken-y'), nn_arch='VGG', batchsize=64, epoch=(15,1), use_scratch_ssd=False, loss_opt=('mean_absolute_error', 'mean_squared_error'),
+    # losses = {'dir_x': 'mean_absolute_error', 'dir_y': 'mean_absolute_error', 'dir_z': 'mean_absolute_error',
+    #           'energy': 'mean_absolute_error', 'bjorken-y': 'mean_absolute_error'}
+    # loss_metrics = {'dir_x': 'mean_squared_error', 'dir_y': 'mean_squared_error', 'dir_z': 'mean_squared_error',
+    #           'energy': 'mean_squared_error', 'bjorken-y': 'mean_squared_error'}
+    # loss_weights = {'dir_x': 40, 'dir_y': 40, 'dir_z': 40, 'energy': 1, 'bjorken-y': 40}
+    # # # TODO change lr back, change cnn_utilities supplier back, enable plot functions in training loop
+    # #
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(5, 'energy_and_direction_and_bjorken-y'), nn_arch='VGG', batchsize=64, epoch=(28,4), use_scratch_ssd=False, loss_opt=(losses, None, loss_weights),
     #             n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.0')
     # python run_cnn.py -l lists/lp/xyz-t_lp_tight-1_train_muon-CC_and_elec-CC_even_split.list lists/lp/xyz-t_lp_tight-1_test_muon-CC_and_elec-CC_even_split.list # OLD
 
     # e+dir+by dp 0.0, with new loss functions + errors
-    losses = {'dir': 'mean_absolute_error', 'e': 'mean_absolute_error', 'by': 'mean_absolute_error',
-              'dir_err': loss_uncertainty_gaussian_likelihood_dir,
-              'e_err': loss_uncertainty_gaussian_likelihood,
-              'by_err': loss_uncertainty_gaussian_likelihood}
-    loss_weights = {'dir': 6, 'e': 1, 'by': 10, 'dir_err': 1, 'e_err': 1, 'by_err': 1}
+    # losses = {'dir': 'mean_absolute_error', 'e': 'mean_absolute_error', 'by': 'mean_absolute_error',
+    #           'dir_err': loss_uncertainty_gaussian_likelihood_dir,
+    #           'e_err': loss_uncertainty_gaussian_likelihood,
+    #           'by_err': loss_uncertainty_gaussian_likelihood}
+    # loss_weights = {'dir': 6, 'e': 1, 'by': 10, 'dir_err': 1, 'e_err': 1, 'by_err': 1}
     # mae dir, mae en
-    # execute_cnn(n_bins=[(11,13,18,300)], class_type=(6, 'energy_dir_bjorken-y_and_errors_dir_new_loss'), nn_arch='VGG', batchsize=64, epoch=(6,19), use_scratch_ssd=False, loss_opt=[losses, None, loss_weights],
+    # execute_cnn(n_bins=[(11,13,18,300)], class_type=(6, 'energy_dir_bjorken-y_and_errors_dir_new_loss'), nn_arch='VGG', batchsize=64, epoch=(11,18), use_scratch_ssd=False, loss_opt=[losses, None, loss_weights],
     #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.0_errors')
 
     # mae dir, mae en, n_filters=(256, 128, 64, 64, 64, 64, 128, 128, 128, 128), mae en , not mre as specified in str_ident
-    execute_cnn(n_bins=[(11,13,18,300)], class_type=(6, 'energy_dir_bjorken-y_and_errors_dir_new_loss'), nn_arch='VGG', batchsize=64, epoch=(4,8), use_scratch_ssd=False, loss_opt=[losses, None, loss_weights],
-                n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.0_errors_mre_e_more_filters')
+    # execute_cnn(n_bins=[(11,13,18,300)], class_type=(6, 'energy_dir_bjorken-y_and_errors_dir_new_loss'), nn_arch='VGG', batchsize=64, epoch=(7,15), use_scratch_ssd=False, loss_opt=[losses, None, loss_weights],
+    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.0_errors_mre_e_more_filters')
 
     # mae dir, mae en, standard filter, different loss weights
-    # loss_weights = {'dir': 30, 'e': 1, 'by': 15, 'dir_err': 1, 'e_err': 1, 'by_err': 1}
-    # execute_cnn(n_bins=[(11,13,18,300)], class_type=(6, 'energy_dir_bjorken-y_and_errors_dir_new_loss'), nn_arch='VGG', batchsize=64, epoch=(0,1), use_scratch_ssd=False, loss_opt=[losses, None, loss_weights],
+    # loss_weights = {'dir': 60, 'e': 1, 'by': 15, 'dir_err': 1, 'e_err': 1, 'by_err': 1}
+    # execute_cnn(n_bins=[(11,13,18,300)], class_type=(6, 'energy_dir_bjorken-y_and_errors_dir_new_loss'), nn_arch='VGG', batchsize=64, epoch=(5,19), use_scratch_ssd=False, loss_opt=[losses, None, loss_weights],
     #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.0_errors_dir_more_loss-w')
 
     # python run_cnn.py -l lists/lp/all_e/xyz-t_lp_e_1-100_t-all_train_e-CC_mu-CC.list lists/lp/all_e/xyz-t_lp_e_1-100_t-all_test_e-CC_mu-CC.list
     # python run_cnn.py -l lists/lp/all_e/xyz-t_lp_e_1-100_t-all_train_e-CC_mu-CC.list lists/lp/all_e/xyz-t_lp_e_1-100_t-all_test_e-CC_mu-CC_half.list
 
+    ## -- Regression 1-100GeV, xyz-t 60b, train elec-cc-nc and muon-cc, with errors, without vertex -- ##
+    # # standard
+    # losses = {'dir_x': 'mean_absolute_error', 'dir_y': 'mean_absolute_error', 'dir_z': 'mean_absolute_error',
+    #           'e': 'mean_absolute_error', 'by': 'mean_absolute_error',
+    #           'dir_x_err': loss_uncertainty_mse, 'dir_y_err': loss_uncertainty_mse, 'dir_z_err': loss_uncertainty_mse,
+    #           'e_err': loss_uncertainty_mse, 'by_err': loss_uncertainty_mse}
+    # loss_weights = {'dir_x': 35, 'dir_y': 35, 'dir_z': 50, 'e': 1, 'by': 80,
+    #                 'dir_x_err': 1, 'dir_y_err': 1, 'dir_z_err': 1, 'e_err': 0.0005, 'by_err': 1}
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(10, 'energy_dir_bjorken-y_errors'), nn_arch='VGG', batchsize=64, epoch=(11,3),
+    #             use_scratch_ssd=False, loss_opt=(losses, None, loss_weights), n_gpu=(1, 'avolkov'), mode='eval',
+    #             swap_4d_channels=None, zero_center=True, str_ident='lp_tight-1_60b_errors_mse')
 
-# lp, xyz-t-tight-1 + tight-2
-#     execute_cnn(n_bins=[(11,13,18,60), (11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=32, epoch=(1,1), use_scratch_ssd=False,
-#                 n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels=None, zero_center=True, str_ident='multi_input_single_train_tight-1_tight-2')
-# python run_cnn.py -m lists/lp/xyz-t_lp_tight-1_tight-2_train_no_tau.list lists/lp/xyz-t_lp_tight-1_tight-2_test_no_tau.list
+    # mae errors
+    # losses = {'dir_x': 'mean_absolute_error', 'dir_y': 'mean_absolute_error', 'dir_z': 'mean_absolute_error',
+    #           'e': 'mean_absolute_error', 'by': 'mean_absolute_error',
+    #           'dir_x_err': loss_uncertainty_mae, 'dir_y_err': loss_uncertainty_mae, 'dir_z_err': loss_uncertainty_mae,
+    #           'e_err': loss_uncertainty_mae, 'by_err': loss_uncertainty_mae}
+    # loss_weights = {'dir_x': 35, 'dir_y': 35, 'dir_z': 35, 'e': 1, 'by': 30,
+    #                 'dir_x_err': 1, 'dir_y_err': 1, 'dir_z_err': 1, 'e_err': 0.07, 'by_err': 1.5}
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(10, 'energy_dir_bjorken-y_errors'), nn_arch='VGG', batchsize=64, epoch=(13,2),
+    #             use_scratch_ssd=False, loss_opt=(losses, None, loss_weights), n_gpu=(1, 'avolkov'), mode='eval',
+    #             swap_4d_channels=None, zero_center=True, str_ident='lp_tight-1_60b_errors_mae')
+
+    # mse errors (faulty, actually mae errors!!), more (double) dense errors
+    # losses = {'dir_x': 'mean_absolute_error', 'dir_y': 'mean_absolute_error', 'dir_z': 'mean_absolute_error',
+    #           'e': 'mean_absolute_error', 'by': 'mean_absolute_error',
+    #           'dir_x_err': loss_uncertainty_mae, 'dir_y_err': loss_uncertainty_mae, 'dir_z_err': loss_uncertainty_mae,
+    #           'e_err': loss_uncertainty_mae, 'by_err': loss_uncertainty_mae}
+    # loss_weights = {'dir_x': 35, 'dir_y': 35, 'dir_z': 50, 'e': 1, 'by': 65,
+    #                 'dir_x_err': 1, 'dir_y_err': 1, 'dir_z_err': 1, 'e_err': 0.05, 'by_err': 1.3}
+    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(10, 'energy_dir_bjorken-y_errors'), nn_arch='VGG', batchsize=64, epoch=(13,3),
+    #             use_scratch_ssd=False, loss_opt=(losses, None, loss_weights), n_gpu=(1, 'avolkov'), mode='eval',
+    #             swap_4d_channels=None, zero_center=True, str_ident='lp_tight-1_60b_errors_mse_double_dense_err')
+
+    # python run_cnn.py -l lists/lp/all_e/xyz-t_lp_60b_e_1-100_all_train_e-cc-nc_mu-cc.list lists/lp/all_e/xyz-t_lp_60b_e_1-100_half_test_e-cc-nc_mu-cc.list
+    # python run_cnn.py -l lists/lp/all_e/xyz-t_lp_60b_e_1-100_all_train_e-cc-nc_mu-cc.list lists/lp/all_e/xyz-t_lp_60b_e_1-100_all_test_e-cc-nc_mu-cc.list
+
+    ## -- Regression 1-100GeV, xyz-t 60b + xyz-c 31b, train elec-cc-nc and muon-cc, with errors, without vertex -- ##
+    # # standard
+    # losses = {'dir_x': 'mean_absolute_error', 'dir_y': 'mean_absolute_error', 'dir_z': 'mean_absolute_error',
+    #           'e': 'mean_absolute_error', 'by': 'mean_absolute_error',
+    #           'dir_x_err': loss_uncertainty_mse, 'dir_y_err': loss_uncertainty_mse, 'dir_z_err': loss_uncertainty_mse,
+    #           'e_err': loss_uncertainty_mse, 'by_err': loss_uncertainty_mse}
+    # loss_weights = {'dir_x': 35, 'dir_y': 35, 'dir_z': 65, 'e': 1, 'by': 65,
+    #                 'dir_x_err': 1, 'dir_y_err': 1, 'dir_z_err': 1, 'e_err': 0.0005, 'by_err': 1}
+    # execute_cnn(n_bins=[(11,13,18,60), (11,13,18,31)], class_type=(10, 'energy_dir_bjorken-y_errors'), nn_arch='VGG', batchsize=64, epoch=(7,1),
+    #             use_scratch_ssd=False, loss_opt=(losses, None, loss_weights), n_gpu=(1, 'avolkov'), mode='eval',
+    #             swap_4d_channels='xyz-t_and_xyz-c_single_input', zero_center=True, str_ident='lp_tight-1_60b_errors_mse')
+
+    # e-NC by fix
+    losses = {'dir_x': 'mean_absolute_error', 'dir_y': 'mean_absolute_error', 'dir_z': 'mean_absolute_error',
+              'e': 'mean_absolute_error', 'by': 'mean_absolute_error',
+              'dir_x_err': loss_uncertainty_mse, 'dir_y_err': loss_uncertainty_mse, 'dir_z_err': loss_uncertainty_mse,
+              'e_err': loss_uncertainty_mse, 'by_err': loss_uncertainty_mse}
+    loss_weights = {'dir_x': 35, 'dir_y': 35, 'dir_z': 65, 'e': 1, 'by': 65,
+                    'dir_x_err': 1, 'dir_y_err': 1, 'dir_z_err': 1, 'e_err': 0.0005, 'by_err': 1}
+    execute_cnn(n_bins=[(11,13,18,60), (11,13,18,31)], class_type=(10, 'energy_dir_bjorken-y_errors'), nn_arch='VGG', batchsize=64, epoch=(8,5),
+                use_scratch_ssd=False, loss_opt=(losses, None, loss_weights), n_gpu=(1, 'avolkov'), mode='train',
+                swap_4d_channels='xyz-t_and_xyz-c_single_input', zero_center=True, str_ident='lp_tight-1_60b_errors_mse_by_fix')
+
+    # python run_cnn.py -m lists/lp/all_e/xyz-t_xyz-c_lp_60b_e_1-100_all_train_e-cc-nc_mu-cc.list lists/lp/all_e/xyz-t_xyz-c_lp_60b_e_1-100_half_test_e-cc-nc_mu-cc.list
+    # python run_cnn.py -m lists/lp/all_e/xyz-t_xyz-c_lp_60b_e_1-100_all_train_e-cc-nc_mu-cc.list lists/lp/all_e/xyz-t_xyz-c_lp_60b_e_1-100_all_test_e-cc-nc_mu-cc.list
+
+
 
 # lp, xyz-t, yzt-x, tight-1 + tight-2
 #     execute_cnn(n_bins=[(11,13,18,60), (11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=32, epoch=(0,1), use_scratch_ssd=False,
