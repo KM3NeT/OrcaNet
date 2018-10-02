@@ -52,7 +52,7 @@ def plot_train_and_test_statistics(modelname, model):
 
             plt.xticks(x_ticks_major)
             test_metric_min_to_max = np.amax(test_metric_loss) - np.amin(test_metric_loss)
-            y_lim = (np.amin(test_metric_loss) - 0.15 * test_metric_min_to_max, np.amax(test_metric_loss) + 0.15 * test_metric_min_to_max)
+            y_lim = (np.amin(test_metric_loss) - 0.25 * test_metric_min_to_max, np.amax(test_metric_loss) + 0.25 * test_metric_min_to_max)
             plt.ylim(y_lim)
 
             axes.legend(loc='upper right')
@@ -119,8 +119,8 @@ def get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels
                                        custom_objects=custom_objects)
 
     inp = saved_model.input
+    model_multi_inputs_cond = True if len(model_inputs) > 1 else False
 
-    model_multi_inputs_cond = True if isinstance(inp, list) else False
     if not isinstance(inp, list):
         inp = [inp] # only one input! let's wrap it in a list.
 
