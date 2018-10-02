@@ -75,17 +75,18 @@ def gen_batches_from_multiple_files(filepath, batchsize, n_bins, class_type, str
                     xs[i] = np.subtract(xs[i], zero_center_image[i])
 
             if swap_col is not None:
-                if swap_col == 'yzt-x_all-t_and_yzt-x_tight-1-t':
-                    for i in xrange(n_files):
-                        xs[i] = np.transpose(xs[i], swap_4d_channels_dict['yzt-x'])
 
-                elif 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2' in swap_col + str_ident:
+                if 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2' in swap_col + str_ident:
                     xs_list.append(xs[0]) # xyz-t tight-1
                     xs_yzt_x_tight_1 = np.transpose(xs[0], swap_4d_channels_dict['yzt-x']) # yzt-x tight-1
                     xs_list.append(xs_yzt_x_tight_1)
                     xs_list.append(xs[1]) # xyz-t tight-2
                     xs_yzt_x_tight_2 = np.transpose(xs[1], swap_4d_channels_dict['yzt-x']) # yzt-x tight-2
                     xs_list.append(xs_yzt_x_tight_2)
+
+                elif swap_col == 'xyz-t_and_xyz-c_single_input':
+                    xyz_t_and_xyz_c = np.concatenate([xs[0], xs[1]], axis=-1)
+                    xs_list = xyz_t_and_xyz_c # here, it's not a list since we have only one input image
 
                 else: raise ValueError('The argument "swap_col"=' + str(swap_col) + ' is not valid.')
 
@@ -96,21 +97,20 @@ def gen_batches_from_multiple_files(filepath, batchsize, n_bins, class_type, str
             # and mc info (labels). Since the labels are same (!!) for all the multiple files, use first file for this
             y_values = f[0]['y'][n_entries:n_entries+batchsize]
             y_values = np.reshape(y_values, (batchsize, y_values.shape[1]))
-            ys = np.zeros((batchsize, class_type[0]), dtype=np.float32)
-            # encode the labels such that they are all within the same range (and filter the ones we don't want for now)
-            for c, y_val in enumerate(y_values): # Could be vectorized with numba, or use dataflow from tensorpack
-                ys[c] = encode_targets(y_val, class_type)
+
+            if class_type[1] != 'track-shower':
+                ys = get_regression_labels(y_values, class_type) # ys: dict which contains arrays for every output key
+
+            else:
+                ys = np.zeros((batchsize, class_type[0]), dtype=np.float32)
+                # encode the labels such that they are all within the same range (and filter the ones we don't want for now)
+                for c, y_val in enumerate(y_values): # Could be vectorized with numba, or use dataflow from tensorpack
+                    ys[c] = encode_targets(y_val, class_type)
 
             # we have read one more batch from this file
             n_entries += batchsize
 
-            if class_type[1] == 'track-shower':  # categorical problem, the Keras model has a single output
-                output = (xs_list, ys) if yield_mc_info is False else (xs_list, ys) + (y_values,)
-
-            else:  # regression problem, the Keras model has multiple outputs, one for each label
-                n_labels = class_type[0] # could also be inferred from the ys array, shape_1
-                ys_list = [ys[:, i] for i in xrange(n_labels)] # split the labels to individual arrays in a list
-                output = (xs, ys_list) if yield_mc_info is False else (xs, ys_list) + (y_values,)
+            output = (xs_list, ys) if yield_mc_info is False else (xs_list, ys) + (y_values,)
 
             yield output
 
@@ -140,7 +140,7 @@ def gen_batches_from_single_file(filepath, batchsize, n_bins, class_type, f_size
     swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'tyz-x': (0, 4, 2, 3, 1), 't-xyz': (0, 4, 1, 2, 3), 'xyt-z': (0, 1, 2, 4, 3)}
 
     while 1:
-        f = h5py.File(filepath, "r")
+        f = h5py.File(filepath, 'r')
         if f_size is None:
             f_size = len(f['y'])
             warnings.warn('f_size=None could produce unexpected results if the f_size used in fit_generator(steps=int(f_size / batchsize)) with epochs > 1 '
@@ -160,17 +160,18 @@ def gen_batches_from_single_file(filepath, batchsize, n_bins, class_type, f_size
                 elif swap_col == 'xyz-t_and_yzt-x':
                     xs_xyz_t = xs
                     xs_yzt_x = np.transpose(xs, swap_4d_channels_dict['yzt-x'])
+                    xs = [xs_xyz_t, xs_yzt_x]
                 else: raise ValueError('The argument "swap_col"=' + str(swap_col) + ' is not valid.')
 
             # and mc info (labels)
             y_values = f['y'][n_entries:n_entries+batchsize]
             y_values = np.reshape(y_values, (batchsize, y_values.shape[1])) #TODO simplify with (y_values, y_values.shape) ?
 
-            if class_type[1] == 'energy_dir_bjorken-y_and_errors_dir_new_loss':
-                ys = get_regression_labels(y_values)
+            if class_type[1] != 'track-shower':
+                ys = get_regression_labels(y_values, class_type) # ys: dict which contains arrays for every output key
 
             else:
-                ys = np.zeros((batchsize, class_type[0]), dtype=np.float32)
+                ys = np.zeros((batchsize, class_type[0]), dtype=np.float32) # ys: arr
                 # encode the labels such that they are all within the same range (and filter the ones we don't want for now)
                 for c, y_val in enumerate(y_values): # Could be vectorized with numba, or use dataflow from tensorpack
                     ys[c] = encode_targets(y_val, class_type)
@@ -178,23 +179,7 @@ def gen_batches_from_single_file(filepath, batchsize, n_bins, class_type, f_size
             # we have read one more batch from this file
             n_entries += batchsize
 
-            if class_type[1] == 'track-shower': # categorical problem, the Keras model has a single output
-
-                if swap_col == 'xyz-t_and_yzt-x':
-                    output = ([xs_xyz_t, xs_yzt_x], ys) if yield_mc_info is False else ([xs_xyz_t, xs_yzt_x], ys) + (y_values,)
-                else:
-                    output = (xs, ys) if yield_mc_info is False else (xs, ys) + (y_values,)
-
-            elif class_type[1] == 'energy_dir_bjorken-y_and_errors_dir_new_loss': #TODO make this the general approach for regression problems, give a dict, delete else below
-                output = (xs, ys) if yield_mc_info is False else (xs, ys) + (y_values,)
-
-            else: # regression problem, the Keras model has multiple outputs, one for each label
-                n_labels = class_type[0] # could also be inferred from the ys array, shape_1
-                ys_list = [ys[:, i] for i in xrange(n_labels)] # split the labels to individual arrays in a list
-                if swap_col == 'xyz-t_and_yzt-x':
-                    output = ([xs_xyz_t, xs_yzt_x], ys_list) if yield_mc_info is False else ([xs_xyz_t, xs_yzt_x], ys_list) + (y_values,)
-                else:
-                    output = (xs, ys_list) if yield_mc_info is False else (xs, ys_list) + (y_values,)
+            output = (xs, ys) if yield_mc_info is False else (xs, ys) + (y_values,)
 
             yield output
 
@@ -254,29 +239,40 @@ def get_dimensions_encoding(n_bins, batchsize):
     return dimensions
 
 
-def get_regression_labels(y_values):
+def get_regression_labels(y_values, class_type):
     """
 
     :param y_values:
+    :param class_type
     :return:
     """
     ys = dict()
     y_values = y_values.astype(np.float32)
 
-    # normalize dirs
-    dirs = y_values[:, 5:8]
-    norm = np.linalg.norm(dirs, axis=1)
-    normalized_dir = dirs / np.reshape(norm, (norm.shape[0], 1)) # actually, the mc dirs are already normed. just for safety
+    if class_type[1] == 'energy_and_direction_and_bjorken-y':
+        ys['dir_x'] = y_values[:, 5:6]
+        ys['dir_y'] = y_values[:, 6:7]
+        ys['dir_z'] = y_values[:, 7:8]
+        ys['energy'] = y_values[:, 2:3]
+        ys['bjorken-y'] = y_values[:, 4:5]
 
-    ys['dir'] = normalized_dir
-    ys['e'] = y_values[:, 2:3]
-    ys['by'] = y_values[:, 4:5]
+    elif class_type[1] == 'energy_dir_bjorken-y_errors':
+        particle_type, is_cc = y_values[:, 1], y_values[:, 3]
+        elec_nc_bool_id = np.logical_and(np.abs(particle_type) == 12, is_cc == 0)
+        y_values[elec_nc_bool_id, 2] = y_values[elec_nc_bool_id, 2] * y_values[elec_nc_bool_id, 4] # correct energy to visible energy
+        y_values[elec_nc_bool_id, 4] = 1 # set bjorken-y for elec_nc events to 1
 
-    ys['dir_err'] = normalized_dir
-    ys['e_err'] = y_values[:, 2:3]
-    ys['by_err'] = y_values[:, 4:5]
+        ys['dir_x'], ys['dir_x_err'] = y_values[:, 5:6], y_values[:, 5:6]
+        ys['dir_y'], ys['dir_y_err'] = y_values[:, 6:7], y_values[:, 6:7]
+        ys['dir_z'], ys['dir_z_err'] = y_values[:, 7:8], y_values[:, 7:8]
+        ys['e'], ys['e_err'] = y_values[:, 2:3], y_values[:, 2:3]
+        ys['by'], ys['by_err'] = y_values[:, 4:5], y_values[:, 4:5]
+
+    else:
+        raise ValueError('The regression label ' + str(class_type[1]) + ' in class_type[1] is not available.')
 
     return ys
+
 
 def encode_targets(y_val, class_type):
     """
@@ -362,14 +358,6 @@ def encode_targets(y_val, class_type):
             train_y[0] = categorical_type[3]
             if categorical_type[3] != 1:
                 train_y[1] = 1
-
-    elif class_type[1] == 'energy_and_direction_and_bjorken-y':
-        train_y = np.zeros(5, dtype='float32')
-        train_y[0] = y_val[2] # energy
-        train_y[1] = y_val[5] # dir_x
-        train_y[2] = y_val[6] # dir_y
-        train_y[3] = y_val[7] # dir_z
-        train_y[4] = y_val[4] # bjorken-y
 
     else:
         print "Class type " + str(class_type) + " not supported!"
