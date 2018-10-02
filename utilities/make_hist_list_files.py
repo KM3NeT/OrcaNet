@@ -111,7 +111,6 @@ def get_filepaths(dirpath, ignore_interaction_type):
     for f in os.listdir(dirpath):
         if f.endswith(".h5"):
             if ignore_interaction_type is not False:
-                #if ignore_interaction_type not in f: filepaths.append(f)
                 if any(ignore_type in f for ignore_type in ignore_interaction_type):
                     continue
                 else:
