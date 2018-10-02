@@ -131,6 +131,7 @@ def get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels
     weights = [layer.get_weights() for layer in saved_model.layers if
                layer.name == layer_name or layer_name is None]
 
+    outputs = outputs[1:] # remove the first input_layer from fetch
     funcs = [K.function(inp + [K.learning_phase()], [out]) for out in outputs]  # evaluation functions
 
     if model_multi_inputs_cond:
