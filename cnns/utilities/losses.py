@@ -31,10 +31,9 @@ def loss_mean_relative_error_energy(y_true, y_pred):
 
 def loss_uncertainty_mae(y_true, y_pred):
     """
-
-    :param y_true:
-    :param y_pred:
-    :return:
+    Mean absolute error loss for the uncertainty estimation.
+    L = sigma_pred / abs(label_true - label_reco).
+    :return: Mean absolute error for uncertainty estimations.
     """
     # order in y_pred: 1) pred label 2) pred label error
     y_pred_label = K.stop_gradient(y_pred[:, 0]) # prevent that the gradient flows back over the label network
@@ -47,10 +46,9 @@ def loss_uncertainty_mae(y_true, y_pred):
 
 def loss_uncertainty_mse(y_true, y_pred):
     """
-
-    :param y_true:
-    :param y_pred:
-    :return:
+    Mean squared error loss for the uncertainty estimation.
+    L = sigma_pred / abs(label_true - label_reco)**2.
+    :return: Mean squared error for uncertainty estimations.
     """
     # order in y_pred: 1) pred label 2) pred label error
     y_pred_label = K.stop_gradient(y_pred[:, 0]) # prevent that the gradient flows back over the label network
