@@ -1642,8 +1642,8 @@ def make_1d_reco_err_to_reco_residual_plot(arr_nn_pred, modelname, precuts=(Fals
     plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, pdf_plots, 'dir_x')
     plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, pdf_plots, 'dir_y')
     plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, pdf_plots, 'dir_z')
-    #plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, pdf_plots, 'azimuth')
-    #plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, pdf_plots, 'zenith')
+    plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, pdf_plots, 'azimuth')
+    plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, pdf_plots, 'zenith')
 
     plt.close()
     pdf_plots.close()
@@ -1675,30 +1675,32 @@ def plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, 
         is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], ic)
         if bool(np.any(is_ic, axis=0)) is False: continue
 
-        if label == 'azimuth':
-            # atan2(y,x)
-            label_true = np.arctan2(arr_nn_pred[is_ic][:, labels['dir_y']['index_label_true']], arr_nn_pred[is_ic][:, labels['dir_x']['index_label_true']])
-            label_pred = np.arctan2(arr_nn_pred[is_ic][:, labels['dir_y']['index_label_pred']], arr_nn_pred[is_ic][:, labels['dir_x']['index_label_pred']])
+        if label == 'azimuth' or label == 'zenith':
+            dx_true, dx_pred = arr_nn_pred[is_ic][:, labels['dir_x']['index_label_true']], arr_nn_pred[is_ic][:, labels['dir_x']['index_label_pred']]
+            dy_true, dy_pred = arr_nn_pred[is_ic][:, labels['dir_y']['index_label_true']], arr_nn_pred[is_ic][:,labels['dir_y']['index_label_pred']]
+            dz_true, dz_pred = arr_nn_pred[is_ic][:, labels['dir_z']['index_label_true']], arr_nn_pred[is_ic][:, labels['dir_z']['index_label_pred']]
 
-            # TODO does this even make sense??
+            dx_std_pred = arr_nn_pred[is_ic][:, labels['dir_x']['index_label_std']]
+            dy_std_pred = arr_nn_pred[is_ic][:, labels['dir_y']['index_label_std']]
+            dz_std_pred = arr_nn_pred[is_ic][:, labels['dir_z']['index_label_std']]
+
             correction = 1.253
-            label_std_pred = np.arctan2(arr_nn_pred[is_ic][:, labels['dir_y']['index_label_std']] * correction,
-                                        arr_nn_pred[is_ic][:, labels['dir_x']['index_label_std']] * correction)
+            if label == 'azimuth':
+                # atan2(y,x)
+                label_true = np.arctan2(dy_true, dx_true)
+                label_pred = np.arctan2(dy_pred, dx_pred)
 
-        elif label == 'zenith':
-            # atan2(z, sqrt(x**2 + y**2))
-            label_true = np.arctan2(arr_nn_pred[is_ic][:, labels['dir_z']['index_label_true']],
-                                    np.sqrt(np.power(arr_nn_pred[is_ic][:, labels['dir_x']['index_label_true']], 2) +
-                                            np.power(arr_nn_pred[is_ic][:, labels['dir_y']['index_label_true']], 2)))
-            label_pred = np.arctan2(arr_nn_pred[is_ic][:, labels['dir_z']['index_label_pred']],
-                                    np.sqrt(np.power(arr_nn_pred[is_ic][:, labels['dir_x']['index_label_pred']], 2) +
-                                            np.power(arr_nn_pred[is_ic][:, labels['dir_y']['index_label_pred']], 2)))
+                # TODO does this even make sense??
+                label_std_pred = np.arctan2(np.abs(dy_std_pred * correction), np.abs(dx_std_pred * correction))
 
-            # TODO does this even make sense?? Answer: no
-            correction = 1.253
-            label_std_pred = np.arctan2(arr_nn_pred[is_ic][:, labels['dir_z']['index_label_std']] * correction,
-                                    np.sqrt(np.power(arr_nn_pred[is_ic][:, labels['dir_x']['index_label_std']] * correction, 2) +
-                                            np.power(arr_nn_pred[is_ic][:, labels['dir_y']['index_label_std']] * correction, 2)))
+            else: # zenith
+                # atan2(z, sqrt(x**2 + y**2))
+                label_true = np.arctan2(dz_true, np.sqrt(np.power(dx_true, 2) + np.power(dy_true, 2)))
+                label_pred = np.arctan2(dz_pred, np.sqrt(np.power(dx_pred, 2) + np.power(dy_pred, 2)))
+
+                # TODO does this even make sense?? Answer: no
+                label_std_pred = np.arctan2(np.abs(dz_std_pred * correction), np.sqrt(np.power(np.abs(dx_std_pred * correction), 2) +
+                                                                              np.power(np.abs(dy_std_pred * correction), 2)))
 
         else:
             label_true = arr_nn_pred[is_ic][:, labels[label]['index_label_true']]
