@@ -1689,9 +1689,48 @@ def plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, 
                 # atan2(y,x)
                 label_true = np.arctan2(dy_true, dx_true)
                 label_pred = np.arctan2(dy_pred, dx_pred)
+                # print np.amin(label_true), np.amax(label_true)
+                # print np.amin(label_pred), np.amax(label_pred)
+                # print np.amin(label_true - label_pred), np.amax(label_true - label_pred)
 
                 # TODO does this even make sense??
-                label_std_pred = np.arctan2(np.abs(dy_std_pred * correction), np.abs(dx_std_pred * correction))
+                #label_std_pred = np.arctan2(np.abs(dy_std_pred * correction), np.abs(dx_std_pred * correction))
+                # print np.amin(dx_std_pred), np.amax(dx_std_pred)
+                dx_pred, dy_pred = np.clip(dx_pred, -0.999, 0.999), np.clip(dy_pred, -0.999, 0.999)
+                dx_std_pred, dy_std_pred = np.clip(dx_std_pred, 0, None) * correction, np.clip(dy_std_pred, 0, None) * correction
+
+                # error propagation of atan2 with correlations between y and x neglected (covariance term = 0)
+                label_std_pred = np.sqrt(( dx_pred / (dx_pred ** 2 + dy_pred ** 2)) ** 2 * dy_std_pred ** 2 +
+                                         (-dy_pred / (dx_pred ** 2 + dy_pred ** 2)) ** 2 * dx_std_pred ** 2)
+                n = label_std_pred > math.pi
+                percentage_true = np.sum(n)/float(label_std_pred.shape[0]) * 100
+                print np.sum(n)
+                print percentage_true
+                print dz_pred[n]
+                print dz_true[n]
+
+                label_std_pred = np.clip(label_std_pred, None, math.pi)
+
+                # we probably can't neglect the covariance term in the error propagation, since y and x are correlated
+                # tested: doesn't really make a difference
+                # mean_dx, mean_dy = np.mean(dx_pred), np.mean(dy_pred)
+                # covariance_xy = 1/float(dx_pred.shape[0]) * np.sum((dx_pred - mean_dx) * (dy_pred - mean_dy))
+                # test = np.abs(2 * (dx_pred / (dx_pred ** 2 + dy_pred ** 2)) * (-dy_pred / (dx_pred ** 2 + dy_pred ** 2)) * covariance_xy)
+                # label_std_pred = np.sqrt(np.abs(( dx_pred / (dx_pred ** 2 + dy_pred ** 2)) ** 2 * dy_std_pred ** 2 +
+                #                          (-dy_pred / (dx_pred ** 2 + dy_pred ** 2)) ** 2 * dx_std_pred ** 2 +
+                #                          2 * (dx_pred / (dx_pred ** 2 + dy_pred ** 2)) * (-dy_pred / (dx_pred ** 2 + dy_pred ** 2)) * covariance_xy))
+                # label_std_pred = np.clip(label_std_pred, None, math.pi/float(2))
+
+                # Steffen's formula
+                # zenith_pred = np.arctan2(dz_pred, np.sqrt(np.power(dx_pred, 2) + np.power(dy_pred, 2)))
+                # label_std_pred = np.sqrt(dx_std_pred ** 2 + dy_std_pred ** 2) / np.sin(zenith_pred + math.pi/float(2))
+                #label_std_pred = np.clip(label_std_pred, None, math.pi)
+
+                print '----- AZIMUTH -----'
+                #print np.amin(zenith_pred), np.amax(zenith_pred)
+                print np.amin(label_std_pred), np.amax(label_std_pred)
+                print np.mean(label_std_pred)
+                print '----- AZIMUTH -----'
 
             else: # zenith
                 # atan2(z, sqrt(x**2 + y**2))
@@ -1699,8 +1738,25 @@ def plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, 
                 label_pred = np.arctan2(dz_pred, np.sqrt(np.power(dx_pred, 2) + np.power(dy_pred, 2)))
 
                 # TODO does this even make sense?? Answer: no
-                label_std_pred = np.arctan2(np.abs(dz_std_pred * correction), np.sqrt(np.power(np.abs(dx_std_pred * correction), 2) +
-                                                                              np.power(np.abs(dy_std_pred * correction), 2)))
+                #dx_std_pred, dy_std_pred, dz_std_pred = np.abs(dx_std_pred * correction), np.abs(dy_std_pred * correction), np.abs(dz_std_pred * correction)
+                dz_std_pred = np.clip(dz_std_pred, 0, None) * correction
+                dz_pred = np.clip(dz_pred, -0.999, 0.999)
+
+                #label_std_pred = np.arctan2(dz_std_pred, np.sqrt(np.power(dx_std_pred, 2) + np.power(dy_std_pred, 2)))
+                label_std_pred = np.sqrt((-1 / np.sqrt((1 - dz_pred ** 2))) ** 2 * dz_std_pred ** 2) # zen = arccos(z/norm(r))
+
+                # dx_std_pred, dy_std_pred = np.clip(dx_std_pred, 0, None) * correction, np.clip(dy_std_pred, 0, None) * correction
+                # dx_pred, dy_pred = np.clip(dx_pred, -0.999, 0.999), np.clip(dy_pred, -0.999, 0.999)
+                # label_std_pred = np.sqrt( (np.sqrt(dx_pred ** 2 + dy_pred ** 2) / (dx_pred ** 2 + dy_pred ** 2 + dz_pred ** 2))**2 * dz_std_pred ** 2 +
+                #                           ((- dx_pred * dz_pred) / (np.sqrt(dx_pred ** 2 + dy_pred ** 2) * (dx_pred ** 2 + dy_pred ** 2 + dz_pred ** 2))) ** 2 * dx_std_pred ** 2 +
+                #                           ((- dy_pred * dz_pred) / (np.sqrt(dx_pred ** 2 + dy_pred ** 2) * (dx_pred ** 2 + dy_pred ** 2 + dz_pred ** 2))) ** 2 * dy_std_pred ** 2)
+
+                print '----- ZENITH -----'
+                print np.amin(label_true - label_pred), np.amax(label_true - label_pred)
+                print np.amin(label_std_pred), np.amax(label_std_pred)
+
+                print label_std_pred
+                print '----- ZENITH -----'
 
         else:
             label_true = arr_nn_pred[is_ic][:, labels[label]['index_label_true']]
@@ -1708,7 +1764,7 @@ def plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, 
             label_std_pred = arr_nn_pred[is_ic][:, labels[label]['index_label_std']]
 
             label_std_pred = label_std_pred * 1.253  # TODO correction with mse training
-            label_std_pred = np.abs(label_std_pred) #TODO necessary?
+            label_std_pred = np.abs(label_std_pred) #TODO necessary? -> rather set to zero, regarding the loss function?
 
         std_pred_range = (np.amin(label_std_pred), np.amax(label_std_pred))
         x_bins_std_pred = np.linspace(std_pred_range[0], std_pred_range[1], n_x_bins + 1)
@@ -1722,33 +1778,208 @@ def plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, 
             if np.count_nonzero(label_std_pred_cut_boolean) < 100:
                 continue
 
-            residuals_std = np.std(label_true[label_std_pred_cut_boolean] - label_pred[label_std_pred_cut_boolean])
+            if label == 'azimuth':
+                # if abs(residual_azimuth) <= pi, take az_true - az_pred ; if residual_azimuth > pi take
+                all_residuals = label_true[label_std_pred_cut_boolean] - label_pred[label_std_pred_cut_boolean]
+                larger_pi = np.abs(all_residuals) > math.pi
+                sign_larger_pi = np.sign(all_residuals[larger_pi]) # loophole for residual == 0, but doesn't matter below
+                all_residuals[larger_pi] = sign_larger_pi * 2 * math.pi - (all_residuals[larger_pi]) # need same sign for 2pi compared to all_residuals value
+                #print np.amin(all_residuals), np.amax(all_residuals)
+
+                residuals_std = np.std(all_residuals)
+
+            else:
+                residuals_std = np.std(label_true[label_std_pred_cut_boolean] - label_pred[label_std_pred_cut_boolean])
 
             x.append(label_std_pred_mean)
             y.append(residuals_std)
 
         plt.scatter(x, y, s=20, lw=0.75, c='blue', marker='+')
 
-        #title = plt.title(label + r': reconstructed $\sigma$ to true $\sigma$')
         title = plt.title(ic_list[ic]['title'] + ': ' + label)
         title.set_position([.5, 1.04])
-        ax.set_xlabel(r'Estimated uncertainty $\sigma_{pred}$ [GeV]'), ax.set_ylabel('Standard deviation of residuals [GeV]')
+        ax.set_xlabel(r'Estimated uncertainty $\sigma_{pred}$ [GeV]'), ax.set_ylabel('Standard deviation of residuals [GeV]') # TODO fix units
         ax.grid(True)
 
         pdf_plots.savefig(fig)
         ax.cla()
 
 
+def make_2d_dir_correlation_plot_different_sigmas(arr_nn_pred, modelname, precuts=(False, '3-100_GeV_prod')):
+    """
+
+    :param arr_nn_pred:
+    :param modelname:
+    :param dir_bins:
+    :param precuts:
+    :return:
+    """
+    if precuts[0] is True:
+        arr_nn_pred = arr_nn_pred_select_pheid_events(arr_nn_pred, invert=False, precuts=precuts[1])
+
+    labels = {'energy': {'reco_index': 9, 'mc_index': 4, 'index_label_std': 15, 'str': ('energy', 'GeV')},
+              'dir_x': {'reco_index': 10, 'mc_index':6, 'reco_index_std': 17, 'str': ('dir_x', 'rad')},
+              'dir_y': {'reco_index': 11, 'mc_index':7, 'reco_index_std': 19, 'str': ('dir_y', 'rad')},
+              'dir_z': {'reco_index': 12, 'mc_index':8, 'reco_index_std': 21, 'str': ('dir_z', 'rad')}}
+
+    ic_list = {'muon-CC': {'title': 'Track like (' + r'$\nu_{\mu}-CC$)'},
+               'elec-CC': {'title': 'Shower like (' + r'$\nu_{e}-CC$)'},
+               'elec-NC': {'title': 'Track like (' + r'$\nu_{e}-NC$)'},
+               'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
+
+    fig, ax = plt.subplots()
+    pdf_plots = mpl.backends.backend_pdf.PdfPages('results/plots/2d/errors/correlation_diff_sigmas_' + modelname + '.pdf')
+
+    for ic in ic_list.iterkeys():
+        is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], ic)
+        if bool(np.any(is_ic, axis=0)) is False: continue
+
+        ic_title = ic_list[ic]['title']
+
+        # azimuth and zenith plots
+        pi = math.pi
+        dir_bins_azimuth, dir_bins_zenith = np.linspace(-pi, pi, 100), np.linspace(-pi/float(2), pi/float(2), 100)
+        plot_2d_dir_correlation_different_sigmas(arr_nn_pred, is_ic, ic_title, 'azimuth', labels, dir_bins_azimuth, fig, ax, pdf_plots, modelname)
+        plot_2d_dir_correlation_different_sigmas(arr_nn_pred, is_ic, ic_title, 'zenith', labels, dir_bins_zenith, fig, ax, pdf_plots, modelname)
+
+        energy_bins = np.linspace(1, 100, 100)
+        plot_2d_dir_correlation_different_sigmas(arr_nn_pred, is_ic, ic_title, 'energy', labels, energy_bins, fig, ax, pdf_plots, modelname)
+
+    plt.close()
+    pdf_plots.close()
 
 
+def plot_2d_dir_correlation_different_sigmas(arr_nn_pred, is_ic, ic_title, label, labels, bins, fig, ax, pdf_plots):
+    """
 
+    :param arr_nn_pred:
+    :param is_ic:
+    :param ic_title:
+    :param label:
+    :param labels:
+    :param dir_bins:
+    :param fig:
+    :param ax:
+    :param pdf_plots:
+    :param modelname:
+    :return:
+    """
+    arr_nn_pred = arr_nn_pred[is_ic] # select only events with this interaction channel
 
+    if label == 'azimuth' or label == 'zenith':
+        dir_mc_index_range = (labels['dir_x']['mc_index'], labels['dir_z']['mc_index'] + 1)
+        dir_pred_index_range = (labels['dir_x']['reco_index'],  labels['dir_z']['reco_index'] + 1)
+        dir_mc_cart = arr_nn_pred[:, dir_mc_index_range[0] : dir_mc_index_range[1]] # cartesian
+        dir_pred_cart = arr_nn_pred[:, dir_pred_index_range[0]: dir_pred_index_range[1]]
 
+        if label == 'azimuth':
+            axis_label_info = ('azimuth', 'rad')
+            # atan2(y,x)
+            label_mc = np.arctan2(dir_mc_cart[:, 1], dir_mc_cart[:, 0])
+            label_pred = np.arctan2(dir_pred_cart[:, 1], dir_pred_cart[:, 0])
 
+            dx_pred, dy_pred = np.clip(dir_pred_cart[:, 0], -0.999, 0.999), np.clip(dir_pred_cart[:, 1], -0.999, 0.999)
 
+            correction = 1.253
+            dx_std_pred, dy_std_pred = arr_nn_pred[:, labels['dir_x']['reco_index_std']], arr_nn_pred[:, labels['dir_y']['reco_index_std']]
+            dx_std_pred, dy_std_pred = np.clip(dx_std_pred, 0, None) * correction, np.clip(dy_std_pred, 0, None) * correction
 
+            # error propagation of atan2 with correlations between y and x neglected (covariance term = 0)
+            label_pred_std = np.sqrt((dx_pred / (dx_pred ** 2 + dy_pred ** 2)) ** 2 * dy_std_pred ** 2 +
+                                     (-dy_pred / (dx_pred ** 2 + dy_pred ** 2)) ** 2 * dx_std_pred ** 2)
+            label_pred_std = np.clip(label_pred_std, None, math.pi)
 
+        elif label == 'zenith':
+            axis_label_info = ('zenith', 'rad')
 
+            # zenith = atan2(z, sqrt(x**2 + y**2))
+            label_mc = np.arctan2(dir_mc_cart[:, 2], np.sqrt(np.power(dir_mc_cart[:, 0], 2) + np.power(dir_mc_cart[:, 1], 2)))
+            label_pred = np.arctan2(dir_pred_cart[:, 2], np.sqrt(np.power(dir_pred_cart[:, 0], 2) + np.power(dir_pred_cart[:, 1], 2)))
+
+            correction = 1.253
+            dz_std_pred = arr_nn_pred[:, labels['dir_z']['reco_index_std']]
+            dz_std_pred = np.clip(dz_std_pred, 0, None) * correction
+            dz_pred = np.clip(dir_pred_cart[:, 2], -0.999, 0.999) # == dz_pred
+
+            label_pred_std = np.sqrt((-1 / np.sqrt((1 - dz_pred ** 2))) ** 2 * dz_std_pred ** 2) # reco std in zenith
+
+    else:
+        axis_label_info = labels[label]['str']
+
+        label_mc = arr_nn_pred[:, labels[label]['mc_index']]
+        label_pred = arr_nn_pred[:, labels[label]['reco_index']]
+        label_pred_std = arr_nn_pred[:, labels[label]['index_label_std']]
+
+    percentage_of_evts = [1.0, 0.8, 0.5, 0.2]
+
+    cbar_max = None
+    for i, percentage in enumerate(percentage_of_evts):
+
+        n_total_evt = label_pred_std.shape[0]
+        n_events_to_keep = int(n_total_evt * percentage) # how many events should be kept
+
+        if label == 'energy': # TODO needs to be improved, maybe fit line through energyres per escale and divide by this func?
+            std_pred_div_by_e_reco = np.divide(label_pred_std, label_pred)
+            indices_events_to_keep = sorted(std_pred_div_by_e_reco.argsort()[:n_events_to_keep])  # select n minimum values in array
+
+        else:
+            indices_events_to_keep = sorted(label_pred_std.argsort()[:n_events_to_keep]) # select n minimum values in array
+
+        hist_2d_label = np.histogram2d(label_mc[indices_events_to_keep], label_pred[indices_events_to_keep], bins)
+        bin_edges_label = hist_2d_label[1]
+
+        if i == 0: cbar_max = hist_2d_label[0].T.max()
+        label_corr = ax.pcolormesh(bin_edges_label, bin_edges_label, hist_2d_label[0].T,
+                                 norm=mpl.colors.LogNorm(vmin=1, vmax=cbar_max))
+
+        plot_line_through_the_origin(label)
+
+        title = plt.title('OrcaNet: ' + ic_title + ', ' + str(int(percentage * 100)) + '% of total events')
+        title.set_position([.5, 1.04])
+        cbar = fig.colorbar(label_corr, ax=ax)
+        cbar.ax.set_ylabel('Number of events')
+
+        ax.set_xlabel('True ' + axis_label_info[0] + ' [' + axis_label_info[1] + ']')
+        ax.set_ylabel('Reconstructed ' + axis_label_info[0] + ' [' + axis_label_info[1] + ']')
+        plt.xlim(bins[0], bins[-1])
+        plt.ylim(bins[0], bins[-1])
+
+        plt.tight_layout()
+
+        pdf_plots.savefig(fig)
+
+        if i > 0:
+            # 1st plot, plot transparency of 100%
+            hist_2d_label_all = np.histogram2d(label_mc, label_pred, bins)
+            bin_edges_label_all = hist_2d_label_all[1]
+
+            # only plot the bins that are not anymore in the histogram from above
+            hist_2d_label_larger_zero = np.invert(hist_2d_label[0] == 0)
+            hist_2d_label_all[0][hist_2d_label_larger_zero] = 0 # set everything to 0, when these bins are still > 0 in hist_2d_labels
+
+            ax.pcolormesh(bin_edges_label_all, bin_edges_label_all, hist_2d_label_all[0].T, alpha=0.5,
+                          norm=mpl.colors.LogNorm(vmin=1, vmax=cbar_max))
+            pdf_plots.savefig(fig)
+            cbar.remove()
+            plt.cla()
+
+            # 2nd plot
+            # only divide nonzero bins of hist_2d_label_all
+            hist_2d_label_all = np.histogram2d(label_mc, label_pred, bins)
+            non_zero = hist_2d_label_all[0] > 0
+            hist_2d_all_div_leftover = np.copy(hist_2d_label_all[0])
+            hist_2d_all_div_leftover[non_zero] = np.divide(hist_2d_label[0][non_zero], hist_2d_label_all[0][non_zero])
+            #hist_2d_all_div_leftover[np.invert(non_zero)] = -1
+            corr_all_div_leftover = ax.pcolormesh(bin_edges_label_all, bin_edges_label_all, hist_2d_all_div_leftover.T, vmin=0, vmax=1)
+            cbar_2 = fig.colorbar(corr_all_div_leftover, ax=ax)
+            cbar_2.ax.set_ylabel('Fraction of leftover events')
+
+            pdf_plots.savefig(fig)
+            cbar_2.remove()
+            plt.cla()
+
+        if i == 0: cbar.remove()
+        plt.cla()
 
 
 #------------- Functions used in making Matplotlib plots -------------#
