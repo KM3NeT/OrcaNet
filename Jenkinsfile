@@ -16,7 +16,7 @@ node('master') {
 
     def docker_image = docker.build("orcanet-container:${env.BUILD_ID}")
 
-    docker_image.inside {
+    docker_image.inside("-u root:root") {
         gitlabBuilds(builds: ["install", "test"]) {
             updateGitlabCommitStatus name: 'build', state: 'pending'
             stage('build') {
