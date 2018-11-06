@@ -18,18 +18,18 @@ node('master') {
 
     docker_image.inside("-u root:root") {
         gitlabBuilds(builds: ["install", "test"]) {
-            updateGitlabCommitStatus name: 'build', state: 'pending'
+            updateGitlabCommitStatus name: 'install', state: 'pending'
             stage('build') {
                 try {
                     sh """
                         cd cnns
                         pip install .
                     """
-                    updateGitlabCommitStatus name: 'build', state: 'success'
+                    updateGitlabCommitStatus name: 'install', state: 'success'
                 } catch (e) {
                     // sendChatMessage("Build Failed")
                     sendMail("Build Failed")
-                    updateGitlabCommitStatus name: 'build', state: 'failed'
+                    updateGitlabCommitStatus name: 'install', state: 'failed'
                     throw e
                 }
             }
