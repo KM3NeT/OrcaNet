@@ -463,6 +463,7 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
 
             make_1d_reco_err_div_by_std_plot(arr_nn_pred, modelname, precuts=precuts) # TODO take precuts from above?
             make_1d_reco_err_to_reco_residual_plot(arr_nn_pred, modelname, precuts=precuts)
+            make_2d_dir_correlation_plot_different_sigmas(arr_nn_pred, modelname, precuts=precuts)
 
 
 def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None,
@@ -662,7 +663,7 @@ if __name__ == '__main__':
     loss_weights = {'dir_x': 35, 'dir_y': 35, 'dir_z': 65, 'e': 1, 'by': 65,
                     'dir_x_err': 1, 'dir_y_err': 1, 'dir_z_err': 1, 'e_err': 0.0005, 'by_err': 1}
     execute_cnn(n_bins=[(11,13,18,60), (11,13,18,31)], class_type=(10, 'energy_dir_bjorken-y_errors'), nn_arch='VGG', batchsize=64, epoch=(8,5),
-                use_scratch_ssd=False, loss_opt=(losses, None, loss_weights), n_gpu=(1, 'avolkov'), mode='train',
+                use_scratch_ssd=False, loss_opt=(losses, None, loss_weights), n_gpu=(1, 'avolkov'), mode='eval',
                 swap_4d_channels='xyz-t_and_xyz-c_single_input', zero_center=True, str_ident='lp_tight-1_60b_errors_mse_by_fix')
 
     # python run_cnn.py -m lists/lp/all_e/xyz-t_xyz-c_lp_60b_e_1-100_all_train_e-cc-nc_mu-cc.list lists/lp/all_e/xyz-t_xyz-c_lp_60b_e_1-100_half_test_e-cc-nc_mu-cc.list

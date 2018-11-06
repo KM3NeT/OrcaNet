@@ -1839,11 +1839,11 @@ def make_2d_dir_correlation_plot_different_sigmas(arr_nn_pred, modelname, precut
         # azimuth and zenith plots
         pi = math.pi
         dir_bins_azimuth, dir_bins_zenith = np.linspace(-pi, pi, 100), np.linspace(-pi/float(2), pi/float(2), 100)
-        plot_2d_dir_correlation_different_sigmas(arr_nn_pred, is_ic, ic_title, 'azimuth', labels, dir_bins_azimuth, fig, ax, pdf_plots, modelname)
-        plot_2d_dir_correlation_different_sigmas(arr_nn_pred, is_ic, ic_title, 'zenith', labels, dir_bins_zenith, fig, ax, pdf_plots, modelname)
+        plot_2d_dir_correlation_different_sigmas(arr_nn_pred, is_ic, ic_title, 'azimuth', labels, dir_bins_azimuth, fig, ax, pdf_plots)
+        plot_2d_dir_correlation_different_sigmas(arr_nn_pred, is_ic, ic_title, 'zenith', labels, dir_bins_zenith, fig, ax, pdf_plots)
 
         energy_bins = np.linspace(1, 100, 100)
-        plot_2d_dir_correlation_different_sigmas(arr_nn_pred, is_ic, ic_title, 'energy', labels, energy_bins, fig, ax, pdf_plots, modelname)
+        plot_2d_dir_correlation_different_sigmas(arr_nn_pred, is_ic, ic_title, 'energy', labels, energy_bins, fig, ax, pdf_plots)
 
     plt.close()
     pdf_plots.close()
@@ -1944,7 +1944,7 @@ def plot_2d_dir_correlation_different_sigmas(arr_nn_pred, is_ic, ic_title, label
         plt.xlim(bins[0], bins[-1])
         plt.ylim(bins[0], bins[-1])
 
-        plt.tight_layout()
+        #plt.tight_layout()
 
         pdf_plots.savefig(fig)
 
@@ -1973,6 +1973,11 @@ def plot_2d_dir_correlation_different_sigmas(arr_nn_pred, is_ic, ic_title, label
             corr_all_div_leftover = ax.pcolormesh(bin_edges_label_all, bin_edges_label_all, hist_2d_all_div_leftover.T, vmin=0, vmax=1)
             cbar_2 = fig.colorbar(corr_all_div_leftover, ax=ax)
             cbar_2.ax.set_ylabel('Fraction of leftover events')
+
+            title = plt.title('OrcaNet: ' + ic_title + ', ' + str(int(percentage * 100)) + '% of total events')
+            title.set_position([.5, 1.04])
+            ax.set_xlabel('True ' + axis_label_info[0] + ' [' + axis_label_info[1] + ']')
+            ax.set_ylabel('Reconstructed ' + axis_label_info[0] + ' [' + axis_label_info[1] + ']')
 
             pdf_plots.savefig(fig)
             cbar_2.remove()
