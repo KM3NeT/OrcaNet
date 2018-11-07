@@ -1,6 +1,6 @@
 #!groovy
 CHAT_CHANNEL = '#deep_learning'
-DEVELOPERS = ['mmoser@km3net.de']
+DEVELOPERS = ['mmoser@km3net.de, michael.m.moser@fau.de']
 
 def projectProperties = [
         disableConcurrentBuilds(),
