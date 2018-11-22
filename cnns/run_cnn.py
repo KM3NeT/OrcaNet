@@ -31,18 +31,34 @@ from utilities.losses import get_all_loss_functions
 def build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4d_channels, str_ident, modelname, custom_objects):
     """
     Function that either loads or builds (epoch = 0) a Keras nn model.
-    :param (int, int) epoch: Epoch (nr_epoch, nr_train_file) of the model if it has been trained before.
-    :param str nn_arch: Specifies, which nn architecture should be used ("VGG" or "WRN").
-    :param list(tuple) n_bins: Number of bins for each dimension (x,y,z,t) in both the train- and test_files.
-                               Can contain multiple n_bins tuples.
-    :param int batchsize: Batchsize that is used in the training.
-    :param (int, str) class_type: Tuple with the number of output classes and a string identifier to specify the output classes.
-    :param None/int swap_4d_channels: For 3.5D. Specifies, if the default channel (t) should be swapped with another dim.
-    :param str str_ident: String identifier for the projection type / model input that is parsed to the image generator.
-                          Needed for some specific models.
-    :param str modelname: Name of the model.
-    :param dict custom_objects: Custom objects variable that contains custom loss functions for loading nn models.
-    :return: ks.models model: Keras nn instance.
+
+    Parameters
+    ----------
+    epoch : tuple(int, int)
+        Declares if a previously trained model or a new model (=0) should be loaded, more info in the execute_cnn function.
+    nn_arch : str
+        Architecture of the neural network.
+    n_bins : list(tuple(int))
+        Declares the number of bins for each dimension (e.g. (x,y,z,t)) in the train- and testfiles.
+    batchsize : int
+        Batchsize that is used for the training / inferencing of the cnn.
+    class_type : tuple(int, str)
+        Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
+    swap_4d_channels : None/str
+        For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
+    str_ident : str
+        Optional string identifier that gets appended to the modelname. Useful when training models which would have
+        the same modelname. Also used for defining models and projections!
+    modelname : str
+        Name of the nn model.
+    custom_objects : dict
+        Keras custom objects variable that contains custom loss functions for loading nn models.
+
+    Returns
+    -------
+    model : ks.models
+        A Keras nn instance.
+
     """
     if epoch[0] == 0:
         if nn_arch is 'WRN': model = create_wide_residual_network(n_bins[0], batchsize, nb_classes=class_type[0], n=1, k=1, dropout=0.2, k_size=3, swap_4d_channels=swap_4d_channels)
@@ -68,15 +84,28 @@ def build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4
 def get_optimizer_info(loss_opt, optimizer='adam'):
     """
     Returns optimizer information for the training procedure.
-    :param tuple loss_opt: Tuple with len=3.
-                           loss_opt[0]: dict with loss functions that should be used for each nn output.
-                           loss_opt[1]: dict with metrics that should be used for each nn output.
-                           loss_opt[2]: dict with loss weights that should be used for each sub-loss.
-    :param str optimizer: Specifies, if "Adam" or "SGD" should be used as optimizer.
-    :return: dict loss_functions: cf. loss_opt[0]
-    :return: dict metrics: cf. loss_opt[1]
-    :return: dict loss_weight: cf. loss_opt[2]
-    :return: ks.optimizers optimizer: Keras optimizer instance, either "Adam" or "SGD".
+
+    Parameters
+    ----------
+    loss_opt : tuple
+        A Tuple with len=3.
+       loss_opt[0]: dict with loss functions that should be used for each nn output.
+       loss_opt[1]: dict with metrics that should be used for each nn output.
+       loss_opt[2]: dict with loss weights that should be used for each sub-loss.
+    optimizer : str
+        Specifies, if "Adam" or "SGD" should be used as optimizer.
+
+    Returns
+    -------
+    loss_functions : dict
+        Cf. loss_opt[0].
+    metrics : dict
+        Cf. loss_opt[1].
+    loss_weight : dict
+        Cf. loss_opt[2].
+    optimizer : ks.optimizers
+        Keras optimizer instance, currently either "Adam" or "SGD".
+
     """
     sgd = ks.optimizers.SGD(momentum=0.9, decay=0, nesterov=True)
     adam = ks.optimizers.Adam(beta_1=0.9, beta_2=0.999, epsilon=0.1, decay=0.0) # epsilon=1 for deep networks
@@ -92,15 +121,33 @@ def get_optimizer_info(loss_opt, optimizer='adam'):
 def parallelize_model_to_n_gpus(model, n_gpu, batchsize, loss_functions, optimizer, metrics, loss_weight):
     """
     Parallelizes the nn-model to multiple gpu's.
+
     Currently, up to 4 GPU's at Tiny-GPU are supported.
-    :param ks.model.Model/Sequential model: Keras model of a neural network.
-    :param (int/str) n_gpu: Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov').
-    :param int batchsize: original batchsize that should be used for training/testing the nn.
-    :param tuple loss_functions: dict with loss functions that should be used for each nn output.
-    :param optimizer: Keras optimizer instance (e.g. SGD or Adam).
-    :param metrics: dict with metrics that should be used for each nn output.
-    :param loss_weight: dict with loss weights that should be used for each sub-loss.
-    :return: ks.models model, int batchsize: multi_gpu model and new batchsize scaled by the number of used gpu's.
+
+    Parameters
+    ----------
+    model : ks.model.Model
+        Keras model of a neural network.
+    n_gpu : tuple(int, str)
+        Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov') [1].
+    batchsize : int
+        Batchsize that is used for the training / inferencing of the cnn.
+    loss_functions : dict/str
+        Dict/str with loss functions that should be used for each nn output. # TODO fix, make single loss func also use dict
+    optimizer : ks.optimizers
+        Keras optimizer instance, currently either "Adam" or "SGD".
+    metrics : dict/str/None
+        Dict/str with metrics that should be used for each nn output.
+    loss_weight : dict/None
+        Dict with loss weights that should be used for each sub-loss.
+
+    Returns
+    -------
+    model : ks.models
+        The parallelized Keras nn instance (multi_gpu_model).
+    batchsize : int
+        The new batchsize scaled by the number of used gpu's.
+
     """
     if n_gpu[1] == 'avolkov':
         if n_gpu[0] == 1:
@@ -403,9 +450,10 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
     # for layer in model.layers: # temp
     #     if 'batch_norm' in layer.name:
     #         layer.stateful = False
-    # arr_nn_pred = get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, modelname, samples=None)
-    # np.save('results/plots/saved_predictions/arr_energy_correct_' + modelname + '.npy', arr_nn_pred)
-    arr_nn_pred = np.load('results/plots/saved_predictions/arr_energy_correct_' + modelname + '.npy')
+    arr_nn_pred = get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, modelname, samples=None)
+    np.save('results/plots/saved_predictions/arr_nn_pred_' + modelname + '.npy', arr_nn_pred)
+    arr_nn_pred = np.load('results/plots/saved_predictions/arr_nn_pred_' + modelname + '.npy')
+
 
     #arr_nn_pred = np.load('results/plots/saved_predictions/arr_nn_pred_' + modelname + '_final_stateful_false.npy')
     #arr_nn_pred = np.load('results/plots/saved_predictions//arr_nn_pred_model_VGG_4d_xyz-t_and_yzt-x_and_4d_xyzt_track-shower_multi_input_single_train_tight-1_tight-2_lr_0.003_tr_st_test_st_final_stateful_false_1-100GeV_precut.npy')
@@ -470,26 +518,48 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
                 use_scratch_ssd=False, zero_center=False, shuffle=(False,None), tb_logger=False, str_ident='',
                 loss_opt=('categorical_crossentropy', 'accuracy', None)):
     """
-    Runs a convolutional neural network.
-    :param list(tuple) n_bins: Declares the number of bins for each dimension (x,y,z,t) in the train- and testfiles. Can contain multiple n_bins tuples.
-                               Multiple n_bins tuples are currently only used for multi-input models with multiple input files per batch.
-    :param (int, str) class_type: Declares the number of output classes and a string identifier to specify the exact output classes.
-                                  I.e. (2, 'track-shower')
-    :param str nn_arch: Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
-    :param int batchsize: Batchsize that should be used for the cnn.
-    :param (int, int) epoch: Declares if a previously trained model or a new model (=0) should be loaded.
-    :param (int, str) n_gpu: Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov').
-    :param str mode: Specifies what the function should do - train & test a model or evaluate a 'finished' model?
-                     Currently, there are two modes available: 'train' & 'eval'.
-    :param None/str swap_4d_channels: For 4D data input (3.5D models). Specifies, if the channels for the 3.5D net should be swapped.
-                                      Currently available: None -> XYZ-T ; 'yzt-x' -> YZT-X
-    :param bool use_scratch_ssd: Declares if the input files should be copied to the node-local SSD scratch before executing the cnn.
-    :param bool zero_center: Declares if the input images ('xs') should be zero-centered before training.
-    :param (bool, None/int) shuffle: Declares if the training data should be shuffled before the next training epoch.
-    :param bool tb_logger: Declares if a tb_callback should be used during training (takes longer to train due to overhead!).
-    :param str str_ident: Optional str identifier that gets appended to the modelname. Useful when training models which would have the same modelname.
-                          Also used for defining models and projections!
-    :param (dict, dict/None, dict) loss_opt: tuple that contains 1) the loss_functions,  2) the metrics and 3) the loss_weights.
+    Code that trains or evaluates a convolutional neural network.
+
+    Parameters
+    ----------
+    n_bins : list(tuple(int))
+        Declares the number of bins for each dimension (e.g. (x,y,z,t)) in the train- and testfiles. Can contain multiple n_bins tuples.
+        Multiple n_bins tuples are currently used for multi-input models with multiple input files per batch.
+    class_type : tuple(int, str)
+        Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
+        I.e. (2, 'track-shower')
+    nn_arch : str
+        Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
+    batchsize : int
+        Batchsize that should be used for the training / inferencing of the cnn.
+    epoch : tuple(int, int)
+        Declares if a previously trained model or a new model (=0) should be loaded.
+        The first argument specifies the last epoch, and the second argument is the last train file number if the train
+        dataset is split over multiple files.
+    n_gpu : tuple(int, str)
+        Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov') [1].
+    mode : str
+        Specifies what the function should do - train & test a model or evaluate a 'finished' model?
+        Currently, there are two modes available: 'train' & 'eval'.
+    swap_4d_channels : None/str
+        For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
+        Currently available: None -> XYZ-T ; 'yzt-x' -> YZT-X, TODO add multi input options
+    use_scratch_ssd : bool
+        Declares if the input files should be copied to the node-local SSD scratch space (only working at Erlangen CC).
+    zero_center : bool
+        Declares if the input images ('xs') should be zero-centered before training.
+    shuffle : tuple(bool, None/int)
+        Declares if the training data should be shuffled before the next training epoch [0].
+        If the train dataset is too large to be shuffled in place, one can preshuffle them n times before running
+        OrcaNet, the number n should then be put into [1].
+    tb_logger : bool
+        Declares if a tb_callback should be used during training (takes longer to train due to overhead!).
+    str_ident : str
+        Optional string identifier that gets appended to the modelname. Useful when training models which would have
+        the same modelname. Also used for defining models and projections!
+    loss_opt : tuple(dict/str, dict/str/None, dict/None)
+        Tuple that contains 1) the loss_functions, 2) the metrics and 3) the loss_weights.
+
     """
     train_files, test_files, multiple_inputs = parse_input()
     xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu[0]) if zero_center is True else None

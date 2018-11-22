@@ -64,7 +64,7 @@ def get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchs
                 y_pred = np.concatenate(y_pred, axis=1)
                 y_true = np.concatenate([y_true['e'], y_true['dir_x'], y_true['dir_y'], y_true['dir_z'], y_true['by']], axis=1) # dont need to save y_true err input
 
-            # check if the predictions were correct
+            # mc labels
             energy = mc_info[:, 2]
             particle_type = mc_info[:, 1]
             is_cc = mc_info[:, 3]
@@ -72,10 +72,18 @@ def get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchs
             run_id = mc_info[:, 9]
             bjorken_y = mc_info[:, 4]
             dir_x, dir_y, dir_z = mc_info[:, 5], mc_info[:, 6], mc_info[:, 7]
+            vtx_x, vtx_y, vtx_z = mc_info[:, 10], mc_info[:, 11], mc_info[:, 12]
+            time_residual_vtx = mc_info[:, 13]
+            # if mc_info.shape[1] > 13: TODO add prod_ident
 
             # make a temporary energy_correct array for this batch
-            arr_nn_pred_temp = np.concatenate([run_id[:, ax], event_id[:, ax], particle_type[:, ax], is_cc[:, ax], energy[:, ax],
-                                               bjorken_y[:, ax], dir_x[:, ax], dir_y[:, ax], dir_z[:, ax], y_pred, y_true], axis=1)
+            # arr_nn_pred_temp = np.concatenate([run_id[:, ax], event_id[:, ax], particle_type[:, ax], is_cc[:, ax], energy[:, ax],
+            #                                    bjorken_y[:, ax], dir_x[:, ax], dir_y[:, ax], dir_z[:, ax], y_pred, y_true], axis=1)
+
+            arr_nn_pred_temp = np.concatenate([run_id[:, ax], event_id[:, ax], particle_type[:, ax], is_cc[:, ax],
+                                               energy[:, ax], bjorken_y[:, ax], dir_x[:, ax], dir_y[:, ax],
+                                               dir_z[:, ax], vtx_x[:, ax], vtx_y[:, ax], vtx_z[:, ax],
+                                               time_residual_vtx[:, ax], y_pred, y_true], axis=1)
 
             if arr_nn_pred is None: arr_nn_pred = np.zeros((cum_number_of_steps[-1] * batchsize, arr_nn_pred_temp.shape[1:2][0]), dtype=np.float32)
             arr_nn_pred[arr_nn_pred_row_start + s*batchsize : arr_nn_pred_row_start + (s+1) * batchsize] = arr_nn_pred_temp
@@ -83,6 +91,22 @@ def get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchs
     # make_pred_h5_file(arr_nn_pred, filepath='predictions/' + modelname, mc_prod='3-100GeV')
 
     return arr_nn_pred
+
+
+def get_array_indices():
+
+    label_indices = {'run_id': 0, 'event_id': 1, 'particle_type': 2, 'is_cc': 3, 'bjorken_y': {'true_index': 5, 'reco_index': 17},
+                     'energy': {'true_index': 4, 'reco_index': 13, 'index_label_std': 19, 'str': ('energy', 'GeV')},
+                     'dir_x': {'true_index':6, 'reco_index': 14, 'reco_index_std': 21, 'str': ('dir_x', 'rad')},
+                     'dir_y': {'true_index':7, 'reco_index': 15, 'reco_index_std': 23, 'str': ('dir_y', 'rad')},
+                     'dir_z': {'true_index':8, 'reco_index': 16, 'reco_index_std': 25, 'str': ('dir_z', 'rad')},
+                     'vtx_x': {'true_index': 9},
+                     'vtx_y': {'true_index': 10},
+                     'vtx_z': {'true_index': 11},
+                     'time_residual_vtx': {'true_index': 12}}
+
+    return label_indices
+
 
 
 def get_cum_number_of_steps(files, batchsize):
@@ -928,10 +952,21 @@ def correct_reco_energy(arr_nn_pred, metric='median'):
     :param metric:
     :return:
     """
-    is_track, is_shower = get_boolean_track_and_shower_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3])
-    is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], 'elec-CC')
+    l = get_array_indices()
+    # label_indices = {'run_id': 0, 'event_id': 1, 'particle_type': 2, 'is_cc': 3, 'bjorken_y': {'true_index': 5, 'reco_index': 13},
+    #                  'energy': {'true_index': 4, 'reco_index': 9, 'index_label_std': 15, 'str': ('energy', 'GeV')},
+    #                  'dir_x': {'true_index':6, 'reco_index': 10, 'reco_index_std': 17, 'str': ('dir_x', 'rad')},
+    #                  'dir_y': {'true_index':7, 'reco_index': 11, 'reco_index_std': 19, 'str': ('dir_y', 'rad')},
+    #                  'dir_z': {'true_index':8, 'reco_index': 12, 'reco_index_std': 21, 'str': ('dir_z', 'rad')},
+    #                  'vtx_x': {'true_index': 9},
+    #                  'vtx_y': {'true_index': 10},
+    #                  'vtx_z': {'true_index': 11},
+    #                  'time_residual_vtx': {'true_index': 0}}
 
-    energy_mc, energy_pred = arr_nn_pred[:, 4][is_ic], arr_nn_pred[:, 9][is_ic]
+    is_track, is_shower = get_boolean_track_and_shower_separation(arr_nn_pred[:, l['particle_type']], arr_nn_pred[:, l['is_cc']])
+    is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, l['particle_type']], arr_nn_pred[:, l['is_cc']], 'elec-CC')
+
+    energy_mc, energy_pred = arr_nn_pred[:, l['energy']['true_index']][is_ic], arr_nn_pred[:, l['energy']['reco_index']][is_ic]
 
     arr_nn_pred_corr = np.copy(arr_nn_pred) # TODO still necessary?
 
@@ -959,11 +994,11 @@ def correct_reco_energy(arr_nn_pred, metric='median'):
 
     # linear interpolation of correction factors
     #correction_factor_en_pred = np.interp(energy_pred, correction_factors_x, correction_factors_y)
-    energy_pred_orig_shower = arr_nn_pred[:, 9][is_shower]
+    energy_pred_orig_shower = arr_nn_pred[:, l['energy']['reco_index']][is_shower]
     correction_factor_en_pred = np.interp(energy_pred_orig_shower, correction_factors_x, correction_factors_y)
 
     # apply correction to ALL shower ic's (including all taus atm)
-    arr_nn_pred_corr[:, 9][is_shower] = energy_pred_orig_shower + (- correction_factor_en_pred) * energy_pred_orig_shower
+    arr_nn_pred_corr[:, l['energy']['reco_index']][is_shower] = energy_pred_orig_shower + (- correction_factor_en_pred) * energy_pred_orig_shower
 
     return arr_nn_pred_corr
 
@@ -1985,6 +2020,123 @@ def plot_2d_dir_correlation_different_sigmas(arr_nn_pred, is_ic, ic_title, label
 
         if i == 0: cbar.remove()
         plt.cla()
+
+
+def for_jannik(arr_nn_pred, modelname, correct_energy=(False, 'median')):
+    """
+
+    :param arr_nn_pred:
+    :param modelname:
+    :param energy_bins:
+    :param precuts:
+    :param correct_energy:
+    :return:
+    """
+    if correct_energy[0] is True:
+        arr_nn_pred = correct_reco_energy(arr_nn_pred, metric=correct_energy[1])
+
+    ic_list = {'muon-CC': {'title': 'Track like (' + r'$\nu_{\mu}-CC$)'},
+               'elec-CC': {'title': 'Shower like (' + r'$\nu_{e}-CC$)'},
+               'elec-NC': {'title': 'Track like (' + r'$\nu_{e}-NC$)'},
+               'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
+
+    # make cuts
+    # dir_z_true > 0.75
+    dir_z_true = arr_nn_pred[:, 8]
+    arr_nn_pred = arr_nn_pred[dir_z_true > 0.75]
+
+    #n p.abs(dir_z_true - reco_dir_z) < 0.05
+    dir_z_true = arr_nn_pred[:, 8]
+    reco_dir_z = arr_nn_pred[:, 16]
+    arr_nn_pred = arr_nn_pred[np.abs(dir_z_true - reco_dir_z) < 0.05]
+
+    # 15 - 40 GeV
+    energy_true = arr_nn_pred[:, 4]
+    arr_nn_pred = arr_nn_pred[np.logical_and(15 < energy_true, energy_true < 50)]
+
+    # np.abs(dir_z_true - reco_dir_z) < 0.05
+
+    # E_reco-E_true / E_true < 0.3
+    energy_pred = arr_nn_pred[:, 9]
+    energy_true = arr_nn_pred[:, 4]
+    cond_en = np.abs((energy_pred - energy_true)) / energy_true
+    arr_nn_pred = arr_nn_pred[cond_en < 0.3]
+
+    vtx_x_true, vtx_y_true, vtx_z_true = arr_nn_pred[:, 9], arr_nn_pred[:, 10], arr_nn_pred[:, 11]
+    r = np.sqrt(vtx_x_true ** 2 + vtx_y_true ** 2)
+
+    fig, ax = plt.subplots()
+    pdf_plots = mpl.backends.backend_pdf.PdfPages('results/plots/2d/energy/for_Jannik_' + modelname + '.pdf')
+
+    for ic in ic_list.iterkeys():
+        is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], ic)
+        if bool(np.any(is_ic, axis=0)) is False: continue
+
+        hist_2d_r_to_vtx_z_ic = np.histogram2d(r[is_ic], vtx_z_true[is_ic], 25)
+        bin_edges_x_axis, bin_edges_y_axis = hist_2d_r_to_vtx_z_ic[1], hist_2d_r_to_vtx_z_ic[2]
+
+        # Format in classical numpy convention: x along first dim (vertical), y along second dim (horizontal)
+        # transpose to get typical cartesian convention: y along first dim (vertical), x along second dim (horizontal)
+        r_to_vtx_z_ic = ax.pcolormesh(bin_edges_x_axis, bin_edges_y_axis, hist_2d_r_to_vtx_z_ic[0].T)
+
+        title = plt.title(ic + ': r_true to vtx_z_true')
+        title.set_position([.5, 1.04])
+        cbar = fig.colorbar(r_to_vtx_z_ic, ax=ax)
+        cbar.ax.set_ylabel('Number of events')
+        ax.set_xlabel('r_true'), ax.set_ylabel('vtx_z_true')
+        plt.tight_layout()
+
+        pdf_plots.savefig(fig)
+        cbar.remove()
+        ax.cla()
+
+    for ic in ic_list.iterkeys():
+        is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], ic)
+        if bool(np.any(is_ic, axis=0)) is False: continue
+
+        #hist_2d_r_to_vtx_z_ic = np.histogram2d(r[is_ic], vtx_z_true[is_ic], 50)
+        #bin_edges_x_axis, bin_edges_y_axis = hist_2d_r_to_vtx_z_ic[1], hist_2d_r_to_vtx_z_ic[2]
+
+        # Format in classical numpy convention: x along first dim (vertical), y along second dim (horizontal)
+        # transpose to get typical cartesian convention: y along first dim (vertical), x along second dim (horizontal)
+        vtx_z_true_hist = plt.hist(vtx_z_true[is_ic], 20)
+        #r_to_vtx_z_ic = ax.pcolormesh(bin_edges_x_axis, bin_edges_y_axis, hist_2d_r_to_vtx_z_ic[0].T)
+
+        title = plt.title(ic + ': vtx_z_true')
+        title.set_position([.5, 1.04])
+        ax.set_xlabel('vtx_z_true')
+        plt.tight_layout()
+
+        pdf_plots.savefig(fig)
+        ax.cla()
+
+    for ic in ic_list.iterkeys():
+        is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], ic)
+        if bool(np.any(is_ic, axis=0)) is False: continue
+
+        energy_pred = arr_nn_pred[:, 9]
+        energy_true = arr_nn_pred[:, 4]
+        cond_en = np.abs((energy_pred - energy_true)) / energy_true
+        hist_2d_r_to_vtx_z_ic = np.histogram2d(cond_en[is_ic], vtx_z_true[is_ic], 15)
+        bin_edges_x_axis, bin_edges_y_axis = hist_2d_r_to_vtx_z_ic[1], hist_2d_r_to_vtx_z_ic[2]
+
+        # Format in classical numpy convention: x along first dim (vertical), y along second dim (horizontal)
+        # transpose to get typical cartesian convention: y along first dim (vertical), x along second dim (horizontal)
+        r_to_vtx_z_ic = ax.pcolormesh(bin_edges_x_axis, bin_edges_y_axis, hist_2d_r_to_vtx_z_ic[0].T)
+
+        title = plt.title(ic + ': |(energy_pred - energy_true)| / energy_true to vtx_z_true')
+        title.set_position([.5, 1.04])
+        cbar = fig.colorbar(r_to_vtx_z_ic, ax=ax)
+        cbar.ax.set_ylabel('Number of events')
+        ax.set_xlabel('|(energy_pred - energy_true)| / energy_true'), ax.set_ylabel('vtx_z_true')
+        plt.tight_layout()
+
+        pdf_plots.savefig(fig)
+        cbar.remove()
+        ax.cla()
+
+    pdf_plots.close()
+    plt.close()
 
 
 #------------- Functions used in making Matplotlib plots -------------#

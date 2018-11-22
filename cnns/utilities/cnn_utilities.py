@@ -13,21 +13,7 @@ import keras as ks
 
 def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, str_ident, f_size=None, zero_center_image=None, yield_mc_info=False, swap_col=None):
     """
-    Wrapper for a generator that creates batches of cnn input images ('xs') and labels ('ys').
-    The wrapper is used for separating two possible cases:
-    1) The data for the generator is contained in a single h5 file (gen_batches_from_single_file).
-    2) The data for the generator is contained in multiple h5 files (gen_batches_from_multiple_files).
-    """
-    if len(filepath) > 1:
-        return gen_batches_from_multiple_files(filepath, batchsize, n_bins, class_type, str_ident, f_size=f_size, zero_center_image=zero_center_image, yield_mc_info=yield_mc_info, swap_col=swap_col)
-
-    else:
-        return gen_batches_from_single_file(filepath[0], batchsize, n_bins[0], class_type, f_size=f_size, zero_center_image=zero_center_image, yield_mc_info=yield_mc_info, swap_col=swap_col)
-
-
-def gen_batches_from_multiple_files(filepath, batchsize, n_bins, class_type, str_ident, f_size=None, zero_center_image=None, yield_mc_info=False, swap_col=None):
-    """
-    Generator that returns batches of (multiple-) images ('xs') and labels ('ys') from multiple h5 files.
+    Generator that returns batches of (multiple-) images ('xs') and labels ('ys') from single or multiple h5 files.
     :param list filepath: List that contains full filepath of the input h5 files, e.g. '/path/to/file/file.h5'.
     :param int batchsize: Size of the batches that should be generated. Ideally same as the chunksize in the h5 file.
     :param tuple n_bins: Number of bins for each dimension (x,y,z,t) in the h5 file.
@@ -49,7 +35,7 @@ def gen_batches_from_multiple_files(filepath, batchsize, n_bins, class_type, str
     for i in xrange(n_files):
         dimensions[i] = get_dimensions_encoding(n_bins[i], batchsize)
 
-    swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'xyt-z': (0, 1, 2, 4, 3)}
+    swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'xyt-z': (0, 1, 2, 4, 3), 't-xyz': (0,4,1,2,3), 'tyz-x': (0,4,2,3,1)}
 
     while 1:
         f = {}
@@ -76,7 +62,15 @@ def gen_batches_from_multiple_files(filepath, batchsize, n_bins, class_type, str
 
             if swap_col is not None:
 
-                if 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2' in swap_col + str_ident:
+                # single image input
+                if swap_col == 'yzt-x' or swap_col == 'xyt-z':
+                    xs_list.append(np.transpose(xs, swap_4d_channels_dict[swap_col]))
+                elif swap_col == 'xyz-t_and_yzt-x':
+                    xs_list.append(xs[0]) # xyzt
+                    xs_yzt_x = np.transpose(xs[0], swap_4d_channels_dict['yzt-x'])
+                    xs_list.append(xs_yzt_x)
+
+                elif 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2' in swap_col + str_ident:
                     xs_list.append(xs[0]) # xyz-t tight-1
                     xs_yzt_x_tight_1 = np.transpose(xs[0], swap_4d_channels_dict['yzt-x']) # yzt-x tight-1
                     xs_list.append(xs_yzt_x_tight_1)
@@ -118,72 +112,72 @@ def gen_batches_from_multiple_files(filepath, batchsize, n_bins, class_type, str
             f[i].close()
 
 
-def gen_batches_from_single_file(filepath, batchsize, n_bins, class_type, f_size=None, zero_center_image=None, yield_mc_info=False, swap_col=None):
-    """
-    Generator that returns batches of images ('xs') and labels ('ys') from a h5 file.
-    :param string filepath: Full filepath of the input h5 file, e.g. '/path/to/file/file.h5'.
-    :param int batchsize: Size of the batches that should be generated. Ideally same as the chunksize in the h5 file.
-    :param tuple n_bins: Number of bins for each dimension (x,y,z,t) in the h5 file.
-    :param (int, str) class_type: Tuple with the umber of output classes and a string identifier to specify the exact output classes.
-                                  I.e. (2, 'muon-CC_to_elec-CC')
-    :param int/None f_size: Specifies the filesize (#images) of the .h5 file if not the whole .h5 file
-                       but a fraction of it (e.g. 10%) should be used for yielding the xs/ys arrays.
-                       This is important if you run fit_generator(epochs>1) with a filesize (and hence # of steps) that is smaller than the .h5 file.
-    :param ndarray zero_center_image: mean_image of the x dataset used for zero-centering.
-    :param bool yield_mc_info: Specifies if mc-infos (y_values) should be yielded as well.
-                               The mc-infos are used for evaluation after training and testing is finished.
-    :param bool/str swap_col: Specifies, if the index of the columns for xs should be swapped. Necessary for 3.5D nets.
-                          Currently available: 'yzt-x' -> [3,1,2,0] from [0,1,2,3]
-    :return: tuple output: Yields a tuple which contains a full batch of images and labels (+ mc_info if yield_mc_info=True).
-    """
-    dimensions = get_dimensions_encoding(n_bins, batchsize)
-    swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'tyz-x': (0, 4, 2, 3, 1), 't-xyz': (0, 4, 1, 2, 3), 'xyt-z': (0, 1, 2, 4, 3)}
-
-    while 1:
-        f = h5py.File(filepath, 'r')
-        if f_size is None:
-            f_size = len(f['y'])
-            warnings.warn('f_size=None could produce unexpected results if the f_size used in fit_generator(steps=int(f_size / batchsize)) with epochs > 1 '
-                          'is not equal to the f_size of the true .h5 file. ')
-
-        n_entries = 0
-        while n_entries <= (f_size - batchsize):
-            # create numpy arrays of input data (features)
-            xs = f['x'][n_entries : n_entries + batchsize]
-            xs = np.reshape(xs, dimensions).astype(np.float32)
-
-            if zero_center_image is not None: xs = np.subtract(xs, zero_center_image[0])
-
-            if swap_col is not None:
-                if swap_col == 'yzt-x' or swap_col == 'xyt-z':
-                    xs = np.transpose(xs, swap_4d_channels_dict[swap_col])
-                elif swap_col == 'xyz-t_and_yzt-x':
-                    xs_xyz_t = xs
-                    xs_yzt_x = np.transpose(xs, swap_4d_channels_dict['yzt-x'])
-                    xs = [xs_xyz_t, xs_yzt_x]
-                else: raise ValueError('The argument "swap_col"=' + str(swap_col) + ' is not valid.')
-
-            # and mc info (labels)
-            y_values = f['y'][n_entries:n_entries+batchsize]
-            y_values = np.reshape(y_values, (batchsize, y_values.shape[1])) #TODO simplify with (y_values, y_values.shape) ?
-
-            if class_type[1] != 'track-shower':
-                ys = get_regression_labels(y_values, class_type) # ys: dict which contains arrays for every output key
-
-            else:
-                ys = np.zeros((batchsize, class_type[0]), dtype=np.float32) # ys: arr
-                # encode the labels such that they are all within the same range (and filter the ones we don't want for now)
-                for c, y_val in enumerate(y_values): # Could be vectorized with numba, or use dataflow from tensorpack
-                    ys[c] = encode_targets(y_val, class_type)
-
-            # we have read one more batch from this file
-            n_entries += batchsize
-
-            output = (xs, ys) if yield_mc_info is False else (xs, ys) + (y_values,)
-
-            yield output
-
-        f.close() # this line of code is actually not reached if steps=f_size/batchsize
+# def gen_batches_from_single_file(filepath, batchsize, n_bins, class_type, f_size=None, zero_center_image=None, yield_mc_info=False, swap_col=None):
+#     """
+#     Generator that returns batches of images ('xs') and labels ('ys') from a h5 file.
+#     :param string filepath: Full filepath of the input h5 file, e.g. '/path/to/file/file.h5'.
+#     :param int batchsize: Size of the batches that should be generated. Ideally same as the chunksize in the h5 file.
+#     :param tuple n_bins: Number of bins for each dimension (x,y,z,t) in the h5 file.
+#     :param (int, str) class_type: Tuple with the umber of output classes and a string identifier to specify the exact output classes.
+#                                   I.e. (2, 'muon-CC_to_elec-CC')
+#     :param int/None f_size: Specifies the filesize (#images) of the .h5 file if not the whole .h5 file
+#                        but a fraction of it (e.g. 10%) should be used for yielding the xs/ys arrays.
+#                        This is important if you run fit_generator(epochs>1) with a filesize (and hence # of steps) that is smaller than the .h5 file.
+#     :param ndarray zero_center_image: mean_image of the x dataset used for zero-centering.
+#     :param bool yield_mc_info: Specifies if mc-infos (y_values) should be yielded as well.
+#                                The mc-infos are used for evaluation after training and testing is finished.
+#     :param bool/str swap_col: Specifies, if the index of the columns for xs should be swapped. Necessary for 3.5D nets.
+#                           Currently available: 'yzt-x' -> [3,1,2,0] from [0,1,2,3]
+#     :return: tuple output: Yields a tuple which contains a full batch of images and labels (+ mc_info if yield_mc_info=True).
+#     """
+#     dimensions = get_dimensions_encoding(n_bins, batchsize)
+#     swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'tyz-x': (0, 4, 2, 3, 1), 't-xyz': (0, 4, 1, 2, 3), 'xyt-z': (0, 1, 2, 4, 3)}
+#
+#     while 1:
+#         f = h5py.File(filepath, 'r')
+#         if f_size is None:
+#             f_size = len(f['y'])
+#             warnings.warn('f_size=None could produce unexpected results if the f_size used in fit_generator(steps=int(f_size / batchsize)) with epochs > 1 '
+#                           'is not equal to the f_size of the true .h5 file. ')
+#
+#         n_entries = 0
+#         while n_entries <= (f_size - batchsize):
+#             # create numpy arrays of input data (features)
+#             xs = f['x'][n_entries : n_entries + batchsize]
+#             xs = np.reshape(xs, dimensions).astype(np.float32)
+#
+#             if zero_center_image is not None: xs = np.subtract(xs, zero_center_image[0])
+#
+#             if swap_col is not None:
+#                 if swap_col == 'yzt-x' or swap_col == 'xyt-z':
+#                     xs = np.transpose(xs, swap_4d_channels_dict[swap_col])
+#                 elif swap_col == 'xyz-t_and_yzt-x':
+#                     xs_xyz_t = xs
+#                     xs_yzt_x = np.transpose(xs, swap_4d_channels_dict['yzt-x'])
+#                     xs = [xs_xyz_t, xs_yzt_x]
+#                 else: raise ValueError('The argument "swap_col"=' + str(swap_col) + ' is not valid.')
+#
+#             # and mc info (labels)
+#             y_values = f['y'][n_entries:n_entries+batchsize]
+#             y_values = np.reshape(y_values, (batchsize, y_values.shape[1])) #TODO simplify with (y_values, y_values.shape) ?
+#
+#             if class_type[1] != 'track-shower':
+#                 ys = get_regression_labels(y_values, class_type) # ys: dict which contains arrays for every output key
+#
+#             else:
+#                 ys = np.zeros((batchsize, class_type[0]), dtype=np.float32) # ys: arr
+#                 # encode the labels such that they are all within the same range (and filter the ones we don't want for now)
+#                 for c, y_val in enumerate(y_values): # Could be vectorized with numba, or use dataflow from tensorpack
+#                     ys[c] = encode_targets(y_val, class_type)
+#
+#             # we have read one more batch from this file
+#             n_entries += batchsize
+#
+#             output = (xs, ys) if yield_mc_info is False else (xs, ys) + (y_values,)
+#
+#             yield output
+#
+#         f.close() # this line of code is actually not reached if steps=f_size/batchsize
 
 
 def get_dimensions_encoding(n_bins, batchsize):
@@ -267,6 +261,24 @@ def get_regression_labels(y_values, class_type):
         ys['dir_z'], ys['dir_z_err'] = y_values[:, 7:8], y_values[:, 7:8]
         ys['e'], ys['e_err'] = y_values[:, 2:3], y_values[:, 2:3]
         ys['by'], ys['by_err'] = y_values[:, 4:5], y_values[:, 4:5]
+
+    elif class_type[1] == 'energy_dir_bjorken-y_vtx_errors':
+        particle_type, is_cc = y_values[:, 1], y_values[:, 3]
+        elec_nc_bool_id = np.logical_and(np.abs(particle_type) == 12, is_cc == 0)
+        y_values[elec_nc_bool_id, 2] = y_values[elec_nc_bool_id, 2] * y_values[
+            elec_nc_bool_id, 4]  # correct energy to visible energy
+        y_values[elec_nc_bool_id, 4] = 1  # set bjorken-y for elec_nc events to 1
+
+        ys['dx'], ys['dx_err'] = y_values[:, 5:6], y_values[:, 5:6] # dir
+        ys['dy'], ys['dy_err'] = y_values[:, 6:7], y_values[:, 6:7]
+        ys['dz'], ys['dz_err'] = y_values[:, 7:8], y_values[:, 7:8]
+        ys['e'], ys['e_err'] = y_values[:, 2:3], y_values[:, 2:3]
+        ys['by'], ys['by_err'] = y_values[:, 4:5], y_values[:, 4:5]
+
+        ys['vx'], ys['vx_err'] = y_values[:, 10:11], y_values[:, 10:11] # vtx
+        ys['vy'], ys['vy_err'] = y_values[:, 11:12], y_values[:, 11:12]
+        ys['vz'], ys['vz_err'] = y_values[:, 12:13], y_values[:, 12:13]
+        ys['vt'], ys['vt_err'] = y_values[:, 13:14], y_values[:, 13:14]
 
     else:
         raise ValueError('The regression label ' + str(class_type[1]) + ' in class_type[1] is not available.')
