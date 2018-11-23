@@ -89,9 +89,9 @@ def get_optimizer_info(loss_opt, optimizer='adam'):
     ----------
     loss_opt : tuple
         A Tuple with len=3.
-       loss_opt[0]: dict with loss functions that should be used for each nn output.
-       loss_opt[1]: dict with metrics that should be used for each nn output.
-       loss_opt[2]: dict with loss weights that should be used for each sub-loss.
+        loss_opt[0]: dict with loss functions that should be used for each nn output.
+        loss_opt[1]: dict with metrics that should be used for each nn output.
+        loss_opt[2]: dict with loss weights that should be used for each sub-loss.
     optimizer : str
         Specifies, if "Adam" or "SGD" should be used as optimizer.
 
@@ -175,20 +175,42 @@ def parallelize_model_to_n_gpus(model, n_gpu, batchsize, loss_functions, optimiz
 def schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=0.003, manual_mode=(False, None, 0.0, None)):
     """
     Function that schedules a learning rate during training.
+
     If manual_mode[0] is False, the current lr will be automatically calculated if the training is resumed, based on the epoch variable.
     If manual_mode[0] is True, the final lr during the last training session (manual_mode[1]) and the lr_decay (manual_mode[1])
     have to be set manually.
-    :param Model model: Keras nn model instance. Used for setting the lr.
-    :param (int, int) epoch: The epoch number and the file number at which this training session is resumed (last finished epoch).
-    :param (int/str) n_gpu: Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov').
-    :param list train_files: list of tuples that contains the trainfiles and their number of rows (filepath, f_size).
-    :param float lr_initial: Initial lr that is used with the automatic mode. Typically 0.01 for SGD and 0.001 for Adam.
-    :param (bool, None/float, float, None/float) manual_mode: Tuple that controls the options for the manual mode.
-            manual_mode[0] = flag to enable the manual mode, manual_mode[1] = lr value, of which the mode should start off
-            manual_mode[2] = lr_decay during epochs, manual_mode[3] = current lr, only used to check if this is the first instance of the while loop
-    :return (int, int) epoch: The epoch number of the new epoch (+= 1) and the filenumber.
-    :return float lr: Learning rate that has been set for the model and for this epoch.
-    :return float lr_decay: Learning rate decay that has been used to decay the lr rate used for this epoch.
+
+    Parameters
+    ----------
+    model : ks.model.Model
+        Keras model of a neural network.
+    epoch : tuple(int, int)
+        Declares if a previously trained model or a new model (=0) should be loaded.
+        The first argument specifies the last epoch, and the second argument is the last train file number if the train
+        dataset is split over multiple files.
+    n_gpu : tuple(int, str)
+        Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov') [1].
+        Needed, because the lr is modified with multi GPU training.
+    train_files : list(([train_filepaths], train_filesize))
+        List with the paths and the filesizes of the train_files. Needed for calculating the lr.
+    lr_initial : float
+        Initial learning rate for the first epoch (and first file).
+    manual_mode : tuple(bool, None/float, float, None/float)
+        Tuple that controls the options for the manual mode.
+        manual_mode[0] = flag to enable the manual mode
+        manual_mode[1] = lr value, of which the manual mode should start off
+        manual_mode[2] = lr_decay during epochs
+        manual_mode[3] = current lr, only used to check if this is the first instance of the while loop
+
+    Returns
+    -------
+    epoch : tuple(int, int)
+        The new train file number +=1 (& new epoch if last train_file).
+    lr : int
+        Learning rate that has been set for the model and for this epoch.
+    lr_decay : float
+        Learning rate decay that has been used to decay the lr rate used for this epoch.
+
     """
     if len(train_files) > epoch[1] and epoch[0] != 0:
         epoch = (epoch[0], epoch[1] + 1)  # resume from the same epoch but with the next file
@@ -226,15 +248,29 @@ def schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=0.003, m
 def get_new_learning_rate(epoch, lr_initial, n_train_files, n_gpu):
     """
     Function that calculates the current learning rate based on the number of already trained epochs.
+
     Learning rate schedule is as follows: lr_decay = 7% for lr > 0.0003
                                           lr_decay = 4% for 0.0003 >= lr > 0.0001
                                           lr_decay = 2% for 0.0001 >= lr
-    :param (int, int) epoch: The number of the current epoch and the current filenumber which is used to calculate the new learning rate.
-    :param float lr_initial: Initial lr for the first epoch. Typically 0.01 for SGD and 0.001 for Adam.
-    :param int n_train_files: specifies to how many files the training dataset is split.
-    :param int n_gpu: number of gpu's that are used during the training. Used for scaling the lr.
-    :return float lr_temp: Calculated learning rate for this epoch.
-    :return float lr_decay: Latest learning rate decay used.
+
+    Parameters
+    ----------
+    epoch : tuple(int, int)
+        The number of the current epoch and the current filenumber which is used to calculate the new learning rate.
+    lr_initial : float
+        Initial lr for the first epoch. Typically 0.01 for SGD and 0.001 for Adam.
+    n_train_files : int
+        Specifies into how many files the training dataset is split.
+    n_gpu : int
+        Number of gpu's that are used during the training. Used for scaling the lr.
+
+    Returns
+    -------
+    lr_temp : float
+        Calculated learning rate for this epoch.
+    lr_decay : float
+        Latest learning rate decay that has been used.
+
     """
     n_epoch, n_file = epoch[0], epoch[1]
     n_lr_decays = (n_epoch - 1) * n_train_files + (n_file - 1)
@@ -297,25 +333,47 @@ def fit_model(model, modelname, train_files, f, f_size, file_no, test_files, bat
               shuffle, swap_4d_channels, str_ident, n_events=None, tb_logger=False):
     """
     Trains a model based on the Keras fit_generator method.
+
     If a TensorBoard callback is wished, validation data has to be passed to the fit_generator method.
     For this purpose, the first file of the test_files is used.
-    :param ks.model.Model/Sequential model: Keras model of a neural network.
-    :param str modelname: Name of the model.
-    :param list train_files: list of tuples that contains the trainfiles and their number of rows (filepath, f_size).
-    :param str f: full filepath of the file that should be used for training.
-    :param int f_size: number of images contained in f.
-    :param int file_no: if the full data is split into multiple files, this param indicates the file number.
-    :param list test_files: list of tuples that contains the testfiles and their number of rows for the tb_callback.
-    :param int batchsize: Batchsize that is used in the fit_generator method.
-    :param list(tuple) n_bins: Number of bins for each dimension (x,y,z,t) in both the train- and test_files. Can contain multiple n_bins tuples.
-    :param (int, str) class_type: Tuple with the number of output classes and a string identifier to specify the output classes.
-    :param ndarray xs_mean: mean_image of the x (train-) dataset used for zero-centering the test data.
-    :param (int, int) epoch: Epoch of the model if it has been trained before.
-    :param (bool, None/int) shuffle: Declares if the training data should be shuffled before the next training epoch.
-    :param None/int swap_4d_channels: For 3.5D, param for the gen to specify, if the default channel (t) should be swapped with another dim.
-    :param str str_ident: string identifier for the projection type / model input that is parsed to the image generator. Needed for some specific models.
-    :param None/int n_events: For testing purposes if not the whole .h5 file should be used for training.
-    :param bool tb_logger: Declares if a tb_callback during fit_generator should be used (takes long time to save the tb_log!).
+
+    Parameters
+    ----------
+    model : ks.model.Model
+        Keras model instance of a neural network.
+    modelname : str
+        Name of the model.
+    train_files : list(([train_filepaths], train_filesize))
+        List of tuples with the filepaths and the filesizes of the train_files.
+    f : str
+        Full filepath of the file that should be used for training.
+    f_size : int
+        Number of images contained in f.
+    file_no : int
+        If the full data is split into multiple files, this parameter indicates the current file number.
+    test_files : list(([test_filepaths], test_filesize))
+        List of tuples that contains the testfiles and their number of rows for the tb_callback.
+    batchsize : int
+        Batchsize that is used in the fit_generator method.
+    n_bins : list(tuple(int))
+        Number of bins for each dimension (x,y,z,t) in both the train- and test_files. Can contain multiple n_bins tuples.
+    class_type : tuple(int, str)
+        Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
+    xs_mean : ndarray
+        Mean_image of the x (train-) dataset used for zero-centering the train-/testdata.
+    epoch : tuple(int, int)
+        The number of the current epoch and the current filenumber.
+    shuffle : tuple(bool, None/int)
+        Declares if the training data should be shuffled before the next training epoch.
+    swap_4d_channels : None/str
+        For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
+    str_ident : str
+        Optional string identifier that gets appended to the modelname.
+    n_events : None/int
+        For testing purposes if not the whole .h5 file should be used for training.
+    tb_logger : bool
+        Declares if a tb_callback during fit_generator should be used (takes long time to save the tb_log during training!).
+
     """
     if tb_logger is True:
         callbacks = [TensorBoardWrapper(generate_batches_from_hdf5_file(test_files[0][0], batchsize, n_bins, class_type, str_ident, zero_center_image=xs_mean),
@@ -353,18 +411,34 @@ def fit_model(model, modelname, train_files, f, f_size, file_no, test_files, bat
 def evaluate_model(model, modelname, test_files, train_files, batchsize, n_bins, class_type, xs_mean, epoch, swap_4d_channels, str_ident, n_events=None):
     """
     Evaluates a model with validation data based on the Keras evaluate_generator method.
-    :param ks.model.Model/Sequential model: Keras model (trained) of a neural network.
-    :param str modelname: Name of the model.
-    :param list test_files: list of tuples that contains the testfiles and their number of rows.
-    :param list train_files: list of tuples that contains the trainfiles and their number of rows (filepath, f_size).
-    :param int batchsize: Batchsize that is used in the evaluate_generator method.
-    :param list(tuple) n_bins: Number of bins for each dimension (x,y,z,t) in the test_files. Can contain multiple n_bins tuples.
-    :param (int, str) class_type: Tuple with the number of output classes and a string identifier to specify the output classes.
-    :param ndarray xs_mean: mean_image of the x (train-) dataset used for zero-centering the test data.
-    :param (int, int) epoch: Current epoch of the training.
-    :param None/int swap_4d_channels: For 3.5D, param for the gen to specify, if the default channel (t) should be swapped with another dim.
-    :param str str_ident: string identifier for the projection type / model input that is parsed to the image generator. Needed for some specific models.
-    :param None/int n_events: For testing purposes if not the whole .h5 file should be used for evaluating.
+
+    Parameters
+    ----------
+    model : ks.model.Model
+        Keras model instance of a neural network.
+    modelname : str
+        Name of the model.
+    test_files : list(([test_filepaths], test_filesize))
+        List of tuples that contains the testfiles and their number of rows.
+    train_files : list(([train_filepaths], train_filesize))
+        List of tuples with the filepaths and the filesizes of the train_files.
+    batchsize : int
+        Batchsize that is used in the evaluate_generator method.
+    n_bins : list(tuple(int))
+        Number of bins for each dimension (x,y,z,t) in both the train- and test_files. Can contain multiple n_bins tuples.
+    class_type : tuple(int, str)
+        Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
+    xs_mean : ndarray
+        Mean_image of the x (train-) dataset used for zero-centering the train-/testdata.
+    epoch : tuple(int, int)
+        The number of the current epoch and the current filenumber.
+    swap_4d_channels : None/str
+        For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
+    str_ident : str
+        Optional string identifier that gets appended to the modelname.
+    n_events : None/int
+        For testing purposes if not the whole .h5 file should be used for testing.
+
     """
     histories = []
     for i, (f, f_size) in enumerate(test_files):
@@ -436,16 +510,28 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
                                               str_ident, modelname, xs_mean):
     """
     Function that 1) makes predictions based on a Keras nn model and 2) investigates the performance of the model based on the predictions.
-    :param ks.model model: Keras nn model instance.
-    :param list(([test_filepaths], test_filesize)) test_files: list of tuples that contains the list(testfiles) and their number of rows.
-    :param list(tuple) n_bins: Declares the number of bins for each dimension (x,y,z,t) in the train- and testfiles. Can contain multiple n_bins tuples.
-    :param int batchsize: Batchsize that is used in the training.
-    :param (int, str) class_type: Tuple with the number of output classes and a string identifier to specify the output classes.
-    :param None/int swap_4d_channels: For 3.5D. Specifies, if the default channel (t) should be swapped with another dim.
-    :param str str_ident: String identifier for the projection type / model input that is parsed to the image generator.
-                          Needed for some specific models.
-    :param str modelname: Name of the model.
-    :param ndarray xs_mean: Mean image of the x dataset. Can be used for zero-centering.
+
+    Parameters
+    ----------
+    model : ks.model.Model
+        Keras model of a neural network.
+    test_files : list(([test_filepaths], test_filesize))
+        List of tuples that contains the testfiles and their number of rows.
+    n_bins : list(tuple(int))
+        Number of bins for each dimension (x,y,z,t) in both the train- and test_files. Can contain multiple n_bins tuples.
+    batchsize : int
+        Batchsize that is used for predicting.
+    class_type : tuple(int, str)
+        Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
+    swap_4d_channels : None/str
+        For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
+    str_ident : str
+        Optional string identifier that gets appended to the modelname.
+    modelname : str
+        Name of the model.
+    xs_mean : ndarray
+        Mean_image of the x (train-) dataset used for zero-centering the train-/testdata.
+
     """
     # for layer in model.layers: # temp
     #     if 'batch_norm' in layer.name:
@@ -453,7 +539,6 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
     arr_nn_pred = get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, modelname, samples=None)
     np.save('results/plots/saved_predictions/arr_nn_pred_' + modelname + '.npy', arr_nn_pred)
     arr_nn_pred = np.load('results/plots/saved_predictions/arr_nn_pred_' + modelname + '.npy')
-
 
     #arr_nn_pred = np.load('results/plots/saved_predictions/arr_nn_pred_' + modelname + '_final_stateful_false.npy')
     #arr_nn_pred = np.load('results/plots/saved_predictions//arr_nn_pred_model_VGG_4d_xyz-t_and_yzt-x_and_4d_xyzt_track-shower_multi_input_single_train_tight-1_tight-2_lr_0.003_tr_st_test_st_final_stateful_false_1-100GeV_precut.npy')
