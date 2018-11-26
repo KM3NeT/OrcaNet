@@ -17,15 +17,29 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident =
     """
     Returns the general dimension (2D/3D), the input dimensions (i.e. bs x 11 x 13 x 18 x channels=1 for 3D)
     and appropriate max_pool_sizes depending on the projection type.
-    :param list(tuple) n_bins: Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
-    :param int batchsize: Batchsize of the fed data.
-    :param None/str swap_4d_channels: For 3.5D nets, specifies if the default channel (t) should be swapped with another dim.
-    :param str str_ident: optional string identifier that specifies the projection.
-    :return: int dim: Dimension of the network (2D/3D).
-    :return: tuple input_dim: dimensions tuple for 2D, 3D or 4D data (ints).
-    :return: dict/dict(dict) max_pool_sizes: Dict that specifies the Pooling locations and properties for the VGG net.
-                                  Key: After which convolutional layer a pooling layer be inserted (counts from layer zero!)
-                                  Item: Specifies the strides.
+
+    Parameters
+    ----------
+    n_bins : list(tuple(int))
+        Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
+    batchsize : int
+        Batchsize that is used for the training / inferencing of the cnn.
+    swap_4d_channels : None/str
+        For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
+    str_ident : str
+        Optional string identifier that gets appended to the modelname.
+
+    Returns
+    -------
+    dim : int
+        Dimension of the network (2D/3D/4D).
+    input_dim : tuple
+        Dimensions tuple for 2D, 3D or 4D data (ints).
+    max_pool_sizes : dict/dict(dict)
+        Dict that specifies the Pooling locations and properties for a cnn
+        Key: After which convolutional layer a pooling layer be inserted (counts from layer zero!)
+        Item: Specifies the strides.
+
     """
     if n_bins[0].count(1) == 1: # 3d case
         dim = 3
@@ -119,19 +133,36 @@ def create_vgg_like_model(n_bins, batchsize, class_type, n_filters=None, dropout
                           activation='relu', kernel_reg=None):
     """
     Returns a VGG-like model (stacked conv. layers) with MaxPooling and Dropout if wished.
+
     The number of convolutional layers can be controlled with the n_filters parameter:
     n_conv_layers = len(n_filters)
-    :param list(tuple) n_bins: Number of bins (x,y,z,t) of the data. Should only contain one element for this single input net.
-    :param (int, str) class_type: Declares the number of output classes and a string identifier to specify the exact output classes.
-                                  I.e. (2, 'track-shower')
-    :param int batchsize: Batchsize of the data that will be used with the VGG net.
-    :param tuple n_filters: Number of filters for each conv. layer. len(n_filters)=n_conv_layer.
-    :param float dropout: Adds dropout if >0.
-    :param int k_size: Kernel size which is used for all dimensions.
-    :param None/str swap_4d_channels: For 3.5D nets, specifies if the default channel (t) should be swapped with another dim.
-    :param str activation: Type of activation function that should be used for the net. E.g. 'linear', 'relu', 'elu', 'selu'.
-    :param None/str kernel_reg: if L2 regularization with 1e-4 should be employed. 'l2' to enable the regularization.
-    :return: Model model: Keras VGG-like model.
+
+    Parameters
+    ----------
+    n_bins : list(tuple(int))
+        Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
+    batchsize : int
+        Batchsize that is used for the training / inferencing of the cnn.
+    class_type : tuple(int, str)
+        Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
+    n_filters : tuple
+        Number of filters for each conv. layer. len(n_filters)=n_conv_layer.
+    dropout : int
+        Adds dropout if >0.
+    k_size : int
+        Kernel size which is used for all dimensions.
+    swap_4d_channels : None/str
+        For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
+    activation : str
+        Type of activation function that should be used for the net. E.g. 'linear', 'relu', 'elu', 'selu'.
+    kernel_reg : None/str
+        If L2 regularization with 1e-4 should be employed. 'l2' to enable the regularization.
+
+    Returns
+    -------
+    model : ks.models.Model
+        A VGG-like Keras nn instance.
+
     """
     if n_filters is None: n_filters = (64,64,64,64,64,128,128,128)
     if kernel_reg is 'l2': kernel_reg = l2(0.0001)
@@ -155,16 +186,33 @@ def create_vgg_like_model(n_bins, batchsize, class_type, n_filters=None, dropout
 def conv_block(ip, dim, n_filters, k_size=3, dropout=0, max_pooling=None, activation='relu', kernel_reg = None):
     """
     2D/3D Convolutional block followed by BatchNorm and Activation with optional MaxPooling or Dropout.
+
     C-B-A-(MP)-(D)
-    :param ip: Keras functional layer instance that is used as the starting point of this convolutional block.
-    :param int dim: 2D or 3D block.
-    :param int n_filters: Number of filters used for the convolution.
-    :param int k_size: Kernel size which is used for all three dimensions.
-    :param float dropout: Adds a dropout layer if value is greater than 0.
-    :param None/tuple max_pooling: Specifies if a MaxPooling layer should be added. e.g. (1,1,2) for 3D.
-    :param str activation: Type of activation function that should be used. E.g. 'linear', 'relu', 'elu', 'selu'.
-    :param None/str kernel_reg: if L2 regularization with 1e-4 should be employed. 'l2' to enable the regularization.
-    :return: x: Resulting output tensor (model).
+
+    Parameters
+    ----------
+    ip : ? # TODO
+        Keras functional layer instance that is used as the starting point of this convolutional block.
+    dim : int
+        Specifies the dimension of the convolutional block, 2D/3D.
+    n_filters : int
+        Number of filters used for the convolutional layer.
+    k_size : int
+        Kernel size which is used for all three dimensions.
+    dropout : int
+        Adds a dropout layer if the value is greater than 0.
+    max_pooling : None/tuple
+        Specifies if a MaxPooling layer should be added. e.g. (1,1,2) -> strides for a 3D conv block.
+    activation : str
+        Type of activation function that should be used. E.g. 'linear', 'relu', 'elu', 'selu'.
+    kernel_reg : None/str
+        If L2 regularization with 1e-4 should be employed. 'l2' to enable the regularization.
+
+    Returns
+    -------
+    x :
+        Resulting output tensor (model).
+
     """
     if dim not in (2,3): raise ValueError('dim must be equal to 2 or 3.')
     convolution_nd = Convolution2D if dim==2 else Convolution3D
@@ -185,9 +233,26 @@ def conv_block(ip, dim, n_filters, k_size=3, dropout=0, max_pooling=None, activa
 
 def add_dense_layers_to_cnn(conv_output_flat, class_type, dropout=0, activation='relu', kernel_reg=None):
     """
-    WIP
-    :param float dropout: Adds dropout if >0.
-    :return:
+    Appends dense layers to the convolutional layers of a cnn.
+
+    Parameters
+    ----------
+    conv_output_flat : ? # TODO
+        The Keras layer instance after the Flatten() layer.
+    class_type : tuple(int, str)
+        Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
+    dropout : int
+        Adds a dropout layer if the value is greater than 0.
+    activation : str
+        Type of activation function that should be used. E.g. 'linear', 'relu', 'elu', 'selu'.
+    kernel_reg : None/str
+        If L2 regularization with 1e-4 should be employed. 'l2' to enable the regularization.
+
+    Returns
+    -------
+    outputs : list
+        List of outputs for the cnn.
+
     """
     nb_classes = class_type[0]
 
@@ -259,19 +324,36 @@ def add_dense_layers_to_cnn(conv_output_flat, class_type, dropout=0, activation=
 
 def create_vgg_like_model_double_input(n_bins, batchsize, nb_classes=2, n_filters=None, dropout=0, k_size=3, swap_4d_channels=None, activation='relu'):
     """
-    Returns a double input, VGG-like model (stacked conv. layers) with MaxPooling and Dropout if wished.
+    Returns a double input, VGG-like model (stacked conv. layers) with MaxPooling and Dropout if wished for classification.
+
     The two single VGG networks are concatenated after the last flatten layers.
     The number of convolutional layers can be controlled with the n_filters parameter:
     n_conv_layers = len(n_filters)
-    :param list(tuple) n_bins: Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
-    :param int nb_classes: Number of output classes.
-    :param int batchsize: Batchsize of the data that will be used with the VGG net.
-    :param tuple n_filters: Number of filters for each conv. layer. len(n_filters)=n_conv_layer.
-    :param float dropout: Adds dropout if >0.
-    :param int k_size: Kernel size which is used for all dimensions.
-    :param None/str swap_4d_channels: For 3.5D nets, specifies if the default channel (t) should be swapped with another dim.
-    :param str activation: Type of activation function that should be used. E.g. 'linear', 'relu', 'elu', 'selu'.
-    :return: Model model: Keras VGG-like model.
+
+    Parameters
+    ----------
+    n_bins : list(tuple(int))
+        Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
+    batchsize : int
+        Batchsize that is used for the training / inferencing of the cnn.
+    nb_classes : int
+        Number of output classes.
+    n_filters : tuple
+        Number of filters for each conv. layer. len(n_filters)=n_conv_layer.
+    dropout : int
+        Adds dropout if >0.
+    k_size : int
+        Kernel size which is used for all dimensions.
+    swap_4d_channels : None/str
+        For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
+    activation : str
+        Type of activation function that should be used for the net. E.g. 'linear', 'relu', 'elu', 'selu'.
+
+    Returns
+    -------
+    model : ks.models.Model
+        A VGG-like, double input Keras nn instance.
+
     """
     if n_filters is None: n_filters = (64,64,64,64,64,128,128,128)
 
@@ -312,15 +394,31 @@ def create_vgg_like_model_double_input(n_bins, batchsize, nb_classes=2, n_filter
 def create_vgg_like_model_multi_input_from_single_nns(n_bins, batchsize, str_ident, nb_classes=2, dropout=(0, 0.2), swap_4d_channels=None, activation='relu'):
     """
     Returns a double input, VGG-like model (stacked conv. layers) with MaxPooling and Dropout if wished.
+
     The two single VGG networks are concatenated after the last flatten layers.
-    :param list(tuple) n_bins: Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
-    :param int batchsize: Batchsize of the data that will be used with the VGG net.
-    :param str str_ident: optional string identifier that specifies the input projection type.
-    :param int nb_classes: Number of output classes.
-    :param (float, float) dropout: Adds dropout if >0.
-    :param None/str swap_4d_channels: For 3.5D nets, specifies if the default channel (t) should be swapped with another dim.
-    :param str activation: Type of activation function that should be used. E.g. 'linear', 'relu', 'elu', 'selu'.
-    :return: Model model: Keras VGG-like model.
+
+    Parameters
+    ----------
+    n_bins : list(tuple(int))
+        Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
+    batchsize : int
+        Batchsize that is used for the training / inferencing of the cnn.
+    str_ident : str
+        Optional string identifier that gets appended to the modelname.
+    nb_classes : int
+        Number of output classes.
+    dropout : int
+        Adds dropout if >0.
+    swap_4d_channels : None/str
+        For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
+    activation : str
+        Type of activation function that should be used for the net. E.g. 'linear', 'relu', 'elu', 'selu'.
+
+    Returns
+    -------
+    model : ks.models.Model
+        A VGG-like, double input Keras nn instance, with pretrained conv layers.
+
     """
     dim, input_dim, max_pool_sizes = decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident=str_ident)
     trained_model_paths = {}
@@ -383,15 +481,30 @@ def create_vgg_like_model_multi_input_from_single_nns(n_bins, batchsize, str_ide
 def create_layer_from_config(x, trained_layer, layer_numbers, trainable=False, net='', dropout=0):
     """
     Creates a new Keras nn layer from the config of an already existing layer.
+
     Changes the 'trainable' flag of the new layer to false and optionally udates the dropout rate.
     Adds a layer name based on the layer_numbers dict.
-    :param x: Keras functional model api instance. E.g. TF tensors.
-    :param ks.layer trained_layer: Keras layer instance that is already trained.
-    :param dict layer_numbers: dictionary for the different layer types to keep track of the layer_number in the layer names.
-    :param bool trainable: flag to set the <trainable> attribute of the new layer.
-    :param str net: additional string that is added to the layer name. E.g. 'net_2' if a double input model is used.
-    :param float dropout: optional, dropout rate of the new layer
-    :return: x: Keras functional model api instance. E.g. TF tensors. Contains a new layer now!
+
+    Parameters
+    ----------
+    x : ? # TODO
+        Keras functional model api instance. E.g. TF tensors.
+    trained_layer : ks.layer
+        Keras layer instance that is already trained.
+    layer_numbers : dict
+        Dictionary for the different layer types to keep track of the layer_number in the layer names.
+    trainable : bool
+        Flag to set the <trainable> attribute of the new layer.
+    net : str
+        Additional string that is added to the layer name. E.g. 'net_2' if a double input model is used.
+    dropout : float
+        optional, dropout rate of the new layer
+
+    Returns
+    -------
+    x : ?
+        Keras functional model api instance. E.g. TF tensors. Contains a new layer now!
+
     """
     if 'conv' in trained_layer.name:
         layer, name = Convolution3D, 'conv'
@@ -428,8 +541,14 @@ def create_layer_from_config(x, trained_layer, layer_numbers, trainable=False, n
 def set_layer_weights(model, trained_models):
     """
     Sets the weights of a double input model (until the first flatten layer) based on two pretrained models.
-    :param Model model: Keras model instance.
-    :param dict trained_models: dict that contains references to the Keras model instances of the already pretrained models.
+
+    Parameters
+    ----------
+    model : ks.models.Model
+        Keras model instance.
+    trained_models : dict
+        Dict that contains references to the Keras model instances of the already pretrained models.
+
     """
     skip_layers = ['dropout', 'input', 'dense', 'flatten', 'max_pooling', 'activation', 'concatenate']
     n_models = len(trained_models)
@@ -452,16 +571,31 @@ def set_layer_weights(model, trained_models):
             layer.set_weights(trained_layers_w_weights[i][j].get_weights())
 
 
-def change_dropout_rate_for_multi_input_model(n_bins, batchsize, trained_model, dropout=(0.1, 0.1), trainable=(True, True), swap_4d_channels=None): # TODO fix for multi input
+def change_dropout_rate_for_multi_input_model(n_bins, batchsize, trained_model, dropout=(0.1, 0.1), trainable=(True, True), swap_4d_channels=None):
     """
     Function that rebuilds a keras model and modifies its dropout rate. Workaround, till layer.rate is fixed to work with Dropout layers.
-    :param list(tuple) n_bins: Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
-    :param int batchsize: Batchsize of the data that will be used with the VGG net.
-    :param ks.models.Model trained_model: Trained Keras model, upon which the dropout rate should be changed.
-    :param (float, float) dropout: Adds dropout if > 0. First value for the conv block, second value for the dense.
-    :param (bool, bool) trainable: Sets the trainable flag for the conv block layers and for the dense layers.
-    :param None/str swap_4d_channels: For 3.5D nets, specifies if the default channel (t) should be swapped with another dim. Only used to decode the input_dim.
-    :return: Model model: Keras VGG-like model based on the trained_model with modified dropout layers.
+
+    Parameters
+    ----------
+    n_bins : list(tuple(int))
+        Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
+    batchsize : int
+        Batchsize that is used for the training / inferencing of the cnn.
+    trained_model : ks.models.Model
+        Trained Keras model, upon which the dropout rate should be changed.
+    dropout : (float, float)
+        Adds dropout if > 0. First value for the conv block, second value for the dense.
+    trainable : (bool, bool)
+        Sets the trainable flag for the conv block layers and for the dense layers.
+    swap_4d_channels : None/str
+        For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
+        Only used to decode the input_dim.
+
+    Returns
+    -------
+    model : ks.models.Model
+        Keras VGG-like model based on the trained_model with modified dropout layers.
+
     """
     dim, input_dim, max_pool_sizes = decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels)
 
@@ -504,8 +638,14 @@ def change_dropout_rate_for_multi_input_model(n_bins, batchsize, trained_model, 
 def set_layer_weights_from_single_trained_model(model, trained_model):
     """
     Sets the weights of a Keras model based on an already trained trained_model.
-    :param Model model: Keras model instance withought weights.
-    :param Model trained_model: Pretrained Keras model used to set the weights for the new model.
+
+    Parameters
+    ----------
+    model : ks.models.Model
+        Keras model instance withought weights.
+    trained_model : ks.models.Model
+        Pretrained Keras model used to set the weights for the new model.
+
     """
     skip_layers = ['dropout', 'input', 'flatten', 'max_pooling', 'activation', 'concatenate']
 
@@ -525,17 +665,35 @@ def set_layer_weights_from_single_trained_model(model, trained_model):
 def create_convolutional_lstm(n_bins, batchsize, nb_classes=2, n_filters=None, dropout=0, k_size=3, activation='relu', kernel_reg=None):
     """
     Returns a VGG-like, convolutional LSTM model (stacked conv. layers + LSTM) with MaxPooling and Dropout if wished.
+    Only working for classification as of now!
+
     The number of convolutional layers can be controlled with the n_filters parameter:
     n_conv_layers = len(n_filters)
-    :param list(tuple) n_bins: Number of bins (x,y,z,t) of the data.
-    :param int nb_classes: Number of output classes.
-    :param int batchsize: Batchsize of the data that will be used with the VGG net.
-    :param tuple/None n_filters: Number of filters for each conv. layer. len(n_filters)=n_conv_layer.
-    :param float dropout: Adds dropout if >0.
-    :param int k_size: Kernel size which is used for all dimensions.
-    :param str activation: Type of activation function that should be used for the net. E.g. 'linear', 'relu', 'elu', 'selu'.
-    :param None/str kernel_reg: if L2 regularization with 1e-4 should be employed. 'l2' to enable the regularization.
-    :return: Model model: Keras VGG-like model.
+
+    Parameters
+    ----------
+    n_bins : list(tuple(int))
+        Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
+    batchsize : int
+        Batchsize that is used for the training / inferencing of the cnn.
+    nb_classes : int
+        Number of output classes.
+    n_filters : None/tuple
+        Number of filters for each conv. layer. len(n_filters)=n_conv_layer.
+    dropout : float
+        Adds dropout if >0.
+    k_size : int
+        Kernel size which is used for all dimensions.
+    activation : str
+        Type of activation function that should be used for the net. E.g. 'linear', 'relu', 'elu', 'selu'.
+    kernel_reg : None/str
+        If L2 regularization with 1e-4 should be employed. 'l2' to enable the regularization.
+
+    Returns
+    -------
+    model : ks.models.Model
+        Keras conv lstm model.
+
     """
     if n_filters is None: n_filters = (32, 32, 64, 64, 64, 64, 128)
     if kernel_reg is 'l2': kernel_reg = l2(0.0001)
@@ -569,16 +727,32 @@ def create_convolutional_lstm(n_bins, batchsize, nb_classes=2, n_filters=None, d
 
 def conv_block_time_distributed(ip, n_filters, k_size=3, dropout=0, max_pooling=None, activation='relu', kernel_reg = None):
     """
-    2D/3D Convolutional block followed by BatchNorm and Activation with optional MaxPooling or Dropout.
+    Time distributed 2D/3D Convolutional block followed by BatchNorm and Activation with optional MaxPooling or Dropout.
+
     C-B-A-(MP)-(D)
-    :param ip: Keras functional layer instance that is used as the starting point of this convolutional block.
-    :param int n_filters: Number of filters used for the convolution.
-    :param int k_size: Kernel size which is used for all three dimensions.
-    :param float dropout: Adds a dropout layer if value is greater than 0.
-    :param None/tuple max_pooling: Specifies if a MaxPooling layer should be added. e.g. (1,1,2) for 3D.
-    :param str activation: Type of activation function that should be used. E.g. 'linear', 'relu', 'elu', 'selu'.
-    :param None/str kernel_reg: if L2 regularization with 1e-4 should be employed. 'l2' to enable the regularization.
-    :return: x: Resulting output tensor (model).
+
+    Parameters
+    ----------
+    ip :
+        Keras functional layer instance that is used as the starting point of this convolutional block.
+    n_filters : int
+        Number of filters used for the convolution.
+    k_size : int
+        Kernel size which is used for all three dimensions.
+    dropout : float
+        Adds a dropout layer if value is greater than 0.
+    max_pooling : None/tuple
+        Specifies if a MaxPooling layer should be added. e.g. (1,1,2) -> strides for a 3D conv block.
+    activation : str
+        Type of activation function that should be used. E.g. 'linear', 'relu', 'elu', 'selu'.
+    kernel_reg : None/str
+        If L2 regularization with 1e-4 should be employed. 'l2' to enable the regularization.
+
+    Returns
+    -------
+    x :
+        Resulting output tensor (model).
+
     """
     x = TimeDistributed(Convolution3D(n_filters, (k_size,) * 3, padding='same', kernel_initializer='he_normal', use_bias=False, kernel_regularizer=kernel_reg))(ip)
 
