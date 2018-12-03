@@ -558,8 +558,22 @@ class TensorBoardWrapper(ks.callbacks.TensorBoard):
 
 
 class BatchLevelPerformanceLogger(ks.callbacks.Callback):
+    """
+    TODO
+    """
     # Gibt loss aus über alle :display batches, gemittelt über die letzten :display batches
     def __init__(self, train_files, batchsize, display, model, modelname, epoch):
+        """
+        TODO
+        Parameters
+        ----------
+        train_files
+        batchsize
+        display
+        model
+        modelname
+        epoch
+        """
         ks.callbacks.Callback.__init__(self)
         self.seen = 0
         self.display = display

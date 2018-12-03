@@ -56,7 +56,7 @@ def build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4
 
     Returns
     -------
-    model : ks.models
+    model : ks.models.Model
         A Keras nn instance.
 
     """
@@ -143,7 +143,7 @@ def parallelize_model_to_n_gpus(model, n_gpu, batchsize, loss_functions, optimiz
 
     Returns
     -------
-    model : ks.models
+    model : ks.models.Model
         The parallelized Keras nn instance (multi_gpu_model).
     batchsize : int
         The new batchsize scaled by the number of used gpu's.

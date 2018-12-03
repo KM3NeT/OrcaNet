@@ -108,7 +108,6 @@ def get_array_indices():
     return label_indices
 
 
-
 def get_cum_number_of_steps(files, batchsize):
     """
     Function that calculates the cumulative number of prediction steps for the single files in the <files> list.
