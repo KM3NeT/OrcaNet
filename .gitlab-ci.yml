@@ -1,0 +1,5 @@
+install:
+    image: docker.km3net.de/base/python:3
+    script:
+        - cd cnn
+        - pip install .
