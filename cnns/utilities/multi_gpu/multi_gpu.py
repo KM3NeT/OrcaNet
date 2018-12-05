@@ -12,7 +12,7 @@ From https://github.com/avolkov1/keras_experiments
 #
 # Also used https://github.com/fchollet/keras/issues/2436 which was just
 # posted as code snippets in a forum.
-from __future__ import print_function
+
 
 import sys
 # import time

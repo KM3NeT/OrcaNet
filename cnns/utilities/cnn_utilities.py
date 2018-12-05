@@ -8,6 +8,7 @@ import numpy as np
 import h5py
 import os
 import keras as ks
+from functools import reduce
 
 #------------- Functions used for supplying images to the GPU -------------#
 
@@ -32,14 +33,14 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, str
     """
     n_files = len(filepath)
     dimensions = {}
-    for i in xrange(n_files):
+    for i in range(n_files):
         dimensions[i] = get_dimensions_encoding(n_bins[i], batchsize)
 
     swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'xyt-z': (0, 1, 2, 4, 3), 't-xyz': (0,4,1,2,3), 'tyz-x': (0,4,2,3,1)}
 
     while 1:
         f = {}
-        for i in xrange(n_files):
+        for i in range(n_files):
             f[i] = h5py.File(filepath[i], 'r')
 
         if f_size is None: # Should be same for all files!
@@ -52,12 +53,12 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, str
             # create numpy arrays of input data (features)
             xs = {}
             xs_list = [] # list of inputs for the Keras NN
-            for i in xrange(n_files):
+            for i in range(n_files):
                 xs[i] = f[i]['x'][n_entries : n_entries + batchsize]
                 xs[i] = np.reshape(xs[i], dimensions[i]).astype(np.float32)
 
             if zero_center_image is not None:
-                for i in xrange(n_files):
+                for i in range(n_files):
                     xs[i] = np.subtract(xs[i], zero_center_image[i])
 
             if swap_col is not None:
@@ -85,7 +86,7 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, str
                 else: raise ValueError('The argument "swap_col"=' + str(swap_col) + ' is not valid.')
 
             else:
-                for i in xrange(n_files):
+                for i in range(n_files):
                     xs_list.append(xs[i])
 
             # and mc info (labels). Since the labels are same (!!) for all the multiple files, use first file for this
@@ -108,7 +109,7 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, str
 
             yield output
 
-        for i in xrange(n_files):
+        for i in range(n_files):
             f[i].close()
 
 
@@ -191,39 +192,39 @@ def get_dimensions_encoding(n_bins, batchsize):
     n_bins_x, n_bins_y, n_bins_z, n_bins_t = n_bins[0], n_bins[1], n_bins[2], n_bins[3]
     if n_bins_x == 1:
         if n_bins_y == 1:
-            print 'Using 2D projected data without dimensions x and y'
+            print('Using 2D projected data without dimensions x and y')
             dimensions = (batchsize, n_bins_z, n_bins_t, 1)
         elif n_bins_z == 1:
-            print 'Using 2D projected data without dimensions x and z'
+            print('Using 2D projected data without dimensions x and z')
             dimensions = (batchsize, n_bins_y, n_bins_t, 1)
         elif n_bins_t == 1:
-            print 'Using 2D projected data without dimensions x and t'
+            print('Using 2D projected data without dimensions x and t')
             dimensions = (batchsize, n_bins_y, n_bins_z, 1)
         else:
-            print 'Using 3D projected data without dimension x'
+            print('Using 3D projected data without dimension x')
             dimensions = (batchsize, n_bins_y, n_bins_z, n_bins_t, 1)
 
     elif n_bins_y == 1:
         if n_bins_z == 1:
-            print 'Using 2D projected data without dimensions y and z'
+            print('Using 2D projected data without dimensions y and z')
             dimensions = (batchsize, n_bins_x, n_bins_t, 1)
         elif n_bins_t == 1:
-            print 'Using 2D projected data without dimensions y and t'
+            print('Using 2D projected data without dimensions y and t')
             dimensions = (batchsize, n_bins_x, n_bins_z, 1)
         else:
-            print 'Using 3D projected data without dimension y'
+            print('Using 3D projected data without dimension y')
             dimensions = (batchsize, n_bins_x, n_bins_z, n_bins_t, 1)
 
     elif n_bins_z == 1:
         if n_bins_t == 1:
-            print 'Using 2D projected data without dimensions z and t'
+            print('Using 2D projected data without dimensions z and t')
             dimensions = (batchsize, n_bins_x, n_bins_y, 1)
         else:
-            print 'Using 3D projected data without dimension z'
+            print('Using 3D projected data without dimension z')
             dimensions = (batchsize, n_bins_x, n_bins_y, n_bins_t, 1)
 
     elif n_bins_t == 1:
-        print 'Using 3D projected data without dimension t'
+        print('Using 3D projected data without dimension t')
         dimensions = (batchsize, n_bins_x, n_bins_y, n_bins_z, 1)
 
     else:
@@ -309,7 +310,7 @@ def encode_targets(y_val, class_type):
         up_down_class_value = int(np.sign(dir_z)) # returns -1 if dir_z < 0, 0 if dir_z==0, 1 if dir_z > 0
 
         if up_down_class_value == 0:
-            print 'Warning: Found an event with dir_z==0. Setting the up-down class randomly.'
+            print('Warning: Found an event with dir_z==0. Setting the up-down class randomly.')
             # maybe [0.5, 0.5], but does it make sense with cat_crossentropy?
             up_down_class_value = np.random.randint(2)
 
@@ -372,7 +373,7 @@ def encode_targets(y_val, class_type):
                 train_y[1] = 1
 
     else:
-        print "Class type " + str(class_type) + " not supported!"
+        print("Class type " + str(class_type) + " not supported!")
         return y_val
 
     return train_y
@@ -400,16 +401,16 @@ def load_zero_center_data(train_files, batchsize, n_bins, n_gpu):
         filepath_without_index = re.sub(shuffle_index.group(1) + shuffle_index.group(2) + shuffle_index.group(3), '', filepath)
 
         if os.path.isfile(filepath_without_index + '_zero_center_mean.npy') is True:
-            print 'Loading an existing xs_mean_array in order to zero_center the data!'
+            print('Loading an existing xs_mean_array in order to zero_center the data!')
             xs_mean_temp = np.load(filepath_without_index + '_zero_center_mean.npy')
 
         else:
-            print 'Calculating the xs_mean_array in order to zero_center the data!'
+            print('Calculating the xs_mean_array in order to zero_center the data!')
             dimensions = get_dimensions_encoding(n_bins[i], batchsize)
 
             # if the train dataset is split over multiple files, we need to average over the single xs_mean_temp arrays.
             xs_mean_temp_arr = None
-            for j in xrange(len(train_files)):
+            for j in range(len(train_files)):
                 filepath_j = train_files[j][0][i] # j is the index of the j-th train file, i the index of the i-th projection input
                 xs_mean_temp_step = get_mean_image(filepath_j, dimensions, n_gpu)
 
@@ -420,7 +421,7 @@ def load_zero_center_data(train_files, batchsize, n_bins, n_gpu):
             xs_mean_temp = np.mean(xs_mean_temp_arr, axis=0, dtype=np.float64).astype(np.float32) if len(train_files) > 1 else xs_mean_temp_arr[0]
 
             np.save(filepath_without_index + '_zero_center_mean.npy', xs_mean_temp)
-            print 'Saved the xs_mean array with shape', xs_mean_temp.shape, ' to ', filepath_without_index, '_zero_center_mean.npy'
+            print('Saved the xs_mean array with shape', xs_mean_temp.shape, ' to ', filepath_without_index, '_zero_center_mean.npy')
 
         xs_mean.append(xs_mean_temp)
 
@@ -449,8 +450,8 @@ def get_mean_image(filepath, dimensions, n_gpu):
 
     xs_mean_arr = None
 
-    for i in xrange(steps):
-        print 'Calculating the mean_image of the xs dataset in step ' + str(i)
+    for i in range(steps):
+        print('Calculating the mean_image of the xs dataset in step ' + str(i))
         if xs_mean_arr is None: # create xs_mean_arr that stores intermediate mean_temp results
             xs_mean_arr = np.zeros((steps, ) + f['x'].shape[1:], dtype=np.float64)
 
@@ -546,7 +547,7 @@ class TensorBoardWrapper(ks.callbacks.TensorBoard):
         # Fill in the `validation_data` property.
         # After it's filled in, the regular on_epoch_end method has access to the validation_data.
         imgs, tags = None, None
-        for s in xrange(self.nb_steps):
+        for s in range(self.nb_steps):
             ib, tb = next(self.batch_gen)
             if imgs is None and tags is None:
                 imgs = np.zeros(((self.nb_steps * ib.shape[0],) + ib.shape[1:]), dtype=np.float32)

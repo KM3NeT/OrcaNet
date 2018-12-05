@@ -57,10 +57,10 @@ def export_hist_2d_to_pdf():
     hists = f['x']
     mc_info = f['y']
 
-    for i in xrange(hists.shape[0]):
+    for i in range(hists.shape[0]):
         event_id = mc_info[i][0]
         if event_id > 25:
-            print i
+            print(i)
             continue
         x_bin_edges = [-118.551, -96.82727272727273, -75.10354545454545, -53.37981818181818, -31.656090909090906, -9.932363636363633,
                        11.791363636363641, 33.515090909090915, 55.23881818181819, 76.96254545454546, 98.68627272727274, 120.41]

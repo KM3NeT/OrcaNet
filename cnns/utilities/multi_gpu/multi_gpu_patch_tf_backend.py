@@ -2,7 +2,7 @@
 Multi-gpu code for Keras/TF.
 From https://github.com/avolkov1/keras_experiments
 """
-from __future__ import print_function
+
 
 import sys
 import numpy as np

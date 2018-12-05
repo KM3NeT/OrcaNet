@@ -46,11 +46,11 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident =
         input_dim = get_dimensions_encoding(n_bins[0], batchsize)  # includes batchsize
 
         if n_bins[0][3] == 1:
-            print 'Using a VGG-like 3D CNN with XYZ projection'
+            print('Using a VGG-like 3D CNN with XYZ projection')
             max_pool_sizes = {3: (2, 2, 2), 7: (2, 2, 2)}
 
         elif n_bins[0][0] == 1:
-            print 'Using a VGG-like 3D CNN with YZT projection'
+            print('Using a VGG-like 3D CNN with YZT projection')
             max_pool_sizes = {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}
 
         else:
@@ -97,13 +97,13 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident =
         else:
             input_dim = get_dimensions_encoding(n_bins[0], batchsize)  # includes batchsize
             if swap_4d_channels is None:
-                print 'Using a VGG-like 3.5D CNN with XYZ data and T/C channel information.'
+                print('Using a VGG-like 3.5D CNN with XYZ data and T/C channel information.')
                 #max_pool_sizes = {3: (2, 2, 2), 7: (2, 2, 2)}
                 max_pool_sizes = {5: (2, 2, 2), 9: (2, 2, 2)} # 2 more layers
                 #max_pool_sizes = {7: (2, 2, 2), 11: (2, 2, 2)}  # 4 more layers
 
             elif swap_4d_channels == 'yzt-x':
-                print 'Using a VGG-like 3.5D CNN with YZT data and X channel information.'
+                print('Using a VGG-like 3.5D CNN with YZT data and X channel information.')
                 #max_pool_sizes = {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}
                 max_pool_sizes = {2: (1, 1, 2), 5: (2, 2, 2), 9: (2, 2, 2)} # 2 more layers
                 input_dim = (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1]) # [bs,y,z,t,x]
@@ -172,7 +172,7 @@ def create_vgg_like_model(n_bins, batchsize, class_type, n_filters=None, dropout
     input_layer = Input(shape=input_dim[1:], dtype=K.floatx())  # input_layer
     x = conv_block(input_layer, dim, n_filters[0], k_size=k_size, dropout=dropout, max_pooling=max_pool_sizes.get(0), activation=activation, kernel_reg=kernel_reg)
 
-    for i in xrange(1, len(n_filters)):
+    for i in range(1, len(n_filters)):
         x = conv_block(x, dim, n_filters[i], k_size=k_size, dropout=dropout, max_pooling=max_pool_sizes.get(i), activation=activation, kernel_reg=kernel_reg)
 
     conv_output_flat = Flatten()(x)
@@ -312,7 +312,7 @@ def add_dense_layers_to_cnn(conv_output_flat, class_type, dropout=0, activation=
                 outputs.append(output_label_merged)
 
         else:
-            label_names = ['neuron_' + str(i) for i in xrange(class_type[0])]
+            label_names = ['neuron_' + str(i) for i in range(class_type[0])]
             if class_type[1] == 'energy_and_direction_and_bjorken-y':
                 label_names = ('energy', 'dir_x', 'dir_y', 'dir_z', 'bjorken-y')
             elif class_type[1] == 'energy':
@@ -365,13 +365,13 @@ def create_vgg_like_model_double_input(n_bins, batchsize, nb_classes=2, n_filter
     # Net 1 convs
     x_1 = conv_block(input_layer_1, dim, n_filters[0], k_size=k_size, dropout=dropout, max_pooling=max_pool_sizes['net_1'].get(0), activation=activation)
 
-    for i in xrange(1, len(n_filters)):
+    for i in range(1, len(n_filters)):
         x_1 = conv_block(x_1, dim, n_filters[i], k_size=k_size, dropout=dropout, max_pooling=max_pool_sizes['net_1'].get(i), activation=activation)
 
     # Net 2 convs
     x_2 = conv_block(input_layer_2, dim, n_filters[0], k_size=k_size, dropout=dropout, max_pooling=max_pool_sizes['net_2'].get(0), activation=activation)
 
-    for i in xrange(1, len(n_filters)):
+    for i in range(1, len(n_filters)):
         x_2 = conv_block(x_2, dim, n_filters[i], k_size=k_size, dropout=dropout, max_pooling=max_pool_sizes['net_2'].get(i), activation=activation)
 
     # flatten both nets
@@ -447,7 +447,7 @@ def create_vgg_like_model_multi_input_from_single_nns(n_bins, batchsize, str_ide
     layer_numbers = {}
     x = {}
 
-    for i in xrange(n_inputs):
+    for i in range(n_inputs):
         trained_models[i] = ks.models.load_model(trained_model_paths[i])
 
         input_layers[i] = Input(shape=input_dim[i][1:], name='input_net_' + str(i+1), dtype=K.floatx())
@@ -554,7 +554,7 @@ def set_layer_weights(model, trained_models):
     n_models = len(trained_models)
     trained_layers_w_weights = {}
 
-    for i in xrange(n_models):
+    for i in range(n_models):
         trained_layers_w_weights[i] = [layer for layer in trained_models[i].layers if 'conv' in layer.name or 'batch_normalization' in layer.name]  # still ordered
 
         j = -1
@@ -703,7 +703,7 @@ def create_convolutional_lstm(n_bins, batchsize, nb_classes=2, n_filters=None, d
     input_layer = Input(shape=input_dim[1:], dtype=K.floatx())  # input_layer
     x = conv_block_time_distributed(input_layer, n_filters[0], k_size=k_size, dropout=dropout, max_pooling=max_pool_sizes.get(0), activation=activation, kernel_reg=kernel_reg)
 
-    for i in xrange(1, len(n_filters)):
+    for i in range(1, len(n_filters)):
         x = conv_block_time_distributed(x, n_filters[i], k_size=k_size, dropout=dropout, max_pooling=max_pool_sizes.get(i), activation=activation, kernel_reg=kernel_reg)
 
     x = TimeDistributed(Flatten())(x)

@@ -123,7 +123,7 @@ def h5_get_number_of_rows(h5_filepath):
     :return: int number_of_rows: number of rows of the .h5 file in the first dataset.
     """
     f = h5py.File(h5_filepath, 'r')
-    number_of_rows = f[f.keys()[0]].shape[0]
+    number_of_rows = f[list(f.keys())[0]].shape[0]
     f.close()
 
     return number_of_rows
@@ -140,7 +140,7 @@ def use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=False)
     """
     local_scratch_path = os.environ['TMPDIR']
     train_files_ssd, test_files_ssd = [], []
-    print 'Copying the input train/test data to the node-local SSD scratch folder'
+    print('Copying the input train/test data to the node-local SSD scratch folder')
 
     if multiple_inputs is True:
         # in the case that we need multiple input data files for each batch, e.g. double input model with two different timecuts
@@ -183,5 +183,5 @@ def use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=False)
             input_filepath_ssd = local_scratch_path + '/' + os.path.basename(input_filepath)
             test_files_ssd.append(([input_filepath_ssd], f_size))
 
-    print 'Finished copying the input train/test data to the node-local SSD scratch folder'
+    print('Finished copying the input train/test data to the node-local SSD scratch folder')
     return train_files_ssd, test_files_ssd
