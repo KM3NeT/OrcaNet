@@ -147,7 +147,7 @@ def get_particle_types_and_energies(filepaths, index_ptype=3, index_energy_range
 
     # make ptype string for the savenames of the .list files
     ptype_str = ''
-    for i in xrange(len(particle_types)):
+    for i in range(len(particle_types)):
         if ptype_str == '':
             ptype_str += particle_types[i]
         else:
@@ -263,7 +263,7 @@ def save_filepaths_to_list(dirpath, filepaths_per_interaction_type, include_rang
 
     n_files = len(include_range[next(iter(include_range))]) - 1 # n_files is same for all interaction types, calculate based on first interaction type
     list_savenames = []
-    for i in xrange(n_files):
+    for i in range(n_files):
 
         if sample_type=='train_' and tau_test_only is True:
             p_type_str = p_type_str.replace('_and_tau-CC', '')
@@ -395,7 +395,7 @@ def submit_concatenate_list_files(savenames, dirpath, p_type_str, proj_type, chu
         n_lists = len(savenames)
         n_loops = int(math.ceil(n_lists/float(n_cores)))
 
-        for i in xrange(n_loops):
+        for i in range(n_loops):
             n_lists_left = n_lists - i*n_cores
             write_txt_concatenate_files_one_loop(f, savenames, i, n_lists_left, n_cores)
 

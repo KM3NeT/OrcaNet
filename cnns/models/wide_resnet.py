@@ -31,12 +31,12 @@ def decode_input_dimensions(n_bins, batchsize, swap_4d_channels):
         dim = 2
 
         if n_bins[0] == 1 and n_bins[3] == 1:
-            print 'Using a Wide ResNet with YZ projection'
+            print('Using a Wide ResNet with YZ projection')
             strides = [(1,1), (1,1), (2,2)]
             average_pooling_size = (7,9)
 
         elif n_bins[0] == 1 and n_bins[1] == 1:
-            print 'Using a Wide ResNet with ZT projection'
+            print('Using a Wide ResNet with ZT projection')
             strides = [(1,1), (1,2), (2,2)]
             average_pooling_size = (9,13)
 
@@ -48,17 +48,17 @@ def decode_input_dimensions(n_bins, batchsize, swap_4d_channels):
         dim = 3
 
         if n_bins[1] == 1:
-            print 'Using a Wide ResNet with XZT projection'
+            print('Using a Wide ResNet with XZT projection')
             strides = [(1,1,1), (1,1,2), (2,2,2)]
             average_pooling_size = (6,9,13)
 
         elif n_bins[3] == 1:
-            print 'Using a Wide ResNet with XYZ projection'
+            print('Using a Wide ResNet with XYZ projection')
             strides = [(1,1,1), (1,1,1), (2,2,2)]
             average_pooling_size = (6,7,9)
 
         elif n_bins[0] == 1:
-            print 'Using a Wide ResNet with YZT projection'
+            print('Using a Wide ResNet with YZT projection')
             strides = [(1,1,1), (1,1,2), (2,2,2)]
             average_pooling_size = (7,9,13)
 
@@ -70,13 +70,13 @@ def decode_input_dimensions(n_bins, batchsize, swap_4d_channels):
         dim = 3
 
         if swap_4d_channels is None:
-            print 'Using a WRN 3.5D CNN with XYZ data and T channel information.'
+            print('Using a WRN 3.5D CNN with XYZ data and T channel information.')
             #strides = [(1,1,1), (1,1,1), (2,2,2)]
             strides = [(1, 1, 1), (2, 2, 2)]
             average_pooling_size = (6,7,9)
 
         elif swap_4d_channels == 'yzt-x':
-            print 'Using a WRN 3.5D CNN with YZT data and X channel information.'
+            print('Using a WRN 3.5D CNN with YZT data and X channel information.')
             #strides = [(1,1,1), (1,1,2), (2,2,2)]
             strides = [(1,1,2), (2,2,2)]
             average_pooling_size = (7,9,13)

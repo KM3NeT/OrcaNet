@@ -225,22 +225,22 @@ def schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=0.003, m
         if epoch[0] > 1 and lr_decay > 0:
             lr *= 1 - float(lr_decay)
             K.set_value(model.optimizer.lr, lr)
-            print 'Decayed learning rate to ' + str(K.get_value(model.optimizer.lr)) + \
-                  ' before epoch ' + str(epoch[0]) + ' (minus ' + '{:.1%}'.format(lr_decay) + ')'
+            print('Decayed learning rate to ' + str(K.get_value(model.optimizer.lr)) + \
+                  ' before epoch ' + str(epoch[0]) + ' (minus ' + '{:.1%}'.format(lr_decay) + ')')
 
     else:
         if epoch[0] == 1 and epoch[1] == 1:
             lr, lr_decay = lr_initial, 0.00
             #lr, lr_decay = lr_initial * n_gpu[0], 0.00
             K.set_value(model.optimizer.lr, lr)
-            print 'Set learning rate to ' + str(K.get_value(model.optimizer.lr)) + ' before epoch ' + str(epoch[0]) + \
-                  ' and file ' + str(epoch[1])
+            print('Set learning rate to ' + str(K.get_value(model.optimizer.lr)) + ' before epoch ' + str(epoch[0]) + \
+                  ' and file ' + str(epoch[1]))
         else:
             n_train_files = len(train_files)
             lr, lr_decay = get_new_learning_rate(epoch, lr_initial, n_train_files, n_gpu[0])
             K.set_value(model.optimizer.lr, lr)
-            print 'Decayed learning rate to ' + str(K.get_value(model.optimizer.lr)) + \
-                  ' before epoch ' + str(epoch[0]) + ' and file ' + str(epoch[1]) + ' (minus ' + '{:.1%}'.format(lr_decay) + ')'
+            print('Decayed learning rate to ' + str(K.get_value(model.optimizer.lr)) + \
+                  ' before epoch ' + str(epoch[0]) + ' and file ' + str(epoch[1]) + ' (minus ' + '{:.1%}'.format(lr_decay) + ')')
 
     return epoch, lr, lr_decay
 
@@ -278,7 +278,7 @@ def get_new_learning_rate(epoch, lr_initial, n_train_files, n_gpu):
     lr_temp = lr_initial # * n_gpu TODO think about multi gpu lr
     lr_decay = None
 
-    for i in xrange(n_lr_decays):
+    for i in range(n_lr_decays):
 
         if lr_temp > 0.0003:
             lr_decay = 0.07 # standard for PID: 0.07, standard for regression: 0.02
@@ -390,14 +390,14 @@ def fit_model(model, modelname, train_files, f, f_size, file_no, test_files, bat
     callbacks.append(logger)
 
     if epoch[0] > 1 and shuffle[0] is True: # just for convenience, we don't want to wait before the first epoch each time
-        print 'Shuffling file ', f, ' before training in epoch ', epoch[0], ' and file ', file_no
+        print('Shuffling file ', f, ' before training in epoch ', epoch[0], ' and file ', file_no)
         shuffle_h5(f, chunking=(True, batchsize), delete_flag=True)
 
     if shuffle[1] is not None:
         n_preshuffled = shuffle[1]
         f = f.replace('0.h5', str(epoch[0]-1) + '.h5') if epoch[0] <= n_preshuffled else f.replace('0.h5', str(np.random.randint(0, n_preshuffled+1)) + '.h5')
 
-    print 'Training in epoch', epoch[0], 'on file ', file_no, ',', f
+    print('Training in epoch', epoch[0], 'on file ', file_no, ',', f)
 
     history = model.fit_generator(
         generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, str_ident, f_size=f_size, zero_center_image=xs_mean, swap_col=swap_4d_channels),
@@ -442,14 +442,14 @@ def evaluate_model(model, modelname, test_files, train_files, batchsize, n_bins,
     """
     histories = []
     for i, (f, f_size) in enumerate(test_files):
-        print 'Testing on file ', i, ',', str(f)
+        print('Testing on file ', i, ',', str(f))
 
         if n_events is not None: f_size = n_events  # for testing purposes
 
         history = model.evaluate_generator(
             generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, str_ident, swap_col=swap_4d_channels, f_size=f_size, zero_center_image=xs_mean),
             steps=int(f_size / batchsize), max_queue_size=10, verbose=1)
-        print 'Test sample results: ' + str(history) + ' (' + str(model.metrics_names) + ')'
+        print('Test sample results: ' + str(history) + ' (' + str(model.metrics_names) + ')')
         histories.append(history)
 
     history_averaged = [sum(col) / float(len(col)) for col in zip(*histories)] if len(histories) > 1 else histories[0] # average over all test files if necessary
@@ -473,7 +473,7 @@ def evaluate_model(model, modelname, test_files, train_files, batchsize, n_bins,
 
     logfile.write(str(epoch_number_float) + '\t')
 
-    for i in xrange(len(model.metrics_names)):
+    for i in range(len(model.metrics_names)):
         logfile.write(str(history_averaged[i]))
         logfile.write('\t') if i + 1 < len(model.metrics_names) else logfile.write('\n')
 
@@ -559,7 +559,7 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
         precuts = (True, 'regr_3-100_GeV_prod_and_1-3_GeV_prod')
 
         if 'energy' in class_type[1]:
-            print 'Generating plots for energy performance investigations'
+            print('Generating plots for energy performance investigations')
 
             # DL
             make_2d_energy_resolution_plot(arr_nn_pred, modelname, precuts=precuts,
@@ -572,7 +572,7 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
             make_2d_energy_resolution_plot(arr_nn_pred_shallow, 'shallow_reco', precuts=precuts)
 
         if 'dir' in class_type[1]:
-            print 'Generating plots for directional performance investigations'
+            print('Generating plots for directional performance investigations')
 
             # DL
             make_1d_dir_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median', precuts=precuts,
@@ -582,7 +582,7 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
             make_2d_dir_correlation_plot(arr_nn_pred_shallow, 'shallow_reco', precuts=precuts)
 
         if 'bjorken-y' in class_type[1]:
-            print 'Generating plots for bjorken-y performance investigations'
+            print('Generating plots for bjorken-y performance investigations')
 
             # DL
             make_1d_bjorken_y_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median', precuts=precuts,
@@ -592,7 +592,7 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
             make_2d_bjorken_y_resolution_plot(arr_nn_pred_shallow, 'shallow_reco', precuts=precuts)
 
         if 'errors' in class_type[1]:
-            print 'Generating plots for error performance investigations'
+            print('Generating plots for error performance investigations')
 
             make_1d_reco_err_div_by_std_plot(arr_nn_pred, modelname, precuts=precuts) # TODO take precuts from above?
             make_1d_reco_err_to_reco_residual_plot(arr_nn_pred, modelname, precuts=precuts)

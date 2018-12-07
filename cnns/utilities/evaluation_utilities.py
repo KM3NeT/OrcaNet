@@ -44,13 +44,13 @@ def get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchs
             test_file.close()
         else:
             samples_f = samples
-        steps = samples_f/batchsize
+        steps = int(samples_f/batchsize)
 
         generator = generate_batches_from_hdf5_file(f[0], batchsize, n_bins, class_type, str_ident, zero_center_image=xs_mean, yield_mc_info=True, swap_col=swap_4d_channels) # f_size=samples prob not necessary
 
         arr_nn_pred_row_start = cum_number_of_steps[f_number] * batchsize
-        for s in xrange(steps):
-            if s % 100 == 0: print 'Predicting in step ' + str(s) + ' on file ' + str(f_number)
+        for s in range(steps):
+            if s % 100 == 0: print('Predicting in step ' + str(s) + ' on file ' + str(f_number))
 
             xs, y_true, mc_info = next(generator)
             y_pred = model.predict_on_batch(xs)
@@ -118,7 +118,7 @@ def get_cum_number_of_steps(files, batchsize):
     cum_number_of_steps = [0]
     for i, f in enumerate(files):
         samples = h5py.File(f[0][0], 'r')['y'].shape[0]
-        steps = samples/batchsize
+        steps = int(samples/batchsize)
         cum_number_of_steps.append(cum_number_of_steps[i] + steps) # [0, steps_sample_1, steps_sample_1 + steps_sample_2, ...]
 
     return cum_number_of_steps
@@ -327,7 +327,7 @@ def print_absolute_performance(arr_energy_correct, print_text='Performance: '):
     n_correct = np.count_nonzero(correct, axis=0) # count how many times the predictions were True
     n_total = arr_energy_correct.shape[0] # count the total number of predictions
     performance = n_correct/float(n_total)
-    print print_text, '\n', str(performance *100), '\n', arr_energy_correct.shape
+    print(print_text, '\n', str(performance *100), '\n', arr_energy_correct.shape)
 
 #-- Utility functions --#
 
@@ -685,7 +685,7 @@ def make_hist_2d_property_vs_property(arr_nn_pred, modelname, property_types=('b
     prop_1, prop_2 = properties[property_types[0]], properties[property_types[1]]
 
 
-    for key in iter(particle_types_dict.keys()):
+    for key in iter(list(particle_types_dict.keys())):
         make_hist_2d_class(prop_1, prop_2, arr_nn_pred, particle_types_dict, e_cut, key,
                            savepath='results/plots/2d/track_shower/hist_2d_' + key + '_' + property_types[0] + '_vs_'
                                     + property_types[1] + '_e_cut_' + str(e_cut[0]) + '_' + str(e_cut[1]) + '_' + modelname)
@@ -695,22 +695,22 @@ def make_hist_2d_property_vs_property(arr_nn_pred, modelname, property_types=('b
 
     pdf_pages = {}
 
-    for key in iter(particle_types_dict.keys()):
+    for key in iter(list(particle_types_dict.keys())):
         pdf_pages[key] = mpl.backends.backend_pdf.PdfPages('results/plots/2d/track_shower/hist_2d_' + key + '_'
                                                          + property_types[0] + '_vs_' + property_types[1] + '_e_cut_'
                                                            + str(e_cut[0]) + '_' + str(e_cut[1]) + '_multiple_' + modelname + '.pdf')
 
-    for i in xrange(e_cut_range[1] - e_cut_range[0]):
+    for i in range(e_cut_range[1] - e_cut_range[0]):
         e_cut_temp = (e_cut_range[0] + i*stepsize, e_cut_range[0] + i * stepsize + stepsize)
-        for key in iter(particle_types_dict.keys()):
+        for key in iter(list(particle_types_dict.keys())):
             make_hist_2d_class(prop_1, prop_2, arr_nn_pred, particle_types_dict, e_cut_temp, key, pdf_file=pdf_pages[key])
 
-    for i in xrange(e_cut_range[1] - e_cut_range[0]):
+    for i in range(e_cut_range[1] - e_cut_range[0]):
         e_cut_temp = (e_cut_range[0] + i*stepsize, e_cut_range[0] + i * stepsize + stepsize)
-        for key in iter(particle_types_dict.keys()):
+        for key in iter(list(particle_types_dict.keys())):
             make_hist_2d_class(prop_1, prop_2, arr_nn_pred, particle_types_dict, e_cut_temp, key, pdf_file=pdf_pages[key], log=True)
 
-    for key in iter(pdf_pages.keys()):
+    for key in iter(list(pdf_pages.keys())):
         pdf_pages[key].close()
 
 #TODO fix arr_nn_pred indices, doesn't work as of now
@@ -800,7 +800,7 @@ def calculate_and_plot_separation_pid(arr_nn_pred, modelname, precuts=(False, '3
         hist_prob_track_e_cut_sum_elec_cc = np.histogram(arr_nn_pred_e_cut_sum_elec_cc[:, 10], bins=40, density=True)
 
         correlation_coeff_enumerator = 0
-        for j in xrange(bins - 1):
+        for j in range(bins - 1):
             correlation_coeff_enumerator += hist_prob_track_e_cut_sum_muon_cc[0][j] * hist_prob_track_e_cut_sum_elec_cc[0][j]
 
         sum_prob_muon_cc = np.sum(hist_prob_track_e_cut_sum_muon_cc[0] ** 2)
@@ -876,7 +876,7 @@ def make_2d_energy_resolution_plot(arr_nn_pred, modelname, energy_bins=np.arange
     fig, ax = plt.subplots()
     pdf_plots = mpl.backends.backend_pdf.PdfPages('results/plots/2d/energy/energy_resolution_' + modelname + '.pdf')
 
-    for ic in ic_list.iterkeys():
+    for ic in ic_list.keys():
         is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], ic)
         if bool(np.any(is_ic, axis=0)) is False: continue
 
@@ -935,7 +935,7 @@ def get_boolean_interaction_channel_separation(particle_type, is_cc, interaction
     :return:
     """
     ic_dict = {'muon-CC': (14, 1), 'elec-CC': (12, 1), 'elec-NC': (12, 0), 'tau-CC': (16, 1)}
-    if interaction_channel not in ic_dict.keys():
+    if interaction_channel not in list(ic_dict.keys()):
         raise ValueError('The interaction_channel ' + str(interaction_channel) + ' is not known.')
 
     abs_ptype = np.abs(particle_type)
@@ -973,7 +973,7 @@ def correct_reco_energy(arr_nn_pred, metric='median'):
 
     e_range = np.logspace(np.log(3)/np.log(2),np.log(100)/np.log(2),50,base=2)
     n_ranges = e_range.shape[0] - 1
-    for i in xrange(n_ranges):
+    for i in range(n_ranges):
         e_range_low, e_range_high = e_range[i], e_range[i+1]
         e_range_mean = (e_range_high + e_range_low) / float(2)
 
@@ -1033,7 +1033,7 @@ def make_1d_energy_reco_metric_vs_energy_plot(arr_nn_pred, modelname, metric='me
     fig, ax = plt.subplots()
     pdf_plots = mpl.backends.backend_pdf.PdfPages('results/plots/1d/energy/energy_resolution_' + modelname + '.pdf')
 
-    for ic in ic_list.iterkeys():
+    for ic in ic_list.keys():
 
         energy_metric_plot_data_ic = calc_plot_data_of_energy_dependent_label(arr_nn_pred, ic, energy_bins=energy_bins, label=('energy', metric))
         if energy_metric_plot_data_ic is None: continue # ic not contained in the arr_nn_pred
@@ -1110,7 +1110,7 @@ def calc_plot_data_of_energy_dependent_label(arr_nn_pred, interaction_channel, e
 
     elif label_name in ['dir_x', 'dir_y', 'dir_z']:
         reco_label_list = []
-        for i in xrange(reco_label.shape[0]): # TODO remove, not necessary?
+        for i in range(reco_label.shape[0]): # TODO remove, not necessary?
             dir = reco_label[i]
             if dir < -1: dir = -1
             if dir > 1: dir = 1
@@ -1144,7 +1144,7 @@ def bin_error_in_energy_bins(energy_bins, mc_energy, err, operation='median_rela
     bin_indices = np.digitize(mc_energy, bins=energy_bins)
 
     # For every mc energy bin, calculate the merge operation (e.g. mae or median relative) of all events that have a corresponding mc energy
-    for bin_no in xrange(1, len(energy_bins)):
+    for bin_no in range(1, len(energy_bins)):
         current_err = err[bin_indices == bin_no]
         current_mc_energy = mc_energy[bin_indices == bin_no]
 
@@ -1206,7 +1206,7 @@ def make_1d_energy_std_div_e_true_plot(arr_nn_pred, modelname, energy_bins=np.li
     fig, ax = plt.subplots()
     pdf_plots = mpl.backends.backend_pdf.PdfPages('results/plots/1d/energy/energy_std_rel_' + modelname + '.pdf')
 
-    for ic in ic_list.iterkeys():
+    for ic in ic_list.keys():
         std_rel_ic = get_std_rel_plot_data(arr_nn_pred, ic, energy_bins)
         if std_rel_ic is None: continue  # ic not contained in the arr_nn_pred
 
@@ -1252,7 +1252,7 @@ def get_std_rel_plot_data(arr_nn_pred, ic, energy_bins):
     energy_mc_ic, energy_pred_ic = energy_mc[is_ic], energy_pred[is_ic]
 
     std_rel_ic = [] # y-axis of the plot
-    for i in xrange(energy_bins.shape[0] -1):
+    for i in range(energy_bins.shape[0] -1):
         e_range_low, e_range_high = energy_bins[i], energy_bins[i+1]
         e_range_mean = (e_range_low + e_range_high)/ float(2)
 
@@ -1298,15 +1298,15 @@ def make_1d_dir_metric_vs_energy_plot(arr_nn_pred, modelname, metric='median', e
     pdf_plots = mpl.backends.backend_pdf.PdfPages('results/plots/1d/dir/dir_resolution_' + modelname + '.pdf')
     reco_name = 'OrcaNet: ' if modelname != 'shallow_reco' else 'Standard Reco: '
 
-    for ic in ic_list.iterkeys():
-        for key, list_dirs in directions.iteritems():
+    for ic in ic_list.keys():
+        for key, list_dirs in directions.items():
             dir_plot_data_ic = {}
 
             for dir_coord in list_dirs:
                 dir_plot_data_ic[dir_coord] = calc_plot_data_of_energy_dependent_label(arr_nn_pred, ic, energy_bins=energy_bins,
                                                                             label=(dir_coord, metric))
             # continue if the specified interaction channel is not contained in any element of the dict
-            if dir_plot_data_ic[dir_plot_data_ic.keys()[0]] is None: continue
+            if dir_plot_data_ic[list(dir_plot_data_ic.keys())[0]] is None: continue
 
             for dir_coord in list_dirs:
                 bins, dir_perf_ic = dir_plot_data_ic[dir_coord][0], dir_plot_data_ic[dir_coord][1]
@@ -1355,7 +1355,7 @@ def make_2d_dir_correlation_plot(arr_nn_pred, modelname, precuts=(False, '3-100_
     fig, ax = plt.subplots()
     pdf_plots = mpl.backends.backend_pdf.PdfPages('results/plots/2d/dir/dir_correlation_' + modelname + '.pdf')
 
-    for ic in ic_list.iterkeys():
+    for ic in ic_list.keys():
         is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], ic)
         if bool(np.any(is_ic, axis=0)) is False: continue
 
@@ -1491,7 +1491,7 @@ def make_1d_bjorken_y_metric_vs_energy_plot(arr_nn_pred, modelname, metric='medi
     is_e_nc = np.logical_and(abs_particle_type == 12, is_cc == 0)
     arr_nn_pred[is_e_nc, 5] = 1
 
-    for ic in ic_list.iterkeys():
+    for ic in ic_list.keys():
 
         by_metric_plot_data_ic = calc_plot_data_of_energy_dependent_label(arr_nn_pred, ic, energy_bins=energy_bins, label=('bjorken_y', metric))
         if by_metric_plot_data_ic is None: continue
@@ -1502,7 +1502,7 @@ def make_1d_bjorken_y_metric_vs_energy_plot(arr_nn_pred, modelname, metric='medi
         if compare_shallow[0] is True:
             by_metric_plot_data_shallow_ic = calc_plot_data_of_energy_dependent_label(arr_nn_pred_shallow, ic, energy_bins=energy_bins,
                                                                                       label=('bjorken_y', metric))
-            print by_metric_plot_data_shallow_ic[1] # TODO check what happens if e-NC
+            print(by_metric_plot_data_shallow_ic[1]) # TODO check what happens if e-NC
             ax.step(bins, by_metric_plot_data_shallow_ic[1], linestyle="-", where='post', label='Standard Reco')
 
         reco_name = 'OrcaNet: ' if modelname != 'shallow_reco' else 'Standard Reco: '
@@ -1552,7 +1552,7 @@ def make_2d_bjorken_y_resolution_plot(arr_nn_pred, modelname, by_bins=np.linspac
     by_mc = arr_nn_pred[:, 5]
     by_pred = arr_nn_pred[:, 13]
 
-    for ic in ic_list.iterkeys():
+    for ic in ic_list.keys():
 
         is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], ic)
         if bool(np.any(is_ic, axis=0)) is False: continue
@@ -1637,7 +1637,7 @@ def plot_1d_reco_err_div_by_std_for_label(arr_nn_pred, fig, ax, pdf_plots, label
     pred_err_div_by_std = np.divide(label_true - label_pred, np.abs(label_std_pred))
     exclude_outliers = np.logical_and(pred_err_div_by_std > -10, pred_err_div_by_std < 10)
 
-    print np.std(pred_err_div_by_std[exclude_outliers])
+    print(np.std(pred_err_div_by_std[exclude_outliers]))
 
     #plt.hist(pred_err_div_by_std, bins=100, label=label, range=(-0.5, 0.5))
     plt.hist(pred_err_div_by_std[exclude_outliers], bins=100, label=label)
@@ -1705,7 +1705,7 @@ def plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, 
                'elec-NC': {'title': 'Track like (' + r'$\nu_{e}-NC$)'},
                'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
 
-    for ic in ic_list.iterkeys():
+    for ic in ic_list.keys():
         is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], ic)
         if bool(np.any(is_ic, axis=0)) is False: continue
 
@@ -1738,10 +1738,10 @@ def plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, 
                                          (-dy_pred / (dx_pred ** 2 + dy_pred ** 2)) ** 2 * dx_std_pred ** 2)
                 n = label_std_pred > math.pi
                 percentage_true = np.sum(n)/float(label_std_pred.shape[0]) * 100
-                print np.sum(n)
-                print percentage_true
-                print dz_pred[n]
-                print dz_true[n]
+                print(np.sum(n))
+                print(percentage_true)
+                print(dz_pred[n])
+                print(dz_true[n])
 
                 label_std_pred = np.clip(label_std_pred, None, math.pi)
 
@@ -1760,11 +1760,11 @@ def plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, 
                 # label_std_pred = np.sqrt(dx_std_pred ** 2 + dy_std_pred ** 2) / np.sin(zenith_pred + math.pi/float(2))
                 #label_std_pred = np.clip(label_std_pred, None, math.pi)
 
-                print '----- AZIMUTH -----'
+                print('----- AZIMUTH -----')
                 #print np.amin(zenith_pred), np.amax(zenith_pred)
-                print np.amin(label_std_pred), np.amax(label_std_pred)
-                print np.mean(label_std_pred)
-                print '----- AZIMUTH -----'
+                print(np.amin(label_std_pred), np.amax(label_std_pred))
+                print(np.mean(label_std_pred))
+                print('----- AZIMUTH -----')
 
             else: # zenith
                 # atan2(z, sqrt(x**2 + y**2))
@@ -1785,12 +1785,12 @@ def plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, 
                 #                           ((- dx_pred * dz_pred) / (np.sqrt(dx_pred ** 2 + dy_pred ** 2) * (dx_pred ** 2 + dy_pred ** 2 + dz_pred ** 2))) ** 2 * dx_std_pred ** 2 +
                 #                           ((- dy_pred * dz_pred) / (np.sqrt(dx_pred ** 2 + dy_pred ** 2) * (dx_pred ** 2 + dy_pred ** 2 + dz_pred ** 2))) ** 2 * dy_std_pred ** 2)
 
-                print '----- ZENITH -----'
-                print np.amin(label_true - label_pred), np.amax(label_true - label_pred)
-                print np.amin(label_std_pred), np.amax(label_std_pred)
+                print('----- ZENITH -----')
+                print(np.amin(label_true - label_pred), np.amax(label_true - label_pred))
+                print(np.amin(label_std_pred), np.amax(label_std_pred))
 
-                print label_std_pred
-                print '----- ZENITH -----'
+                print(label_std_pred)
+                print('----- ZENITH -----')
 
         else:
             label_true = arr_nn_pred[is_ic][:, labels[label]['index_label_true']]
@@ -1804,7 +1804,7 @@ def plot_1d_reco_err_to_reco_residual_for_label(arr_nn_pred, n_x_bins, fig, ax, 
         x_bins_std_pred = np.linspace(std_pred_range[0], std_pred_range[1], n_x_bins + 1)
 
         x, y = [], []
-        for i in xrange(x_bins_std_pred.shape[0] - 1): # same as n_x_bins
+        for i in range(x_bins_std_pred.shape[0] - 1): # same as n_x_bins
             label_std_pred_low, label_std_pred_high = x_bins_std_pred[i], x_bins_std_pred[i+1]
             label_std_pred_mean = (label_std_pred_low + label_std_pred_high) / float(2)
 
@@ -1864,7 +1864,7 @@ def make_2d_dir_correlation_plot_different_sigmas(arr_nn_pred, modelname, precut
     fig, ax = plt.subplots()
     pdf_plots = mpl.backends.backend_pdf.PdfPages('results/plots/2d/errors/correlation_diff_sigmas_' + modelname + '.pdf')
 
-    for ic in ic_list.iterkeys():
+    for ic in ic_list.keys():
         is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], ic)
         if bool(np.any(is_ic, axis=0)) is False: continue
 
@@ -2067,7 +2067,7 @@ def for_jannik(arr_nn_pred, modelname, correct_energy=(False, 'median')):
     fig, ax = plt.subplots()
     pdf_plots = mpl.backends.backend_pdf.PdfPages('results/plots/2d/energy/for_Jannik_' + modelname + '.pdf')
 
-    for ic in ic_list.iterkeys():
+    for ic in ic_list.keys():
         is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], ic)
         if bool(np.any(is_ic, axis=0)) is False: continue
 
@@ -2089,7 +2089,7 @@ def for_jannik(arr_nn_pred, modelname, correct_energy=(False, 'median')):
         cbar.remove()
         ax.cla()
 
-    for ic in ic_list.iterkeys():
+    for ic in ic_list.keys():
         is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], ic)
         if bool(np.any(is_ic, axis=0)) is False: continue
 
@@ -2109,7 +2109,7 @@ def for_jannik(arr_nn_pred, modelname, correct_energy=(False, 'median')):
         pdf_plots.savefig(fig)
         ax.cla()
 
-    for ic in ic_list.iterkeys():
+    for ic in ic_list.keys():
         is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], ic)
         if bool(np.any(is_ic, axis=0)) is False: continue
 
