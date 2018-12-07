@@ -44,7 +44,7 @@ def get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchs
             test_file.close()
         else:
             samples_f = samples
-        steps = samples_f/batchsize
+        steps = int(samples_f/batchsize)
 
         generator = generate_batches_from_hdf5_file(f[0], batchsize, n_bins, class_type, str_ident, zero_center_image=xs_mean, yield_mc_info=True, swap_col=swap_4d_channels) # f_size=samples prob not necessary
 
@@ -119,7 +119,7 @@ def get_cum_number_of_steps(files, batchsize):
     cum_number_of_steps = [0]
     for i, f in enumerate(files):
         samples = h5py.File(f[0][0], 'r')['y'].shape[0]
-        steps = samples/batchsize
+        steps = int(samples/batchsize)
         cum_number_of_steps.append(cum_number_of_steps[i] + steps) # [0, steps_sample_1, steps_sample_1 + steps_sample_2, ...]
 
     return cum_number_of_steps
