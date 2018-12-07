@@ -12,16 +12,16 @@ from keras import backend as K
 import matplotlib as mpl
 mpl.use('Agg')
 
-from .utilities.input_utilities import *
-from .models.short_cnn_models import *
-from .models.wide_resnet import *
-from .utilities.cnn_utilities import *
-from .utilities.multi_gpu.multi_gpu import *
-from .utilities.data_tools.shuffle_h5 import shuffle_h5
-from .utilities.visualization.visualization_tools import *
-from .utilities.evaluation_utilities import *
-from .utilities.losses import *
-from .utilities.losses import get_all_loss_functions
+from utilities.input_utilities import *
+from models.short_cnn_models import *
+from models.wide_resnet import *
+from utilities.cnn_utilities import *
+from utilities.multi_gpu.multi_gpu import *
+from utilities.data_tools.shuffle_h5 import shuffle_h5
+from utilities.visualization.visualization_tools import *
+from utilities.evaluation_utilities import *
+from utilities.losses import *
+from utilities.losses import get_all_loss_functions
 
 # for debugging
 # from tensorflow.python import debug as tf_debug
