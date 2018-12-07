@@ -32,7 +32,7 @@ def plot_train_and_test_statistics(modelname, model):
     pdf_plots = PdfPages('models/trained/perf_plots/plots/loss_' + modelname + '.pdf')
 
     skip_n_first_batches, batchlogger_display = 500, 100
-    first_line = skip_n_first_batches / batchlogger_display
+    first_line = int(skip_n_first_batches / batchlogger_display)
 
     train_batchnr = log_array_train[first_line:, 1]
     test_epoch = log_array_test[:, 0]
