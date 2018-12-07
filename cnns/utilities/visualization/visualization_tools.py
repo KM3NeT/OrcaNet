@@ -39,14 +39,20 @@ def plot_train_and_test_statistics(modelname, model):
 
     x_ticks_major = get_epoch_xticks(test_epoch, train_batchnr)
 
-    i = 0
+    i, j = 0, 0
     for metric_name in model.metrics_names: # metric names have same order as the columns in the log_array_train/test
         if 'loss' in metric_name:
+
             i += 1
             train_metric_loss = log_array_train[first_line:, 1 + i] # skip a certain number of train batches for better y scale
             test_metric_loss = log_array_test[:, 0 + i]
 
-            color = colors[i-1]
+            if 'err' in metric_name:
+                j += 1
+                color = colors[j]
+            else:
+                color = colors[i - 1]
+
             plt.plot(train_batchnr, train_metric_loss, color=color, ls='--', zorder=3, label='train, ' + metric_name, lw=0.5, alpha=0.5)
             plt.plot(test_epoch, test_metric_loss, color=color, marker='o', zorder=3, label='val, ' + metric_name, lw=0.5, markersize=3)
 

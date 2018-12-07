@@ -401,7 +401,7 @@ def fit_model(model, modelname, train_files, f, f_size, file_no, test_files, bat
 
     history = model.fit_generator(
         generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, str_ident, f_size=f_size, zero_center_image=xs_mean, swap_col=swap_4d_channels),
-        steps_per_epoch=int(f_size / batchsize), epochs=1, verbose=1, max_queue_size=10,
+        steps_per_epoch=int(f_size / batchsize), epochs=1, verbose=2, max_queue_size=10,
         validation_data=validation_data, validation_steps=validation_steps, callbacks=callbacks)
     model.save('models/trained/trained_' + modelname + '_epoch_' + str(epoch[0]) + '_file_' + str(file_no) + '.h5')
 
@@ -810,16 +810,29 @@ if __name__ == '__main__':
     #             use_scratch_ssd=False, loss_opt=(losses, None, loss_weights), n_gpu=(1, 'avolkov'), mode='eval',
     #             swap_4d_channels='xyz-t_and_xyz-c_single_input', zero_center=True, str_ident='lp_tight-1_60b_errors_mse')
 
-    # e-NC by fix
-    losses = {'dir_x': 'mean_absolute_error', 'dir_y': 'mean_absolute_error', 'dir_z': 'mean_absolute_error',
+    # # e-NC by fix
+    # losses = {'dir_x': 'mean_absolute_error', 'dir_y': 'mean_absolute_error', 'dir_z': 'mean_absolute_error',
+    #           'e': 'mean_absolute_error', 'by': 'mean_absolute_error',
+    #           'dir_x_err': loss_uncertainty_mse, 'dir_y_err': loss_uncertainty_mse, 'dir_z_err': loss_uncertainty_mse,
+    #           'e_err': loss_uncertainty_mse, 'by_err': loss_uncertainty_mse}
+    # loss_weights = {'dir_x': 35, 'dir_y': 35, 'dir_z': 65, 'e': 1, 'by': 65,
+    #                 'dir_x_err': 1, 'dir_y_err': 1, 'dir_z_err': 1, 'e_err': 0.0005, 'by_err': 1}
+    # execute_cnn(n_bins=[(11,13,18,60), (11,13,18,31)], class_type=(10, 'energy_dir_bjorken-y_errors'), nn_arch='VGG', batchsize=64, epoch=(8,5),
+    #             use_scratch_ssd=False, loss_opt=(losses, None, loss_weights), n_gpu=(1, 'avolkov'), mode='eval',
+    #             swap_4d_channels='xyz-t_and_xyz-c_single_input', zero_center=True, str_ident='lp_tight-1_60b_errors_mse_by_fix')
+
+    # with vertex
+    losses = {'dx': 'mean_absolute_error', 'dy': 'mean_absolute_error', 'dz': 'mean_absolute_error',
+              'vx': 'mean_absolute_error', 'vy': 'mean_absolute_error', 'vz': 'mean_absolute_error', 'vt': 'mean_absolute_error',
               'e': 'mean_absolute_error', 'by': 'mean_absolute_error',
-              'dir_x_err': loss_uncertainty_mse, 'dir_y_err': loss_uncertainty_mse, 'dir_z_err': loss_uncertainty_mse,
+              'dx_err': loss_uncertainty_mse, 'dy_err': loss_uncertainty_mse, 'dz_err': loss_uncertainty_mse,
+              'vx_err': loss_uncertainty_mse, 'vy_err': loss_uncertainty_mse, 'vz_err': loss_uncertainty_mse, 'vt_err': loss_uncertainty_mse,
               'e_err': loss_uncertainty_mse, 'by_err': loss_uncertainty_mse}
-    loss_weights = {'dir_x': 35, 'dir_y': 35, 'dir_z': 65, 'e': 1, 'by': 65,
-                    'dir_x_err': 1, 'dir_y_err': 1, 'dir_z_err': 1, 'e_err': 0.0005, 'by_err': 1}
-    execute_cnn(n_bins=[(11,13,18,60), (11,13,18,31)], class_type=(10, 'energy_dir_bjorken-y_errors'), nn_arch='VGG', batchsize=64, epoch=(8,5),
-                use_scratch_ssd=False, loss_opt=(losses, None, loss_weights), n_gpu=(1, 'avolkov'), mode='eval',
-                swap_4d_channels='xyz-t_and_xyz-c_single_input', zero_center=True, str_ident='lp_tight-1_60b_errors_mse_by_fix')
+    loss_weights = {'dx': 5, 'dy': 5, 'dz': 10, 'vx': 1e-1, 'vy': 1e-1, 'vz': 1e-1, 'vt': 3e-2, 'e': 1, 'by': 20,
+                    'dx_err': 1, 'dy_err': 1, 'dz_err': 1, 'vt_err': 1e-1, 'e_err': 0.0005, 'by_err': 1}
+    execute_cnn(n_bins=[(11,13,18,60), (11,13,18,31)], class_type=(None, 'energy_dir_bjorken-y_vtx_errors'), nn_arch='VGG', batchsize=64, epoch=(2,1),
+                use_scratch_ssd=False, loss_opt=(losses, None, loss_weights), n_gpu=(1, 'avolkov'), mode='train',
+                swap_4d_channels='xyz-t_and_xyz-c_single_input', zero_center=True, str_ident='lp_tight-1_60b_errors_mse_w_vtx')
 
     # python run_cnn.py -m lists/lp/all_e/xyz-t_xyz-c_lp_60b_e_1-100_all_train_e-cc-nc_mu-cc.list lists/lp/all_e/xyz-t_xyz-c_lp_60b_e_1-100_half_test_e-cc-nc_mu-cc.list
     # python run_cnn.py -m lists/lp/all_e/xyz-t_xyz-c_lp_60b_e_1-100_all_train_e-cc-nc_mu-cc.list lists/lp/all_e/xyz-t_xyz-c_lp_60b_e_1-100_all_test_e-cc-nc_mu-cc.list

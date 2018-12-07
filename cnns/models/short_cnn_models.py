@@ -147,7 +147,7 @@ def create_vgg_like_model(n_bins, batchsize, class_type, n_filters=None, dropout
         Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
     n_filters : tuple
         Number of filters for each conv. layer. len(n_filters)=n_conv_layer.
-    dropout : int
+    dropout : float
         Adds dropout if >0.
     k_size : int
         Kernel size which is used for all dimensions.
@@ -199,7 +199,7 @@ def conv_block(ip, dim, n_filters, k_size=3, dropout=0, max_pooling=None, activa
         Number of filters used for the convolutional layer.
     k_size : int
         Kernel size which is used for all three dimensions.
-    dropout : int
+    dropout : float
         Adds a dropout layer if the value is greater than 0.
     max_pooling : None/tuple
         Specifies if a MaxPooling layer should be added. e.g. (1,1,2) -> strides for a 3D conv block.
@@ -241,7 +241,7 @@ def add_dense_layers_to_cnn(conv_output_flat, class_type, dropout=0, activation=
         The Keras layer instance after the Flatten() layer.
     class_type : tuple(int, str)
         Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
-    dropout : int
+    dropout : float
         Adds a dropout layer if the value is greater than 0.
     activation : str
         Type of activation function that should be used. E.g. 'linear', 'relu', 'elu', 'selu'.
@@ -340,7 +340,7 @@ def create_vgg_like_model_double_input(n_bins, batchsize, nb_classes=2, n_filter
         Number of output classes.
     n_filters : tuple
         Number of filters for each conv. layer. len(n_filters)=n_conv_layer.
-    dropout : int
+    dropout : float
         Adds dropout if >0.
     k_size : int
         Kernel size which is used for all dimensions.
@@ -407,7 +407,7 @@ def create_vgg_like_model_multi_input_from_single_nns(n_bins, batchsize, str_ide
         Optional string identifier that gets appended to the modelname.
     nb_classes : int
         Number of output classes.
-    dropout : int
+    dropout : tuple(float, float)
         Adds dropout if >0.
     swap_4d_channels : None/str
         For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
