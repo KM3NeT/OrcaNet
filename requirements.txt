@@ -3,3 +3,6 @@ numpy
 h5py
 matplotlib
 tensorflow
+tensorflow-gpu
+pydot
+graphviz
