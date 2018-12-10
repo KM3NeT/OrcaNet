@@ -4,6 +4,8 @@
 
 import os
 import time
+import toml
+from docopt import docopt
 from time import gmtime, strftime
 import shutil
 import sys
@@ -27,6 +29,7 @@ from utilities.losses import get_all_loss_functions
 # from tensorflow.python import debug as tf_debug
 # K.set_session(tf_debug.LocalCLIDebugWrapperSession(tf.Session()))
 
+# TODO create docopt
 
 def build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4d_channels, str_ident, modelname, custom_objects):
     """
@@ -89,9 +92,8 @@ def get_optimizer_info(loss_opt, optimizer='adam'):
     ----------
     loss_opt : tuple
         A Tuple with len=3.
-        loss_opt[0]: dict with loss functions that should be used for each nn output.
+        loss_opt[0]: dict with lists of loss functions and weights that should be used for each nn output.
         loss_opt[1]: dict with metrics that should be used for each nn output.
-        loss_opt[2]: dict with loss weights that should be used for each sub-loss.
     optimizer : str
         Specifies, if "Adam" or "SGD" should be used as optimizer.
 
@@ -111,9 +113,11 @@ def get_optimizer_info(loss_opt, optimizer='adam'):
     adam = ks.optimizers.Adam(beta_1=0.9, beta_2=0.999, epsilon=0.1, decay=0.0) # epsilon=1 for deep networks
     optimizer = adam if optimizer == 'adam' else sgd
 
-    loss_functions = loss_opt[0]
+    loss_functions, loss_weight = {},{}
+    for loss_key in loss_opt[0].keys():
+        loss_functions[loss_key] = loss_opt[0][loss_key][0]
+        loss_weight[loss_key] = loss_opt[0][loss_key][1]
     metrics = loss_opt[1] if not loss_opt[1] is None else []
-    loss_weight = loss_opt[2]
 
     return loss_functions, metrics, loss_weight, optimizer
 
@@ -601,7 +605,7 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
 
 def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None,
                 use_scratch_ssd=False, zero_center=False, shuffle=(False,None), tb_logger=False, str_ident='',
-                loss_opt=('categorical_crossentropy', 'accuracy', None)):
+                loss_opt=('categorical_crossentropy', 'accuracy')):
     """
     Code that trains or evaluates a convolutional neural network.
 
@@ -642,8 +646,8 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
     str_ident : str
         Optional string identifier that gets appended to the modelname. Useful when training models which would have
         the same modelname. Also used for defining models and projections!
-    loss_opt : tuple(dict/str, dict/str/None, dict/None)
-        Tuple that contains 1) the loss_functions, 2) the metrics and 3) the loss_weights.
+    loss_opt : tuple(dict/str, dict/str/None,)
+        Tuple that contains 1) the loss_functions and loss_weights as lists, 2) the metrics. The default weight is 1.
 
     """
     train_files, test_files, multiple_inputs = parse_input()
@@ -675,167 +679,82 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
         raise ValueError('Mode "', str(mode), '" is not known. Needs to be "train" or "eval".')
 
 
-if __name__ == '__main__':
-    # available class_types:
-    # - (2, 'track-shower')
-    # - (5, 'energy_and_direction_and_bjorken-y')
+def parse_input():
+    """
+    Parses and returns all necessary input options for the data_to_images function.
 
-    ###############
-    #--- YZT-X ---#
-    ###############
+    Check the data_to_images function to get docs about the individual parameters.
+    """
+    args = docopt(__doc__)
 
-    ### Larger Production
-    # tight-1, pad valid, dense 128
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(1,2), use_scratch_ssd=True,
-    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.1_pad-valid')
-    # python run_cnn.py -l lists/lp/xyz-t_lp_tight-1_train_no_tau.list lists/lp/xyz-t_lp_tight-1_test_no_tau.list
+    if args['-c']:
+        config = toml.load(args['-c'])
 
-    # tight-2, pad valid, dense 128
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(1,2), use_scratch_ssd=True,
-    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-2_bs64_dp0.1_pad-valid')
-    # python run_cnn.py -l lists/lp/xyz-t_lp_tight-2_train_no_tau.list lists/lp/xyz-t_lp_tight-2_test_no_tau.list
+        losses = []
+        for loss in config["losses"]:
+            if len(loss)==3:
+                losses.append( [loss[0], [loss[1], float(loss[2])]] )
+            else:
+                losses.append( [loss[0], [loss[1], 1.0]] )
+        config["losses"] = dict(losses)
+        config["class_type"][0] = None if config["class_type"][0]=="None"
+        config["n_gpu"][0] = int(config["n_gpu"][0])
 
-    ## Regression
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(5, 'energy_and_direction_and_bjorken-y'), nn_arch='VGG', batchsize=64, epoch=(0,1), use_scratch_ssd=True, loss_opt=('mean_absolute_error', 'mean_squared_error'),
-    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='yzt-x', zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.0')
-    # python run_cnn.py -l lists/lp/xyz-t_lp_tight-1_train_muon-CC_and_elec-CC_even_split.list lists/lp/xyz-t_lp_tight-1_test_muon-CC_and_elec-CC_even_split.list
+        args.update(config)
+    # TODO instead of using the loss function name directly, maybe use a string instead and look up the corresponding function later
+    losses = {'dx': ['mean_absolute_error', 5],
+              'dy': ['mean_absolute_error', 5],
+              'dz': ['mean_absolute_error', 10],
+              'vx': ['mean_absolute_error', 1e-1],
+              'vy': ['mean_absolute_error', 1e-1],
+              'vz': ['mean_absolute_error', 1e-1],
+              'vt': ['mean_absolute_error', 3e-2],
+              'e':  ['mean_absolute_error', ],
+              'by': ['mean_absolute_error', 20],
+              'dx_err': ["loss_uncertainty_mse",],
+              'dy_err': ["loss_uncertainty_mse", ],
+              'dz_err': ["loss_uncertainty_mse",],
+              'vx_err': ["loss_uncertainty_mse", ],
+              'vy_err': ["loss_uncertainty_mse", ],
+              'vz_err': ["loss_uncertainty_mse",],
+              'vt_err': ["loss_uncertainty_mse", 1e-1],
+              'e_err':  ["loss_uncertainty_mse", 0.0005],
+              'by_err': ["loss_uncertainty_mse"],}
+    n_bins = [(11, 13, 18, 60), (11, 13, 18, 31)]
+    class_type = (None, 'energy_dir_bjorken-y_vtx_errors')
+    nn_arch = 'VGG'
+    batchsize = 64
+    epoch = (2, 1)
+    use_scratch_ssd = False
+    n_gpu = (1, 'avolkov')
+    mode = 'train'
+    swap_4d_channels = 'xyz-t_and_xyz-c_single_input'
+    zero_center = True
+    str_ident = 'lp_tight-1_60b_errors_mse_w_vtx'
 
-    ###############
-    #--- XYZ-C ---#
-    ###############
-    # xyz-channel, timecut all, has new geo Stefan
-    # execute_cnn(n_bins=[(11,13,18,31)], class_type=(2, 'muon-CC_to_elec-CC'), nn_arch='VGG', batchsize=32, epoch=(26,1), use_scratch_ssd=True,
-    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='channel_id_all_time')
+    loss_opt = (losses, None)
 
-    ###############
-    #--- XYZ-T ---#
-    ###############
-
-    ### Larger Production
-    # standard tight-1 // 2 additional layers: n_filters=(64, 64, 64, 64, 64, 64, 128, 128, 128, 128), max_pool_sizes = {5: (2, 2, 2), 9: (2, 2, 2)}, bs 64, initial lr = 0.003, tight-1
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(8,4), use_scratch_ssd=True,
-    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.1')
-
-    # standard tight-1 as above, padding valid, but 128 first dense! // 2 additional layers: n_filters=(64, 64, 64, 64, 64, 64, 128, 128, 128, 128), max_pool_sizes = {5: (2, 2, 2), 9: (2, 2, 2)}, bs 64, initial lr = 0.003, tight-1
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(2,2), use_scratch_ssd=True,
-    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.1_pad-valid_dense-128')
-    # python run_cnn.py -l lists/lp/xyz-t_lp_tight-1_train_no_tau.list lists/lp/xyz-t_lp_tight-1_test_no_tau.list
-
-    # standard tight-2, padding valid, but 12 first dense! // 2 additional layers: n_filters=(64, 64, 64, 64, 64, 64, 128, 128, 128, 128), max_pool_sizes = {5: (2, 2, 2), 9: (2, 2, 2)}, bs 64, initial lr = 0.003, tight-1
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=64, epoch=(2,1), use_scratch_ssd=True,
-    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-2_bs64_dp0.1_pad-valid_dense-128')
-    # python run_cnn.py -l lists/lp/xyz-t_lp_tight-2_train_no_tau.list lists/lp/xyz-t_lp_tight-2_test_no_tau.list
-
-    ######## REGRESSION, Larger Production
-    # e+dir+by dp 0.0
-    # losses = {'dir_x': 'mean_absolute_error', 'dir_y': 'mean_absolute_error', 'dir_z': 'mean_absolute_error',
-    #           'energy': 'mean_absolute_error', 'bjorken-y': 'mean_absolute_error'}
-    # loss_metrics = {'dir_x': 'mean_squared_error', 'dir_y': 'mean_squared_error', 'dir_z': 'mean_squared_error',
-    #           'energy': 'mean_squared_error', 'bjorken-y': 'mean_squared_error'}
-    # loss_weights = {'dir_x': 40, 'dir_y': 40, 'dir_z': 40, 'energy': 1, 'bjorken-y': 40}
-    # # # TODO change lr back, change cnn_utilities supplier back, enable plot functions in training loop
-    # #
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(5, 'energy_and_direction_and_bjorken-y'), nn_arch='VGG', batchsize=64, epoch=(28,4), use_scratch_ssd=False, loss_opt=(losses, None, loss_weights),
-    #             n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.0')
-    # python run_cnn.py -l lists/lp/xyz-t_lp_tight-1_train_muon-CC_and_elec-CC_even_split.list lists/lp/xyz-t_lp_tight-1_test_muon-CC_and_elec-CC_even_split.list # OLD
-
-    # e+dir+by dp 0.0, with new loss functions + errors
-    # losses = {'dir': 'mean_absolute_error', 'e': 'mean_absolute_error', 'by': 'mean_absolute_error',
-    #           'dir_err': loss_uncertainty_gaussian_likelihood_dir,
-    #           'e_err': loss_uncertainty_gaussian_likelihood,
-    #           'by_err': loss_uncertainty_gaussian_likelihood}
-    # loss_weights = {'dir': 6, 'e': 1, 'by': 10, 'dir_err': 1, 'e_err': 1, 'by_err': 1}
-    # mae dir, mae en
-    # execute_cnn(n_bins=[(11,13,18,300)], class_type=(6, 'energy_dir_bjorken-y_and_errors_dir_new_loss'), nn_arch='VGG', batchsize=64, epoch=(11,18), use_scratch_ssd=False, loss_opt=[losses, None, loss_weights],
-    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.0_errors')
-
-    # mae dir, mae en, n_filters=(256, 128, 64, 64, 64, 64, 128, 128, 128, 128), mae en , not mre as specified in str_ident
-    # execute_cnn(n_bins=[(11,13,18,300)], class_type=(6, 'energy_dir_bjorken-y_and_errors_dir_new_loss'), nn_arch='VGG', batchsize=64, epoch=(7,15), use_scratch_ssd=False, loss_opt=[losses, None, loss_weights],
-    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.0_errors_mre_e_more_filters')
-
-    # mae dir, mae en, standard filter, different loss weights
-    # loss_weights = {'dir': 60, 'e': 1, 'by': 15, 'dir_err': 1, 'e_err': 1, 'by_err': 1}
-    # execute_cnn(n_bins=[(11,13,18,300)], class_type=(6, 'energy_dir_bjorken-y_and_errors_dir_new_loss'), nn_arch='VGG', batchsize=64, epoch=(5,19), use_scratch_ssd=False, loss_opt=[losses, None, loss_weights],
-    #             n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None, zero_center=True, tb_logger=False, shuffle=(False, None), str_ident='lp_tight-1_bs64_dp0.0_errors_dir_more_loss-w')
-
-    # python run_cnn.py -l lists/lp/all_e/xyz-t_lp_e_1-100_t-all_train_e-CC_mu-CC.list lists/lp/all_e/xyz-t_lp_e_1-100_t-all_test_e-CC_mu-CC.list
-    # python run_cnn.py -l lists/lp/all_e/xyz-t_lp_e_1-100_t-all_train_e-CC_mu-CC.list lists/lp/all_e/xyz-t_lp_e_1-100_t-all_test_e-CC_mu-CC_half.list
-
-    ## -- Regression 1-100GeV, xyz-t 60b, train elec-cc-nc and muon-cc, with errors, without vertex -- ##
-    # # standard
-    # losses = {'dir_x': 'mean_absolute_error', 'dir_y': 'mean_absolute_error', 'dir_z': 'mean_absolute_error',
-    #           'e': 'mean_absolute_error', 'by': 'mean_absolute_error',
-    #           'dir_x_err': loss_uncertainty_mse, 'dir_y_err': loss_uncertainty_mse, 'dir_z_err': loss_uncertainty_mse,
-    #           'e_err': loss_uncertainty_mse, 'by_err': loss_uncertainty_mse}
-    # loss_weights = {'dir_x': 35, 'dir_y': 35, 'dir_z': 50, 'e': 1, 'by': 80,
-    #                 'dir_x_err': 1, 'dir_y_err': 1, 'dir_z_err': 1, 'e_err': 0.0005, 'by_err': 1}
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(10, 'energy_dir_bjorken-y_errors'), nn_arch='VGG', batchsize=64, epoch=(11,3),
-    #             use_scratch_ssd=False, loss_opt=(losses, None, loss_weights), n_gpu=(1, 'avolkov'), mode='eval',
-    #             swap_4d_channels=None, zero_center=True, str_ident='lp_tight-1_60b_errors_mse')
-
-    # mae errors
-    # losses = {'dir_x': 'mean_absolute_error', 'dir_y': 'mean_absolute_error', 'dir_z': 'mean_absolute_error',
-    #           'e': 'mean_absolute_error', 'by': 'mean_absolute_error',
-    #           'dir_x_err': loss_uncertainty_mae, 'dir_y_err': loss_uncertainty_mae, 'dir_z_err': loss_uncertainty_mae,
-    #           'e_err': loss_uncertainty_mae, 'by_err': loss_uncertainty_mae}
-    # loss_weights = {'dir_x': 35, 'dir_y': 35, 'dir_z': 35, 'e': 1, 'by': 30,
-    #                 'dir_x_err': 1, 'dir_y_err': 1, 'dir_z_err': 1, 'e_err': 0.07, 'by_err': 1.5}
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(10, 'energy_dir_bjorken-y_errors'), nn_arch='VGG', batchsize=64, epoch=(13,2),
-    #             use_scratch_ssd=False, loss_opt=(losses, None, loss_weights), n_gpu=(1, 'avolkov'), mode='eval',
-    #             swap_4d_channels=None, zero_center=True, str_ident='lp_tight-1_60b_errors_mae')
-
-    # mse errors (faulty, actually mae errors!!), more (double) dense errors
-    # losses = {'dir_x': 'mean_absolute_error', 'dir_y': 'mean_absolute_error', 'dir_z': 'mean_absolute_error',
-    #           'e': 'mean_absolute_error', 'by': 'mean_absolute_error',
-    #           'dir_x_err': loss_uncertainty_mae, 'dir_y_err': loss_uncertainty_mae, 'dir_z_err': loss_uncertainty_mae,
-    #           'e_err': loss_uncertainty_mae, 'by_err': loss_uncertainty_mae}
-    # loss_weights = {'dir_x': 35, 'dir_y': 35, 'dir_z': 50, 'e': 1, 'by': 65,
-    #                 'dir_x_err': 1, 'dir_y_err': 1, 'dir_z_err': 1, 'e_err': 0.05, 'by_err': 1.3}
-    # execute_cnn(n_bins=[(11,13,18,60)], class_type=(10, 'energy_dir_bjorken-y_errors'), nn_arch='VGG', batchsize=64, epoch=(13,3),
-    #             use_scratch_ssd=False, loss_opt=(losses, None, loss_weights), n_gpu=(1, 'avolkov'), mode='eval',
-    #             swap_4d_channels=None, zero_center=True, str_ident='lp_tight-1_60b_errors_mse_double_dense_err')
-
-    # python run_cnn.py -l lists/lp/all_e/xyz-t_lp_60b_e_1-100_all_train_e-cc-nc_mu-cc.list lists/lp/all_e/xyz-t_lp_60b_e_1-100_half_test_e-cc-nc_mu-cc.list
-    # python run_cnn.py -l lists/lp/all_e/xyz-t_lp_60b_e_1-100_all_train_e-cc-nc_mu-cc.list lists/lp/all_e/xyz-t_lp_60b_e_1-100_all_test_e-cc-nc_mu-cc.list
-
-    ## -- Regression 1-100GeV, xyz-t 60b + xyz-c 31b, train elec-cc-nc and muon-cc, with errors, without vertex -- ##
-    # # standard
-    # losses = {'dir_x': 'mean_absolute_error', 'dir_y': 'mean_absolute_error', 'dir_z': 'mean_absolute_error',
-    #           'e': 'mean_absolute_error', 'by': 'mean_absolute_error',
-    #           'dir_x_err': loss_uncertainty_mse, 'dir_y_err': loss_uncertainty_mse, 'dir_z_err': loss_uncertainty_mse,
-    #           'e_err': loss_uncertainty_mse, 'by_err': loss_uncertainty_mse}
-    # loss_weights = {'dir_x': 35, 'dir_y': 35, 'dir_z': 65, 'e': 1, 'by': 65,
-    #                 'dir_x_err': 1, 'dir_y_err': 1, 'dir_z_err': 1, 'e_err': 0.0005, 'by_err': 1}
-    # execute_cnn(n_bins=[(11,13,18,60), (11,13,18,31)], class_type=(10, 'energy_dir_bjorken-y_errors'), nn_arch='VGG', batchsize=64, epoch=(7,1),
-    #             use_scratch_ssd=False, loss_opt=(losses, None, loss_weights), n_gpu=(1, 'avolkov'), mode='eval',
-    #             swap_4d_channels='xyz-t_and_xyz-c_single_input', zero_center=True, str_ident='lp_tight-1_60b_errors_mse')
-
-    # # e-NC by fix
-    # losses = {'dir_x': 'mean_absolute_error', 'dir_y': 'mean_absolute_error', 'dir_z': 'mean_absolute_error',
-    #           'e': 'mean_absolute_error', 'by': 'mean_absolute_error',
-    #           'dir_x_err': loss_uncertainty_mse, 'dir_y_err': loss_uncertainty_mse, 'dir_z_err': loss_uncertainty_mse,
-    #           'e_err': loss_uncertainty_mse, 'by_err': loss_uncertainty_mse}
-    # loss_weights = {'dir_x': 35, 'dir_y': 35, 'dir_z': 65, 'e': 1, 'by': 65,
-    #                 'dir_x_err': 1, 'dir_y_err': 1, 'dir_z_err': 1, 'e_err': 0.0005, 'by_err': 1}
-    # execute_cnn(n_bins=[(11,13,18,60), (11,13,18,31)], class_type=(10, 'energy_dir_bjorken-y_errors'), nn_arch='VGG', batchsize=64, epoch=(8,5),
-    #             use_scratch_ssd=False, loss_opt=(losses, None, loss_weights), n_gpu=(1, 'avolkov'), mode='eval',
-    #             swap_4d_channels='xyz-t_and_xyz-c_single_input', zero_center=True, str_ident='lp_tight-1_60b_errors_mse_by_fix')
-
-    # with vertex
+    """
     losses = {'dx': 'mean_absolute_error', 'dy': 'mean_absolute_error', 'dz': 'mean_absolute_error',
-              'vx': 'mean_absolute_error', 'vy': 'mean_absolute_error', 'vz': 'mean_absolute_error', 'vt': 'mean_absolute_error',
+              'vx': 'mean_absolute_error', 'vy': 'mean_absolute_error', 'vz': 'mean_absolute_error',
+              'vt': 'mean_absolute_error',
               'e': 'mean_absolute_error', 'by': 'mean_absolute_error',
               'dx_err': loss_uncertainty_mse, 'dy_err': loss_uncertainty_mse, 'dz_err': loss_uncertainty_mse,
-              'vx_err': loss_uncertainty_mse, 'vy_err': loss_uncertainty_mse, 'vz_err': loss_uncertainty_mse, 'vt_err': loss_uncertainty_mse,
+              'vx_err': loss_uncertainty_mse, 'vy_err': loss_uncertainty_mse, 'vz_err': loss_uncertainty_mse,
+              'vt_err': loss_uncertainty_mse,
               'e_err': loss_uncertainty_mse, 'by_err': loss_uncertainty_mse}
     loss_weights = {'dx': 5, 'dy': 5, 'dz': 10, 'vx': 1e-1, 'vy': 1e-1, 'vz': 1e-1, 'vt': 3e-2, 'e': 1, 'by': 20,
                     'dx_err': 1, 'dy_err': 1, 'dz_err': 1, 'vt_err': 1e-1, 'e_err': 0.0005, 'by_err': 1}
-    execute_cnn(n_bins=[(11,13,18,60), (11,13,18,31)], class_type=(None, 'energy_dir_bjorken-y_vtx_errors'), nn_arch='VGG', batchsize=64, epoch=(2,1),
-                use_scratch_ssd=False, loss_opt=(losses, None, loss_weights), n_gpu=(1, 'avolkov'), mode='train',
-                swap_4d_channels='xyz-t_and_xyz-c_single_input', zero_center=True, str_ident='lp_tight-1_60b_errors_mse_w_vtx')
+    """
 
-    # python run_cnn.py -m lists/lp/all_e/xyz-t_xyz-c_lp_60b_e_1-100_all_train_e-cc-nc_mu-cc.list lists/lp/all_e/xyz-t_xyz-c_lp_60b_e_1-100_half_test_e-cc-nc_mu-cc.list
-    # python run_cnn.py -m lists/lp/all_e/xyz-t_xyz-c_lp_60b_e_1-100_all_train_e-cc-nc_mu-cc.list lists/lp/all_e/xyz-t_xyz-c_lp_60b_e_1-100_all_test_e-cc-nc_mu-cc.list
+    return n_bins, class_type, nn_arch, batchsize, epoch,\
+            use_scratch_ssd, loss_opt, n_gpu, mode,\
+            swap_4d_channels, zero_center, str_ident
+
+
+if __name__ == '__main__':
+    execute_cnn(*parse_input())
+
 
 
 

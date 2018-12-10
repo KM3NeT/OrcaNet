@@ -1,0 +1,33 @@
+# name, metric, [weight]
+losses = [
+          ['dx', 'mean_absolute_error',],
+          ['dy', 'mean_absolute_error', '5'],
+          ['dz', 'mean_absolute_error', '5'],
+          ['vx', 'mean_absolute_error', '5'],
+          ['vy', 'mean_absolute_error', '5'],
+          ['vz', 'mean_absolute_error', '5'],
+          ['vt', 'mean_absolute_error', '5'],
+          ['e',  'mean_absolute_error', '5'],
+          ['by', 'mean_absolute_error', '5'],
+          ['dx_err', 'loss_uncertainty_mse', '5'],
+          ['dy_err', 'loss_uncertainty_mse', '5'],
+          ['dz_err', 'loss_uncertainty_mse', '5'],
+          ['vx_err', 'loss_uncertainty_mse', '5'],
+          ['vy_err', 'loss_uncertainty_mse', '5'],
+          ['vz_err', 'loss_uncertainty_mse', '5'],
+          ['vt_err', 'loss_uncertainty_mse', '5'],
+          ['e_err',  'loss_uncertainty_mse', '5'],
+          ['by_err', 'loss_uncertainty_mse', '5'],
+          ]
+
+n_bins = [[11, 13, 18, 60], [11, 13, 18, 31]]
+class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
+nn_arch = 'VGG'
+batchsize = 64
+epoch = [2, 1]
+use_scratch_ssd = 0
+n_gpu = ['1', 'avolkov']
+mode = 'train'
+swap_4d_channels = 'xyz-t_and_xyz-c_single_input'
+zero_center = 1
+str_ident = 'lp_tight-1_60b_errors_mse_w_vtx'
