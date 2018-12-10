@@ -46,8 +46,8 @@ def make_arr_nn_pred():
 
     arr_nn_pred = np.zeros((sum_arr.shape[0], 19), dtype=np.float32)
 
-    for i in xrange(sum_arr.shape[0]):
-        if i % 100000 == 0: print 'Calculating the arr_nn_pred in step ', i
+    for i in range(sum_arr.shape[0]):
+        if i % 100000 == 0: print('Calculating the arr_nn_pred in step ', i)
 
         e_range_min = sum_arr[i, 26]
         energy_mc = sum_arr[i, 4]
@@ -112,16 +112,16 @@ def make_arr_nn_pred():
 
 
     for ic in ['total', 'muon-CC', 'elec-CC', 'elec-NC', 'tau-CC']:
-        print 'Number of ' + ic +' events in the summary file: ', n_events[ic][0]
-        print 'Number of selected ' + ic + ' events in the summary file: ', n_events[ic][1]
-        print 'You have thrown away ' + str(np.round((1 - n_events[ic][1] / float(n_events[ic][0])) * 100, 1)) + '% of the events'
+        print('Number of ' + ic +' events in the summary file: ', n_events[ic][0])
+        print('Number of selected ' + ic + ' events in the summary file: ', n_events[ic][1])
+        print('You have thrown away ' + str(np.round((1 - n_events[ic][1] / float(n_events[ic][0])) * 100, 1)) + '% of the events')
 
     # remove lines with only 0 entries
     arr_nn_pred = arr_nn_pred[~(arr_nn_pred==0).all(1)]
     np.save('/home/woody/capn/mppi033h/Data/various/arr_nn_pred.npy', arr_nn_pred)
 
     # save cut info (run_id, evt_id) to txt
-    for n_list, ic in ic_dict_str.iteritems():
+    for n_list, ic in ic_dict_str.items():
         boolean_ic = np.abs(arr_nn_pred[:, 2:4]) == np.array(n_list)
         indices_rows_with_ic = np.logical_and(boolean_ic[:, 0], boolean_ic[:, 1])
         arr_nn_pred_ic = arr_nn_pred[indices_rows_with_ic]

@@ -4,7 +4,7 @@
 import sys
 
 try:
-    from cStringIO import StringIO
+    from io import StringIO
 except ImportError:
     # Python 3 compat.
     from io import StringIO

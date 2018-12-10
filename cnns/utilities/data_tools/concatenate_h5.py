@@ -123,9 +123,9 @@ def get_cum_number_of_rows(file_list, cuts=False):
         for file_name in file_list:
             f = h5py.File(file_name, 'r')
             # get number of rows from the first folder of the file -> each folder needs to have the same number of rows
-            total_number_of_rows += f[f.keys()[0]].shape[0]
+            total_number_of_rows += f[list(f.keys())[0]].shape[0]
             cum_number_of_rows_list.append(total_number_of_rows)
-            number_of_rows_list.append(f[f.keys()[0]].shape[0])
+            number_of_rows_list.append(f[list(f.keys())[0]].shape[0])
 
             f.close()
 
@@ -226,7 +226,7 @@ def concatenate_h5_files():
 
     for n, input_file_name in enumerate(file_list):
 
-        print 'Processing file ' + file_list[n]
+        print('Processing file ' + file_list[n])
 
         input_file = h5py.File(input_file_name, 'r')
 
@@ -237,7 +237,7 @@ def concatenate_h5_files():
                 folder_data = folder_data[()] # load whole array into memory as np array
                 folder_data = folder_data[dict_events_survive_cut[input_file_name]] # apply cuts to dataset
 
-            print 'Shape and dtype of dataset ' + folder_name + ': ' + str(folder_data.shape) + ' ; ' + str(folder_data.dtype)
+            print('Shape and dtype of dataset ' + folder_name + ': ' + str(folder_data.shape) + ' ; ' + str(folder_data.dtype))
 
             if n == 0:
                 # first file; create the dummy dataset with no max shape
@@ -254,12 +254,12 @@ def concatenate_h5_files():
 
         file_output.flush()
 
-    print 'Output information:'
-    print '-------------------'
-    print 'The output file contains the following datasets:'
+    print('Output information:')
+    print('-------------------')
+    print('The output file contains the following datasets:')
     for folder_name in file_output:
-        print 'Dataset ' + folder_name + ' with the following shape, dtype and chunks (first argument is the chunksize in axis_0): \n' \
-              +  str(file_output[folder_name].shape) + ' ; ' + str(file_output[folder_name].dtype) + ' ; ' + str(file_output[folder_name].chunks)
+        print('Dataset ' + folder_name + ' with the following shape, dtype and chunks (first argument is the chunksize in axis_0): \n' \
+              +  str(file_output[folder_name].shape) + ' ; ' + str(file_output[folder_name].dtype) + ' ; ' + str(file_output[folder_name].chunks))
 
     file_output.close()
 

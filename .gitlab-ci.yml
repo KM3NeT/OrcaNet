@@ -1,0 +1,4 @@
+install:
+    image: docker.km3net.de/base/python:2
+    script:
+        - pip install .

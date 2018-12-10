@@ -23,7 +23,7 @@ input_files = {'muon-CC': ['/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/h5
 pdf_plots = PdfPages('energy_spectra.pdf')
 fig, axes = plt.subplots()
 
-for ptype, data_files in input_files.iteritems():
+for ptype, data_files in input_files.items():
 
     f_prod_1_to_5 = h5py.File(data_files[0], 'r')
     #print f_prod_1_to_5['y'].shape[0]
@@ -63,7 +63,7 @@ for ptype, data_files in input_files.iteritems():
     if remove_3_to_5_GeV is True:
         e_1_to_5 = e_1_to_5[e_1_to_5 < 3]
 
-    print e_1_to_5.shape[0]
+    print(e_1_to_5.shape[0])
 
     e_total = np.concatenate([e_1_to_5, e_3_to_100], axis=0)
     plt.title(ptype)

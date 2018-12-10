@@ -101,7 +101,7 @@ def shuffle_h5(filepath, delete_flag=True, chunking=(False, None), tool=False, c
 
     filepath_without_extension = os.path.splitext(filepath)[0]
     output_file_shuffled = None
-    for i in xrange(n_shuffles):
+    for i in range(n_shuffles):
 
         if '_shuffled' in filepath_without_extension:
             # we don't want to create a file with hundreds of _shuffled suffixes
@@ -140,19 +140,19 @@ def shuffle_h5_tool():
     Saves the shuffled data to a new .h5 file.
     """
     file_list, delete_flag, chunking, compress, n_shuffles = parse_input()
-    print 'Shuffling ' + str(n_shuffles) + ' times'
+    print('Shuffling ' + str(n_shuffles) + ' times')
 
     for filepath in file_list:
-        print 'Shuffling file ' + filepath
+        print('Shuffling file ' + filepath)
         output_file_shuffled = shuffle_h5(filepath, delete_flag=delete_flag, chunking=chunking, tool=True, compress=compress, n_shuffles=n_shuffles)
 
-        print 'Finished shuffling. Output information:'
-        print '---------------------------------------'
-        print 'The output file contains the following datasets:'
+        print('Finished shuffling. Output information:')
+        print('---------------------------------------')
+        print('The output file contains the following datasets:')
         for dataset_name in output_file_shuffled:
-            print 'Dataset ' + dataset_name + ' with the following shape, dtype and chunks (first argument is the chunksize in axis_0): \n' \
+            print('Dataset ' + dataset_name + ' with the following shape, dtype and chunks (first argument is the chunksize in axis_0): \n' \
                   + str(output_file_shuffled[dataset_name].shape) + ' ; ' + str(output_file_shuffled[dataset_name].dtype) + ' ; ' + str(
-                output_file_shuffled[dataset_name].chunks)
+                output_file_shuffled[dataset_name].chunks))
 
         output_file_shuffled.close()
 
