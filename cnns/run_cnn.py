@@ -1,6 +1,69 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Main code for running CNN's."""
+"""
+Main code for running CNN's.
+
+Usage:
+    run_cnn.py [options]
+    run_cnn.py (-h | --help)
+
+Options:
+    -h --help                       Show this screen.
+
+    --config         Load all options for the model from a config file (.toml format).
+
+    --list          Load a list of files on which the network is trained and tested on.
+
+    --n_bins        Declares the number of bins for each dimension (e.g. (x,y,z,t)) in the train- and testfiles. Can contain multiple n_bins tuples.
+                    Multiple n_bins tuples are currently used for multi-input models with multiple input files per batch.
+
+    --class_type    Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
+                    I.e. (2, 'track-shower')
+
+    --nn_arch       Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
+
+    --batchsize     Batchsize that should be used for the training / inferencing of the cnn.
+
+    --epoch         Declares if a previously trained model or a new model (=0) should be loaded.
+                    The first argument specifies the last epoch, and the second argument is the last train file number if the train
+                    dataset is split over multiple files.
+
+    --n_gpu         Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov') [1].
+
+    --mode          Specifies what the function should do - train & test a model or evaluate a 'finished' model?
+                    Currently, there are two modes available: 'train' & 'eval'.
+
+    --swap_4d_channels  For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
+                        Currently available: None -> XYZ-T ; 'yzt-x' -> YZT-X, TODO add multi input options
+
+    --use_scratch_ssd   Declares if the input files should be copied to the node-local SSD scratch space (only working at Erlangen CC).
+
+    --zero_center       Declares if the input images ('xs') should be zero-centered before training.
+
+    --shuffle       Declares if the training data should be shuffled before the next training epoch [0].
+                    If the train dataset is too large to be shuffled in place, one can preshuffle them n times before running
+                    OrcaNet, the number n should then be put into [1].
+
+    --tb_logger     Declares if a tb_callback should be used during training (takes longer to train due to overhead!).
+
+    --str_ident     Optional string identifier that gets appended to the modelname. Useful when training models which would have
+                    the same modelname. Also used for defining models and projections!
+
+    --loss_opt      Tuple that contains 1) the loss_functions and loss_weights as lists, 2) the metrics. The default weight is 1.
+
+    --train_file    The filepath of the traindata file.
+
+    --test_file     The filepath of the testdata file.
+
+    ---listfile_train_and_test      Filepaths of two .list files (train / test) that contains all .h5 files that should be used for training/testing.
+
+    ---listfile_multiple    Filepaths of two .list files where each contains multiple input files
+                            that should be used for training/testing in double/triple/... input models that need multiple input files per batch.
+                            The required structure of the .list files can be found in /utilities/input_utilities parse_input()
+
+
+"""
+
 
 import os
 import time
@@ -29,7 +92,45 @@ from utilities.losses import get_all_loss_functions
 # from tensorflow.python import debug as tf_debug
 # K.set_session(tf_debug.LocalCLIDebugWrapperSession(tf.Session()))
 
-# TODO create docopt
+
+def parse_input():
+    """
+    Parses and returns all necessary input options.
+    """
+    args = docopt(__doc__)
+
+    config = toml.load(args['--config'])
+    list_filename = toml.load(args['--list'])
+
+    # the losses are in lists like [name, metric, weight] in the toml file, all as strings
+    losses = []
+    for loss in config["losses"]:
+        if len(loss)==3:
+            losses.append( [loss[0], [loss[1], float(loss[2])]] )
+        else:
+            losses.append( [loss[0], [loss[1], 1.0]] )
+    config["losses"] = dict(losses)
+    config["class_type"][0] = None if config["class_type"][0]=="None"
+    config["n_gpu"][0] = int(config["n_gpu"][0])
+
+    losses = config["losses"]
+    n_bins = config["n_bins"]
+    class_type = config["class_type"]
+    nn_arch = config["nn_arch"]
+    batchsize = config["batchsize"]
+    epoch = config["epoch"]
+    use_scratch_ssd = config["use_scratch_ssd"]
+    n_gpu = config["n_gpu"]
+    mode = config["mode"]
+    swap_4d_channels = config["swap_4d_channels"]
+    zero_center = config["zero_center"]
+    str_ident = config["str_ident"]
+    loss_opt = (losses, None)
+
+    return n_bins, class_type, nn_arch, batchsize, epoch, list_filename,\
+            use_scratch_ssd, loss_opt, n_gpu, mode,\
+            swap_4d_channels, zero_center, str_ident, list_filename
+
 
 def build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4d_channels, str_ident, modelname, custom_objects):
     """
@@ -113,9 +214,14 @@ def get_optimizer_info(loss_opt, optimizer='adam'):
     adam = ks.optimizers.Adam(beta_1=0.9, beta_2=0.999, epsilon=0.1, decay=0.0) # epsilon=1 for deep networks
     optimizer = adam if optimizer == 'adam' else sgd
 
+    custom_objects = get_all_loss_functions()
     loss_functions, loss_weight = {},{}
     for loss_key in loss_opt[0].keys():
-        loss_functions[loss_key] = loss_opt[0][loss_key][0]
+        loss_function=loss_opt[0][loss_key][0]
+        if loss_function in custom_objects:
+            #Replace function string with the actual function if it is custom
+            loss_function=custom_objects[loss_function]
+        loss_functions[loss_key] = loss_function
         loss_weight[loss_key] = loss_opt[0][loss_key][1]
     metrics = loss_opt[1] if not loss_opt[1] is None else []
 
@@ -603,7 +709,7 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
             make_2d_dir_correlation_plot_different_sigmas(arr_nn_pred, modelname, precuts=precuts)
 
 
-def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None,
+def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, list_filename, n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None,
                 use_scratch_ssd=False, zero_center=False, shuffle=(False,None), tb_logger=False, str_ident='',
                 loss_opt=('categorical_crossentropy', 'accuracy')):
     """
@@ -625,6 +731,8 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
         Declares if a previously trained model or a new model (=0) should be loaded.
         The first argument specifies the last epoch, and the second argument is the last train file number if the train
         dataset is split over multiple files.
+    list_filename : str
+        Path to a list file which contains pathes to all the h5 files that should be used for training.
     n_gpu : tuple(int, str)
         Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov') [1].
     mode : str
@@ -650,7 +758,7 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
         Tuple that contains 1) the loss_functions and loss_weights as lists, 2) the metrics. The default weight is 1.
 
     """
-    train_files, test_files, multiple_inputs = parse_input()
+    #train_files, test_files, multiple_inputs = parse_input()
     xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu[0]) if zero_center is True else None
     if use_scratch_ssd is True: train_files, test_files = use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=multiple_inputs)
     modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident)
@@ -677,79 +785,6 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolko
 
     else:
         raise ValueError('Mode "', str(mode), '" is not known. Needs to be "train" or "eval".')
-
-
-def parse_input():
-    """
-    Parses and returns all necessary input options for the data_to_images function.
-
-    Check the data_to_images function to get docs about the individual parameters.
-    """
-    args = docopt(__doc__)
-
-    if args['-c']:
-        config = toml.load(args['-c'])
-
-        losses = []
-        for loss in config["losses"]:
-            if len(loss)==3:
-                losses.append( [loss[0], [loss[1], float(loss[2])]] )
-            else:
-                losses.append( [loss[0], [loss[1], 1.0]] )
-        config["losses"] = dict(losses)
-        config["class_type"][0] = None if config["class_type"][0]=="None"
-        config["n_gpu"][0] = int(config["n_gpu"][0])
-
-        args.update(config)
-    # TODO instead of using the loss function name directly, maybe use a string instead and look up the corresponding function later
-    losses = {'dx': ['mean_absolute_error', 5],
-              'dy': ['mean_absolute_error', 5],
-              'dz': ['mean_absolute_error', 10],
-              'vx': ['mean_absolute_error', 1e-1],
-              'vy': ['mean_absolute_error', 1e-1],
-              'vz': ['mean_absolute_error', 1e-1],
-              'vt': ['mean_absolute_error', 3e-2],
-              'e':  ['mean_absolute_error', ],
-              'by': ['mean_absolute_error', 20],
-              'dx_err': ["loss_uncertainty_mse",],
-              'dy_err': ["loss_uncertainty_mse", ],
-              'dz_err': ["loss_uncertainty_mse",],
-              'vx_err': ["loss_uncertainty_mse", ],
-              'vy_err': ["loss_uncertainty_mse", ],
-              'vz_err': ["loss_uncertainty_mse",],
-              'vt_err': ["loss_uncertainty_mse", 1e-1],
-              'e_err':  ["loss_uncertainty_mse", 0.0005],
-              'by_err': ["loss_uncertainty_mse"],}
-    n_bins = [(11, 13, 18, 60), (11, 13, 18, 31)]
-    class_type = (None, 'energy_dir_bjorken-y_vtx_errors')
-    nn_arch = 'VGG'
-    batchsize = 64
-    epoch = (2, 1)
-    use_scratch_ssd = False
-    n_gpu = (1, 'avolkov')
-    mode = 'train'
-    swap_4d_channels = 'xyz-t_and_xyz-c_single_input'
-    zero_center = True
-    str_ident = 'lp_tight-1_60b_errors_mse_w_vtx'
-
-    loss_opt = (losses, None)
-
-    """
-    losses = {'dx': 'mean_absolute_error', 'dy': 'mean_absolute_error', 'dz': 'mean_absolute_error',
-              'vx': 'mean_absolute_error', 'vy': 'mean_absolute_error', 'vz': 'mean_absolute_error',
-              'vt': 'mean_absolute_error',
-              'e': 'mean_absolute_error', 'by': 'mean_absolute_error',
-              'dx_err': loss_uncertainty_mse, 'dy_err': loss_uncertainty_mse, 'dz_err': loss_uncertainty_mse,
-              'vx_err': loss_uncertainty_mse, 'vy_err': loss_uncertainty_mse, 'vz_err': loss_uncertainty_mse,
-              'vt_err': loss_uncertainty_mse,
-              'e_err': loss_uncertainty_mse, 'by_err': loss_uncertainty_mse}
-    loss_weights = {'dx': 5, 'dy': 5, 'dz': 10, 'vx': 1e-1, 'vy': 1e-1, 'vz': 1e-1, 'vt': 3e-2, 'e': 1, 'by': 20,
-                    'dx_err': 1, 'dy_err': 1, 'dz_err': 1, 'vt_err': 1e-1, 'e_err': 0.0005, 'by_err': 1}
-    """
-
-    return n_bins, class_type, nn_arch, batchsize, epoch,\
-            use_scratch_ssd, loss_opt, n_gpu, mode,\
-            swap_4d_channels, zero_center, str_ident
 
 
 if __name__ == '__main__':

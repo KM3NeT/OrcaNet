@@ -116,6 +116,19 @@ def parse_input():
     return train_files, test_files, multiple_inputs
 
 
+def read_out_list_file(list_file):
+    train_files=[]
+    test_files=[]
+    with open(list_file) as f:
+        for line in f:
+            line = line.rstrip('\n')
+            if line[0]=="#":
+                continue
+            elif line == '\n':
+                pass
+            #TODO Fertig schreiben
+
+
 def h5_get_number_of_rows(h5_filepath):
     """
     Gets the total number of rows of the first dataset of a .h5 file. Hence, all datasets should have the same number of rows!
