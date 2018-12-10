@@ -79,7 +79,7 @@ def build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4
         model = ks.models.load_model('models/trained/trained_' + modelname + '_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5', custom_objects=custom_objects)
 
     # plot model, install missing packages with conda install if it throws a module error
-    ks.utils.plot_model(model, to_file='./models/model_plots/' + modelname + '.png', show_shapes=True, show_layer_names=True)
+    #ks.utils.plot_model(model, to_file='./models/model_plots/' + modelname + '.png', show_shapes=True, show_layer_names=True)
 
     return model
 
@@ -233,7 +233,7 @@ def schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=0.003, m
                   ' before epoch ' + str(epoch[0]) + ' (minus ' + '{:.1%}'.format(lr_decay) + ')')
 
     else:
-        if epoch[0] == 1 and epoch[1] == 1:
+        if epoch[0] == 1 and epoch[1] == 1: # set initial learning rate for the training
             lr, lr_decay = lr_initial, 0.00
             #lr, lr_decay = lr_initial * n_gpu[0], 0.00
             K.set_value(model.optimizer.lr, lr)
@@ -285,11 +285,11 @@ def get_new_learning_rate(epoch, lr_initial, n_train_files, n_gpu):
     for i in range(n_lr_decays):
 
         if lr_temp > 0.0003:
-            lr_decay = 0.07 # standard for PID: 0.07, standard for regression: 0.02
+            lr_decay = 0.07 # standard for regression: 0.07, standard for PID: 0.02
         elif 0.0003 >= lr_temp > 0.0001:
-            lr_decay = 0.04 # standard for PID: 0.04, standard for regression: 0.01
+            lr_decay = 0.04 # standard for regression: 0.04, standard for PID: 0.01
         else:
-            lr_decay = 0.02 # standard for PID: 0.02, standard for regression: 0.005
+            lr_decay = 0.02 # standard for regression: 0.02, standard for PID: 0.005
 
         lr_temp = lr_temp * (1 - float(lr_decay))
 
@@ -302,7 +302,7 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
     Convenience function that trains (fit_generator) and tests (evaluate_generator) a Keras model.
     For documentation of the parameters, confer to the fit_model and evaluate_model functions.
     """
-    lr_initial, manual_mode = 0.005, (True, 0.0003, 0.07, lr)
+    lr_initial, manual_mode = 0.005, (False, 0.0003, 0.07, lr)
     test_after_n_train_files = 2
 
     epoch, lr, lr_decay = schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=lr_initial, manual_mode=manual_mode) # begin new training step
