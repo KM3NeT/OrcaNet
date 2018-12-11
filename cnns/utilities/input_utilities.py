@@ -10,37 +10,22 @@ import sys
 import argparse
 import h5py
 import toml
-from docopt import docopt
 
-def parse_input():
-    """
-    Parses and returns all necessary input options from a .toml and a .list file.
 
-    Returns
-    -------
-    config_file : str
-        Path and name of the .toml file that defines the properties of the model.
-    list_file : str
-        Path and name of the .list file containing the names of the files that will be used for training.
-    """
-    args = docopt(__doc__)
-    config_file = toml.load(args['CONFIG'])
-    list_file = args['LIST']
-    return config_file, list_file
-
-def read_out_config_file(config):
+def read_out_config_file(config_file):
     """
     Extract the properties of the model which will be built from a .toml file.
 
     Parameters
     ----------
-    config : str
+    config_file : str
         Path and name of the .toml file that defines the properties of the model.
     Returns
     -------
     Many different inpput options handed directly to the function execute_cnn.py in run_cnn.py.
     See there for documentation.
     """
+    config = toml.load(config_file)
     # the losses are in lists like [name, metric, weight] in the toml file, all as strings
     losses = []
     for loss in config["losses"]:

@@ -22,6 +22,7 @@ import sys
 import keras as ks
 from keras import backend as K
 import matplotlib as mpl
+from docopt import docopt
 mpl.use('Agg')
 
 from utilities.input_utilities import *
@@ -697,6 +698,21 @@ def execute_cnn(list_filename,
     else:
         raise ValueError('Mode "', str(mode), '" is not known. Needs to be "train" or "eval".')
 
+def parse_input():
+    """
+    Parses and returns all necessary input options from a .toml and a .list file.
+
+    Returns
+    -------
+    config_file : str
+        Path and name of the .toml file that defines the properties of the model.
+    list_file : str
+        Path and name of the .list file containing the names of the files that will be used for training.
+    """
+    args = docopt(__doc__)
+    config_file = args['CONFIG']
+    list_file = args['LIST']
+    return config_file, list_file
 
 def main():
     """
