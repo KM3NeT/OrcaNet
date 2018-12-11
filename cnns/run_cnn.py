@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Main code for running CNN's.
+CONFIG is a .toml file which sets up the model. An example can be found in config/models/example_model.toml
+LIST is a .list file which contains the files to be trained on. an example can be found in config/lists/example_list.list
 
 Usage:
     run_cnn.py CONFIG LIST
@@ -14,8 +16,6 @@ Options:
 
 import os
 import time
-import toml
-from docopt import docopt
 from time import gmtime, strftime
 import shutil
 import sys
@@ -40,42 +40,6 @@ from utilities.losses import get_all_loss_functions
 # K.set_session(tf_debug.LocalCLIDebugWrapperSession(tf.Session()))
 
 
-def parse_input():
-    """
-    Parses and returns all necessary input options.
-    """
-    args = docopt(__doc__)
-    config = toml.load(args['CONFIG'])
-    list_filename = args['LIST']
-
-    # the losses are in lists like [name, metric, weight] in the toml file, all as strings
-    losses = []
-    for loss in config["losses"]:
-        if len(loss)==3:
-            losses.append( [loss[0], [loss[1], float(loss[2])]] )
-        else:
-            losses.append( [loss[0], [loss[1], 1.0]] )
-    config["losses"] = dict(losses)
-    config["class_type"][0] = None if config["class_type"][0]=="None"
-    config["n_gpu"][0] = int(config["n_gpu"][0])
-
-    losses = config["losses"]
-    n_bins = config["n_bins"]
-    class_type = config["class_type"]
-    nn_arch = config["nn_arch"]
-    batchsize = config["batchsize"]
-    epoch = config["epoch"]
-    use_scratch_ssd = config["use_scratch_ssd"]
-    n_gpu = config["n_gpu"]
-    mode = config["mode"]
-    swap_4d_channels = config["swap_4d_channels"]
-    zero_center = config["zero_center"]
-    str_ident = config["str_ident"]
-    loss_opt = (losses, None)
-
-    return n_bins, class_type, nn_arch, batchsize, epoch, list_filename,\
-            use_scratch_ssd, loss_opt, n_gpu, mode,\
-            swap_4d_channels, zero_center, str_ident, list_filename
 
 
 def build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4d_channels, str_ident, modelname, custom_objects):
@@ -111,9 +75,9 @@ def build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4
 
     """
     if epoch[0] == 0:
-        if nn_arch is 'WRN': model = create_wide_residual_network(n_bins[0], batchsize, nb_classes=class_type[0], n=1, k=1, dropout=0.2, k_size=3, swap_4d_channels=swap_4d_channels)
+        if nn_arch == 'WRN': model = create_wide_residual_network(n_bins[0], batchsize, nb_classes=class_type[0], n=1, k=1, dropout=0.2, k_size=3, swap_4d_channels=swap_4d_channels)
 
-        elif nn_arch is 'VGG':
+        elif nn_arch == 'VGG':
             if 'multi_input_single_train' in str_ident:
                 model = create_vgg_like_model_multi_input_from_single_nns(n_bins, batchsize, str_ident, nb_classes=class_type[0], dropout=(0,0.1), swap_4d_channels=swap_4d_channels)
 
@@ -655,7 +619,8 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
             make_2d_dir_correlation_plot_different_sigmas(arr_nn_pred, modelname, precuts=precuts)
 
 
-def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, list_filename, n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None,
+def execute_cnn(list_filename,
+                n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None,
                 use_scratch_ssd=False, zero_center=False, shuffle=(False,None), tb_logger=False, str_ident='',
                 loss_opt=('categorical_crossentropy', 'accuracy')):
     """
@@ -663,6 +628,8 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, list_filename, n_
 
     Parameters
     ----------
+    list_filename : str
+        Path to a list file which contains pathes to all the h5 files that should be used for training.
     n_bins : list(tuple(int))
         Declares the number of bins for each dimension (e.g. (x,y,z,t)) in the train- and testfiles. Can contain multiple n_bins tuples.
         Multiple n_bins tuples are currently used for multi-input models with multiple input files per batch.
@@ -677,8 +644,6 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, list_filename, n_
         Declares if a previously trained model or a new model (=0) should be loaded.
         The first argument specifies the last epoch, and the second argument is the last train file number if the train
         dataset is split over multiple files.
-    list_filename : str
-        Path to a list file which contains pathes to all the h5 files that should be used for training.
     n_gpu : tuple(int, str)
         Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov') [1].
     mode : str
@@ -733,20 +698,17 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, list_filename, n_
         raise ValueError('Mode "', str(mode), '" is not known. Needs to be "train" or "eval".')
 
 
+def main():
+    """
+    Parse the input and execute the script.
+    """
+    config_file, list_file = parse_input()
+    config_options = read_out_config_file(config_file)
+    execute_cnn(list_file, *config_options)
+
+
 if __name__ == '__main__':
-    execute_cnn(*parse_input())
+    main()
 
-
-
-
-# lp, xyz-t, yzt-x, tight-1 + tight-2
-#     execute_cnn(n_bins=[(11,13,18,60), (11,13,18,60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=32, epoch=(0,1), use_scratch_ssd=False,
-#                 n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels='xyz-t_and_yzt-x', zero_center=True, str_ident='multi_input_single_train_tight-1_tight-2_lr_0.0003')
-#     execute_cnn(n_bins=[(11, 13, 18, 60), (11, 13, 18, 60)], class_type=(2, 'track-shower'), nn_arch='VGG', batchsize=32, epoch=(1,1), use_scratch_ssd=False,
-#                 n_gpu=(1, 'avolkov'), mode='eval', swap_4d_channels='xyz-t_and_yzt-x', zero_center=True, str_ident='multi_input_single_train_tight-1_tight-2_lr_0.003_tr_st_test_st')
-# python run_cnn.py -m lists/lp/xyz-t_lp_tight-1_tight-2_train_no_tau.list lists/lp/xyz-t_lp_tight-1_tight-2_test_no_tau.list
-# python run_cnn.py -m lists/lp/xyz-t_lp_tight-1_tight-2_train_no_tau.list lists/lp/xyz-t_lp_tight-1_tight-2_test_all_tau.list
-# pred 1-5 GeV
-# python run_cnn.py -m lists/lp/xyz-t_lp_tight-1_tight-2_train_no_tau.list lists/lp/xyz-t_lp_tight-1_tight-2_pred_1_to_5_GeV.list
 
 
