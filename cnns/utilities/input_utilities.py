@@ -25,14 +25,14 @@ def parse_input():
        Another usecase would be a double input xyz-t + xyz-c model.
 
     The output (train_files, test_files) is structured as follows:
-    1) train/test: [ ( [train/test_filepath]  , n_rows) ]. The outmost list has len 1 as well as the list in the tuple.
+    1) train/test: [ ( [train/test_filepath,]  , n_rows) ]. The outmost list has len 1 as well as the list in the tuple.
     2) train/test: [ ( [train/test_filepath]  , n_rows), ... ]. The outmost list has arbitrary length (depends on number of files), but len 1 for the list in the tuple.
        The two train and test input .list files should be structured as follows:
             file_0 \n
             file_1 \n
             file_2 # finish, no \n at last line!
 
-    3) train/test: [ ( [train/test_filepath]  , n_rows), ... ]. The outmost list has arbitrary length, as well as the list inside the tuple.
+    3) train/test: [ ( [train/test_filepath,....]  , n_rows), ... ]. The outmost list has arbitrary length, as well as the list inside the tuple.
        The two train and test input .list files should be structured as follows:
             file_0_dset_0 \n
             file_0_dset_1 \n
@@ -117,17 +117,81 @@ def parse_input():
 
 
 def read_out_list_file(list_file):
-    train_files=[]
-    test_files=[]
+    """
+    Reads out input files for network training. The format of the list file should be as follows:
+        Single empty line seperates train from test files, double empty line seperates different training and test sets which
+        are given simultaneosly to a network.
+
+    Parameters
+    ----------
+    list_file : str
+        Path to a .list file containing the pathes to training and test files to be used during training.
+
+    Returns
+    -------
+    train_files : list
+        A list containing the paths to the different training files given in the list_file.
+        Example format:
+                [
+                 [['path/to/train_file_1_dimx.h5', 'path/to/train_file_1_dimy.h5'], number_of_events_train_files_1],
+                 [['path/to/train_file_2_dimx.h5', 'path/to/train_file_2_dimy.h5'], number_of_events_train_files_1]
+                ]
+    test_files : list
+        Like the above but for test files.
+    multiple_inputs : bool
+        Whether seperate sets of input files were given (e.g. for networks taking data
+        simulataneosly from different files).
+    """
+    lines=[]
     with open(list_file) as f:
         for line in f:
             line = line.rstrip('\n')
-            if line[0]=="#":
+            if line[:1]=="#":
                 continue
-            elif line == '\n':
-                pass
-            #TODO Fertig schreiben
+            else:
+                lines.append(line)
+    multiple_inputs=False
+    train_files_list, test_files_list = [], []
+    train_files_in_dimension, test_files_in_dimension = [], []
+    empty_lines_read = 0
+    for line in lines:
+        if line=="":
+            empty_lines_read += 1
+            continue
 
+        if empty_lines_read==0:
+            train_files_in_dimension.append(line)
+        elif empty_lines_read==1:
+            test_files_in_dimension.append(line)
+        elif empty_lines_read==3:
+            # Block for one dimension is finished
+            train_files_list.append(train_files_in_dimension)
+            test_files_list.append(test_files_in_dimension)
+            train_files_in_dimension, test_files_in_dimension = [], []
+            empty_lines_read = 0
+            train_files_in_dimension.append(line)
+            multiple_inputs=True
+        else:
+            raise ValueError("Check formating of the list file! (empty_lines_read counter is at {} during readoout of file {})".format(empty_lines_read, list_file))
+    train_files_list.append(train_files_in_dimension)
+    test_files_list.append(test_files_in_dimension)
+    """
+    Format of train_files_list at this point:
+    [
+     ['path/to/train_file_1_dimx.h5', 'path/to/train_file_2_dimx.h5'],
+     ['path/to/train_file_1_dimy.h5', 'path/to/train_file_2_dimy.h5']
+    ]
+    Reformat to match the desired output format. Only look up dimension of first file (others should be the same).
+    """
+    train_files, test_files = [], []
+    for set_number in range(len(train_files_list[0])):
+        file_set = [dimension[set_number] for dimension in train_files_list]
+        train_files.append([file_set, h5_get_number_of_rows(file_set[0])])
+    for set_number in range(len(test_files_list[0])):
+        file_set = [dimension[set_number] for dimension in test_files_list]
+        test_files.append([file_set, h5_get_number_of_rows(file_set[0])])
+
+    return train_files, test_files, multiple_inputs
 
 def h5_get_number_of_rows(h5_filepath):
     """

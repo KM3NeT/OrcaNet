@@ -4,64 +4,11 @@
 Main code for running CNN's.
 
 Usage:
-    run_cnn.py [options]
+    run_cnn.py CONFIG LIST
     run_cnn.py (-h | --help)
 
 Options:
     -h --help                       Show this screen.
-
-    --config         Load all options for the model from a config file (.toml format).
-
-    --list          Load a list of files on which the network is trained and tested on.
-
-    --n_bins        Declares the number of bins for each dimension (e.g. (x,y,z,t)) in the train- and testfiles. Can contain multiple n_bins tuples.
-                    Multiple n_bins tuples are currently used for multi-input models with multiple input files per batch.
-
-    --class_type    Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
-                    I.e. (2, 'track-shower')
-
-    --nn_arch       Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
-
-    --batchsize     Batchsize that should be used for the training / inferencing of the cnn.
-
-    --epoch         Declares if a previously trained model or a new model (=0) should be loaded.
-                    The first argument specifies the last epoch, and the second argument is the last train file number if the train
-                    dataset is split over multiple files.
-
-    --n_gpu         Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov') [1].
-
-    --mode          Specifies what the function should do - train & test a model or evaluate a 'finished' model?
-                    Currently, there are two modes available: 'train' & 'eval'.
-
-    --swap_4d_channels  For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
-                        Currently available: None -> XYZ-T ; 'yzt-x' -> YZT-X, TODO add multi input options
-
-    --use_scratch_ssd   Declares if the input files should be copied to the node-local SSD scratch space (only working at Erlangen CC).
-
-    --zero_center       Declares if the input images ('xs') should be zero-centered before training.
-
-    --shuffle       Declares if the training data should be shuffled before the next training epoch [0].
-                    If the train dataset is too large to be shuffled in place, one can preshuffle them n times before running
-                    OrcaNet, the number n should then be put into [1].
-
-    --tb_logger     Declares if a tb_callback should be used during training (takes longer to train due to overhead!).
-
-    --str_ident     Optional string identifier that gets appended to the modelname. Useful when training models which would have
-                    the same modelname. Also used for defining models and projections!
-
-    --loss_opt      Tuple that contains 1) the loss_functions and loss_weights as lists, 2) the metrics. The default weight is 1.
-
-    --train_file    The filepath of the traindata file.
-
-    --test_file     The filepath of the testdata file.
-
-    ---listfile_train_and_test      Filepaths of two .list files (train / test) that contains all .h5 files that should be used for training/testing.
-
-    ---listfile_multiple    Filepaths of two .list files where each contains multiple input files
-                            that should be used for training/testing in double/triple/... input models that need multiple input files per batch.
-                            The required structure of the .list files can be found in /utilities/input_utilities parse_input()
-
-
 """
 
 
@@ -98,9 +45,8 @@ def parse_input():
     Parses and returns all necessary input options.
     """
     args = docopt(__doc__)
-
-    config = toml.load(args['--config'])
-    list_filename = toml.load(args['--list'])
+    config = toml.load(args['CONFIG'])
+    list_filename = args['LIST']
 
     # the losses are in lists like [name, metric, weight] in the toml file, all as strings
     losses = []
@@ -758,7 +704,7 @@ def execute_cnn(n_bins, class_type, nn_arch, batchsize, epoch, list_filename, n_
         Tuple that contains 1) the loss_functions and loss_weights as lists, 2) the metrics. The default weight is 1.
 
     """
-    #train_files, test_files, multiple_inputs = parse_input()
+    train_files, test_files, multiple_inputs = read_out_list_file(list_filename)
     xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu[0]) if zero_center is True else None
     if use_scratch_ssd is True: train_files, test_files = use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=multiple_inputs)
     modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident)

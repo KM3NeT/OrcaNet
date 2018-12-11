@@ -1,0 +1,21 @@
+# Input files for network training
+#
+# Single empty line seperates train from test files, double empty line seperates different
+# training and test sets which are given simultaneosly to a network.
+# Lines starting with # are ignored.
+#
+# Example format:
+# -----------------------------
+# path/to/train_file_1_dimx.h5
+# path/to/train_file_2_dimx.h5
+#
+# path/to/test_file_1_dimx.h5
+# path/to/test_file_2_dimx.h5
+#
+#
+# path/to/train_file_1_dimy.h5
+# path/to/train_file_2_dimy.h5
+#
+# path/to/test_file_1_dimy.h5
+# path/to/test_file_2_dimy.h5
+# -----------------------------
