@@ -485,18 +485,18 @@ def evaluate_model(model, modelname, test_files, train_files, batchsize, n_bins,
     epoch_number_float = epoch[0] - (steps_per_total_epoch - steps_cum[epoch[1]]) / float(steps_per_total_epoch)
 
     logfile_fname = 'models/trained/perf_plots/log_test_' + modelname + '.txt'
-    logfile = open(logfile_fname, 'a+')
-    if os.stat(logfile_fname).st_size == 0:
-        logfile.write('#Epoch\t')
-        for i, metric in enumerate(model.metrics_names):
-            logfile.write(metric)
-            logfile.write('\t') if i + 1 < len(model.metrics_names) else logfile.write('\n') #
+    with open(logfile_fname, 'a+') as logfile:
+        if os.stat(logfile_fname).st_size == 0:
+            logfile.write('#Epoch\t')
+            for i, metric in enumerate(model.metrics_names):
+                logfile.write(metric)
+                logfile.write('\t') if i + 1 < len(model.metrics_names) else logfile.write('\n') #
 
-    logfile.write(str(epoch_number_float) + '\t')
+        logfile.write(str(epoch_number_float) + '\t')
 
-    for i in range(len(model.metrics_names)):
-        logfile.write(str(history_averaged[i]))
-        logfile.write('\t') if i + 1 < len(model.metrics_names) else logfile.write('\n')
+        for i in range(len(model.metrics_names)):
+            logfile.write(str(history_averaged[i]))
+            logfile.write('\t') if i + 1 < len(model.metrics_names) else logfile.write('\n')
 
     return history_averaged
 
@@ -506,7 +506,8 @@ def save_train_and_test_statistics_to_txt(model, history_train, history_test, mo
     """
     Function for saving various information during training and testing to a .txt file.
     """
-    with open('models/trained/train_logs/log_' + modelname + '.txt', 'a+') as f_out:
+    logfile='models/trained/train_logs/log_' + modelname + '.txt'
+    with open(logfile, 'a+') as f_out:
         f_out.write('--------------------------------------------------------------------------------------------------------\n')
         f_out.write('\n')
         f_out.write('Current time: ' + strftime("%Y-%m-%d %H:%M:%S", gmtime()) + '\n')
@@ -671,8 +672,12 @@ def execute_cnn(list_filename,
 
     """
     train_files, test_files, multiple_inputs = read_out_list_file(list_filename)
-    xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu[0]) if zero_center is True else None
-    if use_scratch_ssd is True: train_files, test_files = use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=multiple_inputs)
+    if zero_center == True:
+        xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu[0])
+    else:
+        xs_mean = None
+    if use_scratch_ssd == True:
+        train_files, test_files = use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=multiple_inputs)
     modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident)
     custom_objects = get_all_loss_functions()
 
@@ -683,7 +688,8 @@ def execute_cnn(list_filename,
     model.summary()
 
     #model.compile(loss=loss_functions, optimizer=model.optimizer, metrics=model.metrics, loss_weights=loss_weight)
-    if epoch[0] == 0: model.compile(loss=loss_functions, optimizer=optimizer, metrics=metrics, loss_weights=loss_weight)
+    if epoch[0] == 0:
+        model.compile(loss=loss_functions, optimizer=optimizer, metrics=metrics, loss_weights=loss_weight)
 
     if mode == 'train':
         lr = None
