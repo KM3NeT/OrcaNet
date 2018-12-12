@@ -15,14 +15,15 @@ from ..cnn_utilities import generate_batches_from_hdf5_file
 from ..losses import get_all_loss_functions
 
 
-def plot_train_and_test_statistics(modelname, model):
+def plot_train_and_test_statistics(modelname, model, folder_name):
     """
     Plots the loss in training/testing based on .txt logfiles.
     :param str modelname: name of the model.
     :param ks.model.Model model: Keras model of the neural network.
+    :param str folder_name: Path of the main folder of this model.
     """
     # #Batch number # BatchNumber float # Losses # Metrics
-    log_array_train = np.loadtxt('models/trained/perf_plots/log_train_' + modelname + '.txt', dtype=np.float32, delimiter='\t', skiprows=1, ndmin=2)
+    log_array_train = np.loadtxt(folder_name + '/log_train_' + modelname + '.txt', dtype=np.float32, delimiter='\t', skiprows=1, ndmin=2)
     # #Epoch # Losses # Metrics
     log_array_test = np.loadtxt('models/trained/perf_plots/log_test_' + modelname + '.txt', dtype=np.float32, delimiter='\t', skiprows=1, ndmin=2)
 

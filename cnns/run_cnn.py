@@ -314,7 +314,7 @@ def get_new_learning_rate(epoch, lr_initial, n_train_files, n_gpu):
 
 
 def train_and_test_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
-                         shuffle, lr, tb_logger, swap_4d_channels, str_ident, n_gpu):
+                         shuffle, lr, tb_logger, swap_4d_channels, str_ident, n_gpu, folder_name):
     """
     Convenience function that trains (fit_generator) and tests (evaluate_generator) a Keras model.
     For documentation of the parameters, confer to the fit_model and evaluate_model functions.
@@ -334,24 +334,26 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
         if train_iter_step > 1: epoch, lr, lr_decay = schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=lr_initial, manual_mode=manual_mode)
 
         history_train = fit_model(model, modelname, train_files, f, f_size, file_no, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
-                                            shuffle, swap_4d_channels, str_ident, n_events=None, tb_logger=tb_logger)
+                                            shuffle, swap_4d_channels, str_ident, folder_name, n_events=10000, tb_logger=tb_logger)
 
-        history_test = None
-        # test after the first and else after every 5th file
+        # test after the first and else after every n-th file
         if file_no == 1 or file_no % test_after_n_train_files == 0:
-            history_test = evaluate_model(model, modelname, test_files, train_files, batchsize, n_bins, class_type,
-                                          xs_mean, epoch, swap_4d_channels, str_ident, n_events=None)
-
-        save_train_and_test_statistics_to_txt(model, history_train, history_test, modelname, lr, lr_decay, epoch,
-                                              f, test_files, batchsize, n_bins, class_type, swap_4d_channels, str_ident)
-        plot_train_and_test_statistics(modelname, model)
-        plot_weights_and_activations(test_files[0][0], n_bins, class_type, xs_mean, swap_4d_channels, modelname, epoch[0], file_no, str_ident)
+            history_test = evaluate_model(model, test_files, batchsize, n_bins, class_type,
+                                          xs_mean, swap_4d_channels, str_ident, n_events=10000)
+        else:
+            history_test = None
+        write_summary_logfile(train_files, batchsize, epoch, folder_name, model, history_train, history_test, lr)
+        write_full_logfile(model, history_train, history_test, lr, lr_decay, epoch,
+                                              f, test_files, batchsize, n_bins, class_type, swap_4d_channels, str_ident,
+                                              folder_name)
+        #plot_train_and_test_statistics(modelname, model, folder_name)
+        #plot_weights_and_activations(test_files[0][0], n_bins, class_type, xs_mean, swap_4d_channels, modelname, epoch[0], file_no, str_ident)
 
     return epoch, lr
 
 
 def fit_model(model, modelname, train_files, f, f_size, file_no, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
-              shuffle, swap_4d_channels, str_ident, n_events=None, tb_logger=False):
+              shuffle, swap_4d_channels, str_ident, folder_name, n_events=None, tb_logger=False):
     """
     Trains a model based on the Keras fit_generator method.
 
@@ -390,6 +392,8 @@ def fit_model(model, modelname, train_files, f, f_size, file_no, test_files, bat
         For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
     str_ident : str
         Optional string identifier that gets appended to the modelname.
+    folder_name : str
+        Path of the main folder.
     n_events : None/int
         For testing purposes if not the whole .h5 file should be used for training.
     tb_logger : bool
@@ -407,7 +411,8 @@ def fit_model(model, modelname, train_files, f, f_size, file_no, test_files, bat
 
     if n_events is not None: f_size = n_events  # for testing purposes
 
-    logger = BatchLevelPerformanceLogger(train_files=train_files, batchsize=batchsize, display=100, model=model, modelname=modelname, epoch=epoch)
+    logger = BatchLevelPerformanceLogger(train_files=train_files, batchsize=batchsize, display=100, model=model,
+                                         folder_name=folder_name, epoch=epoch)
     callbacks.append(logger)
 
     if epoch[0] > 1 and shuffle[0] is True: # just for convenience, we don't want to wait before the first epoch each time
@@ -424,12 +429,12 @@ def fit_model(model, modelname, train_files, f, f_size, file_no, test_files, bat
         generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, str_ident, f_size=f_size, zero_center_image=xs_mean, swap_col=swap_4d_channels),
         steps_per_epoch=int(f_size / batchsize), epochs=1, verbose=2, max_queue_size=10,
         validation_data=validation_data, validation_steps=validation_steps, callbacks=callbacks)
-    model.save('models/trained/trained_' + modelname + '_epoch_' + str(epoch[0]) + '_file_' + str(file_no) + '.h5')
+    model.save(folder_name + '/saved_models/trained_' + modelname + '_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5')
 
     return history
 
 
-def evaluate_model(model, modelname, test_files, train_files, batchsize, n_bins, class_type, xs_mean, epoch, swap_4d_channels, str_ident, n_events=None):
+def evaluate_model(model, test_files, batchsize, n_bins, class_type, xs_mean, swap_4d_channels, str_ident, n_events=None):
     """
     Evaluates a model with validation data based on the Keras evaluate_generator method.
 
@@ -437,8 +442,8 @@ def evaluate_model(model, modelname, test_files, train_files, batchsize, n_bins,
     ----------
     model : ks.model.Model
         Keras model instance of a neural network.
-    modelname : str
-        Name of the model.
+    folder_name : str
+        Name of the main folder.
     test_files : list(([test_filepaths], test_filesize))
         List of tuples that contains the testfiles and their number of rows.
     train_files : list(([train_filepaths], train_filesize))
@@ -470,11 +475,17 @@ def evaluate_model(model, modelname, test_files, train_files, batchsize, n_bins,
         history = model.evaluate_generator(
             generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, str_ident, swap_col=swap_4d_channels, f_size=f_size, zero_center_image=xs_mean),
             steps=int(f_size / batchsize), max_queue_size=10, verbose=1)
+        #This history object is just a list, not a dict like with fit_generator!
         print('Test sample results: ' + str(history) + ' (' + str(model.metrics_names) + ')')
         histories.append(history)
-
     history_averaged = [sum(col) / float(len(col)) for col in zip(*histories)] if len(histories) > 1 else histories[0] # average over all test files if necessary
 
+    return history_averaged
+
+
+def write_summary_logfile(train_files, batchsize, epoch, folder_name, model, history_train, history_test, lr):
+    #print("\n\n", model.metrics_names)
+    #print(history_train.history, "\n\n")
     # Save test log
     steps_per_total_epoch, steps_cum = 0, [0] # get this for the epoch_number_float in the logfile
     for f, f_size in train_files:
@@ -483,30 +494,32 @@ def evaluate_model(model, modelname, test_files, train_files, batchsize, n_bins,
         steps_cum.append(steps_cum[-1] + steps_per_file)
 
     epoch_number_float = epoch[0] - (steps_per_total_epoch - steps_cum[epoch[1]]) / float(steps_per_total_epoch)
-
-    logfile_fname = 'models/trained/perf_plots/log_test_' + modelname + '.txt'
+    logfile_fname = folder_name + '/summary.txt'
     with open(logfile_fname, 'a+') as logfile:
+        # Write the headline
         if os.stat(logfile_fname).st_size == 0:
-            logfile.write('#Epoch\t')
+            logfile.write('#Epoch\tLR\t')
             for i, metric in enumerate(model.metrics_names):
-                logfile.write(metric)
-                logfile.write('\t') if i + 1 < len(model.metrics_names) else logfile.write('\n') #
-
+                logfile.write("train " + str(metric) + "\ttest " + str(metric) + "\t")
+            logfile.write('\n')
+        # Write the content
         logfile.write(str(epoch_number_float) + '\t')
+        logfile.write("{:.4E}\t".format(float(lr)))
+        for i, metric_name in enumerate(model.metrics_names):
+            logfile.write("{:.8E}".format(float(history_train.history[metric_name][0])))
+            if history_test is None:
+                logfile.write("nan")
+            else:
+                logfile.write("{:.8E}\t".format(float(history_test[i])))
+        logfile.write('\n')
 
-        for i in range(len(model.metrics_names)):
-            logfile.write(str(history_averaged[i]))
-            logfile.write('\t') if i + 1 < len(model.metrics_names) else logfile.write('\n')
 
-    return history_averaged
-
-
-def save_train_and_test_statistics_to_txt(model, history_train, history_test, modelname, lr, lr_decay, epoch, train_file,
-                                          test_files, batchsize, n_bins, class_type, swap_4d_channels, str_ident):
+def write_full_logfile(model, history_train, history_test, lr, lr_decay, epoch, train_file,
+                            test_files, batchsize, n_bins, class_type, swap_4d_channels, str_ident, folder_name):
     """
     Function for saving various information during training and testing to a .txt file.
     """
-    logfile='models/trained/train_logs/log_' + modelname + '.txt'
+    logfile=folder_name + '/full_log.txt'
     with open(logfile, 'a+') as f_out:
         f_out.write('--------------------------------------------------------------------------------------------------------\n')
         f_out.write('\n')
@@ -621,7 +634,7 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
             make_2d_dir_correlation_plot_different_sigmas(arr_nn_pred, modelname, precuts=precuts)
 
 
-def execute_cnn(list_filename,
+def execute_cnn(list_filename, folder_name,
                 n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None,
                 use_scratch_ssd=False, zero_center=False, shuffle=(False,None), tb_logger=False, str_ident='',
                 loss_opt=('categorical_crossentropy', 'accuracy')):
@@ -632,6 +645,8 @@ def execute_cnn(list_filename,
     ----------
     list_filename : str
         Path to a list file which contains pathes to all the h5 files that should be used for training.
+    folder_name : str
+        Name of the folder in the cnns directory in which everything will be saved.
     n_bins : list(tuple(int))
         Declares the number of bins for each dimension (e.g. (x,y,z,t)) in the train- and testfiles. Can contain multiple n_bins tuples.
         Multiple n_bins tuples are currently used for multi-input models with multiple input files per batch.
@@ -672,11 +687,11 @@ def execute_cnn(list_filename,
 
     """
     train_files, test_files, multiple_inputs = read_out_list_file(list_filename)
-    if zero_center == True:
+    if zero_center:
         xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu[0])
     else:
         xs_mean = None
-    if use_scratch_ssd == True:
+    if use_scratch_ssd:
         train_files, test_files = use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=multiple_inputs)
     modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident)
     custom_objects = get_all_loss_functions()
@@ -695,7 +710,8 @@ def execute_cnn(list_filename,
         lr = None
         while 1:
             epoch, lr = train_and_test_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type,
-                                             xs_mean, epoch, shuffle, lr, tb_logger, swap_4d_channels, str_ident, n_gpu)
+                                             xs_mean, epoch, shuffle, lr, tb_logger, swap_4d_channels, str_ident, n_gpu,
+                                             folder_name)
 
     elif mode == 'eval':
         predict_and_investigate_model_performance(model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
@@ -720,13 +736,36 @@ def parse_input():
     list_file = args['LIST']
     return config_file, list_file
 
+def make_folder_structure(config_file):
+    """
+    Make missing folders if they don't exist already.
+
+    Parameters
+    ----------
+    config_file : str
+        Path to the .toml config file.
+
+    Returns
+    -------
+    folder_name : str
+        Name of the main folder where everything is saved. Has the same name as the config file.
+
+    """
+    folder_name = "trained_models/" + config_file.split("/")[-1].split(".")[:-1][0]
+    folders_to_create = [folder_name, folder_name+"/log_train", folder_name+"/saved_models", folder_name+"/plots"]
+    for directory in folders_to_create:
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+    return folder_name
+
 def main():
     """
-    Parse the input and execute the script.
+    Parse the input and execute the script. The folder name where everything is saved to is the name of the .toml file.
     """
     config_file, list_file = parse_input()
     config_options = read_out_config_file(config_file)
-    execute_cnn(list_file, *config_options)
+    folder_name = make_folder_structure(config_file)
+    execute_cnn(list_file, folder_name, *config_options)
 
 
 if __name__ == '__main__':
