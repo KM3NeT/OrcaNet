@@ -4,13 +4,12 @@
 technical stuff like copying the files to the node-local SSD."""
 
 import os
-import glob
 import shutil
-import sys
-import argparse
 import h5py
 import toml
 
+def config_test(file):
+    config = toml.load(config_file)
 
 def read_out_config_file(config_file):
     """
@@ -22,10 +21,12 @@ def read_out_config_file(config_file):
         Path and name of the .toml file that defines the properties of the model.
     Returns
     -------
-    Many different inpput options handed directly to the function execute_cnn.py in run_cnn.py.
+    Many different inpput options handed directly to the function execute_nn.py in run_cnn.py.
     See there for documentation.
     """
     config = toml.load(config_file)
+    # Adjustment of values (as toml has strict requirements for the format, e.g. lists can only contain
+    #   variables of the same type
     # the losses are in lists like [name, metric, weight] in the toml file, all as strings
     losses = []
     for loss in config["losses"]:
@@ -49,7 +50,6 @@ def read_out_config_file(config_file):
     use_scratch_ssd = config["use_scratch_ssd"]
     zero_center = config["zero_center"]
     shuffle=(False, None)
-    tb_logger = False
     str_ident = config["str_ident"]
 
     losses = config["losses"]
@@ -57,7 +57,7 @@ def read_out_config_file(config_file):
 
     return n_bins, class_type, nn_arch, batchsize, epoch, \
            n_gpu, mode, swap_4d_channels, use_scratch_ssd,\
-            zero_center, shuffle, tb_logger, str_ident, loss_opt
+            zero_center, shuffle, str_ident, loss_opt
 
 def read_out_list_file(list_file):
     """

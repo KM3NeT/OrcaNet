@@ -50,7 +50,7 @@ def build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4
     Parameters
     ----------
     epoch : tuple(int, int)
-        Declares if a previously trained model or a new model (=0) should be loaded, more info in the execute_cnn function.
+        Declares if a previously trained model or a new model (=0) should be loaded, more info in the execute_nn function.
     nn_arch : str
         Architecture of the neural network.
     n_bins : list(tuple(int))
@@ -315,7 +315,7 @@ def get_new_learning_rate(epoch, lr_initial, n_train_files, n_gpu):
 
 
 def train_and_test_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
-                         shuffle, lr, tb_logger, swap_4d_channels, str_ident, n_gpu, folder_name):
+                         shuffle, lr, swap_4d_channels, str_ident, n_gpu, folder_name):
     """
     Convenience function that trains (fit_generator), tests (evaluate_generator) and saves a Keras model.
     For documentation of the parameters, confer to the fit_model and evaluate_model functions.
@@ -333,9 +333,9 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
         if train_iter_step > 1:
             epoch, lr, lr_decay = schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=lr_initial, manual_mode=manual_mode)
 
-        history_train = fit_model(model, modelname, train_files, f, f_size, file_no, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
-                                            shuffle, swap_4d_channels, str_ident, folder_name, n_events=10000, tb_logger=tb_logger)
-        model.save(folder_name + '/saved_models/trained_' + modelname + '_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5')
+        history_train = fit_model(model, train_files, f, f_size, file_no, batchsize, n_bins, class_type, xs_mean, epoch,
+                                            shuffle, swap_4d_channels, str_ident, folder_name, n_events=10000)
+        model.save(folder_name + '/saved_models/trained_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5')
 
         # test after the first and else after every n-th file
         if file_no == 1 or file_no % test_after_n_train_files == 0:
@@ -353,8 +353,8 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
     return epoch, lr
 
 
-def fit_model(model, modelname, train_files, f, f_size, file_no, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
-              shuffle, swap_4d_channels, str_ident, folder_name, n_events=None, tb_logger=False):
+def fit_model(model, train_files, f, f_size, file_no, batchsize, n_bins, class_type, xs_mean, epoch,
+              shuffle, swap_4d_channels, str_ident, folder_name, n_events=None):
     """
     Trains a model based on the Keras fit_generator method.
 
@@ -365,8 +365,6 @@ def fit_model(model, modelname, train_files, f, f_size, file_no, test_files, bat
     ----------
     model : ks.model.Model
         Keras model instance of a neural network.
-    modelname : str
-        Name of the model.
     train_files : list(([train_filepaths], train_filesize))
         List of tuples with the filepaths and the filesizes of the train_files.
     f : str
@@ -375,8 +373,6 @@ def fit_model(model, modelname, train_files, f, f_size, file_no, test_files, bat
         Number of images contained in f.
     file_no : int
         If the full data is split into multiple files, this parameter indicates the current file number.
-    test_files : list(([test_filepaths], test_filesize))
-        List of tuples that contains the testfiles and their number of rows for the tb_callback.
     batchsize : int
         Batchsize that is used in the fit_generator method.
     n_bins : list(tuple(int))
@@ -397,21 +393,10 @@ def fit_model(model, modelname, train_files, f, f_size, file_no, test_files, bat
         Path of the main folder.
     n_events : None/int
         For testing purposes if not the whole .h5 file should be used for training.
-    tb_logger : bool
-        Declares if a tb_callback during fit_generator should be used (takes long time to save the tb_log during training!).
 
     """
-    if tb_logger is True:
-        callbacks = [TensorBoardWrapper(generate_batches_from_hdf5_file(test_files[0][0], batchsize, n_bins, class_type, str_ident, zero_center_image=xs_mean),
-                                     nb_steps=int(5000 / batchsize), log_dir='models/trained/tb_logs/' + modelname + '_{}'.format(time.time()),
-                                     histogram_freq=1, batch_size=batchsize, write_graph=False, write_grads=True, write_images=True)]
-        validation_data = generate_batches_from_hdf5_file(test_files[0][0], batchsize, n_bins, class_type, str_ident, swap_col=swap_4d_channels, zero_center_image=xs_mean) #f_size=None is ok here
-        validation_steps = int(5000 / batchsize)
-    else:
-        validation_data, validation_steps, callbacks = None, None, []
-
+    validation_data, validation_steps, callbacks = None, None, []
     if n_events is not None: f_size = n_events  # for testing purposes
-
     logger = BatchLevelPerformanceLogger(train_files=train_files, batchsize=batchsize, display=100, model=model,
                                          folder_name=folder_name, epoch=epoch)
     callbacks.append(logger)
@@ -650,9 +635,9 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
             make_2d_dir_correlation_plot_different_sigmas(arr_nn_pred, modelname, precuts=precuts)
 
 
-def execute_cnn(list_filename, folder_name,
+def execute_nn(list_filename, folder_name,
                 n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None,
-                use_scratch_ssd=False, zero_center=False, shuffle=(False,None), tb_logger=False, str_ident='',
+                use_scratch_ssd=False, zero_center=False, shuffle=(False,None), str_ident='',
                 loss_opt=('categorical_crossentropy', 'accuracy')):
     """
     Code that trains or evaluates a convolutional neural network.
@@ -693,8 +678,6 @@ def execute_cnn(list_filename, folder_name,
         Declares if the training data should be shuffled before the next training epoch [0].
         If the train dataset is too large to be shuffled in place, one can preshuffle them n times before running
         OrcaNet, the number n should then be put into [1].
-    tb_logger : bool
-        Declares if a tb_callback should be used during training (takes longer to train due to overhead!).
     str_ident : str
         Optional string identifier that gets appended to the modelname. Useful when training models which would have
         the same modelname. Also used for defining models and projections!
@@ -726,7 +709,7 @@ def execute_cnn(list_filename, folder_name,
         lr = None
         while 1:
             epoch, lr = train_and_test_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type,
-                                             xs_mean, epoch, shuffle, lr, tb_logger, swap_4d_channels, str_ident, n_gpu,
+                                             xs_mean, epoch, shuffle, lr, swap_4d_channels, str_ident, n_gpu,
                                              folder_name)
 
     elif mode == 'eval':
@@ -781,7 +764,7 @@ def main():
     config_file, list_file = parse_input()
     config_options = read_out_config_file(config_file)
     folder_name = make_folder_structure(config_file)
-    execute_cnn(list_file, folder_name, *config_options)
+    execute_nn(list_file, folder_name, *config_options)
 
 
 if __name__ == '__main__':

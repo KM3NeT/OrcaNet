@@ -6,7 +6,8 @@
 #   utilities/input_utilities.py.
 #
 # name, metric, [weight]
-losses = [
+
+losses_oldformat = [
           ['dx', 'mean_absolute_error', '10'],
           ['dy', 'mean_absolute_error', '10'],
           ['dz', 'mean_absolute_error', '15'],
@@ -37,3 +38,23 @@ mode = 'train'
 swap_4d_channels = 'xyz-t_and_xyz-c_single_input'
 zero_center = 1
 str_ident = 'lp_tight-1_60b_errors_mse_w_vtx'
+
+[losses]
+dx = {function="mse", weight=10}
+dy = {function="mse", weight=10}
+dz = {function='mean_absolute_error', weight='15'}
+vx = {function='mean_absolute_error', weight='2e-1'}
+vy = {function='mean_absolute_error', weight='2e-1'}
+vz = {function='mean_absolute_error', weight='2e-1'}
+vt = {function='mean_absolute_error', weight='1e-2'}
+e  = {function='mean_absolute_error'}
+by = {function='mean_absolute_error', weight='10'}
+dx_err = {function='loss_uncertainty_mse'}
+dy_err = {function='loss_uncertainty_mse'}
+dz_err = {function='loss_uncertainty_mse', weight='1.25'}
+vx_err = {function='loss_uncertainty_mse'}
+vy_err = {function='loss_uncertainty_mse'}
+vz_err = {function='loss_uncertainty_mse'}
+vt_err = {function='loss_uncertainty_mse', weight='1e-4'}
+e_err  = {function='loss_uncertainty_mse', weight='3e-3'}
+by_err = {function='loss_uncertainty_mse'}
