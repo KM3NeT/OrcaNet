@@ -233,6 +233,7 @@ def schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=0.003, m
         Learning rate decay that has been used to decay the lr rate used for this epoch.
 
     """
+    #TODO set learning rate outside of this function
     if len(train_files) > epoch[1] and epoch[0] != 0:
         epoch = (epoch[0], epoch[1] + 1)  # resume from the same epoch but with the next file
     else:
@@ -316,7 +317,7 @@ def get_new_learning_rate(epoch, lr_initial, n_train_files, n_gpu):
 def train_and_test_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
                          shuffle, lr, tb_logger, swap_4d_channels, str_ident, n_gpu, folder_name):
     """
-    Convenience function that trains (fit_generator) and tests (evaluate_generator) a Keras model.
+    Convenience function that trains (fit_generator), tests (evaluate_generator) and saves a Keras model.
     For documentation of the parameters, confer to the fit_model and evaluate_model functions.
     """
     lr_initial, manual_mode = 0.005, (False, 0.0003, 0.07, lr)
@@ -325,16 +326,16 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
     epoch, lr, lr_decay = schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=lr_initial, manual_mode=manual_mode) # begin new training step
     train_iter_step = 0 # loop n
     for file_no, (f, f_size) in enumerate(train_files, 1):
-
         if file_no < epoch[1]:
             continue # skip if this file for this epoch has already been used for training
 
         train_iter_step += 1
-
-        if train_iter_step > 1: epoch, lr, lr_decay = schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=lr_initial, manual_mode=manual_mode)
+        if train_iter_step > 1:
+            epoch, lr, lr_decay = schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=lr_initial, manual_mode=manual_mode)
 
         history_train = fit_model(model, modelname, train_files, f, f_size, file_no, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
                                             shuffle, swap_4d_channels, str_ident, folder_name, n_events=10000, tb_logger=tb_logger)
+        model.save(folder_name + '/saved_models/trained_' + modelname + '_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5')
 
         # test after the first and else after every n-th file
         if file_no == 1 or file_no % test_after_n_train_files == 0:
@@ -429,7 +430,6 @@ def fit_model(model, modelname, train_files, f, f_size, file_no, test_files, bat
         generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, str_ident, f_size=f_size, zero_center_image=xs_mean, swap_col=swap_4d_channels),
         steps_per_epoch=int(f_size / batchsize), epochs=1, verbose=2, max_queue_size=10,
         validation_data=validation_data, validation_steps=validation_steps, callbacks=callbacks)
-    model.save(folder_name + '/saved_models/trained_' + modelname + '_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5')
 
     return history
 
@@ -442,12 +442,8 @@ def evaluate_model(model, test_files, batchsize, n_bins, class_type, xs_mean, sw
     ----------
     model : ks.model.Model
         Keras model instance of a neural network.
-    folder_name : str
-        Name of the main folder.
     test_files : list(([test_filepaths], test_filesize))
         List of tuples that contains the testfiles and their number of rows.
-    train_files : list(([train_filepaths], train_filesize))
-        List of tuples with the filepaths and the filesizes of the train_files.
     batchsize : int
         Batchsize that is used in the evaluate_generator method.
     n_bins : list(tuple(int))
@@ -456,8 +452,6 @@ def evaluate_model(model, test_files, batchsize, n_bins, class_type, xs_mean, sw
         Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
     xs_mean : ndarray
         Mean_image of the x (train-) dataset used for zero-centering the train-/testdata.
-    epoch : tuple(int, int)
-        The number of the current epoch and the current filenumber.
     swap_4d_channels : None/str
         For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
     str_ident : str
@@ -478,12 +472,34 @@ def evaluate_model(model, test_files, batchsize, n_bins, class_type, xs_mean, sw
         #This history object is just a list, not a dict like with fit_generator!
         print('Test sample results: ' + str(history) + ' (' + str(model.metrics_names) + ')')
         histories.append(history)
-    history_averaged = [sum(col) / float(len(col)) for col in zip(*histories)] if len(histories) > 1 else histories[0] # average over all test files if necessary
+    history_test = [sum(col) / float(len(col)) for col in zip(*histories)] if len(histories) > 1 else histories[0] # average over all test files if necessary
 
-    return history_averaged
+    return history_test
 
 
 def write_summary_logfile(train_files, batchsize, epoch, folder_name, model, history_train, history_test, lr):
+    """
+    Write to the summary.txt file in every trained model folder.
+
+    Parameters
+    ----------
+    train_files : list(([train_filepaths], train_filesize))
+        List of tuples with the filepaths and the filesizes of the train_files.
+    batchsize : int
+        Batchsize that is used in the evaluate_generator method.
+    epoch : tuple(int, int)
+        The number of the current epoch and the current filenumber.
+    folder_name : str
+        Name of the folder in the cnns directory in which everything will be saved.
+    model : ks.model.Model
+        Keras model instance of a neural network.
+    history_train : Keras history object
+        History object containing the history of the training, averaged over files.
+    history_test : list
+        List of test losses for all the metrics, averaged over all test files.
+    lr : float
+        The current learning rate of the model.
+    """
     #print("\n\n", model.metrics_names)
     #print(history_train.history, "\n\n")
     # Save test log
@@ -500,17 +516,17 @@ def write_summary_logfile(train_files, batchsize, epoch, folder_name, model, his
         if os.stat(logfile_fname).st_size == 0:
             logfile.write('#Epoch\tLR\t')
             for i, metric in enumerate(model.metrics_names):
-                logfile.write("train " + str(metric) + "\ttest " + str(metric) + "\t")
+                logfile.write("train_" + str(metric) + "\ttest_" + str(metric) + "\t")
             logfile.write('\n')
-        # Write the content
-        logfile.write(str(epoch_number_float) + '\t')
-        logfile.write("{:.4E}\t".format(float(lr)))
+        # Write the content: Epoch, LR, train_1, test_1, ...
+        logfile.write("{:.4g}\t".format(float(epoch_number_float)))
+        logfile.write("{:.4g}\t".format(float(lr)))
         for i, metric_name in enumerate(model.metrics_names):
-            logfile.write("{:.8E}".format(float(history_train.history[metric_name][0])))
+            logfile.write("{:.4g}\t".format(float(history_train.history[metric_name][0])))
             if history_test is None:
-                logfile.write("nan")
+                logfile.write("nan\t")
             else:
-                logfile.write("{:.8E}\t".format(float(history_test[i])))
+                logfile.write("{:.4g}\t".format(float(history_test[i])))
         logfile.write('\n')
 
 
