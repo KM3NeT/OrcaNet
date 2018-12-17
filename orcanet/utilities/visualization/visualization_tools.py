@@ -11,8 +11,8 @@ import keras.backend as K
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
-from orcanet.utilities.nn_utilities import generate_batches_from_hdf5_file
-from orcanet.utilities.losses import get_all_loss_functions
+from utilities.nn_utilities import generate_batches_from_hdf5_file
+from utilities.losses import get_all_loss_functions
 
 
 def plot_train_and_test_statistics(modelname, model, folder_name):

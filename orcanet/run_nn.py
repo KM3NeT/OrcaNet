@@ -19,15 +19,15 @@ import matplotlib as mpl
 from docopt import docopt
 mpl.use('Agg')
 
-from orcanet.utilities.input_output_utilities import use_node_local_ssd_for_input, read_out_list_file, read_out_config_file, write_summary_logfile, write_full_logfile
-from orcanet.model_archs.short_cnn_models import create_vgg_like_model_multi_input_from_single_nns, create_vgg_like_model
-from orcanet.model_archs.wide_resnet import create_wide_residual_network
-from orcanet.utilities.nn_utilities import load_zero_center_data, get_modelname, BatchLevelPerformanceLogger
-from orcanet.utilities.multi_gpu.multi_gpu import get_available_gpus, make_parallel, print_mgpu_modelsummary
-from orcanet.utilities.data_tools.shuffle_h5 import shuffle_h5
-from orcanet.utilities.visualization.visualization_tools import *
-from orcanet.utilities.evaluation_utilities import *
-from orcanet.utilities.losses import *
+from utilities.input_output_utilities import use_node_local_ssd_for_input, read_out_list_file, read_out_config_file, write_summary_logfile, write_full_logfile
+from model_archs.short_cnn_models import create_vgg_like_model_multi_input_from_single_nns, create_vgg_like_model
+from model_archs.wide_resnet import create_wide_residual_network
+from utilities.nn_utilities import load_zero_center_data, get_modelname, BatchLevelPerformanceLogger
+from utilities.multi_gpu.multi_gpu import get_available_gpus, make_parallel, print_mgpu_modelsummary
+from utilities.data_tools.shuffle_h5 import shuffle_h5
+from utilities.visualization.visualization_tools import *
+from utilities.evaluation_utilities import *
+from utilities.losses import *
 
 # for debugging
 # from tensorflow.python import debug as tf_debug
