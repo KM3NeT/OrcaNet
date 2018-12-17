@@ -7,13 +7,12 @@ import os
 import shutil
 import h5py
 import toml
-
-def config_test(file):
-    config = toml.load(config_file)
+from time import gmtime, strftime
 
 def read_out_config_file(config_file):
     """
-    Extract the properties of the model which will be built from a .toml file.
+    Extract the properties of the model which will be built from a .toml file. These are handed to the execute_nn
+    function in run_nn.py.
 
     Parameters
     ----------
@@ -21,43 +20,31 @@ def read_out_config_file(config_file):
         Path and name of the .toml file that defines the properties of the model.
     Returns
     -------
-    Many different inpput options handed directly to the function execute_nn.py in run_cnn.py.
-    See there for documentation.
+        positional_arguments: tuple
+            Positional arguments of the execute_nn function.
+        config["keyword_arguments"] : dict
+            Keyword arguments of the execute_nn function.
     """
     config = toml.load(config_file)
-    # Adjustment of values (as toml has strict requirements for the format, e.g. lists can only contain
-    #   variables of the same type
-    # the losses are in lists like [name, metric, weight] in the toml file, all as strings
-    losses = []
-    for loss in config["losses"]:
-        if len(loss)==3:
-            losses.append( [loss[0], [loss[1], float(loss[2])]] )
-        else:
-            losses.append( [loss[0], [loss[1], 1.0]] )
-    config["losses"] = dict(losses)
-    if config["class_type"][0]=="None":
-        config["class_type"][0] = None
-    config["n_gpu"][0] = int(config["n_gpu"][0])
 
-    n_bins = config["n_bins"]
-    class_type = config["class_type"]
-    nn_arch = config["nn_arch"]
-    batchsize = config["batchsize"]
-    epoch = config["epoch"]
-    n_gpu = config["n_gpu"]
-    mode = config["mode"]
-    swap_4d_channels = config["swap_4d_channels"]
-    use_scratch_ssd = config["use_scratch_ssd"]
-    zero_center = config["zero_center"]
-    shuffle=(False, None)
-    str_ident = config["str_ident"]
+    loss_opt = (config["losses"], None)
+    n_bins = config["positional_arguments"]["n_bins"]
+    if config["positional_arguments"]["class_type"][0]=="None":
+        config["positional_arguments"]["class_type"][0] = None
+    class_type = config["positional_arguments"]["class_type"]
+    nn_arch = config["positional_arguments"]["nn_arch"]
+    epoch = config["positional_arguments"]["epoch"]
+    mode = config["positional_arguments"]["mode"]
+    if config["positional_arguments"]["swap_4d_channels"]=="None":
+        config["positional_arguments"]["swap_4d_channels"] = None
+    swap_4d_channels = config["positional_arguments"]["swap_4d_channels"]
+    positional_arguments = (loss_opt, n_bins, class_type, nn_arch, epoch, mode, swap_4d_channels)
 
-    losses = config["losses"]
-    loss_opt = (losses, None)
+    if "n_gpu" in config["keyword_arguments"]:
+        config["keyword_arguments"]["n_gpu"][0] = int(config["keyword_arguments"]["n_gpu"][0])
 
-    return n_bins, class_type, nn_arch, batchsize, epoch, \
-           n_gpu, mode, swap_4d_channels, use_scratch_ssd,\
-            zero_center, shuffle, str_ident, loss_opt
+    return positional_arguments, config["keyword_arguments"]
+
 
 def read_out_list_file(list_file):
     """
@@ -136,6 +123,83 @@ def read_out_list_file(list_file):
 
     return train_files, test_files, multiple_inputs
 
+
+def write_summary_logfile(train_files, batchsize, epoch, folder_name, model, history_train, history_test, lr):
+    """
+    Write to the summary.txt file in every trained model folder.
+
+    Parameters
+    ----------
+    train_files : list(([train_filepaths], train_filesize))
+        List of tuples with the filepaths and the filesizes of the train_files.
+    batchsize : int
+        Batchsize that is used in the evaluate_generator method.
+    epoch : tuple(int, int)
+        The number of the current epoch and the current filenumber.
+    folder_name : str
+        Name of the folder in the cnns directory in which everything will be saved.
+    model : ks.model.Model
+        Keras model instance of a neural network.
+    history_train : Keras history object
+        History object containing the history of the training, averaged over files.
+    history_test : list
+        List of test losses for all the metrics, averaged over all test files.
+    lr : float
+        The current learning rate of the model.
+    """
+    # Save test log
+    steps_per_total_epoch, steps_cum = 0, [0] # get this for the epoch_number_float in the logfile
+    for f, f_size in train_files:
+        steps_per_file = int(f_size / batchsize)
+        steps_per_total_epoch += steps_per_file
+        steps_cum.append(steps_cum[-1] + steps_per_file)
+
+    epoch_number_float = epoch[0] - (steps_per_total_epoch - steps_cum[epoch[1]]) / float(steps_per_total_epoch)
+    logfile_fname = folder_name + '/summary.txt'
+    with open(logfile_fname, 'a+') as logfile:
+        # Write the headline
+        if os.stat(logfile_fname).st_size == 0:
+            logfile.write('#Epoch\tLR\t')
+            for i, metric in enumerate(model.metrics_names):
+                logfile.write("train_" + str(metric) + "\ttest_" + str(metric) + "\t")
+            logfile.write('\n')
+        # Write the content: Epoch, LR, train_1, test_1, ...
+        logfile.write("{:.4g}\t".format(float(epoch_number_float)))
+        logfile.write("{:.4g}\t".format(float(lr)))
+        for i, metric_name in enumerate(model.metrics_names):
+            logfile.write("{:.4g}\t".format(float(history_train.history[metric_name][0])))
+            if history_test is None:
+                logfile.write("nan\t")
+            else:
+                logfile.write("{:.4g}\t".format(float(history_test[i])))
+        logfile.write('\n')
+
+
+def write_full_logfile(model, history_train, history_test, lr, lr_decay, epoch, train_file,
+                            test_files, batchsize, n_bins, class_type, swap_4d_channels, str_ident, folder_name):
+    """
+    Function for saving various information during training and testing to a .txt file.
+    """
+    logfile=folder_name + '/full_log.txt'
+    with open(logfile, 'a+') as f_out:
+        f_out.write('--------------------------------------------------------------------------------------------------------\n')
+        f_out.write('\n')
+        f_out.write('Current time: ' + strftime("%Y-%m-%d %H:%M:%S", gmtime()) + '\n')
+        f_out.write('Decayed learning rate to ' + str(lr) + ' before epoch ' + str(epoch[0]) +
+                    ' and file ' + str(epoch[1]) + ' (minus ' + str(lr_decay) + ')\n')
+        f_out.write('Trained in epoch ' + str(epoch) + ' on file ' + str(epoch[1]) + ', ' + str(train_file) + '\n')
+        if history_test is not None:
+            f_out.write('Tested in epoch ' + str(epoch) + ', file ' + str(epoch[1]) + ' on test_files ' + str(test_files) + '\n')
+        f_out.write('History for training / testing: \n')
+        f_out.write('Train: ' + str(history_train.history) + '\n')
+        if history_test is not None:
+            f_out.write('Test: ' + str(history_test) + ' (' + str(model.metrics_names) + ')' + '\n')
+        f_out.write('\n')
+        f_out.write('Additional Info:\n')
+        f_out.write('Batchsize=' + str(batchsize) + ', n_bins=' + str(n_bins) +
+                    ', class_type=' + str(class_type) + '\n' +
+                    'swap_4d_channels=' + str(swap_4d_channels) + ', str_ident=' + str_ident + '\n')
+        f_out.write('\n')
 
 
 def h5_get_number_of_rows(h5_filepath):

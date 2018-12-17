@@ -4,41 +4,9 @@
 #   read_out_config_file in
 # the file
 #   utilities/input_utilities.py.
-#
-# name, metric, [weight]
 
-losses_oldformat = [
-          ['dx', 'mean_absolute_error', '10'],
-          ['dy', 'mean_absolute_error', '10'],
-          ['dz', 'mean_absolute_error', '15'],
-          ['vx', 'mean_absolute_error', '2e-1'],
-          ['vy', 'mean_absolute_error', '2e-1'],
-          ['vz', 'mean_absolute_error', '2e-1'],
-          ['vt', 'mean_absolute_error', '1e-2'],
-          ['e',  'mean_absolute_error', ],
-          ['by', 'mean_absolute_error', '10'],
-          ['dx_err', 'loss_uncertainty_mse',],
-          ['dy_err', 'loss_uncertainty_mse',],
-          ['dz_err', 'loss_uncertainty_mse', '1.25'],
-          ['vx_err', 'loss_uncertainty_mse', ],
-          ['vy_err', 'loss_uncertainty_mse', ],
-          ['vz_err', 'loss_uncertainty_mse', ],
-          ['vt_err', 'loss_uncertainty_mse', '1e-4'],
-          ['e_err',  'loss_uncertainty_mse', '3e-3'],
-          ['by_err', 'loss_uncertainty_mse', '1'],
-          ]
-n_bins = [[11, 13, 18, 60], [11, 13, 18, 31]]
-class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
-nn_arch = 'VGG'
-batchsize = 64
-epoch = [0, 1]
-use_scratch_ssd = 0
-n_gpu = ['1', 'avolkov']
-mode = 'train'
-swap_4d_channels = 'xyz-t_and_xyz-c_single_input'
-zero_center = 1
-str_ident = 'lp_tight-1_60b_errors_mse_w_vtx'
-
+# The loss(es) of the model are listed here. Every loss has an identifier as a keyword,
+# and a loss function that it will use. Can also give a weight to each loss.
 [losses]
 dx = {function="mse", weight=10}
 dy = {function="mse", weight=10}
@@ -58,3 +26,22 @@ vz_err = {function='loss_uncertainty_mse'}
 vt_err = {function='loss_uncertainty_mse', weight='1e-4'}
 e_err  = {function='loss_uncertainty_mse', weight='3e-3'}
 by_err = {function='loss_uncertainty_mse'}
+
+# Options that also need to be given for executing the script.
+[positional_arguments]
+# TODO add doc for these options
+n_bins = [[11, 13, 18, 60], [11, 13, 18, 31]]
+class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
+nn_arch = 'VGG'
+# Epoch of training and file number of a saved model. If epoch[0]==0, a new model will be built.
+epoch = [0, 1]
+mode = 'train'
+swap_4d_channels = 'xyz-t_and_xyz-c_single_input'
+
+# Options for altering various things in the script.
+[keyword_arguments]
+str_ident = 'lp_tight-1_60b_errors_mse_w_vtx'
+n_gpu = ['1', 'avolkov']
+zero_center = true
+n_events = 10000
+

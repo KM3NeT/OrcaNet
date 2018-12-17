@@ -13,28 +13,21 @@ Options:
     -h --help                       Show this screen.
 """
 
-
 import os
-import time
-from time import gmtime, strftime
-import shutil
-import sys
 import keras as ks
-from keras import backend as K
 import matplotlib as mpl
 from docopt import docopt
 mpl.use('Agg')
 
-from orcanet.utilities.input_utilities import *
-from orcanet.model_archs.short_cnn_models import *
-from orcanet.model_archs.wide_resnet import *
-from orcanet.utilities.nn_utilities import *
-from orcanet.utilities.multi_gpu.multi_gpu import *
+from orcanet.utilities.input_output_utilities import use_node_local_ssd_for_input, read_out_list_file, read_out_config_file, write_summary_logfile, write_full_logfile
+from orcanet.model_archs.short_cnn_models import create_vgg_like_model_multi_input_from_single_nns, create_vgg_like_model
+from orcanet.model_archs.wide_resnet import create_wide_residual_network
+from orcanet.utilities.nn_utilities import load_zero_center_data, get_modelname, BatchLevelPerformanceLogger
+from orcanet.utilities.multi_gpu.multi_gpu import get_available_gpus, make_parallel, print_mgpu_modelsummary
 from orcanet.utilities.data_tools.shuffle_h5 import shuffle_h5
 from orcanet.utilities.visualization.visualization_tools import *
 from orcanet.utilities.evaluation_utilities import *
 from orcanet.utilities.losses import *
-from orcanet.utilities.losses import get_all_loss_functions
 
 # for debugging
 # from tensorflow.python import debug as tf_debug
@@ -43,7 +36,7 @@ from orcanet.utilities.losses import get_all_loss_functions
 
 
 
-def build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4d_channels, str_ident, modelname, custom_objects):
+def build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4d_channels, str_ident, path_of_model, custom_objects):
     """
     Function that either loads or builds (epoch = 0) a Keras nn model.
 
@@ -64,8 +57,8 @@ def build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4
     str_ident : str
         Optional string identifier that gets appended to the modelname. Useful when training models which would have
         the same modelname. Also used for defining models and projections!
-    modelname : str
-        Name of the nn model.
+    path_of_model : str
+        Name and path of the nn model.
     custom_objects : dict
         Keras custom objects variable that contains custom loss functions for loading nn models.
 
@@ -88,7 +81,7 @@ def build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4
 
         else: raise ValueError('Currently, only "WRN" or "VGG" are available as nn_arch')
     else:
-        model = ks.models.load_model('models/trained/trained_' + modelname + '_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5', custom_objects=custom_objects)
+        model = ks.models.load_model(path_of_model, custom_objects=custom_objects)
 
     # plot model, install missing packages with conda install if it throws a module error
     #ks.utils.plot_model(model, to_file='./models/model_plots/' + modelname + '.png', show_shapes=True, show_layer_names=True)
@@ -103,8 +96,10 @@ def get_optimizer_info(loss_opt, optimizer='adam'):
     Parameters
     ----------
     loss_opt : tuple
-        A Tuple with len=3.
-        loss_opt[0]: dict with lists of loss functions and weights that should be used for each nn output.
+        A Tuple with len=2.
+        loss_opt[0]: dict with dicts of loss functions and optionally weights that should be used for each nn output.
+            Typically read in from a .toml file.
+            Format: { loss : { function, weight } }
         loss_opt[1]: dict with metrics that should be used for each nn output.
     optimizer : str
         Specifies, if "Adam" or "SGD" should be used as optimizer.
@@ -121,19 +116,27 @@ def get_optimizer_info(loss_opt, optimizer='adam'):
         Keras optimizer instance, currently either "Adam" or "SGD".
 
     """
-    sgd = ks.optimizers.SGD(momentum=0.9, decay=0, nesterov=True)
-    adam = ks.optimizers.Adam(beta_1=0.9, beta_2=0.999, epsilon=0.1, decay=0.0) # epsilon=1 for deep networks
-    optimizer = adam if optimizer == 'adam' else sgd
-
+    if optimizer == 'adam':
+        optimizer = ks.optimizers.Adam(beta_1=0.9, beta_2=0.999, epsilon=0.1, decay=0.0) # epsilon=1 for deep networks
+    elif optimizer == "sgd":
+        optimizer = ks.optimizers.SGD(momentum=0.9, decay=0, nesterov=True)
+    else:
+        raise NameError("Unknown optimizer name ({})".format(optimizer))
     custom_objects = get_all_loss_functions()
     loss_functions, loss_weight = {},{}
     for loss_key in loss_opt[0].keys():
-        loss_function=loss_opt[0][loss_key][0]
-        if loss_function in custom_objects:
-            #Replace function string with the actual function if it is custom
-            loss_function=custom_objects[loss_function]
+        # Replace function string with the actual function if it is custom
+        if loss_opt[0][loss_key]["function"] in custom_objects:
+            loss_function=custom_objects[loss_opt[0][loss_key]["function"]]
+        else:
+            loss_function=loss_opt[0][loss_key]["function"]
+        # Use given weight, else use default weight of 1
+        if "weight" in loss_opt[0][loss_key]:
+            weight = loss_opt[0][loss_key]["weight"]
+        else:
+            weight = 1.0
         loss_functions[loss_key] = loss_function
-        loss_weight[loss_key] = loss_opt[0][loss_key][1]
+        loss_weight[loss_key] = weight
     metrics = loss_opt[1] if not loss_opt[1] is None else []
 
     return loss_functions, metrics, loss_weight, optimizer
@@ -315,7 +318,7 @@ def get_new_learning_rate(epoch, lr_initial, n_train_files, n_gpu):
 
 
 def train_and_test_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
-                         shuffle, lr, swap_4d_channels, str_ident, n_gpu, folder_name):
+                         shuffle, lr, swap_4d_channels, str_ident, n_gpu, folder_name, n_events):
     """
     Convenience function that trains (fit_generator), tests (evaluate_generator) and saves a Keras model.
     For documentation of the parameters, confer to the fit_model and evaluate_model functions.
@@ -334,13 +337,13 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
             epoch, lr, lr_decay = schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=lr_initial, manual_mode=manual_mode)
 
         history_train = fit_model(model, train_files, f, f_size, file_no, batchsize, n_bins, class_type, xs_mean, epoch,
-                                            shuffle, swap_4d_channels, str_ident, folder_name, n_events=10000)
+                                            shuffle, swap_4d_channels, str_ident, folder_name, n_events)
         model.save(folder_name + '/saved_models/trained_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5')
 
         # test after the first and else after every n-th file
         if file_no == 1 or file_no % test_after_n_train_files == 0:
             history_test = evaluate_model(model, test_files, batchsize, n_bins, class_type,
-                                          xs_mean, swap_4d_channels, str_ident, n_events=10000)
+                                          xs_mean, swap_4d_channels, str_ident, n_events)
         else:
             history_test = None
         write_summary_logfile(train_files, batchsize, epoch, folder_name, model, history_train, history_test, lr)
@@ -462,86 +465,6 @@ def evaluate_model(model, test_files, batchsize, n_bins, class_type, xs_mean, sw
     return history_test
 
 
-def write_summary_logfile(train_files, batchsize, epoch, folder_name, model, history_train, history_test, lr):
-    """
-    Write to the summary.txt file in every trained model folder.
-
-    Parameters
-    ----------
-    train_files : list(([train_filepaths], train_filesize))
-        List of tuples with the filepaths and the filesizes of the train_files.
-    batchsize : int
-        Batchsize that is used in the evaluate_generator method.
-    epoch : tuple(int, int)
-        The number of the current epoch and the current filenumber.
-    folder_name : str
-        Name of the folder in the cnns directory in which everything will be saved.
-    model : ks.model.Model
-        Keras model instance of a neural network.
-    history_train : Keras history object
-        History object containing the history of the training, averaged over files.
-    history_test : list
-        List of test losses for all the metrics, averaged over all test files.
-    lr : float
-        The current learning rate of the model.
-    """
-    #print("\n\n", model.metrics_names)
-    #print(history_train.history, "\n\n")
-    # Save test log
-    steps_per_total_epoch, steps_cum = 0, [0] # get this for the epoch_number_float in the logfile
-    for f, f_size in train_files:
-        steps_per_file = int(f_size / batchsize)
-        steps_per_total_epoch += steps_per_file
-        steps_cum.append(steps_cum[-1] + steps_per_file)
-
-    epoch_number_float = epoch[0] - (steps_per_total_epoch - steps_cum[epoch[1]]) / float(steps_per_total_epoch)
-    logfile_fname = folder_name + '/summary.txt'
-    with open(logfile_fname, 'a+') as logfile:
-        # Write the headline
-        if os.stat(logfile_fname).st_size == 0:
-            logfile.write('#Epoch\tLR\t')
-            for i, metric in enumerate(model.metrics_names):
-                logfile.write("train_" + str(metric) + "\ttest_" + str(metric) + "\t")
-            logfile.write('\n')
-        # Write the content: Epoch, LR, train_1, test_1, ...
-        logfile.write("{:.4g}\t".format(float(epoch_number_float)))
-        logfile.write("{:.4g}\t".format(float(lr)))
-        for i, metric_name in enumerate(model.metrics_names):
-            logfile.write("{:.4g}\t".format(float(history_train.history[metric_name][0])))
-            if history_test is None:
-                logfile.write("nan\t")
-            else:
-                logfile.write("{:.4g}\t".format(float(history_test[i])))
-        logfile.write('\n')
-
-
-def write_full_logfile(model, history_train, history_test, lr, lr_decay, epoch, train_file,
-                            test_files, batchsize, n_bins, class_type, swap_4d_channels, str_ident, folder_name):
-    """
-    Function for saving various information during training and testing to a .txt file.
-    """
-    logfile=folder_name + '/full_log.txt'
-    with open(logfile, 'a+') as f_out:
-        f_out.write('--------------------------------------------------------------------------------------------------------\n')
-        f_out.write('\n')
-        f_out.write('Current time: ' + strftime("%Y-%m-%d %H:%M:%S", gmtime()) + '\n')
-        f_out.write('Decayed learning rate to ' + str(lr) + ' before epoch ' + str(epoch[0]) +
-                    ' and file ' + str(epoch[1]) + ' (minus ' + str(lr_decay) + ')\n')
-        f_out.write('Trained in epoch ' + str(epoch) + ' on file ' + str(epoch[1]) + ', ' + str(train_file) + '\n')
-        if history_test is not None:
-            f_out.write('Tested in epoch ' + str(epoch) + ', file ' + str(epoch[1]) + ' on test_files ' + str(test_files) + '\n')
-        f_out.write('History for training / testing: \n')
-        f_out.write('Train: ' + str(history_train.history) + '\n')
-        if history_test is not None:
-            f_out.write('Test: ' + str(history_test) + ' (' + str(model.metrics_names) + ')' + '\n')
-        f_out.write('\n')
-        f_out.write('Additional Info:\n')
-        f_out.write('Batchsize=' + str(batchsize) + ', n_bins=' + str(n_bins) +
-                    ', class_type=' + str(class_type) + '\n' +
-                    'swap_4d_channels=' + str(swap_4d_channels) + ', str_ident=' + str_ident + '\n')
-        f_out.write('\n')
-
-
 def predict_and_investigate_model_performance(model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
                                               str_ident, modelname, xs_mean):
     """
@@ -636,11 +559,11 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
 
 
 def execute_nn(list_filename, folder_name,
-                n_bins, class_type, nn_arch, batchsize, epoch, n_gpu=(1, 'avolkov'), mode='train', swap_4d_channels=None,
-                use_scratch_ssd=False, zero_center=False, shuffle=(False,None), str_ident='',
-                loss_opt=('categorical_crossentropy', 'accuracy')):
+               loss_opt, n_bins, class_type, nn_arch, epoch, mode, swap_4d_channels,
+                batchsize=64, n_gpu=(1, 'avolkov'), use_scratch_ssd=False, zero_center=False, shuffle=(False,None),
+                str_ident='', n_events=None):
     """
-    Code that trains or evaluates a convolutional neural network.
+    Core code that trains or evaluates a neural network.
 
     Parameters
     ----------
@@ -662,14 +585,14 @@ def execute_nn(list_filename, folder_name,
         Declares if a previously trained model or a new model (=0) should be loaded.
         The first argument specifies the last epoch, and the second argument is the last train file number if the train
         dataset is split over multiple files.
-    n_gpu : tuple(int, str)
-        Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov') [1].
     mode : str
         Specifies what the function should do - train & test a model or evaluate a 'finished' model?
         Currently, there are two modes available: 'train' & 'eval'.
     swap_4d_channels : None/str
         For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
         Currently available: None -> XYZ-T ; 'yzt-x' -> YZT-X, TODO add multi input options
+    n_gpu : tuple(int, str)
+        Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov') [1].
     use_scratch_ssd : bool
         Declares if the input files should be copied to the node-local SSD scratch space (only working at Erlangen CC).
     zero_center : bool
@@ -681,8 +604,10 @@ def execute_nn(list_filename, folder_name,
     str_ident : str
         Optional string identifier that gets appended to the modelname. Useful when training models which would have
         the same modelname. Also used for defining models and projections!
-    loss_opt : tuple(dict/str, dict/str/None,)
-        Tuple that contains 1) the loss_functions and loss_weights as lists, 2) the metrics. The default weight is 1.
+    loss_opt : tuple(dict, dict/str/None,)
+        Tuple that contains 1) the loss_functions and loss_weights as dicts, 2) the metrics.
+    n_events : None/int
+        For testing purposes. If not the whole .h5 file should be used for training, define the number of events.
 
     """
     train_files, test_files, multiple_inputs = read_out_list_file(list_filename)
@@ -695,7 +620,8 @@ def execute_nn(list_filename, folder_name,
     modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident)
     custom_objects = get_all_loss_functions()
 
-    model = build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4d_channels, str_ident, modelname, custom_objects)
+    path_to_initial_model = folder_name + '/saved_models/trained_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5'
+    model = build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4d_channels, str_ident, path_to_initial_model, custom_objects)
     loss_functions, metrics, loss_weight, optimizer = get_optimizer_info(loss_opt, optimizer='adam')
 
     model, batchsize = parallelize_model_to_n_gpus(model, n_gpu, batchsize, loss_functions, optimizer, metrics, loss_weight)
@@ -710,7 +636,7 @@ def execute_nn(list_filename, folder_name,
         while 1:
             epoch, lr = train_and_test_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type,
                                              xs_mean, epoch, shuffle, lr, swap_4d_channels, str_ident, n_gpu,
-                                             folder_name)
+                                             folder_name, n_events)
 
     elif mode == 'eval':
         predict_and_investigate_model_performance(model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
@@ -735,22 +661,15 @@ def parse_input():
     list_file = args['LIST']
     return config_file, list_file
 
-def make_folder_structure(config_file):
+def make_folder_structure(folder_name):
     """
-    Make missing folders if they don't exist already.
+    Make missing folders and subfolders if they don't exist already.
 
     Parameters
     ----------
-    config_file : str
-        Path to the .toml config file.
-
-    Returns
-    -------
     folder_name : str
-        Name of the main folder where everything is saved. Has the same name as the config file, but a different path.
-
+        Name of the main folder.
     """
-    folder_name = "user/trained_models/" + config_file.split("/")[-1].split(".")[:-1][0]
     folders_to_create = [folder_name, folder_name+"/log_train", folder_name+"/saved_models", folder_name+"/plots"]
     for directory in folders_to_create:
         if not os.path.exists(directory):
@@ -762,9 +681,10 @@ def main():
     Parse the input and execute the script. The folder name where everything is saved to is the name of the .toml file.
     """
     config_file, list_file = parse_input()
-    config_options = read_out_config_file(config_file)
-    folder_name = make_folder_structure(config_file)
-    execute_nn(list_file, folder_name, *config_options)
+    positional_arguments, keyword_arguments = read_out_config_file(config_file)
+    folder_name = "user/trained_models/" + config_file.split("/")[-1].split(".")[:-1][0]
+    make_folder_structure(folder_name)
+    execute_nn(list_file, folder_name, *positional_arguments, **keyword_arguments)
 
 
 if __name__ == '__main__':
