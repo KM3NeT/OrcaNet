@@ -19,7 +19,7 @@ import matplotlib as mpl
 from docopt import docopt
 mpl.use('Agg')
 
-from utilities.input_output_utilities import use_node_local_ssd_for_input, read_out_list_file, read_out_config_file, write_summary_logfile, write_full_logfile
+from utilities.input_output_utilities import use_node_local_ssd_for_input, read_out_list_file, read_out_config_file, write_summary_logfile, write_full_logfile, read_logfiles
 from model_archs.short_cnn_models import create_vgg_like_model_multi_input_from_single_nns, create_vgg_like_model
 from model_archs.wide_resnet import create_wide_residual_network
 from utilities.nn_utilities import load_zero_center_data, get_modelname, BatchLevelPerformanceLogger
@@ -350,10 +350,26 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
         write_full_logfile(model, history_train, history_test, lr, lr_decay, epoch,
                                               f, test_files, batchsize, n_bins, class_type, swap_4d_channels, str_ident,
                                               folder_name)
-        #plot_train_and_test_statistics(modelname, model, folder_name)
+        auto_train_test_plots(folder_name)
         #plot_weights_and_activations(test_files[0][0], n_bins, class_type, xs_mean, swap_4d_channels, modelname, epoch[0], file_no, str_ident)
 
     return epoch, lr
+
+
+def auto_train_test_plots(folder_name):
+    """
+    Make a plot of the loss and all metrics, each in its own plot in a large pdf.
+
+    Parameters
+    ----------
+    folder_name : str
+        Name of the main folder with the summary.txt in it.
+
+    """
+    summary_logfile = folder_name + "summary.txt"
+    summary_data, full_train_data = read_logfiles(summary_logfile)
+    pdf_name = folder_name + "plots/summary_plot.pdf"
+    plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name)
 
 
 def fit_model(model, train_files, f, f_size, file_no, batchsize, n_bins, class_type, xs_mean, epoch,
@@ -610,6 +626,7 @@ def execute_nn(list_filename, folder_name,
         For testing purposes. If not the whole .h5 file should be used for training, define the number of events.
 
     """
+    make_folder_structure(folder_name)
     train_files, test_files, multiple_inputs = read_out_list_file(list_filename)
     if zero_center:
         xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu[0])
@@ -683,7 +700,6 @@ def main():
     config_file, list_file = parse_input()
     positional_arguments, keyword_arguments = read_out_config_file(config_file)
     folder_name = "user/trained_models/" + config_file.split("/")[-1].split(".")[:-1][0]
-    make_folder_structure(folder_name)
     execute_nn(list_file, folder_name, *positional_arguments, **keyword_arguments)
 
 

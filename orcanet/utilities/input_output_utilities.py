@@ -8,6 +8,7 @@ import shutil
 import h5py
 import toml
 from time import gmtime, strftime
+import numpy as np
 
 def read_out_config_file(config_file):
     """
@@ -124,6 +125,33 @@ def read_out_list_file(list_file):
     return train_files, test_files, multiple_inputs
 
 
+def write_full_logfile(model, history_train, history_test, lr, lr_decay, epoch, train_file,
+                            test_files, batchsize, n_bins, class_type, swap_4d_channels, str_ident, folder_name):
+    """
+    Function for saving various information during training and testing to a .txt file.
+    """
+    logfile=folder_name + '/full_log.txt'
+    with open(logfile, 'a+') as f_out:
+        f_out.write('--------------------------------------------------------------------------------------------------------\n')
+        f_out.write('\n')
+        f_out.write('Current time: ' + strftime("%Y-%m-%d %H:%M:%S", gmtime()) + '\n')
+        f_out.write('Decayed learning rate to ' + str(lr) + ' before epoch ' + str(epoch[0]) +
+                    ' and file ' + str(epoch[1]) + ' (minus ' + str(lr_decay) + ')\n')
+        f_out.write('Trained in epoch ' + str(epoch) + ' on file ' + str(epoch[1]) + ', ' + str(train_file) + '\n')
+        if history_test is not None:
+            f_out.write('Tested in epoch ' + str(epoch) + ', file ' + str(epoch[1]) + ' on test_files ' + str(test_files) + '\n')
+        f_out.write('History for training / testing: \n')
+        f_out.write('Train: ' + str(history_train.history) + '\n')
+        if history_test is not None:
+            f_out.write('Test: ' + str(history_test) + ' (' + str(model.metrics_names) + ')' + '\n')
+        f_out.write('\n')
+        f_out.write('Additional Info:\n')
+        f_out.write('Batchsize=' + str(batchsize) + ', n_bins=' + str(n_bins) +
+                    ', class_type=' + str(class_type) + '\n' +
+                    'swap_4d_channels=' + str(swap_4d_channels) + ', str_ident=' + str_ident + '\n')
+        f_out.write('\n')
+
+
 def write_summary_logfile(train_files, batchsize, epoch, folder_name, model, history_train, history_test, lr):
     """
     Write to the summary.txt file in every trained model folder.
@@ -159,9 +187,10 @@ def write_summary_logfile(train_files, batchsize, epoch, folder_name, model, his
     with open(logfile_fname, 'a+') as logfile:
         # Write the headline
         if os.stat(logfile_fname).st_size == 0:
-            logfile.write('#Epoch\tLR\t')
+            logfile.write('Epoch\tLR\t')
             for i, metric in enumerate(model.metrics_names):
-                logfile.write("train_" + str(metric) + "\ttest_" + str(metric) + "\t")
+                logfile.write("train_" + str(metric) + "\ttest_" + str(metric))
+                if i + 1 < len(model.metrics_names): logfile.write("\t")
             logfile.write('\n')
         # Write the content: Epoch, LR, train_1, test_1, ...
         logfile.write("{:.4g}\t".format(float(epoch_number_float)))
@@ -169,38 +198,51 @@ def write_summary_logfile(train_files, batchsize, epoch, folder_name, model, his
         for i, metric_name in enumerate(model.metrics_names):
             logfile.write("{:.4g}\t".format(float(history_train.history[metric_name][0])))
             if history_test is None:
-                logfile.write("nan\t")
+                logfile.write("nan")
             else:
-                logfile.write("{:.4g}\t".format(float(history_test[i])))
+                logfile.write("{:.4g}".format(float(history_test[i])))
+            if i + 1 < len(model.metrics_names): logfile.write("\t")
         logfile.write('\n')
 
 
-def write_full_logfile(model, history_train, history_test, lr, lr_decay, epoch, train_file,
-                            test_files, batchsize, n_bins, class_type, swap_4d_channels, str_ident, folder_name):
+def read_logfiles(summary_logfile):
     """
-    Function for saving various information during training and testing to a .txt file.
-    """
-    logfile=folder_name + '/full_log.txt'
-    with open(logfile, 'a+') as f_out:
-        f_out.write('--------------------------------------------------------------------------------------------------------\n')
-        f_out.write('\n')
-        f_out.write('Current time: ' + strftime("%Y-%m-%d %H:%M:%S", gmtime()) + '\n')
-        f_out.write('Decayed learning rate to ' + str(lr) + ' before epoch ' + str(epoch[0]) +
-                    ' and file ' + str(epoch[1]) + ' (minus ' + str(lr_decay) + ')\n')
-        f_out.write('Trained in epoch ' + str(epoch) + ' on file ' + str(epoch[1]) + ', ' + str(train_file) + '\n')
-        if history_test is not None:
-            f_out.write('Tested in epoch ' + str(epoch) + ', file ' + str(epoch[1]) + ' on test_files ' + str(test_files) + '\n')
-        f_out.write('History for training / testing: \n')
-        f_out.write('Train: ' + str(history_train.history) + '\n')
-        if history_test is not None:
-            f_out.write('Test: ' + str(history_test) + ' (' + str(model.metrics_names) + ')' + '\n')
-        f_out.write('\n')
-        f_out.write('Additional Info:\n')
-        f_out.write('Batchsize=' + str(batchsize) + ', n_bins=' + str(n_bins) +
-                    ', class_type=' + str(class_type) + '\n' +
-                    'swap_4d_channels=' + str(swap_4d_channels) + ', str_ident=' + str_ident + '\n')
-        f_out.write('\n')
+    Read out the data from the summary.txt file, and from all training log files in the log_train folder which
+    is in the same directory as the summary.txt file.
 
+    Parameters
+    ----------
+    summary_logfile : str
+        Path and filename of the summary.txt file of a model.
+
+    Returns
+    -------
+    summary_data : numpy.ndarray
+        Structured array containing the data from the summary.txt file.
+    full_train_data : numpy.ndarray
+        Structured array containing the data from all the training log files, merged into a single array.
+
+    """
+    summary_data = np.genfromtxt(summary_logfile, names=True, delimiter="\t")
+
+    # list of all files in the log_train folder of this model
+    log_train_folder = "/".join(summary_logfile.split("/")[:-1])+"/log_train/"
+    files = os.listdir(log_train_folder)
+    train_file_data = []
+    for file in files:
+        # file is something like "log_epoch_1_file_2.txt", extract the 1 and 2:
+        epoch, file_no = [int(file.split(".")[0].split("_")[i]) for i in [2,4]]
+        file_data = np.genfromtxt(log_train_folder+file, names=True, delimiter="\t")
+        train_file_data.append([[epoch, file_no], file_data])
+    train_file_data.sort()
+    full_train_data = train_file_data[0][1]
+    for [epoch, file_no], file_data in train_file_data[1:]:
+        file_data["Batch_float"]+=(epoch-1)
+        full_train_data = np.append(full_train_data, file_data)
+    return summary_data, full_train_data
+
+#summary_logfile="user/trained_models/example_model/summary.txt"
+#a = read_logfiles(summary_logfile)
 
 def h5_get_number_of_rows(h5_filepath):
     """

@@ -5,7 +5,7 @@ with open('requirements.txt') as fobj:
     requirements = [l.strip() for l in fobj.readlines()]
 
 setup(
-    name='OrcaNet',
+    name='orcanet',
     version='1.0',
     description='Runs Neural Networks for usage in the KM3NeT project',
     url='https://git.km3net.de/ml',

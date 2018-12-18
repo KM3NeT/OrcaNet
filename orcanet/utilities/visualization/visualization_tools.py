@@ -15,7 +15,7 @@ from utilities.nn_utilities import generate_batches_from_hdf5_file
 from utilities.losses import get_all_loss_functions
 
 
-def plot_train_and_test_statistics(modelname, model, folder_name):
+def plot_train_and_test_statistics_old(modelname, model, folder_name):
     """
     Plots the loss in training/testing based on .txt logfiles.
     :param str modelname: name of the model.
@@ -77,28 +77,149 @@ def plot_train_and_test_statistics(modelname, model, folder_name):
     pdf_plots.close()
 
 
-def get_epoch_xticks(test_epoch, train_batchnr):
+def make_test_train_plot(test_train_data_list, title=""):
+    """
+    Plot one or more test/train lines in a single plot.
+
+    Parameters
+    ----------
+    test_train_data_list : list
+        test_train_data_list[0] = x and y test data as a list, plotted as connected dots
+        test_train_data_list[1] = x and y train data as a list, plotted as a faint line
+        test_train_data_list[2] = label used for the train/test lines
+        test_train_data_list[3] = color used for the train/test lines
+    title : str
+        Title of the plot.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The plot.
+    """
+    fig, ax = plt.subplots()
+    all_x_coordinates_test, all_x_coordinates_train = [],[]
+    all_y_coordinates_test, all_y_coordinates_train = [],[]
+    for test_train_data in test_train_data_list:
+        test_data, train_data, label, color = test_train_data
+        plt.plot(test_data[0], test_data[1], color=color, marker='o', zorder=3, label='test ' + label)
+        plt.plot(train_data[0], train_data[1], color=color, ls='--', zorder=3, label='train ' + label,
+                 lw=0.6, alpha=0.5)
+        all_x_coordinates_test.extend(test_data[0])
+        all_x_coordinates_train.extend(train_data[0])
+        all_y_coordinates_test.extend(test_data[1])
+        all_y_coordinates_train.extend(train_data[1])
+
+    plt.xticks(get_epoch_xticks(all_x_coordinates_test+all_x_coordinates_train))
+    test_metric_min_to_max = np.amax(all_y_coordinates_test) - np.amin(all_y_coordinates_test)
+    y_lim = (np.amin(all_y_coordinates_test) - 0.25 * test_metric_min_to_max,
+             np.amax(all_y_coordinates_test) + 0.25 * test_metric_min_to_max)
+    plt.ylim(y_lim)
+
+    ax.legend(loc='upper right')
+    plt.xlabel('Epoch [#]')
+    plt.ylabel('Loss')
+    title = plt.title(title)
+    title.set_position([.5, 1.04])
+    plt.grid(True, zorder=0, linestyle='dotted')
+
+    return fig
+
+def plot_metrics(summary_data, full_train_data, metric_names="loss", make_auto_titles=False):
+    """
+    Plot one or more metrics over the epochs from a summary.txt file in a single plot,
+    each with its test and train curves.
+
+    Parameters
+    ----------
+    summary_data : numpy.ndarray
+        Structured array containing the data from the summary.txt file.
+    full_train_data : numpy.ndarray
+        Structured array containing the data from all the training log files, merged into a single array.
+    metric_names : list or str
+        Name or list of names of metrics to be plotted over the epoch. The name is what was written in the head line
+        of the summary file, except without the train_ or test_ prefix.
+    make_auto_titles : bool
+        If true, the title of the plot will be the name of the first metric in metric_names.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The plot.
+    """
+    test_train_data_list = []
+    if isinstance(metric_names, str): metric_names=[metric_names,]
+    for metric_name in metric_names:
+        summary_label   = "test_"+metric_name
+        train_log_label = metric_name
+
+        test_data = [summary_data["Epoch"], summary_data[summary_label]]
+        train_data = [full_train_data["Batch_float"], full_train_data[train_log_label]]
+        label = metric_name
+        color = "red"
+        test_train_data = test_data, train_data, label, color
+        test_train_data_list.append(test_train_data)
+    if make_auto_titles:
+        title = metric_name
+    else:
+        title = ""
+    fig = make_test_train_plot(test_train_data_list, title)
+    return fig
+
+def get_epoch_xticks(x_coordinates):
     """
     Calculates the xticks for the train and test statistics matplotlib plot.
-    :param ndarray(ndim=1) test_epoch: 1D array of the test epoch numbers in the log_array_test file.
-    :param ndarray(ndim=1) train_batchnr: 1D array of the train batch numbers in the log_array_train file.
-    :return: ndarray(ndim=1) x_ticks_major: 1D array that defines the x-ticks that should be used for the mpl plot.
-    """
-    # if we didn't start logging with epoch 1
-    min_test, max_test = np.amin(test_epoch), np.amax(test_epoch)
-    min_train, max_train = np.amin(train_batchnr), np.amax(train_batchnr)
-    minimum = min_test if min_test < min_train else min_train
-    maximum = max_test if max_test > max_train else max_train
-    start_epoch, end_epoch = np.floor(minimum), np.ceil(maximum)
 
+    Parameters
+    ----------
+    x_coordinates : list
+        List of the x-coordinates of the points in the plot.
+
+    Returns
+    -------
+    x_ticks_major : numpy.ndarray
+        Array containing the ticks.
+
+    """
+    minimum, maximum = np.amin(x_coordinates), np.amax(x_coordinates)
+    start_epoch, end_epoch = np.floor(minimum), np.ceil(maximum)
     # reduce number of x_ticks by factor of 2 if n_epochs > 20
     n_epochs = end_epoch - start_epoch
-
     x_ticks_stepsize = 1 + np.floor(n_epochs / 20.) # 20 ticks max, increase stepsize if n_epochs >= 20
     x_ticks_major = np.arange(start_epoch, end_epoch + x_ticks_stepsize, x_ticks_stepsize)
 
     return x_ticks_major
 
+def plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name):
+    """
+    Plot all metrics of the given data into a pdf file, each metric in its own plot.
+
+    Parameters
+    ----------
+    summary_data : numpy.ndarray
+        Structured array containing the data from the summary.txt file.
+    full_train_data : numpy.ndarray
+        Structured array containing the data from all the training log files, merged into a single array.
+    pdf_name : str
+        Where the pdf will get saved.
+
+    """
+    all_metrics = []
+    for keyword in summary_data.dtype.names:
+        if keyword == "Epoch" or keyword=="LR":
+            continue
+        if "train_" in keyword:
+            keyword = keyword.split("train_")[-1]
+        else:
+            keyword = keyword.split("test_")[-1]
+        if not keyword in all_metrics:
+            all_metrics.append(keyword)
+    with PdfPages(pdf_name) as pdf:
+        for metric in all_metrics:
+            fig = plot_metrics(summary_data, full_train_data, metric_names=metric, make_auto_titles=True)
+            pdf.savefig(fig)
+            plt.close(fig)
+
+#plot_all_metrics_to_pdf(a[0],a[1],"test.pdf")
 
 def get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels, modelname, epoch, str_ident, file_no=1, layer_name=None, learning_phase='test'):
     """

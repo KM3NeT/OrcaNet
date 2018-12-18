@@ -619,7 +619,7 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
     def on_epoch_end(self, batch, logs={}): # on epoch end here means that this is called after one fit_generator loop in Keras is finished.
         with open(self.logfile_train_fname, 'a+') as self.logfile_train:
             if os.stat(self.logfile_train_fname).st_size == 0:
-                self.logfile_train.write('#Batch\t#Batch_float\t')
+                self.logfile_train.write('Batch\tBatch_float\t')
                 for i, metric in enumerate(self.model.metrics_names): # write columns for all losses / metrics
                     self.logfile_train.write(metric)
                     if i + 1 < len(self.model.metrics_names): self.logfile_train.write('\t') # newline \n is already written in the batch_statistics
