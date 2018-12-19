@@ -19,7 +19,7 @@ import matplotlib as mpl
 from docopt import docopt
 mpl.use('Agg')
 
-from utilities.input_output_utilities import use_node_local_ssd_for_input, read_out_list_file, read_out_config_file, write_summary_logfile, write_full_logfile, read_logfiles
+from utilities.input_output_utilities import use_node_local_ssd_for_input, read_out_list_file, read_out_config_file, write_summary_logfile, write_full_logfile, read_logfiles, look_for_latest_epoch
 from model_archs.short_cnn_models import create_vgg_like_model_multi_input_from_single_nns, create_vgg_like_model
 from model_archs.wide_resnet import create_wide_residual_network
 from utilities.nn_utilities import load_zero_center_data, get_modelname, BatchLevelPerformanceLogger
@@ -32,8 +32,6 @@ from utilities.losses import *
 # for debugging
 # from tensorflow.python import debug as tf_debug
 # K.set_session(tf_debug.LocalCLIDebugWrapperSession(tf.Session()))
-
-
 
 
 def build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4d_channels, str_ident, path_of_model, custom_objects):
@@ -599,10 +597,10 @@ def execute_nn(list_filename, folder_name,
         Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
     batchsize : int
         Batchsize that should be used for the training / inferencing of the cnn.
-    epoch : tuple(int, int)
+    epoch : list[int, int]
         Declares if a previously trained model or a new model (=0) should be loaded.
         The first argument specifies the last epoch, and the second argument is the last train file number if the train
-        dataset is split over multiple files.
+        dataset is split over multiple files. Can also give [-1,-1] to automatically load the most recent epoch.
     mode : str
         Specifies what the function should do - train & test a model or evaluate a 'finished' model?
         Currently, there are two modes available: 'train' & 'eval'.
@@ -630,6 +628,9 @@ def execute_nn(list_filename, folder_name,
     """
     make_folder_structure(folder_name)
     train_files, test_files, multiple_inputs = read_out_list_file(list_filename)
+    if epoch == [-1, -1]:
+        epoch = look_for_latest_epoch(folder_name)
+        print("Epoch is set to {} file {}".format(epoch[0], epoch[1]))
     if zero_center:
         xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu[0])
     else:
@@ -664,6 +665,7 @@ def execute_nn(list_filename, folder_name,
     else:
         raise ValueError('Mode "', str(mode), '" is not known. Needs to be "train" or "eval".')
 
+
 def parse_input():
     """
     Parses and returns all necessary input options from a .toml and a .list file.
@@ -687,11 +689,12 @@ def make_folder_structure(folder_name):
     Parameters
     ----------
     folder_name : str
-        Name of the main folder.
+        Name of the main folder, e.g. "user/trained_models/example_model".
     """
     folders_to_create = [folder_name, folder_name+"/log_train", folder_name+"/saved_models", folder_name+"/plots/activations"]
     for directory in folders_to_create:
         if not os.path.exists(directory):
+            print("Creating directory: "+directory)
             os.makedirs(directory)
     return folder_name
 

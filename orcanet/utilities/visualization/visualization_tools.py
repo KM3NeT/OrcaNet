@@ -84,10 +84,11 @@ def make_test_train_plot(test_train_data_list, title=""):
     Parameters
     ----------
     test_train_data_list : list
-        test_train_data_list[0] = x and y test data as a list. Will be plotted as connected dots.
-        test_train_data_list[1] = x and y train data as a list. Will be plotted as a faint solid line.
-        test_train_data_list[2] = label used for the train/test line.
-        test_train_data_list[3] = color used for the train/test line.
+        Every entry [i] is one set of a test and a train line, together with plotting options:
+        test_train_data_list[i][0] = x and y test data as a list. Will be plotted as connected dots.
+        test_train_data_list[i][1] = x and y train data as a list. Will be plotted as a faint solid line.
+        test_train_data_list[i][2] = label used for the train/test line.
+        test_train_data_list[i][3] = color used for the train/test line.
     title : str
         Title of the plot.
 
@@ -106,14 +107,14 @@ def make_test_train_plot(test_train_data_list, title=""):
         if color is None:
             test_plot = plt.plot(test_data[0], test_data[1], marker='o', zorder=3, label='test ' + label)
         else:
-            plt.plot(test_data[0], test_data[1], color=color, marker='o', zorder=3, label='test ' + label)
+            test_plot = plt.plot(test_data[0], test_data[1], color=color, marker='o', zorder=3, label='test ' + label)
         plt.plot(train_data[0], train_data[1], color=test_plot[0].get_color(), ls='--', zorder=3,
                  label='train ' + label, lw=0.6, alpha=0.5)
         all_x_coordinates_test.extend(test_data[0])
         all_x_coordinates_train.extend(train_data[0])
-        all_y_coordinates_test.extend(test_data[1])
-        all_y_coordinates_train.extend(train_data[1])
-
+        # Remove the occasional np.nan from the y data
+        all_y_coordinates_test.extend(test_data[1][~np.isnan(test_data[1])])
+        all_y_coordinates_train.extend(train_data[1][~np.isnan(train_data[1])])
     plt.xticks(get_epoch_xticks(all_x_coordinates_test+all_x_coordinates_train))
     test_metric_min_to_max = np.amax(all_y_coordinates_test) - np.amin(all_y_coordinates_test)
     y_lim = (np.amin(all_y_coordinates_test) - 0.25 * test_metric_min_to_max,
@@ -159,8 +160,11 @@ def plot_metrics(summary_data, full_train_data, metric_names="loss", make_auto_t
     for metric_name in metric_names:
         summary_label   = "test_"+metric_name
         train_log_label = metric_name
-
-        test_data = [summary_data["Epoch"], summary_data[summary_label]]
+        if summary_data["Epoch"].shape == ():
+            # This is only the case when just one line is present in the summary.txt file.
+            test_data = [summary_data["Epoch"].reshape(1), summary_data[summary_label].reshape(1)]
+        else:
+            test_data = [summary_data["Epoch"], summary_data[summary_label]]
         train_data = [full_train_data["Batch_float"], full_train_data[train_log_label]]
         label = metric_name
         test_train_data = test_data, train_data, label, color

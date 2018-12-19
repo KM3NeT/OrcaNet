@@ -244,6 +244,31 @@ def read_logfiles(summary_logfile):
 #summary_logfile="user/trained_models/example_model/summary.txt"
 #a = read_logfiles(summary_logfile)
 
+def look_for_latest_epoch(folder_name):
+    """
+    Check all saved models in the ./saved_models folder and return the highest epoch / file_no pair.
+
+    Parameters
+    ----------
+    folder_name : str
+        Name of the main folder.
+    Returns
+    -------
+    list
+        The highest epoch, file_no pair. [0,1] if the folder is empty.
+    """
+    files = os.listdir(folder_name + "/saved_models")
+    if len(files) == 0:
+        latest_epoch = [0 , 1]
+    else:
+        epochs = []
+        for file in files:
+            epoch, file_no = file.split("trained_epoch_")[-1].split(".h5")[0].split("_file_")
+            epochs.append([int(epoch), int(file_no)])
+        latest_epoch = max(epochs)
+    return latest_epoch
+
+
 def h5_get_number_of_rows(h5_filepath):
     """
     Gets the total number of rows of the first dataset of a .h5 file. Hence, all datasets should have the same number of rows!
