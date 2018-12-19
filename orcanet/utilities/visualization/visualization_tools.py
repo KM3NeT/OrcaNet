@@ -84,10 +84,10 @@ def make_test_train_plot(test_train_data_list, title=""):
     Parameters
     ----------
     test_train_data_list : list
-        test_train_data_list[0] = x and y test data as a list, plotted as connected dots
-        test_train_data_list[1] = x and y train data as a list, plotted as a faint line
-        test_train_data_list[2] = label used for the train/test lines
-        test_train_data_list[3] = color used for the train/test lines
+        test_train_data_list[0] = x and y test data as a list. Will be plotted as connected dots.
+        test_train_data_list[1] = x and y train data as a list. Will be plotted as a faint solid line.
+        test_train_data_list[2] = label used for the train/test line.
+        test_train_data_list[3] = color used for the train/test line.
     title : str
         Title of the plot.
 
@@ -95,15 +95,20 @@ def make_test_train_plot(test_train_data_list, title=""):
     -------
     fig : matplotlib.figure.Figure
         The plot.
+
     """
     fig, ax = plt.subplots()
+    # Record all the datapoints in the plot for proper scaling.
     all_x_coordinates_test, all_x_coordinates_train = [],[]
     all_y_coordinates_test, all_y_coordinates_train = [],[]
     for test_train_data in test_train_data_list:
         test_data, train_data, label, color = test_train_data
-        plt.plot(test_data[0], test_data[1], color=color, marker='o', zorder=3, label='test ' + label)
-        plt.plot(train_data[0], train_data[1], color=color, ls='--', zorder=3, label='train ' + label,
-                 lw=0.6, alpha=0.5)
+        if color is None:
+            test_plot = plt.plot(test_data[0], test_data[1], marker='o', zorder=3, label='test ' + label)
+        else:
+            plt.plot(test_data[0], test_data[1], color=color, marker='o', zorder=3, label='test ' + label)
+        plt.plot(train_data[0], train_data[1], color=test_plot[0].get_color(), ls='--', zorder=3,
+                 label='train ' + label, lw=0.6, alpha=0.5)
         all_x_coordinates_test.extend(test_data[0])
         all_x_coordinates_train.extend(train_data[0])
         all_y_coordinates_test.extend(test_data[1])
@@ -124,27 +129,30 @@ def make_test_train_plot(test_train_data_list, title=""):
 
     return fig
 
-def plot_metrics(summary_data, full_train_data, metric_names="loss", make_auto_titles=False):
+def plot_metrics(summary_data, full_train_data, metric_names="loss", make_auto_titles=False, color=None):
     """
-    Plot one or more metrics over the epochs from a summary.txt file in a single plot,
-    each with its test and train curves.
+    Plot and return the training and testing history of one (or more) metrices over the epochs in a single plot.
 
     Parameters
     ----------
     summary_data : numpy.ndarray
         Structured array containing the data from the summary.txt file.
     full_train_data : numpy.ndarray
-        Structured array containing the data from all the training log files, merged into a single array.
+        Structured array containing the data from all the training log files from ./log_train/, merged into a single array.
     metric_names : list or str
-        Name or list of names of metrics to be plotted over the epoch. The name is what was written in the head line
-        of the summary file, except without the train_ or test_ prefix.
+        Name or list of names of metrics to be plotted over the epoch. This name is what was written in the head line
+        of the summary.txt file, except without the train_ or test_ prefix (as these will be added by this script).
     make_auto_titles : bool
-        If true, the title of the plot will be the name of the first metric in metric_names.
+        If true, the title of the plot will be the name of the first metric in metric_names. Should probably not
+        be used if more than one metric is given.
+    color : None or str
+        The color of the train and test lines. If None is given, the default color cycle is used.
 
     Returns
     -------
     fig : matplotlib.figure.Figure
         The plot.
+
     """
     test_train_data_list = []
     if isinstance(metric_names, str): metric_names=[metric_names,]
@@ -155,7 +163,6 @@ def plot_metrics(summary_data, full_train_data, metric_names="loss", make_auto_t
         test_data = [summary_data["Epoch"], summary_data[summary_label]]
         train_data = [full_train_data["Batch_float"], full_train_data[train_log_label]]
         label = metric_name
-        color = "red"
         test_train_data = test_data, train_data, label, color
         test_train_data_list.append(test_train_data)
     if make_auto_titles:
@@ -191,7 +198,9 @@ def get_epoch_xticks(x_coordinates):
 
 def plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name):
     """
-    Plot all metrics of the given data into a pdf file, each metric in its own plot.
+    Plot and save all metrics of the given test- and train-data from the training of a model
+    into a pdf file, each metric in its own plot. If metric pairs of a variable and its error are found (e.g. e_loss
+    and e_err_loss), they will have the same color and appear back to back in the plot.
 
     Parameters
     ----------
@@ -203,6 +212,7 @@ def plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name):
         Where the pdf will get saved.
 
     """
+    # Extract the names of the metrics
     all_metrics = []
     for keyword in summary_data.dtype.names:
         if keyword == "Epoch" or keyword=="LR":
@@ -213,15 +223,66 @@ def plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name):
             keyword = keyword.split("test_")[-1]
         if not keyword in all_metrics:
             all_metrics.append(keyword)
+    all_metrics = sort_metric_names_and_errors(all_metrics)
+    # Plot them
+    colors = ['#000000', '#332288', '#88CCEE', '#44AA99', '#117733', '#999933', '#DDCC77',
+              '#CC6677', '#882255', '#AA4499', '#661100', '#6699CC', '#AA4466',
+              '#4477AA']  # ref. personal.sron.nl/~pault/
+    color_counter = 0
     with PdfPages(pdf_name) as pdf:
-        for metric in all_metrics:
-            fig = plot_metrics(summary_data, full_train_data, metric_names=metric, make_auto_titles=True)
+        for metric_no, metric in enumerate(all_metrics):
+            # If this metric is an err metric of a variable, color it the same
+            if all_metrics[metric_no-1] == metric.replace("_err", ""):
+                color_counter -= 1
+            fig = plot_metrics(summary_data, full_train_data, metric_names=metric, make_auto_titles=True, color=colors[color_counter%len(colors)])
+            color_counter += 1
             pdf.savefig(fig)
             plt.close(fig)
 
 #plot_all_metrics_to_pdf(a[0],a[1],"test.pdf")
 
-def get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels, modelname, epoch, str_ident, file_no=1, layer_name=None, learning_phase='test'):
+def sort_metric_names_and_errors(metric_names):
+    """
+    Sort a list of metrices, so that errors are right after their variable.
+    The format of the metric names have to be e.g. e_loss and e_err_loss for this to work.
+
+    Example
+    ----------
+    >>> sort_metric_names_and_errors( ['e_loss', 'loss', 'e_err_loss', 'dx_err_loss'] )
+    ['e_loss', 'e_err_loss', 'loss', 'dx_err_loss']
+
+    Parameters
+    ----------
+    metric_names : list
+        List of metric names.
+
+    Returns
+    -------
+    sorted_metrics : list
+        List of sorted metric names with the same length as the input.
+
+    """
+    sorted_metrics = [0] * len(metric_names)
+    counter = 0
+    for metric_name in metric_names:
+        if "err_" in metric_name:
+            if metric_name.replace("err_", "") not in metric_names:
+                sorted_metrics[counter] = metric_name
+                counter += 1
+            continue
+        sorted_metrics[counter] = metric_name
+        counter += 1
+        err_loss = metric_name.split("_loss")[0]+"_err_loss"
+        if err_loss in metric_names:
+            sorted_metrics[counter] = err_loss
+            counter += 1
+    if 0 in sorted_metrics:
+        print("Warning: Something went wrong with the sorting of metrics! Given was {}, output was {}. Using unsorted metrics instead.".format(metric_names, sorted_metrics))
+        sorted_metrics = metric_names
+    return sorted_metrics
+
+
+def get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels, model_name, str_ident, layer_name=None, learning_phase='test'):
     """
     Get the weights of a model and also the activations of the model for a single event.
     :param str f: path to a .h5 file that contains images of events. Needed for plotting the activations for the event.
@@ -229,10 +290,8 @@ def get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels
     :param (int, str) class_type: the number of output classes and a string identifier to specify the exact output classes.
     :param ndarray xs_mean: mean_image of the x (train-) dataset used for zero-centering the data.
     :param None/int swap_4d_channels: for 3.5D, param for the gen to specify, if the default channel (t) should be swapped with another dim.
-    :param str modelname: Name of the model in order to load it.
-    :param int epoch: Epoch of the trained model.
+    :param str model_name: Path of the model in order to load it.
     :param str str_ident: string identifier that is parsed to the generator. Needed for some projection types.
-    :param int file_no: File Number of the trained model in this epoch (if multiple files are trained per epoch).
     :param None/str layer_name: if only the activations of a single layer should be collected.
     :param str learning_phase: string identifier to specify the learning phase during the calculation of the activations.
                                'test', 'train': Dropout, Batchnorm etc. in test/train mode
@@ -243,8 +302,7 @@ def get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels
     model_inputs, ys, y_values = next(generator) # y_values = mc_info for the event
 
     custom_objects = get_all_loss_functions()
-    saved_model = ks.models.load_model('models/trained/trained_' + modelname + '_epoch_' + str(epoch) + '_file_' + str(file_no) + '.h5',
-                                       custom_objects=custom_objects)
+    saved_model = ks.models.load_model(model_name, custom_objects=custom_objects)
 
     inp = saved_model.input
     model_multi_inputs_cond = True if len(model_inputs) > 1 else False
@@ -277,7 +335,7 @@ def get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels
     return layer_names, activations, weights, y_values
 
 
-def plot_weights_and_activations(f, n_bins, class_type, xs_mean, swap_4d_channels, modelname, epoch, file_no, str_ident):
+def plot_weights_and_activations(f, n_bins, class_type, xs_mean, swap_4d_channels, epoch, file_no, str_ident, folder_name):
     """
     Plots the weights of a model and the activations for one event to a .pdf file.
     :param str f: path to a .h5 file that contains images of events. Needed for plotting the activations for the event.
@@ -285,16 +343,18 @@ def plot_weights_and_activations(f, n_bins, class_type, xs_mean, swap_4d_channel
     :param (int, str) class_type: the number of output classes and a string identifier to specify the exact output classes.
     :param ndarray xs_mean: mean_image of the x (train-) dataset used for zero-centering the data.
     :param None/int swap_4d_channels: for 3.5D, param for the gen to specify, if the default channel (t) should be swapped with another dim.
-    :param str modelname: name of the model.
     :param int epoch: epoch of the model.
     :param int file_no: File Number of the trained model in this epoch (if multiple files are trained per epoch).
     :param str str_ident: string identifier that is parsed to the get_activations_and_weights function. Needed for some projection types.
+    :param str folder_name: Path to the folder of a trained model.
     """
+    model_name = folder_name + '/saved_models/trained_epoch_' + str(epoch) + '_file_' + str(file_no) + '.h5'
     layer_names, activations, weights, y_values = get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels,
-                                                                              modelname, epoch, str_ident, file_no=file_no,  layer_name=None, learning_phase='test')
+                                            model_name, str_ident, layer_name=None, learning_phase='test')
 
     fig, axes = plt.subplots()
-    pdf_activations_and_weights = PdfPages('models/trained/perf_plots/model_stat_plots/act_and_weights_plots_' + modelname + '_epoch' + str(epoch) + '.pdf')
+    pdf_name = folder_name + "/plots/activations/act_and_weights_plots_epoch_" + str(epoch) + '.pdf'
+    pdf_activations_and_weights = PdfPages(pdf_name)
 
     # plot weights
     event_id = int(y_values[0][0])

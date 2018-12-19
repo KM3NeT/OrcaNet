@@ -350,15 +350,17 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
         write_full_logfile(model, history_train, history_test, lr, lr_decay, epoch,
                                               f, test_files, batchsize, n_bins, class_type, swap_4d_channels, str_ident,
                                               folder_name)
-        auto_train_test_plots(folder_name)
-        #plot_weights_and_activations(test_files[0][0], n_bins, class_type, xs_mean, swap_4d_channels, modelname, epoch[0], file_no, str_ident)
+        update_summary_plot(folder_name)
+        plot_weights_and_activations(test_files[0][0], n_bins, class_type, xs_mean, swap_4d_channels,
+                                     epoch[0], file_no, str_ident, folder_name)
 
     return epoch, lr
 
 
-def auto_train_test_plots(folder_name):
+def update_summary_plot(folder_name):
     """
-    Make a plot of the loss and all metrics, each in its own plot in a large pdf.
+    Refresh the summary plot of a model directory, found in ./plots/summary_plot.pdf. Test- and train-data
+    will be read out automatically, and the loss and every metric will be plotted in a seperate page in the pdf.
 
     Parameters
     ----------
@@ -366,9 +368,9 @@ def auto_train_test_plots(folder_name):
         Name of the main folder with the summary.txt in it.
 
     """
-    summary_logfile = folder_name + "summary.txt"
+    summary_logfile = folder_name + "/summary.txt"
     summary_data, full_train_data = read_logfiles(summary_logfile)
-    pdf_name = folder_name + "plots/summary_plot.pdf"
+    pdf_name = folder_name + "/plots/summary_plot.pdf"
     plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name)
 
 
@@ -687,7 +689,7 @@ def make_folder_structure(folder_name):
     folder_name : str
         Name of the main folder.
     """
-    folders_to_create = [folder_name, folder_name+"/log_train", folder_name+"/saved_models", folder_name+"/plots"]
+    folders_to_create = [folder_name, folder_name+"/log_train", folder_name+"/saved_models", folder_name+"/plots/activations"]
     for directory in folders_to_create:
         if not os.path.exists(directory):
             os.makedirs(directory)

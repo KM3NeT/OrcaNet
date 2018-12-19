@@ -213,7 +213,7 @@ def read_logfiles(summary_logfile):
     Parameters
     ----------
     summary_logfile : str
-        Path and filename of the summary.txt file of a model.
+        Path of the summary.txt file in a model folder.
 
     Returns
     -------
