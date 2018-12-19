@@ -11,10 +11,10 @@
 dx = {function="mse", weight=10}
 dy = {function="mse", weight=10}
 dz = {function='mean_absolute_error', weight=15}
-vx = {function='mean_absolute_error', weight=2e-1}
-vy = {function='mean_absolute_error', weight=2e-1}
-vz = {function='mean_absolute_error', weight=2e-1}
-vt = {function='mean_absolute_error', weight=1e-2}
+vx = {function='mean_absolute_error', weight=1}
+vy = {function='mean_absolute_error', weight=1}
+vz = {function='mean_absolute_error', weight=1}
+vt = {function='mean_absolute_error', weight=1e-10}
 e  = {function='mean_absolute_error'}
 by = {function='mean_absolute_error', weight=10}
 dx_err = {function='loss_uncertainty_mse'}
@@ -23,8 +23,8 @@ dz_err = {function='loss_uncertainty_mse', weight=1.25}
 vx_err = {function='loss_uncertainty_mse'}
 vy_err = {function='loss_uncertainty_mse'}
 vz_err = {function='loss_uncertainty_mse'}
-vt_err = {function='loss_uncertainty_mse', weight=1e-4}
-e_err  = {function='loss_uncertainty_mse', weight=3e-3}
+vt_err = {function='loss_uncertainty_mse', weight=1e-10}
+e_err  = {function='loss_uncertainty_mse', weight=1e-2}
 by_err = {function='loss_uncertainty_mse'}
 
 [positional_arguments]
@@ -33,8 +33,6 @@ by_err = {function='loss_uncertainty_mse'}
 n_bins = [[11, 13, 18, 60], [11, 13, 18, 31]]
 class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
 nn_arch = 'VGG'
-# Epoch of training and file number of a saved model. If epoch[0]==0, a new model will be built.
-epoch = [0, 1]
 mode = 'train'
 swap_4d_channels = 'xyz-t_and_xyz-c_single_input'
 

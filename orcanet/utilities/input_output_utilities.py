@@ -34,12 +34,11 @@ def read_out_config_file(config_file):
         config["positional_arguments"]["class_type"][0] = None
     class_type = config["positional_arguments"]["class_type"]
     nn_arch = config["positional_arguments"]["nn_arch"]
-    epoch = config["positional_arguments"]["epoch"]
     mode = config["positional_arguments"]["mode"]
     if config["positional_arguments"]["swap_4d_channels"]=="None":
         config["positional_arguments"]["swap_4d_channels"] = None
     swap_4d_channels = config["positional_arguments"]["swap_4d_channels"]
-    positional_arguments = (loss_opt, n_bins, class_type, nn_arch, epoch, mode, swap_4d_channels)
+    positional_arguments = (loss_opt, n_bins, class_type, nn_arch, mode, swap_4d_channels)
 
     if "n_gpu" in config["keyword_arguments"]:
         config["keyword_arguments"]["n_gpu"][0] = int(config["keyword_arguments"]["n_gpu"][0])

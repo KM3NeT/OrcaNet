@@ -575,8 +575,8 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
 
 
 def execute_nn(list_filename, folder_name,
-               loss_opt, n_bins, class_type, nn_arch, epoch, mode, swap_4d_channels,
-                batchsize=64, n_gpu=(1, 'avolkov'), use_scratch_ssd=False, zero_center=False, shuffle=(False,None),
+               loss_opt, n_bins, class_type, nn_arch, mode, swap_4d_channels,
+                batchsize=64, epoch=[-1,-1], n_gpu=(1, 'avolkov'), use_scratch_ssd=False, zero_center=False, shuffle=(False,None),
                 str_ident='', n_events=None):
     """
     Core code that trains or evaluates a neural network.

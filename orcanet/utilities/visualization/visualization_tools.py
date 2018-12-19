@@ -170,7 +170,7 @@ def plot_metrics(summary_data, full_train_data, metric_names="loss", make_auto_t
         test_train_data = test_data, train_data, label, color
         test_train_data_list.append(test_train_data)
     if make_auto_titles:
-        title = metric_name
+        title = metric_names[0]
     else:
         title = ""
     fig = make_test_train_plot(test_train_data_list, title)
