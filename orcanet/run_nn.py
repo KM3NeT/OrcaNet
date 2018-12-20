@@ -217,7 +217,8 @@ def schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=0.003, m
         List with the paths and the filesizes of the train_files. Needed for calculating the lr.
     lr_initial : float
         Initial learning rate for the first epoch (and first file).
-    manual_mode : tuple(bool, None/float, float, None/float)
+    manual_mode : tuple
+        tuple(bool, None/float, float, None/float)
         Tuple that controls the options for the manual mode.
         manual_mode[0] = flag to enable the manual mode
         manual_mode[1] = lr value, of which the manual mode should start off
@@ -315,8 +316,9 @@ def get_new_learning_rate(epoch, lr_initial, n_train_files, n_gpu):
     return lr_temp, lr_decay
 
 
-def train_and_test_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
-                         shuffle, lr, swap_4d_channels, str_ident, n_gpu, folder_name, n_events):
+def train_and_test_model(model, train_files, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
+                         shuffle, lr, swap_4d_channels, str_ident, n_gpu, folder_name, train_logger_display, train_logger_flush,
+                         n_events):
     """
     Convenience function that trains (fit_generator), tests (evaluate_generator) and saves a Keras model.
     For documentation of the parameters, confer to the fit_model and evaluate_model functions.
@@ -335,7 +337,8 @@ def train_and_test_model(model, modelname, train_files, test_files, batchsize, n
             epoch, lr, lr_decay = schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=lr_initial, manual_mode=manual_mode)
 
         history_train = fit_model(model, train_files, f, f_size, file_no, batchsize, n_bins, class_type, xs_mean, epoch,
-                                            shuffle, swap_4d_channels, str_ident, folder_name, n_events)
+                                  shuffle, swap_4d_channels, str_ident, folder_name, train_logger_display,
+                                  train_logger_flush, n_events)
         model.save(folder_name + '/saved_models/trained_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5')
 
         # test after the first and else after every n-th file
@@ -373,7 +376,7 @@ def update_summary_plot(folder_name):
 
 
 def fit_model(model, train_files, f, f_size, file_no, batchsize, n_bins, class_type, xs_mean, epoch,
-              shuffle, swap_4d_channels, str_ident, folder_name, n_events=None):
+              shuffle, swap_4d_channels, str_ident, folder_name, train_logger_display, train_logger_flush, n_events=None):
     """
     Trains a model based on the Keras fit_generator method.
 
@@ -386,8 +389,8 @@ def fit_model(model, train_files, f, f_size, file_no, batchsize, n_bins, class_t
         Keras model instance of a neural network.
     train_files : list(([train_filepaths], train_filesize))
         List of tuples with the filepaths and the filesizes of the train_files.
-    f : str
-        Full filepath of the file that should be used for training.
+    f : list
+        Full filepaths of the files that should be used for training.
     f_size : int
         Number of images contained in f.
     file_no : int
@@ -410,14 +413,18 @@ def fit_model(model, train_files, f, f_size, file_no, batchsize, n_bins, class_t
         Optional string identifier that gets appended to the modelname.
     folder_name : str
         Path of the main folder.
+    train_logger_display : int
+        How many batches should be averaged for one line in the training logs.
+    train_logger_flush : int
+        After how many lines the file should be flushed. -1 for flush at the end of the epoch only.
     n_events : None/int
         For testing purposes if not the whole .h5 file should be used for training.
 
     """
     validation_data, validation_steps, callbacks = None, None, []
     if n_events is not None: f_size = n_events  # for testing purposes
-    logger = BatchLevelPerformanceLogger(train_files=train_files, batchsize=batchsize, display=100, model=model,
-                                         folder_name=folder_name, epoch=epoch)
+    logger = BatchLevelPerformanceLogger(train_files=train_files, batchsize=batchsize, display=train_logger_display, model=model,
+                                         folder_name=folder_name, epoch=epoch, flush_after_n_lines=train_logger_flush)
     callbacks.append(logger)
 
     if epoch[0] > 1 and shuffle[0] is True: # just for convenience, we don't want to wait before the first epoch each time
@@ -482,7 +489,7 @@ def evaluate_model(model, test_files, batchsize, n_bins, class_type, xs_mean, sw
 
 
 def predict_and_investigate_model_performance(model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
-                                              str_ident, modelname, xs_mean):
+                                              str_ident, modelname, xs_mean, folder_name):
     """
     Function that 1) makes predictions based on a Keras nn model and 2) investigates the performance of the model based on the predictions.
 
@@ -512,8 +519,8 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
     #     if 'batch_norm' in layer.name:
     #         layer.stateful = False
     arr_nn_pred = get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, modelname, samples=None)
-    np.save('results/plots/saved_predictions/arr_nn_pred_' + modelname + '.npy', arr_nn_pred)
-    arr_nn_pred = np.load('results/plots/saved_predictions/arr_nn_pred_' + modelname + '.npy')
+    np.save(folder_name + '/predictions/arr_nn_pred_' + modelname + '.npy', arr_nn_pred)
+    arr_nn_pred = np.load(folder_name + '/predictions/arr_nn_pred_' + modelname + '.npy')
 
     #arr_nn_pred = np.load('results/plots/saved_predictions/arr_nn_pred_' + modelname + '_final_stateful_false.npy')
     #arr_nn_pred = np.load('results/plots/saved_predictions//arr_nn_pred_model_VGG_4d_xyz-t_and_yzt-x_and_4d_xyzt_track-shower_multi_input_single_train_tight-1_tight-2_lr_0.003_tr_st_test_st_final_stateful_false_1-100GeV_precut.npy')
@@ -577,7 +584,7 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
 def execute_nn(list_filename, folder_name,
                loss_opt, n_bins, class_type, nn_arch, mode, swap_4d_channels,
                 batchsize=64, epoch=[-1,-1], n_gpu=(1, 'avolkov'), use_scratch_ssd=False, zero_center=False, shuffle=(False,None),
-                str_ident='', n_events=None):
+                str_ident='', train_logger_display=100, train_logger_flush=-1, n_events=None):
     """
     Core code that trains or evaluates a neural network.
 
@@ -622,6 +629,10 @@ def execute_nn(list_filename, folder_name,
         the same modelname. Also used for defining models and projections!
     loss_opt : tuple(dict, dict/str/None,)
         Tuple that contains 1) the loss_functions and loss_weights as dicts, 2) the metrics.
+    train_logger_display : int
+        How many batches should be averaged for one line in the training logs.
+    train_logger_flush : int
+        After how many lines the file should be flushed. -1 for flush at the end of the epoch only.
     n_events : None/int
         For testing purposes. If not the whole .h5 file should be used for training, define the number of events.
 
@@ -654,13 +665,13 @@ def execute_nn(list_filename, folder_name,
     if mode == 'train':
         lr = None
         while 1:
-            epoch, lr = train_and_test_model(model, modelname, train_files, test_files, batchsize, n_bins, class_type,
+            epoch, lr = train_and_test_model(model, train_files, test_files, batchsize, n_bins, class_type,
                                              xs_mean, epoch, shuffle, lr, swap_4d_channels, str_ident, n_gpu,
-                                             folder_name, n_events)
+                                             folder_name, train_logger_display, train_logger_flush, n_events)
 
     elif mode == 'eval':
         predict_and_investigate_model_performance(model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
-                                                  str_ident, modelname, xs_mean)
+                                                  str_ident, modelname, xs_mean, folder_name)
 
     else:
         raise ValueError('Mode "', str(mode), '" is not known. Needs to be "train" or "eval".')

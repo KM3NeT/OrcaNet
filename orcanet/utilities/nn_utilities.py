@@ -563,9 +563,9 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
     TODO
     """
     # Gibt loss aus über alle :display batches, gemittelt über die letzten :display batches
-    def __init__(self, train_files, batchsize, display, model, folder_name, epoch):
+    def __init__(self, train_files, batchsize, display, model, folder_name, epoch, flush_after_n_lines):
         """
-        TODO
+
         Parameters
         ----------
         train_files
@@ -574,19 +574,20 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
         model
         folder_name
         epoch
+        flush_after_n_lines : int
+            After how many lines the file should be flushed. -1 for flush at the end of the epoch only.
+
         """
         ks.callbacks.Callback.__init__(self)
-        self.seen = 0
         self.display = display
-        self.cum_loss = 0
-        self.cum_acc = 0
-        self.logfile_train_fname = folder_name + '/log_train/log_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.txt'
-        self.logfile_train = None
         self.epoch_number = epoch[0]
         self.f_number = epoch[1]
-        self.loglist = []
-        self.n_train_files = len(train_files)
         self.model = model
+        self.flush = flush_after_n_lines
+
+        self.seen = 0
+        self.logfile_train_fname = folder_name + '/log_train/log_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.txt'
+        self.loglist = []
 
         self.cum_metrics = {}
         for metric in self.model.metrics_names: # set up dict with all model metrics
@@ -598,36 +599,45 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
             self.steps_per_total_epoch += steps_per_file
             self.steps_cum.append(self.steps_cum[-1] + steps_per_file)
 
+        with open(self.logfile_train_fname, 'w') as logfile_train:
+            logfile_train.write('Batch\tBatch_float\t')
+            for i, metric in enumerate(self.model.metrics_names):
+                # write columns for all losses / metrics
+                logfile_train.write(metric)
+                if i + 1 < len(self.model.metrics_names): logfile_train.write('\t')  # newline \n is already written in the batch_statistics
+
     def on_batch_end(self, batch, logs={}):
         self.seen += 1
         for metric in self.model.metrics_names:
             self.cum_metrics[metric] += logs.get(metric)
 
         if self.seen % self.display == 0:
-
             batchnumber_float = (self.seen - self.display / 2.) / float(self.steps_per_total_epoch) + self.epoch_number - 1 \
-                                + (self.steps_cum [self.f_number-1] / float(self.steps_per_total_epoch)) # offset if the currently trained file is not the first one
+                                + (self.steps_cum [self.f_number-1] / float(self.steps_per_total_epoch))
+                                # offset if the currently trained file is not the first one
                                 #+ (self.f_number-1) * (1/float(self.n_train_files)) # start from zero # only works if all train files have approximately the same number of entries
-
-            self.loglist.append('\n{0}\t{1}'.format(self.seen, batchnumber_float))
+            line = '\n{0}\t{1}'.format(self.seen, batchnumber_float)
             for metric in self.model.metrics_names:
-                self.loglist.append('\t' + str(self.cum_metrics[metric] / self.display))
-
-            for metric in self.model.metrics_names: #reset accumulated metrics
+                line = line + '\t' + str(self.cum_metrics[metric] / self.display)
                 self.cum_metrics[metric] = 0
+            self.loglist.append(line)
 
-    def on_epoch_end(self, batch, logs={}): # on epoch end here means that this is called after one fit_generator loop in Keras is finished.
-        with open(self.logfile_train_fname, 'w') as self.logfile_train:
-            if os.stat(self.logfile_train_fname).st_size == 0:
-                self.logfile_train.write('Batch\tBatch_float\t')
-                for i, metric in enumerate(self.model.metrics_names): # write columns for all losses / metrics
-                    self.logfile_train.write(metric)
-                    if i + 1 < len(self.model.metrics_names): self.logfile_train.write('\t') # newline \n is already written in the batch_statistics
+            if self.flush != -1 and self.display % self.flush == 0:
+                with open(self.logfile_train_fname, 'a') as logfile_train:
+                    for batch_statistics in self.loglist:
+                        logfile_train.write(batch_statistics)
+                    self.loglist=[]
+                    logfile_train.flush()
+                    os.fsync(logfile_train.fileno())
 
-            for batch_statistics in self.loglist: # only write finished fit_generator calls to the .txt
-                self.logfile_train.write(batch_statistics)
+    def on_epoch_end(self, batch, logs={}):
+        # on epoch end here means that this is called after one fit_generator loop in Keras is finished.
+        if self.flush == -1:
+            with open(self.logfile_train_fname, 'a') as logfile_train:
+                for batch_statistics in self.loglist:
+                    logfile_train.write(batch_statistics)
+                logfile_train.flush()
+                os.fsync(logfile_train.fileno())
 
-            self.logfile_train.flush()
-            os.fsync(self.logfile_train.fileno())
 
 #------------- Classes -------------#
