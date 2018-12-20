@@ -34,10 +34,8 @@ def read_out_config_file(config_file):
     class_type = config["positional_arguments"]["class_type"]
     nn_arch = config["positional_arguments"]["nn_arch"]
     mode = config["positional_arguments"]["mode"]
-    if config["positional_arguments"]["swap_4d_channels"]=="None":
-        config["positional_arguments"]["swap_4d_channels"] = None
-    swap_4d_channels = config["positional_arguments"]["swap_4d_channels"]
-    positional_arguments = (loss_opt, n_bins, class_type, nn_arch, mode, swap_4d_channels)
+
+    positional_arguments = (loss_opt, class_type, nn_arch, mode)
 
     if "n_gpu" in config["keyword_arguments"]:
         config["keyword_arguments"]["n_gpu"][0] = int(config["keyword_arguments"]["n_gpu"][0])
@@ -54,7 +52,7 @@ def read_out_list_file(list_file):
     Parameters
     ----------
     list_file : str
-        Path to a .list file containing the pathes to training and test files to be used during training.
+        Path to a .list file containing the paths to training and test files to be used during training.
 
     Returns
     -------
@@ -168,7 +166,7 @@ def write_summary_logfile(train_files, batchsize, epoch, folder_name, model, his
         Keras model instance of a neural network.
     history_train : Keras history object
         History object containing the history of the training, averaged over files.
-    history_test : list
+    history_test : List
         List of test losses for all the metrics, averaged over all test files.
     lr : float
         The current learning rate of the model.
@@ -235,7 +233,7 @@ def read_logfiles(summary_logfile):
     train_file_data.sort()
     full_train_data = train_file_data[0][1]
     for [epoch, file_no], file_data in train_file_data[1:]:
-        file_data["Batch_float"]+=(epoch-1)
+        #file_data["Batch_float"]+=(epoch-1)
         full_train_data = np.append(full_train_data, file_data)
     return summary_data, full_train_data
 
@@ -252,7 +250,7 @@ def look_for_latest_epoch(folder_name):
         Name of the main folder.
     Returns
     -------
-    list
+    List
         The highest epoch, file_no pair. [0,1] if the folder is empty.
     """
     files = os.listdir(folder_name + "/saved_models")
@@ -279,13 +277,13 @@ def h5_get_number_of_rows(h5_filepath):
     return number_of_rows
 
 
-def get_n_bins(train_files):
+def h5_get_n_bins(train_files):
     """
     Get the number of bins from the training files. Only the first files are looked up, the others should be identical.
 
     Parameters
     ----------
-    train_files : list
+    train_files : List
         A list containing the paths to the different training files given in the list_file.
         Example format:
                 [
@@ -309,8 +307,8 @@ def use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=False)
     """
     Copies the test and train files to the node-local ssd scratch folder and returns the new filepaths of the train and test data.
     Speeds up I/O and reduces RRZE network load.
-    :param list train_files: list that contains all train files in tuples (filepath, f_size).
-    :param list test_files: list that contains all test files in tuples (filepath, f_size).
+    :param List train_files: list that contains all train files in tuples (filepath, f_size).
+    :param List test_files: list that contains all test files in tuples (filepath, f_size).
     :param bool multiple_inputs: specifies if the -m option in the parser has been chosen. This means that the list inside the train/test_files tuple has more than one element!
     :return: list train_files_ssd, test_files_ssd: new train/test list with updated SSD /scratch filepaths.
     """

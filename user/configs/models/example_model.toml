@@ -33,12 +33,11 @@ by_err = {function='loss_uncertainty_mse'}
 class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
 nn_arch = 'VGG'
 mode = 'train'
-swap_4d_channels = 'xyz-t_and_xyz-c_single_input'
 
 [keyword_arguments]
 # Keyword arguments of the execute_nn function in run_nn.py
+swap_4d_channels = 'xyz-t_and_xyz-c_single_input'
 str_ident = 'lp_tight-1_60b_errors_mse_w_vtx'
-n_gpu = ['1', 'avolkov']
 zero_center = true
 #n_events = 10000
 #train_logger_display=500

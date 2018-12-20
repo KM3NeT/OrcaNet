@@ -13,13 +13,13 @@ Options:
     -h --help                       Show this screen.
 """
 
-import os
+#import os
 import keras as ks
 import matplotlib as mpl
 from docopt import docopt
 mpl.use('Agg')
 
-from utilities.input_output_utilities import use_node_local_ssd_for_input, read_out_list_file, read_out_config_file, write_summary_logfile, write_full_logfile, read_logfiles, look_for_latest_epoch, get_n_bins
+from utilities.input_output_utilities import use_node_local_ssd_for_input, read_out_list_file, read_out_config_file, write_summary_logfile, write_full_logfile, read_logfiles, look_for_latest_epoch, h5_get_n_bins
 from model_archs.short_cnn_models import create_vgg_like_model_multi_input_from_single_nns, create_vgg_like_model
 from model_archs.wide_resnet import create_wide_residual_network
 from utilities.nn_utilities import load_zero_center_data, get_modelname, BatchLevelPerformanceLogger
@@ -34,7 +34,7 @@ from utilities.losses import *
 # K.set_session(tf_debug.LocalCLIDebugWrapperSession(tf.Session()))
 
 
-def build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4d_channels, str_ident, path_of_model, custom_objects):
+def build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4d_channels, str_ident, path_of_model):
     """
     Function that either loads or builds (epoch = 0) a Keras nn model.
 
@@ -57,8 +57,6 @@ def build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4
         the same modelname. Also used for defining models and projections!
     path_of_model : str
         Name and path of the nn model.
-    custom_objects : dict
-        Keras custom objects variable that contains custom loss functions for loading nn models.
 
     Returns
     -------
@@ -67,7 +65,8 @@ def build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4
 
     """
     if epoch[0] == 0:
-        if nn_arch == 'WRN': model = create_wide_residual_network(n_bins[0], batchsize, nb_classes=class_type[0], n=1, k=1, dropout=0.2, k_size=3, swap_4d_channels=swap_4d_channels)
+        if nn_arch == 'WRN':
+            model = create_wide_residual_network(n_bins[0], batchsize, nb_classes=class_type[0], n=1, k=1, dropout=0.2, k_size=3, swap_4d_channels=swap_4d_channels)
 
         elif nn_arch == 'VGG':
             if 'multi_input_single_train' in str_ident:
@@ -79,6 +78,7 @@ def build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4
 
         else: raise ValueError('Currently, only "WRN" or "VGG" are available as nn_arch')
     else:
+        custom_objects = get_all_loss_functions()
         model = ks.models.load_model(path_of_model, custom_objects=custom_objects)
 
     # plot model, install missing packages with conda install if it throws a module error
@@ -583,10 +583,10 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
             make_2d_dir_correlation_plot_different_sigmas(arr_nn_pred, modelname, precuts=precuts)
 
 
-def execute_nn(list_filename, folder_name,
-               loss_opt, class_type, nn_arch, mode, swap_4d_channels,
-                batchsize=64, epoch=[-1,-1], n_gpu=(1, 'avolkov'), use_scratch_ssd=False, zero_center=False, shuffle=(False,None),
-                str_ident='', train_logger_display=100, train_logger_flush=-1, n_events=None):
+def execute_nn(list_filename, folder_name, loss_opt,
+               class_type, nn_arch, mode,
+               swap_4d_channels=None, batchsize=64, epoch=[-1,-1], n_gpu=(1, 'avolkov'), use_scratch_ssd=False,
+               zero_center=False, shuffle=(False,None), str_ident='', train_logger_display=100, train_logger_flush=-1, n_events=None):
     """
     Core code that trains or evaluates a neural network.
 
@@ -596,6 +596,8 @@ def execute_nn(list_filename, folder_name,
         Path to a list file which contains pathes to all the h5 files that should be used for training.
     folder_name : str
         Name of the folder in the cnns directory in which everything will be saved.
+    loss_opt : tuple(dict, dict/str/None,)
+        Tuple that contains 1) the loss_functions and loss_weights as dicts, 2) the metrics.
     class_type : tuple(int, str)
         Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
         I.e. (2, 'track-shower')
@@ -603,7 +605,7 @@ def execute_nn(list_filename, folder_name,
         Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
     batchsize : int
         Batchsize that should be used for the training / inferencing of the cnn.
-    epoch : list[int, int]
+    epoch : List[int, int]
         Declares if a previously trained model or a new model (=0) should be loaded.
         The first argument specifies the last epoch, and the second argument is the last train file number if the train
         dataset is split over multiple files. Can also give [-1,-1] to automatically load the most recent epoch.
@@ -626,8 +628,6 @@ def execute_nn(list_filename, folder_name,
     str_ident : str
         Optional string identifier that gets appended to the modelname. Useful when training models which would have
         the same modelname. Also used for defining models and projections!
-    loss_opt : tuple(dict, dict/str/None,)
-        Tuple that contains 1) the loss_functions and loss_weights as dicts, 2) the metrics.
     train_logger_display : int
         How many batches should be averaged for one line in the training logs.
     train_logger_flush : int
@@ -638,10 +638,10 @@ def execute_nn(list_filename, folder_name,
     """
     make_folder_structure(folder_name)
     train_files, test_files, multiple_inputs = read_out_list_file(list_filename)
-    n_bins = get_n_bins(train_files)
+    n_bins = h5_get_n_bins(train_files)
     if epoch == [-1, -1]:
         epoch = look_for_latest_epoch(folder_name)
-        print("Found a saved model with epoch {} file {}, continuing training.".format(epoch[0], epoch[1]))
+        print("Found a saved model in epoch {} file {}, continuing training.".format(epoch[0], epoch[1]))
     if zero_center:
         xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu[0])
     else:
@@ -649,10 +649,9 @@ def execute_nn(list_filename, folder_name,
     if use_scratch_ssd:
         train_files, test_files = use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=multiple_inputs)
     modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident)
-    custom_objects = get_all_loss_functions()
 
     path_to_initial_model = folder_name + '/saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5'
-    model = build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4d_channels, str_ident, path_to_initial_model, custom_objects)
+    model = build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4d_channels, str_ident, path_to_initial_model)
     loss_functions, metrics, loss_weight, optimizer = get_optimizer_info(loss_opt, optimizer='adam')
 
     model, batchsize = parallelize_model_to_n_gpus(model, n_gpu, batchsize, loss_functions, optimizer, metrics, loss_weight)
@@ -677,22 +676,6 @@ def execute_nn(list_filename, folder_name,
         raise ValueError('Mode "', str(mode), '" is not known. Needs to be "train" or "eval".')
 
 
-def parse_input():
-    """
-    Parses and returns all necessary input options from a .toml and a .list file.
-
-    Returns
-    -------
-    config_file : str
-        Path and name of the .toml file that defines the properties of the model.
-    list_file : str
-        Path and name of the .list file containing the names of the files that will be used for training.
-    """
-    args = docopt(__doc__)
-    config_file = args['CONFIG']
-    list_file = args['LIST']
-    return config_file, list_file
-
 def make_folder_structure(folder_name):
     """
     Make folders and subfolders if they don't exist already.
@@ -709,14 +692,56 @@ def make_folder_structure(folder_name):
             print("Creating directory: "+directory)
             os.makedirs(directory)
 
+
+def orcatrain(user_folder, config_file, list_file):
+    """
+    Frontend function for training networks.
+
+    Parameters
+    ----------
+    user_folder : str
+        Path to the user folder where everything gets saved to.
+        Every model (from a .toml file) will get its own folder in here, with the name being the
+        same as the one from the .toml file.
+    config_file : str
+        Path to a .toml file which contains all the infos for training and testing of a model.
+    list_file : str
+        Path to a list file which contains pathes to all the h5 files that should be used for training.
+
+    """
+    positional_arguments, keyword_arguments = read_out_config_file(config_file)
+    folder_name = user_folder + "/trained_models/" + config_file.split("/")[-1].split(".")[:-1][0]
+    execute_nn(list_file, folder_name, *positional_arguments, **keyword_arguments)
+
+
+# XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
+# TODO: Move all of the below in an own file outside of OrcaNet
+
+
+def parse_input():
+    """
+    Parses and returns all necessary input options from a .toml and a .list file.
+
+    Returns
+    -------
+    config_file : str
+        Path and name of the .toml file that defines the properties of the model.
+    list_file : str
+        Path and name of the .list file containing the names of the files that will be used for training.
+    """
+    args = docopt(__doc__)
+    config_file = args['CONFIG']
+    list_file = args['LIST']
+    return config_file, list_file
+
+
 def main():
     """
-    Parse the input and execute the script. The folder name where everything is saved to is the name of the .toml file.
+    Parse the input and execute the script.
     """
     config_file, list_file = parse_input()
-    positional_arguments, keyword_arguments = read_out_config_file(config_file)
-    folder_name = "user/trained_models/" + config_file.split("/")[-1].split(".")[:-1][0]
-    execute_nn(list_file, folder_name, *positional_arguments, **keyword_arguments)
+    user_folder = "user/"
+    orcatrain(user_folder, config_file, list_file)
 
 
 if __name__ == '__main__':

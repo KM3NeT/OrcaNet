@@ -15,68 +15,6 @@ from utilities.nn_utilities import generate_batches_from_hdf5_file
 from utilities.losses import get_all_loss_functions
 
 
-def plot_train_and_test_statistics_old(modelname, model, folder_name):
-    """
-    Plots the loss in training/testing based on .txt logfiles.
-    :param str modelname: name of the model.
-    :param ks.model.Model model: Keras model of the neural network.
-    :param str folder_name: Path of the main folder of this model.
-    """
-    # #Batch number # BatchNumber float # Losses # Metrics
-    log_array_train = np.loadtxt(folder_name + '/log_train_' + modelname + '.txt', dtype=np.float32, delimiter='\t', skiprows=1, ndmin=2)
-    # #Epoch # Losses # Metrics
-    log_array_test = np.loadtxt('models/trained/perf_plots/log_test_' + modelname + '.txt', dtype=np.float32, delimiter='\t', skiprows=1, ndmin=2)
-
-    fig, axes = plt.subplots()
-    colors = ['#000000', '#332288', '#88CCEE', '#44AA99', '#117733', '#999933', '#DDCC77',
-              '#CC6677', '#882255', '#AA4499', '#661100', '#6699CC', '#AA4466', '#4477AA'] # ref. personal.sron.nl/~pault/
-    pdf_plots = PdfPages('models/trained/perf_plots/plots/loss_' + modelname + '.pdf')
-
-    skip_n_first_batches, batchlogger_display = 500, 100
-    first_line = int(skip_n_first_batches / batchlogger_display)
-
-    train_batchnr = log_array_train[first_line:, 1]
-    test_epoch = log_array_test[:, 0]
-
-    x_ticks_major = get_epoch_xticks(test_epoch, train_batchnr)
-
-    i, j = 0, 0
-    for metric_name in model.metrics_names: # metric names have same order as the columns in the log_array_train/test
-        if 'loss' in metric_name:
-
-            i += 1
-            train_metric_loss = log_array_train[first_line:, 1 + i] # skip a certain number of train batches for better y scale
-            test_metric_loss = log_array_test[:, 0 + i]
-
-            if 'err' in metric_name:
-                j += 1
-                color = colors[j]
-            else:
-                color = colors[i - 1]
-
-            plt.plot(train_batchnr, train_metric_loss, color=color, ls='--', zorder=3, label='train, ' + metric_name, lw=0.5, alpha=0.5)
-            plt.plot(test_epoch, test_metric_loss, color=color, marker='o', zorder=3, label='val, ' + metric_name, lw=0.5, markersize=3)
-
-            plt.xticks(x_ticks_major)
-            test_metric_min_to_max = np.amax(test_metric_loss) - np.amin(test_metric_loss)
-            y_lim = (np.amin(test_metric_loss) - 0.25 * test_metric_min_to_max, np.amax(test_metric_loss) + 0.25 * test_metric_min_to_max)
-            plt.ylim(y_lim)
-
-            axes.legend(loc='upper right')
-            plt.xlabel('Epoch [#]')
-            plt.ylabel('Loss')
-            title = plt.title('Loss for ' + modelname)
-            title.set_position([.5, 1.04])
-            plt.grid(True, zorder=0, linestyle='dotted')
-
-            pdf_plots.savefig(fig)
-            plt.savefig('models/trained/perf_plots/plots/png/loss_' + metric_name + '_' + modelname + '.png', dpi=600)
-            plt.cla()
-
-    plt.close()
-    pdf_plots.close()
-
-
 def make_test_train_plot(test_train_data_list, title=""):
     """
     Plot one or more test/train lines in a single plot.
@@ -257,12 +195,12 @@ def sort_metric_names_and_errors(metric_names):
 
     Parameters
     ----------
-    metric_names : list
+    metric_names : List
         List of metric names.
 
     Returns
     -------
-    sorted_metrics : list
+    sorted_metrics : List
         List of sorted metric names with the same length as the input.
 
     """
