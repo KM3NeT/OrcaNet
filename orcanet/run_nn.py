@@ -19,7 +19,7 @@ import matplotlib as mpl
 from docopt import docopt
 mpl.use('Agg')
 
-from utilities.input_output_utilities import use_node_local_ssd_for_input, read_out_list_file, read_out_config_file, write_summary_logfile, write_full_logfile, read_logfiles, look_for_latest_epoch
+from utilities.input_output_utilities import use_node_local_ssd_for_input, read_out_list_file, read_out_config_file, write_summary_logfile, write_full_logfile, read_logfiles, look_for_latest_epoch, get_n_bins
 from model_archs.short_cnn_models import create_vgg_like_model_multi_input_from_single_nns, create_vgg_like_model
 from model_archs.wide_resnet import create_wide_residual_network
 from utilities.nn_utilities import load_zero_center_data, get_modelname, BatchLevelPerformanceLogger
@@ -339,7 +339,7 @@ def train_and_test_model(model, train_files, test_files, batchsize, n_bins, clas
         history_train = fit_model(model, train_files, f, f_size, file_no, batchsize, n_bins, class_type, xs_mean, epoch,
                                   shuffle, swap_4d_channels, str_ident, folder_name, train_logger_display,
                                   train_logger_flush, n_events)
-        model.save(folder_name + '/saved_models/trained_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5')
+        model.save(folder_name + '/saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5')
 
         # test after the first and else after every n-th file
         if file_no == 1 or file_no % test_after_n_train_files == 0:
@@ -513,6 +513,8 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
         Name of the model.
     xs_mean : ndarray
         Mean_image of the x (train-) dataset used for zero-centering the train-/testdata.
+    folder_name : str
+        Name of the main folder, e.g. "user/trained_models/example_model".
 
     """
     # for layer in model.layers: # temp
@@ -582,7 +584,7 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
 
 
 def execute_nn(list_filename, folder_name,
-               loss_opt, n_bins, class_type, nn_arch, mode, swap_4d_channels,
+               loss_opt, class_type, nn_arch, mode, swap_4d_channels,
                 batchsize=64, epoch=[-1,-1], n_gpu=(1, 'avolkov'), use_scratch_ssd=False, zero_center=False, shuffle=(False,None),
                 str_ident='', train_logger_display=100, train_logger_flush=-1, n_events=None):
     """
@@ -594,9 +596,6 @@ def execute_nn(list_filename, folder_name,
         Path to a list file which contains pathes to all the h5 files that should be used for training.
     folder_name : str
         Name of the folder in the cnns directory in which everything will be saved.
-    n_bins : list(tuple(int))
-        Declares the number of bins for each dimension (e.g. (x,y,z,t)) in the train- and testfiles. Can contain multiple n_bins tuples.
-        Multiple n_bins tuples are currently used for multi-input models with multiple input files per batch.
     class_type : tuple(int, str)
         Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
         I.e. (2, 'track-shower')
@@ -639,9 +638,10 @@ def execute_nn(list_filename, folder_name,
     """
     make_folder_structure(folder_name)
     train_files, test_files, multiple_inputs = read_out_list_file(list_filename)
+    n_bins = get_n_bins(train_files)
     if epoch == [-1, -1]:
         epoch = look_for_latest_epoch(folder_name)
-        print("Epoch is set to {} file {}".format(epoch[0], epoch[1]))
+        print("Found a saved model with epoch {} file {}, continuing training.".format(epoch[0], epoch[1]))
     if zero_center:
         xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu[0])
     else:
@@ -651,7 +651,7 @@ def execute_nn(list_filename, folder_name,
     modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident)
     custom_objects = get_all_loss_functions()
 
-    path_to_initial_model = folder_name + '/saved_models/trained_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5'
+    path_to_initial_model = folder_name + '/saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5'
     model = build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4d_channels, str_ident, path_to_initial_model, custom_objects)
     loss_functions, metrics, loss_weight, optimizer = get_optimizer_info(loss_opt, optimizer='adam')
 
@@ -695,19 +695,19 @@ def parse_input():
 
 def make_folder_structure(folder_name):
     """
-    Make missing folders and subfolders if they don't exist already.
+    Make folders and subfolders if they don't exist already.
 
     Parameters
     ----------
     folder_name : str
         Name of the main folder, e.g. "user/trained_models/example_model".
     """
-    folders_to_create = [folder_name, folder_name+"/log_train", folder_name+"/saved_models", folder_name+"/plots/activations"]
+    folders_to_create = [folder_name, folder_name+"/log_train", folder_name+"/saved_models",
+                         folder_name+"/plots/activations", folder_name+"/predictions"]
     for directory in folders_to_create:
         if not os.path.exists(directory):
             print("Creating directory: "+directory)
             os.makedirs(directory)
-    return folder_name
 
 def main():
     """

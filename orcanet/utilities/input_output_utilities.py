@@ -29,7 +29,6 @@ def read_out_config_file(config_file):
     config = toml.load(config_file)
 
     loss_opt = (config["losses"], None)
-    n_bins = config["positional_arguments"]["n_bins"]
     if config["positional_arguments"]["class_type"][0]=="None":
         config["positional_arguments"]["class_type"][0] = None
     class_type = config["positional_arguments"]["class_type"]
@@ -262,7 +261,7 @@ def look_for_latest_epoch(folder_name):
     else:
         epochs = []
         for file in files:
-            epoch, file_no = file.split("trained_epoch_")[-1].split(".h5")[0].split("_file_")
+            epoch, file_no = file.split("model_epoch_")[-1].split(".h5")[0].split("_file_")
             epochs.append([int(epoch), int(file_no)])
         latest_epoch = max(epochs)
     return latest_epoch
@@ -277,8 +276,33 @@ def h5_get_number_of_rows(h5_filepath):
     f = h5py.File(h5_filepath, 'r')
     number_of_rows = f[list(f.keys())[0]].shape[0]
     f.close()
-
     return number_of_rows
+
+
+def get_n_bins(train_files):
+    """
+    Get the number of bins from the training files. Only the first files are looked up, the others should be identical.
+
+    Parameters
+    ----------
+    train_files : list
+        A list containing the paths to the different training files given in the list_file.
+        Example format:
+                [
+                 [['path/to/train_file_1_dimx.h5', 'path/to/train_file_1_dimy.h5'], number_of_events_train_files_1],
+                 [['path/to/train_file_2_dimx.h5', 'path/to/train_file_2_dimy.h5'], number_of_events_train_files_1]
+                ]
+
+    Returns
+    -------
+    n_bins : list
+
+    """
+    n_bins=[]
+    for dim_file in train_files[0][0]:
+        f = h5py.File(dim_file, "r")
+        n_bins.append(f[list(f.keys())[0]].shape[1:])
+    return n_bins
 
 
 def use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=False):
