@@ -12,7 +12,7 @@ import numpy as np
 
 def read_out_config_file(config_file):
     """
-    Extract the properties of the model which will be built from a .toml file. These are handed to the execute_nn
+    Extract the variables of a model from the .toml file and convert them to a dict. It is handed to the execute_nn
     function in run_nn.py.
 
     Parameters
@@ -21,26 +21,21 @@ def read_out_config_file(config_file):
         Path and name of the .toml file that defines the properties of the model.
     Returns
     -------
-        positional_arguments: tuple
-            Positional arguments of the execute_nn function.
-        config["keyword_arguments"] : dict
-            Keyword arguments of the execute_nn function.
+    keyword_arguments : dict
+        Arguments for the execute_nn function.
+
     """
     config = toml.load(config_file)
+    keyword_arguments = config["keyword_arguments"]
 
-    loss_opt = (config["losses"], None)
-    if config["positional_arguments"]["class_type"][0]=="None":
-        config["positional_arguments"]["class_type"][0] = None
-    class_type = config["positional_arguments"]["class_type"]
-    nn_arch = config["positional_arguments"]["nn_arch"]
-    mode = config["positional_arguments"]["mode"]
+    if "class_type" in keyword_arguments:
+        if keyword_arguments["class_type"][0]=="None":
+            keyword_arguments["class_type"][0] = None
+    if "n_gpu" in keyword_arguments:
+        keyword_arguments["n_gpu"][0] = int(keyword_arguments["n_gpu"][0])
+    keyword_arguments["loss_opt"] = (config["losses"], None)
 
-    positional_arguments = (loss_opt, class_type, nn_arch, mode)
-
-    if "n_gpu" in config["keyword_arguments"]:
-        config["keyword_arguments"]["n_gpu"][0] = int(config["keyword_arguments"]["n_gpu"][0])
-
-    return positional_arguments, config["keyword_arguments"]
+    return keyword_arguments
 
 
 def read_out_list_file(list_file):

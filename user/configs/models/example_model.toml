@@ -27,18 +27,18 @@ vt_err = {function='loss_uncertainty_mse', weight=1e-10}
 e_err  = {function='loss_uncertainty_mse', weight=1e-2}
 by_err = {function='loss_uncertainty_mse'}
 
-[positional_arguments]
+[keyword_arguments]
 # Positional arguments of the execute_nn function in run_nn.py
 # TODO add doc for these options
 class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
 nn_arch = 'VGG'
 mode = 'train'
 
-[keyword_arguments]
-# Keyword arguments of the execute_nn function in run_nn.py
+
+# Additional options
 swap_4d_channels = 'xyz-t_and_xyz-c_single_input'
 str_ident = 'lp_tight-1_60b_errors_mse_w_vtx'
 zero_center = true
-#n_events = 10000
-#train_logger_display=500
-#train_logger_flush=1
+n_events = 32000
+train_logger_display=250
+train_logger_flush=-1

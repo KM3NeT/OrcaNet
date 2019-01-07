@@ -586,8 +586,7 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
             make_2d_dir_correlation_plot_different_sigmas(arr_nn_pred, modelname, folder_name, precuts=precuts)
 
 
-def execute_nn(list_filename, folder_name, loss_opt,
-               class_type, nn_arch, mode,
+def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch, mode,
                swap_4d_channels=None, batchsize=64, epoch=[-1,-1], n_gpu=(1, 'avolkov'), use_scratch_ssd=False,
                zero_center=False, shuffle=(False,None), str_ident='', train_logger_display=100, train_logger_flush=-1, n_events=None):
     """
@@ -600,7 +599,8 @@ def execute_nn(list_filename, folder_name, loss_opt,
     folder_name : str
         Name of the folder in the cnns directory in which everything will be saved.
     loss_opt : tuple(dict, dict/str/None,)
-        Tuple that contains 1) the loss_functions and loss_weights as dicts, 2) the metrics.
+        Tuple that contains 1) the loss_functions and loss_weights as dicts (this is the losses table from the toml file)
+        and 2) the metrics.
     class_type : tuple(int, str)
         Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
         I.e. (2, 'track-shower')
@@ -697,14 +697,14 @@ def make_folder_structure(folder_name):
             os.makedirs(directory)
 
 
-def orcatrain(user_folder, config_file, list_file):
+def orcatrain(trained_models_folder, config_file, list_file):
     """
     Frontend function for training networks.
 
     Parameters
     ----------
-    user_folder : str
-        Path to the user folder where everything gets saved to.
+    trained_models_folder : str
+        Path to the folder where everything gets saved to.
         Every model (from a .toml file) will get its own folder in here, with the name being the
         same as the one from the .toml file.
     config_file : str
@@ -713,9 +713,9 @@ def orcatrain(user_folder, config_file, list_file):
         Path to a list file which contains pathes to all the h5 files that should be used for training.
 
     """
-    positional_arguments, keyword_arguments = read_out_config_file(config_file)
-    folder_name = user_folder + "/trained_models/" + config_file.split("/")[-1].split(".")[:-1][0]
-    execute_nn(list_file, folder_name, *positional_arguments, **keyword_arguments)
+    keyword_arguments = read_out_config_file(config_file)
+    folder_name = trained_models_folder + config_file[:-5].split("/")[-1]
+    execute_nn(list_file, folder_name, **keyword_arguments)
 
 
 # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
@@ -744,7 +744,7 @@ def main():
     Parse the input and execute the script.
     """
     config_file, list_file = parse_input()
-    user_folder = "user/"
+    user_folder = "user/trained_models/"
     orcatrain(user_folder, config_file, list_file)
 
 
