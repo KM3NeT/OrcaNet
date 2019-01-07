@@ -255,6 +255,7 @@ def look_for_latest_epoch(folder_name):
         epochs = []
         for file in files:
             epoch, file_no = file.split("model_epoch_")[-1].split(".h5")[0].split("_file_")
+            print(file, epoch, file_no)
             epochs.append([int(epoch), int(file_no)])
         latest_epoch = max(epochs)
     return latest_epoch

@@ -93,13 +93,12 @@ def decode_input_dimensions(n_bins, batchsize, swap_4d_channels):
     return dim, input_dim, strides, average_pooling_size
 
 
-def create_wide_residual_network(n_bins, batchsize, nb_classes=2, n=1, k=8, dropout=0.0, k_size=3, verbose=True, swap_4d_channels=None):
+def create_wide_residual_network(n_bins, nb_classes=2, n=1, k=8, dropout=0.0, k_size=3, verbose=True, swap_4d_channels=None):
     """
     Creates a 2D or 3D Wide Residual Network with specified parameters.
     The torch implementation from the paper differs slightly (change default arguments in BatchNorm):
     - BatchNormalization(axis=channel_axis, momentum=0.1, epsilon=1e-5, gamma_initializer='uniform')(x)
     :param tuple n_bins: Number of bins (x,y,z,t) of the data that will be fed to the network.
-    :param int batchsize: Batchsize of the fed data.
     :param int nb_classes: Number of output classes.
     :param int n: Depth of the network. Compute n = (N - 4) / 6.
                   Example : For a depth of 16, N = 16, n = (16 - 4) / 6 = 2
@@ -113,6 +112,10 @@ def create_wide_residual_network(n_bins, batchsize, nb_classes=2, n=1, k=8, drop
     :return: Model model: Keras WRN model.
     """
     channel_axis = 1 if K.image_data_format() == "channels_first" else -1
+
+    # TODO Batchsize has to be given to decode_input_dimensions_vgg, but is not used for constructing the model.
+    # For now: Just use some random value.
+    batchsize = 64
 
     dim, input_dim, strides, avg_pool_size = decode_input_dimensions(n_bins, batchsize, swap_4d_channels)  # includes batchsize
     average_pooling_nd = AveragePooling2D if dim==2 else AveragePooling3D

@@ -129,7 +129,7 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident =
     return dim, input_dim, max_pool_sizes
 
 
-def create_vgg_like_model(n_bins, batchsize, class_type, n_filters=None, dropout=0, k_size=3, swap_4d_channels=None,
+def create_vgg_like_model(n_bins, class_type, n_filters=None, dropout=0, k_size=3, swap_4d_channels=None,
                           activation='relu', kernel_reg=None):
     """
     Returns a VGG-like model (stacked conv. layers) with MaxPooling and Dropout if wished.
@@ -141,8 +141,6 @@ def create_vgg_like_model(n_bins, batchsize, class_type, n_filters=None, dropout
     ----------
     n_bins : list(tuple(int))
         Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
-    batchsize : int
-        Batchsize that is used for the training / inferencing of the cnn.
     class_type : tuple(int, str)
         Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
     n_filters : tuple
@@ -166,6 +164,10 @@ def create_vgg_like_model(n_bins, batchsize, class_type, n_filters=None, dropout
     """
     if n_filters is None: n_filters = (64,64,64,64,64,128,128,128)
     if kernel_reg is 'l2': kernel_reg = l2(0.0001)
+
+    # TODO Batchsize has to be given to decode_input_dimensions_vgg, but is not used for constructing the model.
+    # For now: Just use some random value.
+    batchsize = 64
 
     dim, input_dim, max_pool_sizes = decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels)
 
@@ -391,7 +393,7 @@ def create_vgg_like_model_double_input(n_bins, batchsize, nb_classes=2, n_filter
     return model
 
 
-def create_vgg_like_model_multi_input_from_single_nns(n_bins, batchsize, str_ident, nb_classes=2, dropout=(0, 0.2), swap_4d_channels=None, activation='relu'):
+def create_vgg_like_model_multi_input_from_single_nns(n_bins, str_ident, nb_classes=2, dropout=(0, 0.2), swap_4d_channels=None, activation='relu'):
     """
     Returns a double input, VGG-like model (stacked conv. layers) with MaxPooling and Dropout if wished.
 
@@ -401,8 +403,6 @@ def create_vgg_like_model_multi_input_from_single_nns(n_bins, batchsize, str_ide
     ----------
     n_bins : list(tuple(int))
         Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
-    batchsize : int
-        Batchsize that is used for the training / inferencing of the cnn.
     str_ident : str
         Optional string identifier that gets appended to the modelname.
     nb_classes : int
@@ -420,6 +420,10 @@ def create_vgg_like_model_multi_input_from_single_nns(n_bins, batchsize, str_ide
         A VGG-like, double input Keras nn instance, with pretrained conv layers.
 
     """
+    # TODO Batchsize has to be given to decode_input_dimensions_vgg, but is not used for constructing the model.
+    # For now: Just use some random value.
+    batchsize=64
+
     dim, input_dim, max_pool_sizes = decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident=str_ident)
     trained_model_paths = {}
     if swap_4d_channels is None: swap_4d_channels = ''

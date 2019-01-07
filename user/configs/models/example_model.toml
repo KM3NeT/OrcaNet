@@ -39,6 +39,6 @@ mode = 'train'
 swap_4d_channels = 'xyz-t_and_xyz-c_single_input'
 str_ident = 'lp_tight-1_60b_errors_mse_w_vtx'
 zero_center = true
-n_events = 32000
+#n_events = 32000
 train_logger_display=250
 train_logger_flush=-1

@@ -34,20 +34,16 @@ from utilities.losses import *
 # K.set_session(tf_debug.LocalCLIDebugWrapperSession(tf.Session()))
 
 
-def build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4d_channels, str_ident, path_of_model):
+def build_nn_model(nn_arch, n_bins, class_type, swap_4d_channels, str_ident):
     """
-    Function that either loads or builds (epoch = 0) a Keras nn model.
+    Function that builds a Keras nn model of a specific type.
 
     Parameters
     ----------
-    epoch : tuple(int, int)
-        Declares if a previously trained model or a new model (=0) should be loaded, more info in the execute_nn function.
     nn_arch : str
         Architecture of the neural network.
     n_bins : list(tuple(int))
         Declares the number of bins for each dimension (e.g. (x,y,z,t)) in the train- and testfiles.
-    batchsize : int
-        Batchsize that is used for the training / inferencing of the cnn.
     class_type : tuple(int, str)
         Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
     swap_4d_channels : None/str
@@ -55,8 +51,52 @@ def build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4
     str_ident : str
         Optional string identifier that gets appended to the modelname. Useful when training models which would have
         the same modelname. Also used for defining models and projections!
-    path_of_model : str
-        Name and path of the nn model.
+
+    Returns
+    -------
+    model : ks.models.Model
+        A Keras nn instance.
+
+    """
+    if nn_arch == 'WRN':
+        model = create_wide_residual_network(n_bins[0], nb_classes=class_type[0], n=1, k=1, dropout=0.2, k_size=3, swap_4d_channels=swap_4d_channels)
+
+    elif nn_arch == 'VGG':
+        if 'multi_input_single_train' in str_ident:
+            model = create_vgg_like_model_multi_input_from_single_nns(n_bins, str_ident, nb_classes=class_type[0], dropout=(0,0.1), swap_4d_channels=swap_4d_channels)
+
+        else:
+            model = create_vgg_like_model(n_bins, class_type, dropout=0.0,
+                                          n_filters=(64, 64, 64, 64, 64, 64, 128, 128, 128, 128), swap_4d_channels=swap_4d_channels) # 2 more layers
+
+    else: raise ValueError('Currently, only "WRN" or "VGG" are available as nn_arch')
+
+    #model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
+
+    return model
+
+
+def build_or_load_nn_model(epoch, folder_name, nn_arch, n_bins, class_type, swap_4d_channels, str_ident):
+    """
+    Function that either loads or builds (epoch = 0) a Keras nn model.
+
+    Parameters
+    ----------
+    epoch : tuple(int, int)
+        Declares if a previously trained model or a new model (=0) should be loaded, more info in the execute_nn function.
+    folder_name : str
+        Name of the main folder.
+    nn_arch : str
+        Architecture of the neural network.
+    n_bins : list(tuple(int))
+        Declares the number of bins for each dimension (e.g. (x,y,z,t)) in the train- and testfiles.
+    class_type : tuple(int, str)
+        Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
+    swap_4d_channels : None/str
+        For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
+    str_ident : str
+        Optional string identifier that gets appended to the modelname. Useful when training models which would have
+        the same modelname. Also used for defining models and projections!
 
     Returns
     -------
@@ -65,25 +105,10 @@ def build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4
 
     """
     if epoch[0] == 0:
-        if nn_arch == 'WRN':
-            model = create_wide_residual_network(n_bins[0], batchsize, nb_classes=class_type[0], n=1, k=1, dropout=0.2, k_size=3, swap_4d_channels=swap_4d_channels)
-
-        elif nn_arch == 'VGG':
-            if 'multi_input_single_train' in str_ident:
-                model = create_vgg_like_model_multi_input_from_single_nns(n_bins, batchsize, str_ident, nb_classes=class_type[0], dropout=(0,0.1), swap_4d_channels=swap_4d_channels)
-
-            else:
-                model = create_vgg_like_model(n_bins, batchsize, class_type, dropout=0.0,
-                                              n_filters=(64, 64, 64, 64, 64, 64, 128, 128, 128, 128), swap_4d_channels=swap_4d_channels) # 2 more layers
-
-        else: raise ValueError('Currently, only "WRN" or "VGG" are available as nn_arch')
+        model = build_nn_model(nn_arch, n_bins, class_type, swap_4d_channels, str_ident)
     else:
-        custom_objects = get_all_loss_functions()
-        model = ks.models.load_model(path_of_model, custom_objects=custom_objects)
-
-    # plot model, install missing packages with conda install if it throws a module error
-    #ks.utils.plot_model(model, to_file='./models/model_plots/' + modelname + '.png', show_shapes=True, show_layer_names=True)
-
+        path_of_model = folder_name + '/saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5'
+        model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
     return model
 
 
@@ -597,7 +622,7 @@ def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch, mode,
     list_filename : str
         Path to a list file which contains pathes to all the h5 files that should be used for training.
     folder_name : str
-        Name of the folder in the cnns directory in which everything will be saved.
+        Name of the folder of this model in which everything will be saved. E.g., the summary.txt log file is located in here.
     loss_opt : tuple(dict, dict/str/None,)
         Tuple that contains 1) the loss_functions and loss_weights as dicts (this is the losses table from the toml file)
         and 2) the metrics.
@@ -653,8 +678,7 @@ def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch, mode,
         train_files, test_files = use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=multiple_inputs)
     modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident)
 
-    path_to_initial_model = folder_name + '/saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5'
-    model = build_or_load_nn_model(epoch, nn_arch, n_bins, batchsize, class_type, swap_4d_channels, str_ident, path_to_initial_model)
+    model = build_or_load_nn_model(epoch, folder_name, nn_arch, n_bins, class_type, swap_4d_channels, str_ident)
     loss_functions, metrics, loss_weight, optimizer = get_optimizer_info(loss_opt, optimizer='adam')
 
     model, batchsize = parallelize_model_to_n_gpus(model, n_gpu, batchsize, loss_functions, optimizer, metrics, loss_weight)
@@ -744,8 +768,8 @@ def main():
     Parse the input and execute the script.
     """
     config_file, list_file = parse_input()
-    user_folder = "user/trained_models/"
-    orcatrain(user_folder, config_file, list_file)
+    trained_models_folder = "user/trained_models/"
+    orcatrain(trained_models_folder, config_file, list_file)
 
 
 if __name__ == '__main__':
