@@ -63,7 +63,12 @@ def get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchs
             elif class_type[1] == 'energy_dir_bjorken-y_errors':
                 y_pred = np.concatenate(y_pred, axis=1)
                 y_true = np.concatenate([y_true['e'], y_true['dir_x'], y_true['dir_y'], y_true['dir_z'], y_true['by']], axis=1) # dont need to save y_true err input
-
+            elif class_type[1] == 'energy_dir_bjorken-y_vtx_errors':
+                y_pred = np.concatenate(y_pred, axis=1)
+                y_true = np.concatenate([y_true['e'], y_true['dir_x'], y_true['dir_y'], y_true['dir_z'], y_true['by'], y_true['vx'], y_true['vy'], y_true['vz'], y_true['vt']],
+                                        axis=1)  # dont need to save y_true err input
+            else:
+                raise NameError("Unknown class_type " + str(class_type[1]))
             # mc labels
             energy = mc_info[:, 2]
             particle_type = mc_info[:, 1]
@@ -79,7 +84,9 @@ def get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchs
             # make a temporary energy_correct array for this batch
             # arr_nn_pred_temp = np.concatenate([run_id[:, ax], event_id[:, ax], particle_type[:, ax], is_cc[:, ax], energy[:, ax],
             #                                    bjorken_y[:, ax], dir_x[:, ax], dir_y[:, ax], dir_z[:, ax], y_pred, y_true], axis=1)
-
+            #print(y_pred.shape)
+            #print(y_true.shape)
+            # alle [...,ax] haben dim 64,1.
             arr_nn_pred_temp = np.concatenate([run_id[:, ax], event_id[:, ax], particle_type[:, ax], is_cc[:, ax],
                                                energy[:, ax], bjorken_y[:, ax], dir_x[:, ax], dir_y[:, ax],
                                                dir_z[:, ax], vtx_x[:, ax], vtx_y[:, ax], vtx_z[:, ax],

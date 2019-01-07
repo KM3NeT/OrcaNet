@@ -644,7 +644,7 @@ def execute_nn(list_filename, folder_name, loss_opt,
     n_bins = h5_get_n_bins(train_files)
     if epoch == [-1, -1]:
         epoch = look_for_latest_epoch(folder_name)
-        print("Found a saved model in epoch {} file {}, continuing training.".format(epoch[0], epoch[1]))
+        print("Found a saved model in epoch {} file {}, continuing from there.".format(epoch[0], epoch[1]))
     if zero_center:
         xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu[0])
     else:
