@@ -6,7 +6,7 @@ Main code for training NN's. The main function for training, testing, logging an
 It can also be called via a parser by running this python module as follows:
 
 Usage:
-    run_cnn.py CONFIG LIST [FOLDER]
+    run_cnn.py CONFIG LIST [FOLDER] [MODE]
     run_cnn.py (-h | --help)
 
 Arguments:
@@ -16,6 +16,9 @@ Arguments:
             An example can be found in config/lists/example_list.list
     FOLDER  A new subfolder will be generated in this folder, where everything from this model gets saved to.
             Default is the current working directory.
+    MODE    Specifies what the function should do - train & test a model or evaluate a 'finished' model?
+            Currently, there are two modes available: 'train' & 'eval'.
+            Default is train.
 
 Options:
     -h --help                       Show this screen.
@@ -621,12 +624,12 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
             make_2d_dir_correlation_plot_different_sigmas(arr_nn_pred, modelname, folder_name, precuts=precuts)
 
 
-def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch, mode,
+def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch,
                swap_4d_channels=None, batchsize=64, epoch=[-1,-1], epochs_to_train=-1, n_gpu=(1, 'avolkov'), use_scratch_ssd=False,
                zero_center=False, shuffle=(False,None), str_ident='', train_logger_display=100, train_logger_flush=-1,
                train_verbose=2, n_events=None):
     """
-    Core code that trains or evaluates a neural network.
+    Core code that trains a neural network.
 
     Parameters
     ----------
@@ -650,9 +653,6 @@ def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch, mode,
         dataset is split over multiple files. Can also give [-1,-1] to automatically load the most recent epoch.
     epochs_to_train : int
         How many new epochs should be trained by running this function. -1 for infinite.
-    mode : str
-        Specifies what the function should do - train & test a model or evaluate a 'finished' model?
-        Currently, there are two modes available: 'train' & 'eval'.
     swap_4d_channels : None/str
         For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
         Currently available: None -> XYZ-T ; 'yzt-x' -> YZT-X, TODO add multi input options
@@ -702,24 +702,45 @@ def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch, mode,
     if epoch[0] == 0:
         model.compile(loss=loss_functions, optimizer=optimizer, metrics=metrics, loss_weights=loss_weight)
 
-    if mode == 'train':
-        lr = None
-        trained_epochs = 0
-        while trained_epochs<epochs_to_train or epochs_to_train==-1:
-            epoch, lr = train_and_test_model(model, train_files, test_files, batchsize, n_bins, class_type,
-                                             xs_mean, epoch, shuffle, lr, swap_4d_channels, str_ident, n_gpu,
-                                             folder_name, train_logger_display, train_logger_flush, train_verbose,
-                                             n_events)
-            trained_epochs+=1
+    lr = None
+    trained_epochs = 0
+    while trained_epochs<epochs_to_train or epochs_to_train==-1:
+        epoch, lr = train_and_test_model(model, train_files, test_files, batchsize, n_bins, class_type,
+                                         xs_mean, epoch, shuffle, lr, swap_4d_channels, str_ident, n_gpu,
+                                         folder_name, train_logger_display, train_logger_flush, train_verbose,
+                                         n_events)
+        trained_epochs+=1
 
-    elif mode == 'eval':
-        modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident)
-        arr_filename = folder_name + '/predictions/pred_model_epoch_{}_file_{}_on_{}.npy'.format(str(epoch[0]), str(epoch[1]), list_filename[:-5].split("/")[-1])
-        predict_and_investigate_model_performance(model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
-                                                  str_ident, modelname, xs_mean, arr_filename, folder_name)
 
+def eval_nn(list_filename, folder_name, loss_opt, class_type, nn_arch,
+               swap_4d_channels=None, batchsize=64, epoch=[-1,-1], epochs_to_train=-1, n_gpu=(1, 'avolkov'), use_scratch_ssd=False,
+               zero_center=False, shuffle=(False,None), str_ident='', train_logger_display=100, train_logger_flush=-1,
+               train_verbose=2, n_events=None):
+    """
+    Core code that evaluates a neural network. The input parameters are the same as for orca_train, so that it is compatible
+    with the .toml file.
+    TODO Should be directly callable on a saved model, so that less arguments are required, and maybe no .toml is needed?
+
+    """
+
+    train_files, test_files, multiple_inputs = read_out_list_file(list_filename)
+    n_bins = h5_get_n_bins(train_files)
+    if epoch == [-1, -1]:
+        epoch = look_for_latest_epoch(folder_name)
+        print("Automatically initialized epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
+    if zero_center:
+        xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu[0])
     else:
-        raise ValueError('Mode "', str(mode), '" is not known. Needs to be "train" or "eval".')
+        xs_mean = None
+    if use_scratch_ssd:
+        train_files, test_files = use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=multiple_inputs)
+
+    model = build_or_load_nn_model(epoch, folder_name, nn_arch, n_bins, class_type, swap_4d_channels, str_ident)
+    modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident)
+    arr_filename = folder_name + '/predictions/pred_model_epoch_{}_file_{}_on_{}.npy'.format(str(epoch[0]), str(epoch[1]), list_filename[:-5].split("/")[-1])
+
+    predict_and_investigate_model_performance(model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
+                                              str_ident, modelname, xs_mean, arr_filename, folder_name)
 
 
 def make_folder_structure(folder_name):
@@ -741,9 +762,9 @@ def make_folder_structure(folder_name):
             os.makedirs(directory)
 
 
-def orca_train(trained_models_folder, config_file, list_file):
+def orca_train(trained_models_folder, config_file, list_file, mode):
     """
-    Frontend function for training networks.
+    Frontend function for training and evaluating networks.
 
     Parameters
     ----------
@@ -755,36 +776,37 @@ def orca_train(trained_models_folder, config_file, list_file):
         Path to a .toml file which contains all the infos for training and testing of a model.
     list_file : str
         Path to a list file which contains pathes to all the h5 files that should be used for training.
+    mode : str
+        Specifies what the function should do - train & test a model or evaluate a 'finished' model?
+        Currently, there are two modes available: 'train' & 'eval'.
 
     """
     keyword_arguments = read_out_config_file(config_file)
     folder_name = trained_models_folder + str(os.path.splitext(os.path.basename(config_file))[0])
-    write_full_logfile_startup(folder_name, list_file, keyword_arguments)
-    execute_nn(list_file, folder_name, **keyword_arguments)
+
+    # TODO Move the eval mode to its own function and possibly file, since it is used more rarely probably than train.
+    if mode == "train":
+        write_full_logfile_startup(folder_name, list_file, keyword_arguments)
+        execute_nn(list_file, folder_name, **keyword_arguments)
+    elif mode == "eval":
+        eval_nn(list_file, folder_name, **keyword_arguments)
+    else:
+        raise NameError("Unknown mode: "+str(mode))
 
 
 def orca_parse_input():
     """
     Run the orca_train function with a parser.
-
-    Returns
-    -------
-    config_file : str
-        Path and name of the .toml file that defines the properties of the model.
-    list_file : str
-        Path and name of the .list file containing the names of the files that will be used for training.
-    trained_models_folder : str
-        Path to the folder where everything gets saved to.
-        Every model (from a .toml file) will get its own folder in here, with the name being the
-        same as the one from the .toml file.
+    Returns the arguments of the orca_train function.
 
     """
     args = docopt(__doc__)
     config_file = args['CONFIG']
     list_file = args['LIST']
     trained_models_folder = args['FOLDER'] if args['FOLDER'] is not None else "./"
+    mode = args['MODE'] if args['MODE'] is not None else "train"
 
-    orca_train(trained_models_folder, config_file, list_file)
+    orca_train(trained_models_folder, config_file, list_file, mode)
 
 
 if __name__ == '__main__':

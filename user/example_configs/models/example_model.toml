@@ -32,8 +32,6 @@ by_err = {function='loss_uncertainty_mse'}
 # TODO add doc for these options
 class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
 nn_arch = 'VGG'
-mode = 'train'
-
 
 # Additional options
 swap_4d_channels = 'xyz-t_and_xyz-c_single_input'
