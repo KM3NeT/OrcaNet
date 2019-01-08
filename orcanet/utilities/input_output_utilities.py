@@ -130,10 +130,10 @@ def write_full_logfile_startup(folder_name, list_filename, keyword_arguments):
         f_out.write("List file path:\t"+list_filename+"\n")
         f_out.write("Given trainfiles in the .list file:\n")
         for train_file in train_files:
-            f_out.write("   " + train_file+"\n")
+            f_out.write("   " + str(train_file)+"\n")
         f_out.write("\nGiven testfiles in the .list file:\n")
         for test_file in test_files:
-            f_out.write("   " + test_file + "\n")
+            f_out.write("   " + str(test_file) + "\n")
         f_out.write("\nGiven options in the .toml config:\n")
         for keyword_argument in keyword_arguments.keys():
             f_out.write("   {}:\t{}\n".format(keyword_argument, keyword_arguments[keyword_argument]))
@@ -282,7 +282,6 @@ def look_for_latest_epoch(folder_name):
         epochs = []
         for file in files:
             epoch, file_no = file.split("model_epoch_")[-1].split(".h5")[0].split("_file_")
-            print(file, epoch, file_no)
             epochs.append([int(epoch), int(file_no)])
         latest_epoch = max(epochs)
     return latest_epoch

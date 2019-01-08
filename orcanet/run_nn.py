@@ -2,19 +2,20 @@
 # -*- coding: utf-8 -*-
 """
 
-Main code for running NN's.
+Main code for training NN's. The main function for training, testing, logging and plotting the progress is orca_train.
+It can also be called via a parser by running this python module as follows:
 
 Usage:
     run_cnn.py CONFIG LIST [FOLDER]
     run_cnn.py (-h | --help)
 
 Arguments:
-    CONFIG  A .toml file which sets up the model.
+    CONFIG  A .toml file which sets up the model and training.
             An example can be found in config/models/example_model.toml
     LIST    A .list file which contains the files to be trained on.
             An example can be found in config/lists/example_list.list
     FOLDER  A new subfolder will be generated in this folder, where everything from this model gets saved to.
-            Default is in the current working directory.
+            Default is the current working directory.
 
 Options:
     -h --help                       Show this screen.
