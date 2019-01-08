@@ -1,25 +1,33 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Main code for running CNN's.
-CONFIG is a .toml file which sets up the model. An example can be found in config/models/example_model.toml
-LIST is a .list file which contains the files to be trained on. an example can be found in config/lists/example_list.list
+
+Main code for running NN's.
 
 Usage:
-    run_cnn.py CONFIG LIST
+    run_cnn.py CONFIG LIST [FOLDER]
     run_cnn.py (-h | --help)
+
+Arguments:
+    CONFIG  A .toml file which sets up the model.
+            An example can be found in config/models/example_model.toml
+    LIST    A .list file which contains the files to be trained on.
+            An example can be found in config/lists/example_list.list
+    FOLDER  A new subfolder will be generated in this folder, where everything from this model gets saved to.
+            Default is in the current working directory.
 
 Options:
     -h --help                       Show this screen.
+
 """
 
-#import os
+import os
 import keras as ks
 import matplotlib as mpl
 from docopt import docopt
 mpl.use('Agg')
 
-from utilities.input_output_utilities import use_node_local_ssd_for_input, read_out_list_file, read_out_config_file, write_summary_logfile, write_full_logfile, read_logfiles, look_for_latest_epoch, h5_get_n_bins
+from utilities.input_output_utilities import use_node_local_ssd_for_input, read_out_list_file, read_out_config_file, write_summary_logfile, write_full_logfile, read_logfiles, look_for_latest_epoch, h5_get_n_bins, write_full_logfile_startup
 from model_archs.short_cnn_models import create_vgg_like_model_multi_input_from_single_nns, create_vgg_like_model
 from model_archs.wide_resnet import create_wide_residual_network
 from utilities.nn_utilities import load_zero_center_data, get_modelname, BatchLevelPerformanceLogger
@@ -70,8 +78,6 @@ def build_nn_model(nn_arch, n_bins, class_type, swap_4d_channels, str_ident):
                                           n_filters=(64, 64, 64, 64, 64, 64, 128, 128, 128, 128), swap_4d_channels=swap_4d_channels) # 2 more layers
 
     else: raise ValueError('Currently, only "WRN" or "VGG" are available as nn_arch')
-
-    #model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
 
     return model
 
@@ -343,7 +349,7 @@ def get_new_learning_rate(epoch, lr_initial, n_train_files, n_gpu):
 
 def train_and_test_model(model, train_files, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
                          shuffle, lr, swap_4d_channels, str_ident, n_gpu, folder_name, train_logger_display, train_logger_flush,
-                         n_events):
+                         train_verbose, n_events):
     """
     Convenience function that trains (fit_generator), tests (evaluate_generator) and saves a Keras model.
     For documentation of the parameters, confer to the fit_model and evaluate_model functions.
@@ -363,7 +369,7 @@ def train_and_test_model(model, train_files, test_files, batchsize, n_bins, clas
 
         history_train = fit_model(model, train_files, f, f_size, file_no, batchsize, n_bins, class_type, xs_mean, epoch,
                                   shuffle, swap_4d_channels, str_ident, folder_name, train_logger_display,
-                                  train_logger_flush, n_events)
+                                  train_logger_flush, train_verbose, n_events)
         model.save(folder_name + '/saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5')
 
         # test after the first and else after every n-th file
@@ -401,7 +407,8 @@ def update_summary_plot(folder_name):
 
 
 def fit_model(model, train_files, f, f_size, file_no, batchsize, n_bins, class_type, xs_mean, epoch,
-              shuffle, swap_4d_channels, str_ident, folder_name, train_logger_display, train_logger_flush, n_events=None):
+              shuffle, swap_4d_channels, str_ident, folder_name, train_logger_display, train_logger_flush, train_verbose,
+              n_events=None):
     """
     Trains a model based on the Keras fit_generator method.
 
@@ -442,6 +449,8 @@ def fit_model(model, train_files, f, f_size, file_no, batchsize, n_bins, class_t
         How many batches should be averaged for one line in the training logs.
     train_logger_flush : int
         After how many lines the file should be flushed. -1 for flush at the end of the epoch only.
+    train_verbose : int
+        verbose option of keras.model.fit_generator.
     n_events : None/int
         For testing purposes if not the whole .h5 file should be used for training.
 
@@ -464,7 +473,7 @@ def fit_model(model, train_files, f, f_size, file_no, batchsize, n_bins, class_t
 
     history = model.fit_generator(
         generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, str_ident, f_size=f_size, zero_center_image=xs_mean, swap_col=swap_4d_channels),
-        steps_per_epoch=int(f_size / batchsize), epochs=1, verbose=2, max_queue_size=10,
+        steps_per_epoch=int(f_size / batchsize), epochs=1, verbose=train_verbose, max_queue_size=10,
         validation_data=validation_data, validation_steps=validation_steps, callbacks=callbacks)
 
     return history
@@ -548,7 +557,7 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
     # for layer in model.layers: # temp
     #     if 'batch_norm' in layer.name:
     #         layer.stateful = False
-    arr_nn_pred = get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, modelname, samples=None)
+    arr_nn_pred = get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, samples=None)
     np.save(arr_filename, arr_nn_pred)
     arr_nn_pred = np.load(arr_filename)
 
@@ -564,7 +573,7 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
         make_prob_hists(arr_nn_pred, folder_name, modelname=modelname, precuts=precuts)
         make_hist_2d_property_vs_property(arr_nn_pred, folder_name, modelname, property_types=('bjorken-y', 'probability'),
                                           e_cut=(1, 100), precuts=precuts)
-        calculate_and_plot_separation_pid(arr_nn_pred, folder_name, precuts=precuts)
+        calculate_and_plot_separation_pid(arr_nn_pred, folder_name, modelname, precuts=precuts)
 
     else:  # regression
         arr_nn_pred_shallow = np.load('/home/woody/capn/mppi033h/Data/various/arr_nn_pred.npy')
@@ -612,8 +621,9 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
 
 
 def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch, mode,
-               swap_4d_channels=None, batchsize=64, epoch=[-1,-1], n_gpu=(1, 'avolkov'), use_scratch_ssd=False,
-               zero_center=False, shuffle=(False,None), str_ident='', train_logger_display=100, train_logger_flush=-1, n_events=None):
+               swap_4d_channels=None, batchsize=64, epoch=[-1,-1], epochs_to_train=-1, n_gpu=(1, 'avolkov'), use_scratch_ssd=False,
+               zero_center=False, shuffle=(False,None), str_ident='', train_logger_display=100, train_logger_flush=-1,
+               train_verbose=2, n_events=None):
     """
     Core code that trains or evaluates a neural network.
 
@@ -637,6 +647,8 @@ def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch, mode,
         Declares if a previously trained model or a new model (=0) should be loaded.
         The first argument specifies the last epoch, and the second argument is the last train file number if the train
         dataset is split over multiple files. Can also give [-1,-1] to automatically load the most recent epoch.
+    epochs_to_train : int
+        How many new epochs should be trained by running this function. -1 for infinite.
     mode : str
         Specifies what the function should do - train & test a model or evaluate a 'finished' model?
         Currently, there are two modes available: 'train' & 'eval'.
@@ -657,9 +669,11 @@ def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch, mode,
         Optional string identifier that gets appended to the modelname. Useful when training models which would have
         the same modelname. Also used for defining models and projections!
     train_logger_display : int
-        How many batches should be averaged for one line in the training logs.
+        How many batches should be averaged for one line in the training log files.
     train_logger_flush : int
-        After how many lines the file should be flushed. -1 for flush at the end of the epoch only.
+        After how many lines the training log file should be flushed. -1 for flush at the end of the epoch only.
+    train_verbose : int
+        verbose option of keras.model.fit_generator.
     n_events : None/int
         For testing purposes. If not the whole .h5 file should be used for training, define the number of events.
 
@@ -669,14 +683,13 @@ def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch, mode,
     n_bins = h5_get_n_bins(train_files)
     if epoch == [-1, -1]:
         epoch = look_for_latest_epoch(folder_name)
-        print("Found a saved model in epoch {} file {}, continuing from there.".format(epoch[0], epoch[1]))
+        print("Automatically initialized epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
     if zero_center:
         xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu[0])
     else:
         xs_mean = None
     if use_scratch_ssd:
         train_files, test_files = use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=multiple_inputs)
-    modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident)
 
     model = build_or_load_nn_model(epoch, folder_name, nn_arch, n_bins, class_type, swap_4d_channels, str_ident)
     loss_functions, metrics, loss_weight, optimizer = get_optimizer_info(loss_opt, optimizer='adam')
@@ -690,12 +703,16 @@ def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch, mode,
 
     if mode == 'train':
         lr = None
-        while 1:
+        trained_epochs = 0
+        while trained_epochs<epochs_to_train or epochs_to_train==-1:
             epoch, lr = train_and_test_model(model, train_files, test_files, batchsize, n_bins, class_type,
                                              xs_mean, epoch, shuffle, lr, swap_4d_channels, str_ident, n_gpu,
-                                             folder_name, train_logger_display, train_logger_flush, n_events)
+                                             folder_name, train_logger_display, train_logger_flush, train_verbose,
+                                             n_events)
+            trained_epochs+=1
 
     elif mode == 'eval':
+        modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident)
         arr_filename = folder_name + '/predictions/pred_model_epoch_{}_file_{}_on_{}.npy'.format(str(epoch[0]), str(epoch[1]), list_filename[:-5].split("/")[-1])
         predict_and_investigate_model_performance(model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
                                                   str_ident, modelname, xs_mean, arr_filename, folder_name)
@@ -706,12 +723,14 @@ def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch, mode,
 
 def make_folder_structure(folder_name):
     """
-    Make folders and subfolders if they don't exist already.
+    Make subfolders for a specific model if they don't exist already. These subfolders will contain e.g. saved models,
+    logfiles, etc.
 
     Parameters
     ----------
     folder_name : str
         Name of the main folder, e.g. "user/trained_models/example_model".
+
     """
     folders_to_create = [folder_name+"/log_train", folder_name+"/saved_models",
                          folder_name+"/plots/activations", folder_name+"/predictions"]
@@ -721,7 +740,7 @@ def make_folder_structure(folder_name):
             os.makedirs(directory)
 
 
-def orcatrain(trained_models_folder, config_file, list_file):
+def orca_train(trained_models_folder, config_file, list_file):
     """
     Frontend function for training networks.
 
@@ -738,17 +757,14 @@ def orcatrain(trained_models_folder, config_file, list_file):
 
     """
     keyword_arguments = read_out_config_file(config_file)
-    folder_name = trained_models_folder + config_file[:-5].split("/")[-1]
+    folder_name = trained_models_folder + str(os.path.splitext(os.path.basename(config_file))[0])
+    write_full_logfile_startup(folder_name, list_file, keyword_arguments)
     execute_nn(list_file, folder_name, **keyword_arguments)
 
 
-# XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
-# TODO: Move all of the below in an own file outside of OrcaNet
-
-
-def parse_input():
+def orca_parse_input():
     """
-    Parses and returns all necessary input options from a .toml and a .list file.
+    Run the orca_train function with a parser.
 
     Returns
     -------
@@ -756,24 +772,22 @@ def parse_input():
         Path and name of the .toml file that defines the properties of the model.
     list_file : str
         Path and name of the .list file containing the names of the files that will be used for training.
+    trained_models_folder : str
+        Path to the folder where everything gets saved to.
+        Every model (from a .toml file) will get its own folder in here, with the name being the
+        same as the one from the .toml file.
+
     """
     args = docopt(__doc__)
     config_file = args['CONFIG']
     list_file = args['LIST']
-    return config_file, list_file
+    trained_models_folder = args['FOLDER'] if args['FOLDER'] is not None else "./"
 
-
-def main():
-    """
-    Parse the input and execute the script.
-    """
-    config_file, list_file = parse_input()
-    trained_models_folder = "user/trained_models/"
-    orcatrain(trained_models_folder, config_file, list_file)
+    orca_train(trained_models_folder, config_file, list_file)
 
 
 if __name__ == '__main__':
-    main()
+    orca_parse_input()
 
 
 

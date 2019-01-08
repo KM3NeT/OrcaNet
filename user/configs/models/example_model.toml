@@ -42,3 +42,4 @@ zero_center = true
 #n_events = 32000
 train_logger_display=250
 train_logger_flush=-1
+train_verbose = 1

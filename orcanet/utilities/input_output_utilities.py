@@ -116,14 +116,39 @@ def read_out_list_file(list_file):
     return train_files, test_files, multiple_inputs
 
 
+def write_full_logfile_startup(folder_name, list_filename, keyword_arguments):
+    """
+    Whenever the orca_train function is run, this logs all the input parameters in the full log file.
+
+    """
+    logfile = folder_name + '/full_log.txt'
+    train_files, test_files, multiple_inputs = read_out_list_file(list_filename)
+    with open(logfile, 'a+') as f_out:
+        f_out.write('--------------------------------------------------------------------------------------------------------\n')
+        f_out.write('--------------------------------------------------------------------------------------------------------\n\n\n')
+        f_out.write("New execution of the orca_train function started with the following options:\n")
+        f_out.write("List file path:\t"+list_filename+"\n")
+        f_out.write("Given trainfiles in the .list file:\n")
+        for train_file in train_files:
+            f_out.write("   " + train_file+"\n")
+        f_out.write("\nGiven testfiles in the .list file:\n")
+        for test_file in test_files:
+            f_out.write("   " + test_file + "\n")
+        f_out.write("\nGiven options in the .toml config:\n")
+        for keyword_argument in keyword_arguments.keys():
+            f_out.write("   {}:\t{}\n".format(keyword_argument, keyword_arguments[keyword_argument]))
+        f_out.write("\n")
+
+
 def write_full_logfile(model, history_train, history_test, lr, lr_decay, epoch, train_file,
                             test_files, batchsize, n_bins, class_type, swap_4d_channels, str_ident, folder_name):
     """
     Function for saving various information during training and testing to a .txt file.
+
     """
     logfile=folder_name + '/full_log.txt'
     with open(logfile, 'a+') as f_out:
-        f_out.write('--------------------------------------------------------------------------------------------------------\n')
+        f_out.write('---------------Epoch {} File {}-------------------------------------------------------------------------\n'.format(epoch[0], epoch[1]))
         f_out.write('\n')
         f_out.write('Current time: ' + strftime("%Y-%m-%d %H:%M:%S", gmtime()) + '\n')
         f_out.write('Decayed learning rate to ' + str(lr) + ' before epoch ' + str(epoch[0]) +
@@ -136,11 +161,11 @@ def write_full_logfile(model, history_train, history_test, lr, lr_decay, epoch, 
         if history_test is not None:
             f_out.write('Test: ' + str(history_test) + ' (' + str(model.metrics_names) + ')' + '\n')
         f_out.write('\n')
-        f_out.write('Additional Info:\n')
-        f_out.write('Batchsize=' + str(batchsize) + ', n_bins=' + str(n_bins) +
-                    ', class_type=' + str(class_type) + '\n' +
-                    'swap_4d_channels=' + str(swap_4d_channels) + ', str_ident=' + str_ident + '\n')
-        f_out.write('\n')
+        #f_out.write('Additional Info:\n')
+        #f_out.write('Batchsize=' + str(batchsize) + ', n_bins=' + str(n_bins) +
+        #            ', class_type=' + str(class_type) + '\n' +
+        #            'swap_4d_channels=' + str(swap_4d_channels) + ', str_ident=' + str_ident + '\n')
+        #f_out.write('\n')
 
 
 def write_summary_logfile(train_files, batchsize, epoch, folder_name, model, history_train, history_test, lr):
@@ -165,6 +190,7 @@ def write_summary_logfile(train_files, batchsize, epoch, folder_name, model, his
         List of test losses for all the metrics, averaged over all test files.
     lr : float
         The current learning rate of the model.
+
     """
     # Save test log
     steps_per_total_epoch, steps_cum = 0, [0] # get this for the epoch_number_float in the logfile
@@ -247,6 +273,7 @@ def look_for_latest_epoch(folder_name):
     -------
     List
         The highest epoch, file_no pair. [0,1] if the folder is empty.
+
     """
     files = os.listdir(folder_name + "/saved_models")
     if len(files) == 0:

@@ -15,7 +15,7 @@ from utilities.nn_utilities import generate_batches_from_hdf5_file
 
 #------------- Functions used in evaluating the performance of model -------------#
 
-def get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, modelname, samples=None):
+def get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, samples=None):
     """
     Creates an arr_nn_pred array based on the test_data.
     :param ks.model.Model model: Fully trained Keras model of a neural network.
@@ -28,7 +28,6 @@ def get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchs
     :param None/str swap_4d_channels: For 4D data input (3.5D models). Specifies, if the channels for the 3.5D net should be swapped in the generator.
     :param str str_ident: string identifier that is parsed to the generator. Needed for some projection types.
     :param None/int samples: Number of events that should be predicted. If samples=None, the whole file will be used.
-    :param str modelname: name of the nn model.
     :return ndarray arr_nn_pred: array that contains important information for each event (mc_info + model predictions).
     """
     # get total number of samples
