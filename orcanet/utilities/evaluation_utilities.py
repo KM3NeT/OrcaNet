@@ -272,27 +272,43 @@ def add_prod_column_to_cut_arr_nn_pred(cut_arr_nn_pred, arr_nn_pred_e_col):
     return cut_arr_nn_pred # now with prod col
 
 
-def in_nd(a, b, absolute=True, assume_unique=False):
+def asvoid(arr):
+    """
+    Based on http://stackoverflow.com/a/16973510/190597 (Jaime, 2013-06)
+    View the array as dtype np.void (bytes). The items along the last axis are
+    viewed as one value. This allows comparisons to be performed on the entire row.
+    """
+    arr = np.ascontiguousarray(arr)
+    if np.issubdtype(arr.dtype, np.floating):
+        """ Care needs to be taken here since
+        np.array([-0.]).view(np.void) != np.array([0.]).view(np.void)
+        Adding 0. converts -0. to 0.
+        """
+        arr += 0.
+    return arr.view(np.dtype((np.void, arr.dtype.itemsize * arr.shape[-1])))
+
+def in_nd(a, b, assume_unique=False):
     """
     Function that generalizes the np in_1d function to nd.
     Checks if entries in axis_0 of a exist in b and returns the bool array for all rows.
     Kind of hacky by using str views on the np arrays.
     :param ndarray(ndim=2) a: array where it should be checked whether each row exists in b or not.
     :param ndarray(ndim=2) b: array upon which the rows of a are checked.
-    :param bool absolute: Specifies if absolute() should be called on the arrays before applying in_nd.
-                     Useful when e.g. in_nd shouldn't care about particle (+) or antiparticle (-).
     :param bool assume_unique: if True, the input arrays are both assumed to be unique, which can speed up the calculation.
     :return: ndarray(ndim=1): Boolean array that specifies for each row of a if it also exists in b or not.
+
     """
-    if a.dtype!=b.dtype: raise TypeError('The dtype of array a must be equal to the dtype of array b.')
-    a, b = np.asarray(a, order='C'), np.asarray(b, order='C')
-
-    if absolute is True: # we don't care about e.g. particles or antiparticles
-        a, b = np.absolute(a), np.absolute(b)
-
-    a = a.ravel().view((np.str, a.itemsize * a.shape[1]))
-    b = b.ravel().view((np.str, b.itemsize * b.shape[1]))
+    a = asvoid(a)
+    b = asvoid(b)
     return np.in1d(a, b, assume_unique)
+
+def test_ind():
+    a = np.array([[1,129385,1,-1,-0],[1,1,0,0,0],[0,0,0,0,0]])
+    b = np.array([[1,1,0,0,2],[6,6,6,6,6],[1,129385,1,-1,-0]])
+
+    c = in_nd(a,b)
+    it_works = np.all(c == [ True, False, False ])
+    return it_works
 
 
 def arr_nn_pred_select_pheid_events(arr_nn_pred, invert=False, precuts='3-100_GeV_prod'):
@@ -309,7 +325,7 @@ def arr_nn_pred_select_pheid_events(arr_nn_pred, invert=False, precuts='3-100_Ge
     cut_arr_nn_pred = arr_nn_pred[:, [0, 1, 2, 3]] # 0,1,2,3: run_id, event_id, particle_type, is_cc
     cut_arr_nn_pred = add_prod_column_to_cut_arr_nn_pred(cut_arr_nn_pred, arr_nn_pred[:, 4])
 
-    bool_evt_run_id_in_selection = in_nd(cut_arr_nn_pred, arr_sel_events, absolute=True)
+    bool_evt_run_id_in_selection = in_nd(cut_arr_nn_pred, arr_sel_events)
 
     if invert is True: bool_evt_run_id_in_selection = np.invert(bool_evt_run_id_in_selection)
 
@@ -1575,6 +1591,7 @@ def make_2d_bjorken_y_resolution_plot(arr_nn_pred, modelname, folder_name, by_bi
         reco_name = 'OrcaNet: ' if modelname != 'shallow_reco' else 'Standard Reco: '
         title = plt.title(reco_name + ic_list[ic]['title'])
         title.set_position([.5, 1.04])
+        # TODO \/ float division by zero
         cbar = fig.colorbar(by_res_ic, ax=ax)
         cbar.ax.set_ylabel('Number of events')
         ax.set_xlabel('True bjorken-y'), ax.set_ylabel('Reconstructed bjorken-y (GeV)')

@@ -6,8 +6,8 @@ Main code for training NN's. The main function for training, testing, logging an
 It can also be called via a parser by running this python module as follows:
 
 Usage:
-    run_cnn.py CONFIG LIST [FOLDER] [MODE]
-    run_cnn.py (-h | --help)
+    run_nn.py CONFIG LIST [FOLDER] [MODE]
+    run_nn.py (-h | --help)
 
 Arguments:
     CONFIG  A .toml file which sets up the model and training.
@@ -561,9 +561,16 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
     # for layer in model.layers: # temp
     #     if 'batch_norm' in layer.name:
     #         layer.stateful = False
-    arr_nn_pred = get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, samples=None)
-    np.save(arr_filename, arr_nn_pred)
-    arr_nn_pred = np.load(arr_filename)
+
+    if os.path.exists(arr_filename):
+        print("Loading saved prediction:\n   "+arr_filename)
+        arr_nn_pred = np.load(arr_filename)
+    else:
+        print("Generating new prediction.")
+        arr_nn_pred = get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, samples=None)
+        print("Done! Saving prediction as:\n   "+arr_filename)
+        np.save(arr_filename, arr_nn_pred)
+
 
     #arr_nn_pred = np.load('results/plots/saved_predictions/arr_nn_pred_' + modelname + '_final_stateful_false.npy')
     #arr_nn_pred = np.load('results/plots/saved_predictions//arr_nn_pred_model_VGG_4d_xyz-t_and_yzt-x_and_4d_xyzt_track-shower_multi_input_single_train_tight-1_tight-2_lr_0.003_tr_st_test_st_final_stateful_false_1-100GeV_precut.npy')
@@ -581,8 +588,8 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
 
     else:  # regression
         arr_nn_pred_shallow = np.load('/home/woody/capn/mppi033h/Data/various/arr_nn_pred.npy')
-        precuts = (True, 'regr_3-100_GeV_prod_and_1-3_GeV_prod')
-
+        #precuts = (True, 'regr_3-100_GeV_prod_and_1-3_GeV_prod')
+        precuts = (False, '3-100_GeV_prod')
         if 'energy' in class_type[1]:
             print('Generating plots for energy performance investigations')
 
