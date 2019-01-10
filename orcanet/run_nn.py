@@ -163,12 +163,29 @@ def get_new_learning_rate(epoch, lr_initial, n_train_files, n_gpu):
     return lr_temp, lr_decay
 
 
-def train_and_test_model(model, train_files, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
-                         shuffle, lr, swap_4d_channels, str_ident, n_gpu, folder_name, train_logger_display, train_logger_flush,
-                         train_verbose, n_events):
+def update_summary_plot(folder_name):
     """
-    Convenience function that trains (fit_generator), tests (evaluate_generator) and saves a Keras model.
-    For documentation of the parameters, confer to the fit_model and evaluate_model functions.
+    Refresh the summary plot of a model directory, found in ./plots/summary_plot.pdf. Test- and train-data
+    will be read out automatically, and the loss and every metric will be plotted in a seperate page in the pdf.
+
+    Parameters
+    ----------
+    folder_name : str
+        Name of the main folder with the summary.txt in it.
+
+    """
+    summary_logfile = folder_name + "/summary.txt"
+    summary_data, full_train_data = read_logfiles(summary_logfile)
+    pdf_name = folder_name + "/plots/summary_plot.pdf"
+    plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name)
+
+
+def train_and_evaluate_model(model, train_files, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
+                             shuffle, lr, swap_4d_channels, str_ident, n_gpu, folder_name, train_logger_display, train_logger_flush,
+                             train_verbose, n_events):
+    """
+    Convenience function that trains (fit_generator), evaluates (evaluate_generator) and saves a Keras model.
+    For documentation of the parameters, confer to the train_model and evaluate_model functions.
     """
     lr_initial, manual_mode = 0.005, (False, 0.0003, 0.07, lr)
     test_after_n_train_files = 2
@@ -183,9 +200,9 @@ def train_and_test_model(model, train_files, test_files, batchsize, n_bins, clas
         if train_iter_step > 1:
             epoch, lr, lr_decay = schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=lr_initial, manual_mode=manual_mode)
 
-        history_train = fit_model(model, train_files, f, f_size, file_no, batchsize, n_bins, class_type, xs_mean, epoch,
-                                  shuffle, swap_4d_channels, str_ident, folder_name, train_logger_display,
-                                  train_logger_flush, train_verbose, n_events)
+        history_train = train_model(model, train_files, f, f_size, file_no, batchsize, n_bins, class_type, xs_mean, epoch,
+                                    shuffle, swap_4d_channels, str_ident, folder_name, train_logger_display,
+                                    train_logger_flush, train_verbose, n_events)
         model.save(folder_name + '/saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5')
 
         # test after the first and else after every n-th file
@@ -205,26 +222,9 @@ def train_and_test_model(model, train_files, test_files, batchsize, n_bins, clas
     return epoch, lr
 
 
-def update_summary_plot(folder_name):
-    """
-    Refresh the summary plot of a model directory, found in ./plots/summary_plot.pdf. Test- and train-data
-    will be read out automatically, and the loss and every metric will be plotted in a seperate page in the pdf.
-
-    Parameters
-    ----------
-    folder_name : str
-        Name of the main folder with the summary.txt in it.
-
-    """
-    summary_logfile = folder_name + "/summary.txt"
-    summary_data, full_train_data = read_logfiles(summary_logfile)
-    pdf_name = folder_name + "/plots/summary_plot.pdf"
-    plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name)
-
-
-def fit_model(model, train_files, f, f_size, file_no, batchsize, n_bins, class_type, xs_mean, epoch,
-              shuffle, swap_4d_channels, str_ident, folder_name, train_logger_display, train_logger_flush, train_verbose,
-              n_events=None):
+def train_model(model, train_files, f, f_size, file_no, batchsize, n_bins, class_type, xs_mean, epoch,
+                shuffle, swap_4d_channels, str_ident, folder_name, train_logger_display, train_logger_flush, train_verbose,
+                n_events=None):
     """
     Trains a model based on the Keras fit_generator method.
 
@@ -419,10 +419,10 @@ def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch,
     lr = None
     trained_epochs = 0
     while trained_epochs<epochs_to_train or epochs_to_train==-1:
-        epoch, lr = train_and_test_model(model, train_files, test_files, batchsize, n_bins, class_type,
-                                         xs_mean, epoch, shuffle, lr, swap_4d_channels, str_ident, n_gpu,
-                                         folder_name, train_logger_display, train_logger_flush, train_verbose,
-                                         n_events)
+        epoch, lr = train_and_evaluate_model(model, train_files, test_files, batchsize, n_bins, class_type,
+                                             xs_mean, epoch, shuffle, lr, swap_4d_channels, str_ident, n_gpu,
+                                             folder_name, train_logger_display, train_logger_flush, train_verbose,
+                                             n_events)
         trained_epochs+=1
 
 
