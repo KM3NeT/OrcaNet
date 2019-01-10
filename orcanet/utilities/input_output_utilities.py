@@ -77,8 +77,8 @@ def list_restructure(number_of_files, keyword, file_content_input):
         file_set = []
         for input_data in file_content_input:
             file_set.append(input_data[keyword][file_no])
-        # train_files.append([file_set, h5_get_number_of_rows(file_set[0])]])
-        files.append([file_set, 42])
+        files.append([file_set, h5_get_number_of_rows(file_set[0])])
+        #TODO Maybe files have different number of events? Should give an error
     return files
 
 
