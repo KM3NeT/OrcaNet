@@ -1591,7 +1591,6 @@ def make_2d_bjorken_y_resolution_plot(arr_nn_pred, modelname, folder_name, by_bi
         reco_name = 'OrcaNet: ' if modelname != 'shallow_reco' else 'Standard Reco: '
         title = plt.title(reco_name + ic_list[ic]['title'])
         title.set_position([.5, 1.04])
-        # TODO \/ float division by zero
         cbar = fig.colorbar(by_res_ic, ax=ax)
         cbar.ax.set_ylabel('Number of events')
         ax.set_xlabel('True bjorken-y'), ax.set_ylabel('Reconstructed bjorken-y (GeV)')
