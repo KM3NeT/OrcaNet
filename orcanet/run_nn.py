@@ -34,7 +34,7 @@ from utilities.data_tools.shuffle_h5 import shuffle_h5
 from utilities.visualization.visualization_tools import *
 from utilities.evaluation_utilities import *
 from utilities.losses import *
-from model_setup import build_or_load_nn_model
+from model_setup import build_nn_model
 
 # for debugging
 # from tensorflow.python import debug as tf_debug
@@ -395,12 +395,20 @@ def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch,
 
     """
     train_files, test_files, multiple_inputs = read_out_list_file(list_filename)
-    n_bins = h5_get_n_bins(train_files)
     if epoch[0] == -1 and epoch[1] == -1:
         epoch = look_for_latest_epoch(folder_name)
         print("Automatically set epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
-    model = build_or_load_nn_model(epoch, folder_name, nn_arch, n_bins, class_type, swap_4d_channels, str_ident,
-                                   loss_opt, n_gpu, batchsize)
+    n_bins = h5_get_n_bins(train_files)
+
+    if epoch[0] == 0 and epoch[1] == 1:
+        # Create and compile a new model
+        model = build_nn_model(nn_arch, n_bins, class_type, swap_4d_channels, str_ident, loss_opt, n_gpu, batchsize)
+    else:
+        # Load an existing model
+        path_of_model = folder_name + '/saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5'
+        model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
+    model.summary()
+
     if zero_center:
         xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu[0])
     else:
