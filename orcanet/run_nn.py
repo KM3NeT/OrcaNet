@@ -12,7 +12,7 @@ Usage:
 Arguments:
     CONFIG  A .toml file which sets up the model and training.
             An example can be found in config/models/example_model.toml
-    LIST    A .list file which contains the files to be trained on.
+    LIST    A .toml file which contains the pathes of the training and evaluation files.
             An example can be found in config/lists/example_list.toml
     FOLDER  A new subfolder will be generated in this folder, where everything from this model gets saved to.
             Default is the current working directory.
@@ -30,7 +30,6 @@ mpl.use('Agg')
 
 from utilities.input_output_utilities import use_node_local_ssd_for_input, read_out_list_file, read_out_config_file, write_summary_logfile, write_full_logfile, read_logfiles, look_for_latest_epoch, h5_get_n_bins, write_full_logfile_startup
 from utilities.nn_utilities import load_zero_center_data, BatchLevelPerformanceLogger
-from utilities.multi_gpu.multi_gpu import get_available_gpus, make_parallel, print_mgpu_modelsummary
 from utilities.data_tools.shuffle_h5 import shuffle_h5
 from utilities.visualization.visualization_tools import *
 from utilities.evaluation_utilities import *
@@ -40,113 +39,6 @@ from model_setup import build_or_load_nn_model
 # for debugging
 # from tensorflow.python import debug as tf_debug
 # K.set_session(tf_debug.LocalCLIDebugWrapperSession(tf.Session()))
-
-
-def get_optimizer_info(loss_opt, optimizer='adam'):
-    """
-    Returns optimizer information for the training procedure.
-
-    Parameters
-    ----------
-    loss_opt : tuple
-        A Tuple with len=2.
-        loss_opt[0]: dict with dicts of loss functions and optionally weights that should be used for each nn output.
-            Typically read in from a .toml file.
-            Format: { loss : { function, weight } }
-        loss_opt[1]: dict with metrics that should be used for each nn output.
-    optimizer : str
-        Specifies, if "Adam" or "SGD" should be used as optimizer.
-
-    Returns
-    -------
-    loss_functions : dict
-        Cf. loss_opt[0].
-    metrics : dict
-        Cf. loss_opt[1].
-    loss_weight : dict
-        Cf. loss_opt[2].
-    optimizer : ks.optimizers
-        Keras optimizer instance, currently either "Adam" or "SGD".
-
-    """
-    if optimizer == 'adam':
-        optimizer = ks.optimizers.Adam(beta_1=0.9, beta_2=0.999, epsilon=0.1, decay=0.0) # epsilon=1 for deep networks
-    elif optimizer == "sgd":
-        optimizer = ks.optimizers.SGD(momentum=0.9, decay=0, nesterov=True)
-    else:
-        raise NameError("Unknown optimizer name ({})".format(optimizer))
-    custom_objects = get_all_loss_functions()
-    loss_functions, loss_weight = {},{}
-    for loss_key in loss_opt[0].keys():
-        # Replace function string with the actual function if it is custom
-        if loss_opt[0][loss_key]["function"] in custom_objects:
-            loss_function=custom_objects[loss_opt[0][loss_key]["function"]]
-        else:
-            loss_function=loss_opt[0][loss_key]["function"]
-        # Use given weight, else use default weight of 1
-        if "weight" in loss_opt[0][loss_key]:
-            weight = loss_opt[0][loss_key]["weight"]
-        else:
-            weight = 1.0
-        loss_functions[loss_key] = loss_function
-        loss_weight[loss_key] = weight
-    metrics = loss_opt[1] if not loss_opt[1] is None else []
-
-    return loss_functions, metrics, loss_weight, optimizer
-
-
-def parallelize_model_to_n_gpus(model, n_gpu, batchsize, loss_functions, optimizer, metrics, loss_weight):
-    """
-    Parallelizes the nn-model to multiple gpu's.
-
-    Currently, up to 4 GPU's at Tiny-GPU are supported.
-
-    Parameters
-    ----------
-    model : ks.model.Model
-        Keras model of a neural network.
-    n_gpu : tuple(int, str)
-        Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov') [1].
-    batchsize : int
-        Batchsize that is used for the training / inferencing of the cnn.
-    loss_functions : dict/str
-        Dict/str with loss functions that should be used for each nn output. # TODO fix, make single loss func also use dict
-    optimizer : ks.optimizers
-        Keras optimizer instance, currently either "Adam" or "SGD".
-    metrics : dict/str/None
-        Dict/str with metrics that should be used for each nn output.
-    loss_weight : dict/None
-        Dict with loss weights that should be used for each sub-loss.
-
-    Returns
-    -------
-    model : ks.models.Model
-        The parallelized Keras nn instance (multi_gpu_model).
-    batchsize : int
-        The new batchsize scaled by the number of used gpu's.
-
-    """
-    if n_gpu[1] == 'avolkov':
-        if n_gpu[0] == 1:
-            return model, batchsize
-        else:
-            assert n_gpu[0] > 1 and isinstance(n_gpu[0], int), 'You probably made a typo: n_gpu must be an int with n_gpu >= 1!'
-
-            gpus_list = get_available_gpus(n_gpu[0])
-            ngpus = len(gpus_list)
-            print('Using GPUs: {}'.format(', '.join(gpus_list)))
-            batchsize = batchsize * ngpus
-
-            # Data-Parallelize the model via function
-            model = make_parallel(model, gpus_list, usenccl=False, initsync=True, syncopt=False, enqueue=False)
-            print_mgpu_modelsummary(model)
-
-            model.compile(loss=loss_functions, optimizer=optimizer, metrics=metrics, loss_weights=loss_weight)  # TODO check if necessary
-
-            return model, batchsize
-
-    else:
-        raise ValueError('Currently, no multi_gpu mode other than "avolkov" is available.')
 
 
 def schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=0.003, manual_mode=(False, None, 0.0, None)):
@@ -457,7 +349,7 @@ def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch,
     Parameters
     ----------
     list_filename : str
-        Path to a list file which contains pathes to all the h5 files that should be used for training.
+        Path to a list file which contains pathes to all the h5 files that should be used for training and evaluation.
     folder_name : str
         Name of the folder of this model in which everything will be saved. E.g., the summary.txt log file is located in here.
     loss_opt : tuple(dict, dict/str/None,)
@@ -507,20 +399,14 @@ def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch,
     if epoch[0] == -1 and epoch[1] == -1:
         epoch = look_for_latest_epoch(folder_name)
         print("Automatically set epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
+    model = build_or_load_nn_model(epoch, folder_name, nn_arch, n_bins, class_type, swap_4d_channels, str_ident,
+                                   loss_opt, n_gpu, batchsize)
     if zero_center:
         xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu[0])
     else:
         xs_mean = None
     if use_scratch_ssd:
         train_files, test_files = use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=multiple_inputs)
-
-    model = build_or_load_nn_model(epoch, folder_name, nn_arch, n_bins, class_type, swap_4d_channels, str_ident)
-    loss_functions, metrics, loss_weight, optimizer = get_optimizer_info(loss_opt, optimizer='adam')
-    model, batchsize = parallelize_model_to_n_gpus(model, n_gpu, batchsize, loss_functions, optimizer, metrics, loss_weight)
-    model.summary()
-    #model.compile(loss=loss_functions, optimizer=model.optimizer, metrics=model.metrics, loss_weights=loss_weight)
-    if epoch[0] == 0:
-        model.compile(loss=loss_functions, optimizer=optimizer, metrics=metrics, loss_weights=loss_weight)
 
     lr = None
     trained_epochs = 0
@@ -564,7 +450,7 @@ def orca_train(trained_models_folder, config_file, list_file):
     config_file : str
         Path to a .toml file which contains all the infos for training and testing of a model.
     list_file : str
-        Path to a list file which contains pathes to all the h5 files that should be used for training.
+        Path to a list file which contains pathes to all the h5 files that should be used for training and evaluation.
 
     """
     keyword_arguments = read_out_config_file(config_file)

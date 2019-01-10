@@ -17,7 +17,7 @@ from utilities.losses import get_all_loss_functions
 
 def make_test_train_plot(test_train_data_list, title=""):
     """
-    Plot one or more test/train lines in a single plot.
+    Plot one or more eval/train lines in a single plot.
 
     Parameters
     ----------
@@ -43,9 +43,9 @@ def make_test_train_plot(test_train_data_list, title=""):
     for test_train_data in test_train_data_list:
         test_data, train_data, label, color = test_train_data
         if color is None:
-            test_plot = plt.plot(test_data[0], test_data[1], marker='o', zorder=3, label='test ' + label)
+            test_plot = plt.plot(test_data[0], test_data[1], marker='o', zorder=3, label='eval ' + label)
         else:
-            test_plot = plt.plot(test_data[0], test_data[1], color=color, marker='o', zorder=3, label='test ' + label)
+            test_plot = plt.plot(test_data[0], test_data[1], color=color, marker='o', zorder=3, label='eval ' + label)
         plt.plot(train_data[0], train_data[1], color=test_plot[0].get_color(), ls='--', zorder=3,
                  label='train ' + label, lw=0.6, alpha=0.5)
         all_x_coordinates_test.extend(test_data[0])
