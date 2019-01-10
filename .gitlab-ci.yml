@@ -9,7 +9,7 @@ before_script:
 
 
 install-os:
-    image: docker.km3net.de/base/python:3
+    image: docker.km3net.de/base/python:3.6
     stage: install
     script:
         - pip install .
