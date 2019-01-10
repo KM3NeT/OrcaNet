@@ -13,7 +13,7 @@ Arguments:
     CONFIG  A .toml file which sets up the model and training.
             An example can be found in config/models/example_model.toml
     LIST    A .list file which contains the files to be trained on.
-            An example can be found in config/lists/example_list.list
+            An example can be found in config/lists/example_list.toml
     FOLDER  A new subfolder will be generated in this folder, where everything from this model gets saved to.
             Default is the current working directory.
 

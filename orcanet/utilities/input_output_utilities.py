@@ -38,11 +38,54 @@ def read_out_config_file(config_file):
     return keyword_arguments
 
 
+def list_get_number_of_files(file_content, keyword):
+    """
+    Get the number of training or evaluation files from the content of a toml list.
+
+    Parameters
+    ----------
+    file_content : dict
+        From a list file by toml.load().
+    keyword : str
+        Keyword in the file content dictionary to look up, e.g. "train_files" or "evaluation_files".
+
+    Returns
+    -------
+    number_of_files : int
+        The number of files.
+
+    Raises
+    -------
+    ValueError
+        If different inputs have a different number of files.
+
+    """
+    number_of_files = 0
+    for dataset_no in range(len(file_content["input"])):
+        current_number_of_files = len(file_content["input"][dataset_no][keyword])
+        if dataset_no == 0:
+            number_of_files = current_number_of_files
+        elif current_number_of_files != number_of_files:
+            raise ValueError("Error: The specified inputs do not all have the same number of files ("+keyword+")")
+    return number_of_files
+
+
+def list_restructure(number_of_files, keyword, file_content_input):
+    """ Arrange the given files to the desired format. """
+    files = []
+    for file_no in range(number_of_files):
+        file_set = []
+        for input_data in file_content_input:
+            file_set.append(input_data[keyword][file_no])
+        # train_files.append([file_set, h5_get_number_of_rows(file_set[0])]])
+        files.append([file_set, 42])
+    return files
+
+
 def read_out_list_file(list_file):
     """
-    Reads out input files for network training. The format of the list file should be as follows:
-        Single empty line seperates train from test files, double empty line seperates different training and test sets which
-        are given simultaneosly to a network.
+    Reads out a list file in .toml format containing the pathes to training
+    and evaluation files and bring it into the proper format.
 
     Parameters
     ----------
@@ -53,67 +96,27 @@ def read_out_list_file(list_file):
     -------
     train_files : list
         A list containing the paths to the different training files given in the list_file.
-        Example format:
+        Example for the output format:
                 [
                  [['path/to/train_file_1_dimx.h5', 'path/to/train_file_1_dimy.h5'], number_of_events_train_files_1],
-                 [['path/to/train_file_2_dimx.h5', 'path/to/train_file_2_dimy.h5'], number_of_events_train_files_1]
+                 [['path/to/train_file_2_dimx.h5', 'path/to/train_file_2_dimy.h5'], number_of_events_train_files_2],
+                 ...
                 ]
     test_files : list
         Like the above but for test files.
     multiple_inputs : bool
         Whether seperate sets of input files were given (e.g. for networks taking data
         simulataneosly from different files).
-    """
-    lines=[]
-    with open(list_file) as f:
-        for line in f:
-            line = line.rstrip('\n')
-            if line[:1]=="#":
-                continue
-            else:
-                lines.append(line)
-    multiple_inputs=False
-    train_files_list, test_files_list = [], []
-    train_files_in_dimension, test_files_in_dimension = [], []
-    empty_lines_read = 0
-    for line in lines:
-        if line=="":
-            empty_lines_read += 1
-            continue
 
-        if empty_lines_read==0:
-            train_files_in_dimension.append(line)
-        elif empty_lines_read==1:
-            test_files_in_dimension.append(line)
-        elif empty_lines_read==3:
-            # Block for one dimension is finished
-            train_files_list.append(train_files_in_dimension)
-            test_files_list.append(test_files_in_dimension)
-            train_files_in_dimension, test_files_in_dimension = [], []
-            empty_lines_read = 0
-            train_files_in_dimension.append(line)
-            multiple_inputs=True
-        elif empty_lines_read==2:
-            raise ValueError("Check formating of the list file! (empty_lines_read counter is at {} during readoout of file {})".format(empty_lines_read, list_file))
-    train_files_list.append(train_files_in_dimension)
-    test_files_list.append(test_files_in_dimension)
     """
-    Format of train_files_list at this point:
-    [
-     ['path/to/train_file_1_dimx.h5', 'path/to/train_file_2_dimx.h5'],
-     ['path/to/train_file_1_dimy.h5', 'path/to/train_file_2_dimy.h5']
-    ]
-    Reformat to match the desired output format. Only look up dimension of first file (others should be the same).
-    """
-    train_files, test_files = [], []
-    for set_number in range(len(train_files_list[0])):
-        file_set = [dimension[set_number] for dimension in train_files_list]
-        train_files.append([file_set, h5_get_number_of_rows(file_set[0])])
-    for set_number in range(len(test_files_list[0])):
-        file_set = [dimension[set_number] for dimension in test_files_list]
-        test_files.append([file_set, h5_get_number_of_rows(file_set[0])])
+    file_content = toml.load(list_file)
+    number_of_train_files = list_get_number_of_files(file_content, "train_files")
+    number_of_eval_files = list_get_number_of_files(file_content, "evaluation_files")
+    train_files = list_restructure(number_of_train_files, "train_files", file_content["input"])
+    evaluation_files = list_restructure(number_of_eval_files, "evaluation_files", file_content["input"])
+    multiple_inputs = len(file_content["input"]) > 1
 
-    return train_files, test_files, multiple_inputs
+    return train_files, evaluation_files, multiple_inputs
 
 
 def write_full_logfile_startup(folder_name, list_filename, keyword_arguments):
@@ -258,8 +261,6 @@ def read_logfiles(summary_logfile):
         full_train_data = np.append(full_train_data, file_data)
     return summary_data, full_train_data
 
-#summary_logfile="user/trained_models/example_model/summary.txt"
-#a = read_logfiles(summary_logfile)
 
 def look_for_latest_epoch(folder_name):
     """

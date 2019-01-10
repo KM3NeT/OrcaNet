@@ -1,0 +1,58 @@
+# Define the files for network training and evaluation in the toml format.
+#
+# Give an array of train files and evaluation files.
+# If the network has multiple inputs, mark each seperate dataset with [[input]].
+#
+# Example format:
+# -----------------------------
+# [[input]]
+# train_files = [
+# "path/to/train_file_1_dimx.h5",
+# "path/to/train_file_2_dimx.h5",
+# ]
+#
+# evaluation_files = [
+# "path/to/test_file_1_dimx.h5",
+# ]
+#
+# [[input]]
+# train_files = [
+# "path/to/train_file_1_dimy.h5",
+# "path/to/train_file_2_dimy.h5",
+# ]
+#
+# evaluation_files = [
+# "path/to/test_file_1_dimy.h5",
+# ]
+# -----------------------------
+
+[[input]]
+train_files = [
+"/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/ip_images_1-100GeV/4dTo4d/time_-250+500_w_gf_60b/concatenated/muon-cc_and_elec-cc-nc/elec-CC_and_elec-NC_and_muon-CC_xyzt_train_file_0_shuffled_0.h5",
+"/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/ip_images_1-100GeV/4dTo4d/time_-250+500_w_gf_60b/concatenated/muon-cc_and_elec-cc-nc/elec-CC_and_elec-NC_and_muon-CC_xyzt_train_file_1_shuffled_0.h5",
+"/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/ip_images_1-100GeV/4dTo4d/time_-250+500_w_gf_60b/concatenated/muon-cc_and_elec-cc-nc/elec-CC_and_elec-NC_and_muon-CC_xyzt_train_file_2_shuffled_0.h5",
+"/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/ip_images_1-100GeV/4dTo4d/time_-250+500_w_gf_60b/concatenated/muon-cc_and_elec-cc-nc/elec-CC_and_elec-NC_and_muon-CC_xyzt_train_file_3_shuffled_0.h5",
+"/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/ip_images_1-100GeV/4dTo4d/time_-250+500_w_gf_60b/concatenated/muon-cc_and_elec-cc-nc/elec-CC_and_elec-NC_and_muon-CC_xyzt_train_file_4_shuffled_0.h5",
+]
+
+evaluation_files = [
+"/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/ip_images_1-100GeV/4dTo4d/time_-250+500_w_gf_60b/concatenated/muon-cc_and_elec-cc-nc/elec-CC_and_elec-NC_and_muon-CC_xyzt_test_file_0_shuffled_0.h5",
+"/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/ip_images_1-100GeV/4dTo4d/time_-250+500_w_gf_60b/concatenated/muon-cc_and_elec-cc-nc/elec-CC_and_elec-NC_and_muon-CC_xyzt_test_file_1_shuffled_0.h5",
+]
+
+
+[[input]]
+train_files = [
+"/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/ip_images_1-100GeV/4dTo4d/xyzc_time_-250+500_w_gf_31b/concatenated/muon-cc_and_elec-cc-nc/elec-CC_and_elec-NC_and_muon-CC_xyzc_train_file_0_shuffled_0.h5",
+"/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/ip_images_1-100GeV/4dTo4d/xyzc_time_-250+500_w_gf_31b/concatenated/muon-cc_and_elec-cc-nc/elec-CC_and_elec-NC_and_muon-CC_xyzc_train_file_1_shuffled_0.h5",
+"/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/ip_images_1-100GeV/4dTo4d/xyzc_time_-250+500_w_gf_31b/concatenated/muon-cc_and_elec-cc-nc/elec-CC_and_elec-NC_and_muon-CC_xyzc_train_file_2_shuffled_0.h5",
+"/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/ip_images_1-100GeV/4dTo4d/xyzc_time_-250+500_w_gf_31b/concatenated/muon-cc_and_elec-cc-nc/elec-CC_and_elec-NC_and_muon-CC_xyzc_train_file_3_shuffled_0.h5",
+"/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/ip_images_1-100GeV/4dTo4d/xyzc_time_-250+500_w_gf_31b/concatenated/muon-cc_and_elec-cc-nc/elec-CC_and_elec-NC_and_muon-CC_xyzc_train_file_4_shuffled_0.h5",
+]
+
+evaluation_files = [
+"/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/ip_images_1-100GeV/4dTo4d/xyzc_time_-250+500_w_gf_31b/concatenated/muon-cc_and_elec-cc-nc/elec-CC_and_elec-NC_and_muon-CC_xyzc_test_file_0_shuffled_0.h5",
+"/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/ip_images_1-100GeV/4dTo4d/xyzc_time_-250+500_w_gf_31b/concatenated/muon-cc_and_elec-cc-nc/elec-CC_and_elec-NC_and_muon-CC_xyzc_test_file_1_shuffled_0.h5",
+]
+
+

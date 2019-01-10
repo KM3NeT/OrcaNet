@@ -13,7 +13,7 @@ Arguments:
     CONFIG  A .toml file which sets up the model and training.
             An example can be found in config/models/example_model.toml
     LIST    A .list file which contains the files to be trained on.
-            An example can be found in config/lists/example_list.list
+            An example can be found in config/lists/example_list.toml
     FOLDER  A new subfolder will be generated in this folder, where everything from this model gets saved to.
             Default is the current working directory.
 
@@ -504,9 +504,9 @@ def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch,
     """
     train_files, test_files, multiple_inputs = read_out_list_file(list_filename)
     n_bins = h5_get_n_bins(train_files)
-    if epoch == [-1, -1]:
+    if epoch[0] == -1 and epoch[1] == -1:
         epoch = look_for_latest_epoch(folder_name)
-        print("Automatically initialized epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
+        print("Automatically set epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
     if zero_center:
         xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu[0])
     else:
@@ -516,10 +516,8 @@ def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch,
 
     model = build_or_load_nn_model(epoch, folder_name, nn_arch, n_bins, class_type, swap_4d_channels, str_ident)
     loss_functions, metrics, loss_weight, optimizer = get_optimizer_info(loss_opt, optimizer='adam')
-
     model, batchsize = parallelize_model_to_n_gpus(model, n_gpu, batchsize, loss_functions, optimizer, metrics, loss_weight)
     model.summary()
-
     #model.compile(loss=loss_functions, optimizer=model.optimizer, metrics=model.metrics, loss_weights=loss_weight)
     if epoch[0] == 0:
         model.compile(loss=loss_functions, optimizer=optimizer, metrics=metrics, loss_weights=loss_weight)

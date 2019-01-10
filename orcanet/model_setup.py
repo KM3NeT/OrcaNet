@@ -40,11 +40,15 @@ def build_nn_model(nn_arch, n_bins, class_type, swap_4d_channels, str_ident):
 
     elif nn_arch == 'VGG':
         if 'multi_input_single_train' in str_ident:
-            model = create_vgg_like_model_multi_input_from_single_nns(n_bins, str_ident, nb_classes=class_type[0], dropout=(0,0.1), swap_4d_channels=swap_4d_channels)
+            dropout=(0,0.1)
+            model = create_vgg_like_model_multi_input_from_single_nns(n_bins, str_ident, nb_classes=class_type[0],
+                                                                      dropout=dropout, swap_4d_channels=swap_4d_channels)
 
         else:
-            model = create_vgg_like_model(n_bins, class_type, dropout=0.0,
-                                          n_filters=(64, 64, 64, 64, 64, 64, 128, 128, 128, 128), swap_4d_channels=swap_4d_channels) # 2 more layers
+            dropout=0.0
+            n_filters=(64, 64, 64, 64, 64, 64, 128, 128, 128, 128)
+            model = create_vgg_like_model(n_bins, class_type, dropout=dropout,
+                                          n_filters=n_filters, swap_4d_channels=swap_4d_channels) # 2 more layers
 
     else: raise ValueError('Currently, only "WRN" or "VGG" are available as nn_arch')
 
