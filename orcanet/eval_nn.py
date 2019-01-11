@@ -29,7 +29,7 @@ mpl.use('Agg')
 from utilities.input_output_utilities import use_node_local_ssd_for_input, read_out_list_file, read_out_config_file, look_for_latest_epoch, h5_get_n_bins
 from utilities.nn_utilities import load_zero_center_data, get_modelname
 from utilities.evaluation_utilities import *
-from model_setup import build_or_load_nn_model
+from utilities.losses import get_all_loss_functions
 
 
 def predict_and_investigate_model_performance(model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
@@ -160,7 +160,8 @@ def eval_nn(list_filename, folder_name, loss_opt, class_type, nn_arch,
     if use_scratch_ssd:
         train_files, test_files = use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=multiple_inputs)
 
-    model = build_or_load_nn_model(epoch, folder_name, nn_arch, n_bins, class_type, swap_4d_channels, str_ident)
+    path_of_model = folder_name + '/saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5'
+    model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
     modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident)
     arr_filename = folder_name + '/predictions/pred_model_epoch_{}_file_{}_on_{}.npy'.format(str(epoch[0]), str(epoch[1]), list_filename[:-5].split("/")[-1])
 
