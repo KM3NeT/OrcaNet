@@ -385,10 +385,62 @@ def use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=False)
 
 
 
-class Config(object):
-    def __init__(self, config_file, list_file):
+class Settings(object):
+    """
+    XXXX
+
+    Attributes
+    ----------
+    list_filename : str
+        Path to a list file which contains pathes to all the h5 files that should be used for training and evaluation.
+    folder_name : str
+        Name of the folder of this model in which everything will be saved. E.g., the summary.txt log file is located in here.
+    loss_opt : tuple(dict, dict/str/None,)
+        Tuple that contains 1) the loss_functions and loss_weights as dicts (this is the losses table from the toml file)
+        and 2) the metrics.
+    class_type : tuple(int, str)
+        Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
+        I.e. (2, 'track-shower')
+    nn_arch : str
+        Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
+    batchsize : int
+        Batchsize that should be used for the training / inferencing of the cnn.
+    epoch : List[int, int]
+        Declares if a previously trained model or a new model (=0) should be loaded.
+        The first argument specifies the last epoch, and the second argument is the last train file number if the train
+        dataset is split over multiple files. Can also give [-1,-1] to automatically load the most recent epoch.
+    epochs_to_train : int
+        How many new epochs should be trained by running this function. -1 for infinite.
+    swap_4d_channels : None/str
+        For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
+        Currently available: None -> XYZ-T ; 'yzt-x' -> YZT-X, TODO add multi input options
+    n_gpu : tuple(int, str)
+        Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov') [1].
+    use_scratch_ssd : bool
+        Declares if the input files should be copied to the node-local SSD scratch space (only working at Erlangen CC).
+    zero_center : bool
+        Declares if the input images ('xs') should be zero-centered before training.
+    shuffle : tuple(bool, None/int)
+        Declares if the training data should be shuffled before the next training epoch [0].
+        If the train dataset is too large to be shuffled in place, one can preshuffle them n times before running
+        OrcaNet, the number n should then be put into [1].
+    str_ident : str
+        Optional string identifier that gets appended to the modelname. Useful when training models which would have
+        the same modelname. Also used for defining models and projections!
+    train_logger_display : int
+        How many batches should be averaged for one line in the training log files.
+    train_logger_flush : int
+        After how many lines the training log file should be flushed. -1 for flush at the end of the epoch only.
+    train_verbose : int
+        verbose option of keras.model.fit_generator.
+    n_events : None/int
+        For testing purposes. If not the whole .h5 file should be used for training, define the number of events.
+
+    """
+    def __init__(self, config_file, list_file, folder_name):
         self.config_file = config_file
         self.list_file = list_file
+        self.folder_name = folder_name
 
         user_values = read_out_config_file(self.config_file)
         default_values = self.get_default_values()

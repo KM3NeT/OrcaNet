@@ -28,7 +28,7 @@ import matplotlib as mpl
 from docopt import docopt
 mpl.use('Agg')
 
-from utilities.input_output_utilities import use_node_local_ssd_for_input, read_out_list_file, read_out_config_file, write_summary_logfile, write_full_logfile, read_logfiles, look_for_latest_epoch, h5_get_n_bins, write_full_logfile_startup
+from utilities.input_output_utilities import use_node_local_ssd_for_input, read_out_list_file, read_out_config_file, write_summary_logfile, write_full_logfile, read_logfiles, look_for_latest_epoch, h5_get_n_bins, write_full_logfile_startup, Settings
 from utilities.nn_utilities import load_zero_center_data, BatchLevelPerformanceLogger
 from utilities.data_tools.shuffle_h5 import shuffle_h5
 from utilities.visualization.visualization_tools import *
@@ -339,64 +339,22 @@ def evaluate_model(model, test_files, batchsize, n_bins, class_type, xs_mean, sw
     return history_test
 
 
-def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch, initial_model = None,
-               swap_4d_channels=None, batchsize=64, epoch=[-1,-1], epochs_to_train=-1, n_gpu=(1, 'avolkov'), use_scratch_ssd=False,
-               zero_center=False, shuffle=(False,None), str_ident='', train_logger_display=100, train_logger_flush=-1,
-               train_verbose=2, n_events=None):
+def execute_nn(cfg, initial_model):
     """
     Core code that trains a neural network.
 
     Parameters
     ----------
-    list_filename : str
-        Path to a list file which contains pathes to all the h5 files that should be used for training and evaluation.
-    folder_name : str
-        Name of the folder of this model in which everything will be saved. E.g., the summary.txt log file is located in here.
-    loss_opt : tuple(dict, dict/str/None,)
-        Tuple that contains 1) the loss_functions and loss_weights as dicts (this is the losses table from the toml file)
-        and 2) the metrics.
-    class_type : tuple(int, str)
-        Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
-        I.e. (2, 'track-shower')
-    nn_arch : str
-        Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
-    batchsize : int
-        Batchsize that should be used for the training / inferencing of the cnn.
-    epoch : List[int, int]
-        Declares if a previously trained model or a new model (=0) should be loaded.
-        The first argument specifies the last epoch, and the second argument is the last train file number if the train
-        dataset is split over multiple files. Can also give [-1,-1] to automatically load the most recent epoch.
-    epochs_to_train : int
-        How many new epochs should be trained by running this function. -1 for infinite.
-    swap_4d_channels : None/str
-        For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
-        Currently available: None -> XYZ-T ; 'yzt-x' -> YZT-X, TODO add multi input options
-    n_gpu : tuple(int, str)
-        Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov') [1].
-    use_scratch_ssd : bool
-        Declares if the input files should be copied to the node-local SSD scratch space (only working at Erlangen CC).
-    zero_center : bool
-        Declares if the input images ('xs') should be zero-centered before training.
-    shuffle : tuple(bool, None/int)
-        Declares if the training data should be shuffled before the next training epoch [0].
-        If the train dataset is too large to be shuffled in place, one can preshuffle them n times before running
-        OrcaNet, the number n should then be put into [1].
-    str_ident : str
-        Optional string identifier that gets appended to the modelname. Useful when training models which would have
-        the same modelname. Also used for defining models and projections!
-    train_logger_display : int
-        How many batches should be averaged for one line in the training log files.
-    train_logger_flush : int
-        After how many lines the training log file should be flushed. -1 for flush at the end of the epoch only.
-    train_verbose : int
-        verbose option of keras.model.fit_generator.
-    n_events : None/int
-        For testing purposes. If not the whole .h5 file should be used for training, define the number of events.
+    cfg : Class
+        ...
+    initial_model : ks.model
+        ...
 
     """
-    train_files, test_files, multiple_inputs = read_out_list_file(list_filename)
+    train_files, test_files, multiple_inputs = read_out_list_file(cfg.list_file)
+    epoch = cfg.epoch
     if epoch[0] == -1 and epoch[1] == -1:
-        epoch = look_for_latest_epoch(folder_name)
+        epoch = look_for_latest_epoch(cfg.folder_name)
         print("Automatically set epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
     n_bins = h5_get_n_bins(train_files)
 
@@ -405,20 +363,20 @@ def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch, initia
         model = initial_model
     else:
         # Load an existing model
-        path_of_model = folder_name + '/saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5'
+        path_of_model = cfg.folder_name + '/saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5'
         model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
     model.summary()
 
-    if zero_center:
-        xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu[0])
+    if cfg.zero_center:
+        xs_mean = load_zero_center_data(train_files, cfg.batchsize, n_bins, cfg.n_gpu[0])
     else:
         xs_mean = None
-    if use_scratch_ssd:
+    if cfg.use_scratch_ssd:
         train_files, test_files = use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=multiple_inputs)
 
     lr = None
     trained_epochs = 0
-    while trained_epochs<epochs_to_train or epochs_to_train==-1:
+    while trained_epochs<cfg.epochs_to_train or cfg.epochs_to_train==-1:
         epoch, lr = train_and_evaluate_model(model, train_files, test_files, batchsize, n_bins, class_type,
                                              xs_mean, epoch, shuffle, lr, swap_4d_channels, str_ident, n_gpu,
                                              folder_name, train_logger_display, train_logger_flush, train_verbose,
@@ -445,13 +403,13 @@ def make_folder_structure(folder_name):
             os.makedirs(directory)
 
 
-def orca_train(trained_models_folder, config_file, list_file):
+def orca_train(parent_folder, config_file, list_file):
     """
     Frontend function for training networks.
 
     Parameters
     ----------
-    trained_models_folder : str
+    parent_folder : str
         Path to the folder where everything gets saved to.
         Every model (from a .toml file) will get its own folder in here, with the name being the
         same as the one from the .toml file.
@@ -461,12 +419,16 @@ def orca_train(trained_models_folder, config_file, list_file):
         Path to a list file which contains pathes to all the h5 files that should be used for training and evaluation.
 
     """
-    keyword_arguments = read_out_config_file(config_file)
-    folder_name = trained_models_folder + str(os.path.splitext(os.path.basename(config_file))[0])
-    make_folder_structure(folder_name)
+    folder_name = parent_folder + str(os.path.splitext(os.path.basename(config_file))[0])
+    cfg = Settings(config_file, list_file, folder_name)
+
+    make_folder_structure(cfg.folder_name)
     write_full_logfile_startup(folder_name, list_file, keyword_arguments)
-    initial_model = build_nn_model(nn_arch, n_bins, class_type, swap_4d_channels, str_ident, loss_opt, n_gpu, batchsize)
-    execute_nn(list_file, folder_name, initial_model=initial_model **keyword_arguments)
+
+    # TODO implement model
+    initial_model = None #build_nn_model(nn_arch, n_bins, class_type, swap_4d_channels, str_ident, loss_opt, n_gpu, batchsize)
+
+    execute_nn(cfg, initial_model)
 
 
 def parse_input():
@@ -474,8 +436,8 @@ def parse_input():
     args = docopt(__doc__)
     config_file = args['CONFIG']
     list_file = args['LIST']
-    trained_models_folder = args['FOLDER'] if args['FOLDER'] is not None else "./"
-    orca_train(trained_models_folder, config_file, list_file)
+    parent_folder = args['FOLDER'] if args['FOLDER'] is not None else "./"
+    orca_train(parent_folder, config_file, list_file)
 
 
 if __name__ == '__main__':
