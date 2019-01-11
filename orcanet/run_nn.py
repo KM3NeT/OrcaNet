@@ -339,7 +339,7 @@ def evaluate_model(model, test_files, batchsize, n_bins, class_type, xs_mean, sw
     return history_test
 
 
-def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch,
+def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch, initial_model = None,
                swap_4d_channels=None, batchsize=64, epoch=[-1,-1], epochs_to_train=-1, n_gpu=(1, 'avolkov'), use_scratch_ssd=False,
                zero_center=False, shuffle=(False,None), str_ident='', train_logger_display=100, train_logger_flush=-1,
                train_verbose=2, n_events=None):
@@ -402,7 +402,7 @@ def execute_nn(list_filename, folder_name, loss_opt, class_type, nn_arch,
 
     if epoch[0] == 0 and epoch[1] == 1:
         # Create and compile a new model
-        model = build_nn_model(nn_arch, n_bins, class_type, swap_4d_channels, str_ident, loss_opt, n_gpu, batchsize)
+        model = initial_model
     else:
         # Load an existing model
         path_of_model = folder_name + '/saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5'
@@ -465,7 +465,8 @@ def orca_train(trained_models_folder, config_file, list_file):
     folder_name = trained_models_folder + str(os.path.splitext(os.path.basename(config_file))[0])
     make_folder_structure(folder_name)
     write_full_logfile_startup(folder_name, list_file, keyword_arguments)
-    execute_nn(list_file, folder_name, **keyword_arguments)
+    initial_model = build_nn_model(nn_arch, n_bins, class_type, swap_4d_channels, str_ident, loss_opt, n_gpu, batchsize)
+    execute_nn(list_file, folder_name, initial_model=initial_model **keyword_arguments)
 
 
 def parse_input():
