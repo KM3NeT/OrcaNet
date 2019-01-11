@@ -382,3 +382,38 @@ def use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=False)
 
     print('Finished copying the input train/test data to the node-local SSD scratch folder')
     return train_files_ssd, test_files_ssd
+
+
+
+class Config(object):
+    def __init__(self, config_file, list_file):
+        self.config_file = config_file
+        self.list_file = list_file
+
+        user_values = read_out_config_file(self.config_file)
+        default_values = self.get_default_values()
+        for key in default_values:
+            setattr(self, key, default_values[key])
+        for key in user_values:
+            if hasattr(self, key):
+                setattr(self, key, user_values[key])
+            else:
+                raise AttributeError("Unknown option "+str(key))
+
+    @staticmethod
+    def get_default_values():
+        default_values = dict()
+        default_values["swap_4d_channels"] = None
+        default_values["batchsize"] = 64
+        default_values["epoch"] = [-1, -1]
+        default_values["epochs_to_train"] = -1
+        default_values["n_gpu"] = (1, 'avolkov')
+        default_values["use_scratch_ssd"] = False
+        default_values["zero_center"] = False
+        default_values["shuffle"] = (False, None)
+        default_values["str_ident"] = ''
+        default_values["train_logger_display"] = 100
+        default_values["train_logger_flush"] = -1
+        default_values["train_verbose"] = 2
+        default_values["n_events"] = None
+        return default_values
