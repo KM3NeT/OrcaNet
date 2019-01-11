@@ -1,4 +1,16 @@
-install:
-    image: docker.km3net.de/base/python:3
+stages:
+  - install
+
+
+before_script:
+  - apt-get update -qq && apt-get install -y -qq libhdf5-dev
+  - pip install -U pip setuptools wheel numpy
+  - pip install .
+
+
+install-os:
+    image: docker.km3net.de/base/python:3.6
+    stage: install
     script:
         - pip install .
+
