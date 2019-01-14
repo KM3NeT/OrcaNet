@@ -1,5 +1,7 @@
 stages:
   - install
+  - doc
+  - release
 
 
 before_script:
@@ -14,3 +16,27 @@ install-os:
     script:
         - pip install .
 
+
+pages:
+    image: docker.km3net.de/base/python:3.6
+    stage: doc
+    script:
+        - cd docs && make html
+        - mv _build/html/ ../public/
+    artifacts:
+        paths:
+            - public
+    only:
+        - tags
+        - master
+
+#pypi:
+#    image: docker.km3net.de/base/python:3.6
+#    stage: release
+#    cache: {}
+#    script:
+#        - pip install -U twine
+#        - python setup.py sdist
+#        - twine upload dist/*
+#    only:
+#        - tags
