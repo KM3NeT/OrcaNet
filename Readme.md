@@ -1,4 +1,13 @@
-## Deep Learning in KM3NeT-ORCA <br />
+## OrcaNet: A framework for Deep Learning in KM3NeT <br />
+
+[![alt text][image_1]][hyperlink_1] [![alt text][image_2]][hyperlink_2]
+
+  [hyperlink_1]: https://git.km3net.de/OrcaNet/pipelines
+  [image_1]: https://git.km3net.de/ml/OrcaNet/badges/master/build.svg
+
+  [hyperlink_2]: https://ml.pages.km3net.de/OrcaNet
+  [image_2]: https://examples.pages.km3net.de/km3badges/docs-latest-brightgreen.svg
+
 Find more information about KM3NeT on [www.km3net.org](http://www.km3net.org).
 
 This repository contains contains code that is used for a Deep Learning project with the neutrino telescope KM3NeT, which records 4D data (xyz,t).

@@ -5,3 +5,9 @@ matplotlib
 tensorflow-gpu
 toml
 docopt
+setuptools_scm
+sphinx
+sphinx-rtd-theme
+sphinx-autoapi
+twine
+numpydoc
