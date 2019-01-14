@@ -27,7 +27,8 @@ def read_out_config_file(config_file):
     """
     config = toml.load(config_file)
     keyword_arguments = config["keyword_arguments"]
-
+    if "initial_epoch" in keyword_arguments:
+        keyword_arguments["initial_epoch"] = tuple(keyword_arguments["initial_epoch"])
     if "class_type" in keyword_arguments:
         if keyword_arguments["class_type"][0]=="None":
             keyword_arguments["class_type"][0] = None
@@ -145,22 +146,21 @@ def write_full_logfile_startup(cfg):
         f_out.write("\n")
 
 
-def write_full_logfile(model, history_train, history_test, lr, lr_decay, epoch, train_file,
-                            test_files, batchsize, n_bins, class_type, swap_4d_channels, str_ident, folder_name):
+def write_full_logfile(cfg, model, history_train, history_test, lr, lr_decay, epoch, f):
     """
     Function for saving various information during training and testing to a .txt file.
 
     """
-    logfile=folder_name + '/full_log.txt'
+    logfile=cfg.main_folder + 'full_log.txt'
     with open(logfile, 'a+') as f_out:
         f_out.write('---------------Epoch {} File {}-------------------------------------------------------------------------\n'.format(epoch[0], epoch[1]))
         f_out.write('\n')
         f_out.write('Current time: ' + strftime("%Y-%m-%d %H:%M:%S", gmtime()) + '\n')
         f_out.write('Decayed learning rate to ' + str(lr) + ' before epoch ' + str(epoch[0]) +
                     ' and file ' + str(epoch[1]) + ' (minus ' + str(lr_decay) + ')\n')
-        f_out.write('Trained in epoch ' + str(epoch) + ' on file ' + str(epoch[1]) + ', ' + str(train_file) + '\n')
+        f_out.write('Trained in epoch ' + str(epoch) + ' on file ' + str(epoch[1]) + ', ' + str(cfg.train_file) + '\n')
         if history_test is not None:
-            f_out.write('Tested in epoch ' + str(epoch) + ', file ' + str(epoch[1]) + ' on test_files ' + str(test_files) + '\n')
+            f_out.write('Tested in epoch ' + str(epoch) + ', file ' + str(epoch[1]) + ' on test_files ' + str(cfg.test_files) + '\n')
         f_out.write('History for training / testing: \n')
         f_out.write('Train: ' + str(history_train.history) + '\n')
         if history_test is not None:
@@ -173,20 +173,16 @@ def write_full_logfile(model, history_train, history_test, lr, lr_decay, epoch, 
         #f_out.write('\n')
 
 
-def write_summary_logfile(train_files, batchsize, epoch, folder_name, model, history_train, history_test, lr):
+def write_summary_logfile(cfg, epoch, model, history_train, history_test, lr):
     """
     Write to the summary.txt file in every trained model folder.
 
     Parameters
     ----------
-    train_files : list(([train_filepaths], train_filesize))
-        List of tuples with the filepaths and the filesizes of the train_files.
-    batchsize : int
-        Batchsize that is used in the evaluate_generator method.
+    cfg : class Settings
+        ...
     epoch : tuple(int, int)
         The number of the current epoch and the current filenumber.
-    folder_name : str
-        Name of the folder in the cnns directory in which everything will be saved.
     model : ks.model.Model
         Keras model instance of a neural network.
     history_train : Keras history object
@@ -199,13 +195,13 @@ def write_summary_logfile(train_files, batchsize, epoch, folder_name, model, his
     """
     # Save test log
     steps_per_total_epoch, steps_cum = 0, [0] # get this for the epoch_number_float in the logfile
-    for f, f_size in train_files:
-        steps_per_file = int(f_size / batchsize)
+    for f, f_size in cfg.train_files:
+        steps_per_file = int(f_size / cfg.batchsize)
         steps_per_total_epoch += steps_per_file
         steps_cum.append(steps_cum[-1] + steps_per_file)
 
     epoch_number_float = epoch[0] - (steps_per_total_epoch - steps_cum[epoch[1]]) / float(steps_per_total_epoch)
-    logfile_fname = folder_name + '/summary.txt'
+    logfile_fname = cfg.main_folder + 'summary.txt'
     with open(logfile_fname, 'a+') as logfile:
         # Write the headline
         if os.stat(logfile_fname).st_size == 0:
@@ -264,13 +260,13 @@ def read_logfiles(summary_logfile):
     return summary_data, full_train_data
 
 
-def look_for_latest_epoch(folder_name):
+def look_for_latest_epoch(main_folder):
     """
     Check all saved models in the ./saved_models folder and return the highest epoch / file_no pair.
 
     Parameters
     ----------
-    folder_name : str
+    main_folder : str
         Name of the main folder.
     Returns
     -------
@@ -278,7 +274,7 @@ def look_for_latest_epoch(folder_name):
         The highest epoch, file_no pair. [0,1] if the folder is empty.
 
     """
-    files = os.listdir(folder_name + "/saved_models")
+    files = os.listdir(main_folder + "saved_models")
     if len(files) == 0:
         latest_epoch = [0 , 1]
     else:
@@ -395,7 +391,7 @@ class Settings(object):
     ----------
     list_file : str
         Path to a list file which contains pathes to all the h5 files that should be used for training and evaluation.
-    folder_name : str
+    main_folder : str
         Name of the folder of this model in which everything will be saved. E.g., the summary.txt log file is located in here.
     loss_opt : tuple(dict, dict/str/None,)
         Tuple that contains 1) the loss_functions and loss_weights as dicts (this is the losses table from the toml file)
@@ -439,11 +435,11 @@ class Settings(object):
         For testing purposes. If not the whole .h5 file should be used for training, define the number of events.
 
     """
-    def __init__(self, main_folder, list_file, config_file=None):
+    def __init__(self, main_folder, list_file=None, config_file=None):
         # Default Settings:
         self.swap_4d_channels = None
         self.batchsize = 64
-        self.initial_epoch = [-1, -1]
+        self.initial_epoch = (-1, -1)
         self.epochs_to_train = -1
         self.n_gpu = (1, 'avolkov')
         self.use_scratch_ssd = False
@@ -454,6 +450,8 @@ class Settings(object):
         self.train_logger_flush = -1
         self.train_verbose = 2
         self.n_events = None
+        self.class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
+
         self._default_values = dict(self.__dict__)
 
         # User Settings:
@@ -467,8 +465,10 @@ class Settings(object):
             self.set_from_config_file(self.config_file)
 
         self.list_file = list_file
-        self.train_files, self.test_files, self.multiple_inputs = read_out_list_file(self.list_file)
-
+        if self.list_file is None:
+            self.train_files, self.test_files, self.multiple_inputs = None, None, None
+        else:
+            self.train_files, self.test_files, self.multiple_inputs = read_out_list_file(self.list_file)
 
     def set_from_config_file(self, config_file):
         """ Overwrite default attribute values with values from a config file. """
@@ -478,3 +478,7 @@ class Settings(object):
                 setattr(self, key, user_values[key])
             else:
                 raise AttributeError("Unknown option "+str(key))
+
+    def get_n_bins(self):
+        n_bins = h5_get_n_bins(self.train_files)
+        return n_bins

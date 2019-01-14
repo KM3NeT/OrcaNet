@@ -12,29 +12,35 @@ from functools import reduce
 
 #------------- Functions used for supplying images to the GPU -------------#
 
-def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, str_ident, f_size=None, zero_center_image=None, yield_mc_info=False, swap_col=None):
+def generate_batches_from_hdf5_file(cfg, filepath, f_size=None, zero_center_image=None, yield_mc_info=False):
     """
     Generator that returns batches of (multiple-) images ('xs') and labels ('ys') from single or multiple h5 files.
-    :param list filepath: List that contains full filepath of the input h5 files, e.g. '/path/to/file/file.h5'.
-    :param int batchsize: Size of the batches that should be generated. Ideally same as the chunksize in the h5 file.
-    :param tuple n_bins: Number of bins for each dimension (x,y,z,t) in the h5 file.
-    :param (int, str) class_type: Tuple with the umber of output classes and a string identifier to specify the exact output classes.
-                                  I.e. (2, 'muon-CC_to_elec-CC')
-    :param str str_ident: string identifier that specifies the projection type / model inputs in certain cases.
-    :param int/None f_size: Specifies the filesize (#images) of the .h5 file if not the whole .h5 file
-                       but a fraction of it (e.g. 10%) should be used for yielding the xs/ys arrays.
-                       This is important if you run fit_generator(epochs>1) with a filesize (and hence # of steps) that is smaller than the .h5 file.
-    :param ndarray zero_center_image: mean_image of the x dataset used for zero-centering.
-    :param bool yield_mc_info: Specifies if mc-infos (y_values) should be yielded as well.
-                               The mc-infos are used for evaluation after training and testing is finished.
-    :param bool/str swap_col: Specifies, if the index of the columns for xs should be swapped. Necessary for 3.5D nets.
-                          Currently available: 'yzt-x' -> [3,1,2,0] from [0,1,2,3]
-    :return: tuple output: Yields a tuple which contains a full batch of images and labels (+ mc_info if yield_mc_info=True).
+
+    Parameters
+    ----------
+    cfg : class Settings
+        ...
+    filepath : list
+        List that contains full filepath of the input h5 files, e.g. '/path/to/file/file.h5'.
+    f_size : int/None
+        Specifies the filesize (#images) of the .h5 file if not the whole .h5 file
+        but a fraction of it (e.g. 10%) should be used for yielding the xs/ys arrays.
+        This is important if you run fit_generator(epochs>1) with a filesize (and hence # of steps) that is smaller than the .h5 file.
+    zero_center_image : ndarray
+        mean_image of the x dataset used for zero-centering.
+    yield_mc_info : bool
+        Specifies if mc-infos (y_values) should be yielded as well.
+        The mc-infos are used for evaluation after training and testing is finished.
+    Yields
+    -------
+    output : tuple
+        A tuple which contains a full batch of images and labels (+ mc_info if yield_mc_info=True).
+
     """
     n_files = len(filepath)
     dimensions = {}
     for i in range(n_files):
-        dimensions[i] = get_dimensions_encoding(n_bins[i], batchsize)
+        dimensions[i] = get_dimensions_encoding(cfg.get_n_bins()[i], cfg.batchsize)
 
     swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'xyt-z': (0, 1, 2, 4, 3), 't-xyz': (0,4,1,2,3), 'tyz-x': (0,4,2,3,1)}
 
@@ -49,29 +55,28 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, str
                           'is not equal to the f_size of the true .h5 file. Should be ok if you use the tb_callback.')
 
         n_entries = 0
-        while n_entries <= (f_size - batchsize):
+        while n_entries <= (f_size - cfg.batchsize):
             # create numpy arrays of input data (features)
             xs = {}
             xs_list = [] # list of inputs for the Keras NN
             for i in range(n_files):
-                xs[i] = f[i]['x'][n_entries : n_entries + batchsize]
+                xs[i] = f[i]['x'][n_entries : n_entries + cfg.batchsize]
                 xs[i] = np.reshape(xs[i], dimensions[i]).astype(np.float32)
 
             if zero_center_image is not None:
                 for i in range(n_files):
                     xs[i] = np.subtract(xs[i], zero_center_image[i])
 
-            if swap_col is not None:
-
+            if cfg.swap_4d_channels is not None:
                 # single image input
-                if swap_col == 'yzt-x' or swap_col == 'xyt-z':
-                    xs_list.append(np.transpose(xs, swap_4d_channels_dict[swap_col]))
-                elif swap_col == 'xyz-t_and_yzt-x':
+                if cfg.swap_col == 'yzt-x' or cfg.swap_4d_channels == 'xyt-z':
+                    xs_list.append(np.transpose(xs, swap_4d_channels_dict[cfg.swap_4d_channels]))
+                elif cfg.swap_4d_channels == 'xyz-t_and_yzt-x':
                     xs_list.append(xs[0]) # xyzt
                     xs_yzt_x = np.transpose(xs[0], swap_4d_channels_dict['yzt-x'])
                     xs_list.append(xs_yzt_x)
 
-                elif 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2' in swap_col + str_ident:
+                elif 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2' in cfg.swap_4d_channels + cfg.str_ident:
                     xs_list.append(xs[0]) # xyz-t tight-1
                     xs_yzt_x_tight_1 = np.transpose(xs[0], swap_4d_channels_dict['yzt-x']) # yzt-x tight-1
                     xs_list.append(xs_yzt_x_tight_1)
@@ -79,31 +84,31 @@ def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, str
                     xs_yzt_x_tight_2 = np.transpose(xs[1], swap_4d_channels_dict['yzt-x']) # yzt-x tight-2
                     xs_list.append(xs_yzt_x_tight_2)
 
-                elif swap_col == 'xyz-t_and_xyz-c_single_input':
+                elif cfg.swap_4d_channels == 'xyz-t_and_xyz-c_single_input':
                     xyz_t_and_xyz_c = np.concatenate([xs[0], xs[1]], axis=-1)
                     xs_list = xyz_t_and_xyz_c # here, it's not a list since we have only one input image
 
-                else: raise ValueError('The argument "swap_col"=' + str(swap_col) + ' is not valid.')
+                else: raise ValueError('The argument "swap_col"=' + str(cfg.swap_4d_channels) + ' is not valid.')
 
             else:
                 for i in range(n_files):
                     xs_list.append(xs[i])
 
             # and mc info (labels). Since the labels are same (!!) for all the multiple files, use first file for this
-            y_values = f[0]['y'][n_entries:n_entries+batchsize]
-            y_values = np.reshape(y_values, (batchsize, y_values.shape[1]))
+            y_values = f[0]['y'][n_entries:n_entries+cfg.batchsize]
+            y_values = np.reshape(y_values, (cfg.batchsize, y_values.shape[1]))
 
-            if class_type[1] != 'track-shower':
-                ys = get_regression_labels(y_values, class_type) # ys: dict which contains arrays for every output key
+            if cfg.class_type[1] != 'track-shower':
+                ys = get_regression_labels(y_values, cfg.class_type) # ys: dict which contains arrays for every output key
 
             else:
-                ys = np.zeros((batchsize, class_type[0]), dtype=np.float32)
+                ys = np.zeros((cfg.batchsize, cfg.class_type[0]), dtype=np.float32)
                 # encode the labels such that they are all within the same range (and filter the ones we don't want for now)
                 for c, y_val in enumerate(y_values): # Could be vectorized with numba, or use dataflow from tensorpack
-                    ys[c] = encode_targets(y_val, class_type)
+                    ys[c] = encode_targets(y_val, cfg.class_type)
 
             # we have read one more batch from this file
-            n_entries += batchsize
+            n_entries += cfg.batchsize
 
             output = (xs_list, ys) if yield_mc_info is False else (xs_list, ys) + (y_values,)
 
@@ -563,7 +568,7 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
     TODO
     """
     # Gibt loss aus über alle :display batches, gemittelt über die letzten :display batches
-    def __init__(self, train_files, batchsize, display, model, folder_name, epoch, flush_after_n_lines):
+    def __init__(self, train_files, batchsize, display, model, main_folder, epoch, flush_after_n_lines):
         """
 
         Parameters
@@ -572,7 +577,7 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
         batchsize
         display
         model
-        folder_name
+        main_folder
         epoch
         flush_after_n_lines : int
             After how many lines the file should be flushed. -1 for flush at the end of the epoch only.
@@ -586,7 +591,7 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
         self.flush = flush_after_n_lines
 
         self.seen = 0
-        self.logfile_train_fname = folder_name + '/log_train/log_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.txt'
+        self.logfile_train_fname = main_folder + 'log_train/log_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.txt'
         self.loglist = []
 
         self.cum_metrics = {}

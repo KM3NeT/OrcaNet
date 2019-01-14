@@ -27,6 +27,7 @@ import keras as ks
 import matplotlib as mpl
 from docopt import docopt
 mpl.use('Agg')
+import warnings
 
 from utilities.input_output_utilities import use_node_local_ssd_for_input, read_out_list_file, read_out_config_file, write_summary_logfile, write_full_logfile, read_logfiles, look_for_latest_epoch, h5_get_n_bins, write_full_logfile_startup, Settings
 from utilities.nn_utilities import load_zero_center_data, BatchLevelPerformanceLogger
@@ -163,20 +164,20 @@ def get_new_learning_rate(epoch, lr_initial, n_train_files, n_gpu):
     return lr_temp, lr_decay
 
 
-def update_summary_plot(folder_name):
+def update_summary_plot(main_folder):
     """
     Refresh the summary plot of a model directory, found in ./plots/summary_plot.pdf. Test- and train-data
     will be read out automatically, and the loss and every metric will be plotted in a seperate page in the pdf.
 
     Parameters
     ----------
-    folder_name : str
+    main_folder : str
         Name of the main folder with the summary.txt in it.
 
     """
-    summary_logfile = folder_name + "/summary.txt"
+    summary_logfile = main_folder + "summary.txt"
     summary_data, full_train_data = read_logfiles(summary_logfile)
-    pdf_name = folder_name + "/plots/summary_plot.pdf"
+    pdf_name = main_folder + "plots/summary_plot.pdf"
     plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name)
 
 
@@ -190,10 +191,11 @@ def train_and_evaluate_model(cfg, model, epoch, xs_mean):
     cfg : class Settings
     """
     lr = None
-    lr_initial, manual_mode = 0.005, (False, 0.0003, 0.07, lr)
     test_after_n_train_files = 2
 
+    lr_initial, manual_mode = 0.005, (False, 0.0003, 0.07, lr)
     epoch, lr, lr_decay = schedule_learning_rate(model, epoch, cfg.n_gpu, cfg.train_files, lr_initial=lr_initial, manual_mode=manual_mode) # begin new training step
+
     train_iter_step = 0 # loop n
     for file_no, (f, f_size) in enumerate(cfg.train_files, 1):
         if file_no < epoch[1]:
@@ -203,31 +205,23 @@ def train_and_evaluate_model(cfg, model, epoch, xs_mean):
         if train_iter_step > 1:
             epoch, lr, lr_decay = schedule_learning_rate(model, epoch, cfg.n_gpu, cfg.train_files, lr_initial=lr_initial, manual_mode=manual_mode)
 
-        history_train = train_model(model, train_files, f, f_size, file_no, batchsize, n_bins, class_type, xs_mean, epoch,
-                                    shuffle, swap_4d_channels, str_ident, folder_name, train_logger_display,
-                                    train_logger_flush, train_verbose, n_events)
-        model.save(cfg.folder_name + '/saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5')
+        history_train = train_model(cfg, model, f, f_size, file_no, xs_mean, epoch)
+        model.save(cfg.main_folder + 'saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5')
 
         # test after the first and else after every n-th file
         if file_no == 1 or file_no % test_after_n_train_files == 0:
-            history_test = evaluate_model(model, test_files, batchsize, n_bins, class_type,
-                                          xs_mean, swap_4d_channels, str_ident, n_events)
+            history_test = evaluate_model(cfg, model, xs_mean)
         else:
             history_test = None
-        write_summary_logfile(train_files, batchsize, epoch, folder_name, model, history_train, history_test, lr)
-        write_full_logfile(model, history_train, history_test, lr, lr_decay, epoch,
-                                              f, test_files, batchsize, n_bins, class_type, swap_4d_channels, str_ident,
-                                              folder_name)
-        update_summary_plot(folder_name)
-        plot_weights_and_activations(test_files[0][0], n_bins, class_type, xs_mean, swap_4d_channels,
-                                     epoch[0], file_no, str_ident, folder_name)
+        write_summary_logfile(cfg, epoch, model, history_train, history_test, lr)
+        write_full_logfile(cfg, model, history_train, history_test, lr, lr_decay, epoch, f)
+        update_summary_plot(cfg.main_folder)
+        plot_weights_and_activations(cfg, xs_mean, epoch[0], file_no)
 
     return epoch, lr
 
 
-def train_model(model, train_files, f, f_size, file_no, batchsize, n_bins, class_type, xs_mean, epoch,
-                shuffle, swap_4d_channels, str_ident, folder_name, train_logger_display, train_logger_flush, train_verbose,
-                n_events=None):
+def train_model(cfg, model, f, f_size, file_no, xs_mean, epoch):
     """
     Trains a model based on the Keras fit_generator method.
 
@@ -236,104 +230,70 @@ def train_model(model, train_files, f, f_size, file_no, batchsize, n_bins, class
 
     Parameters
     ----------
+    cfg : class Settings
+        ...
     model : ks.model.Model
         Keras model instance of a neural network.
-    train_files : list(([train_filepaths], train_filesize))
-        List of tuples with the filepaths and the filesizes of the train_files.
     f : list
         Full filepaths of the files that should be used for training.
     f_size : int
         Number of images contained in f.
     file_no : int
         If the full data is split into multiple files, this parameter indicates the current file number.
-    batchsize : int
-        Batchsize that is used in the fit_generator method.
-    n_bins : list(tuple(int))
-        Number of bins for each dimension (x,y,z,t) in both the train- and test_files. Can contain multiple n_bins tuples.
-    class_type : tuple(int, str)
-        Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
     xs_mean : ndarray
         Mean_image of the x (train-) dataset used for zero-centering the train-/testdata.
     epoch : tuple(int, int)
         The number of the current epoch and the current filenumber.
-    shuffle : tuple(bool, None/int)
-        Declares if the training data should be shuffled before the next training epoch.
-    swap_4d_channels : None/str
-        For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
-    str_ident : str
-        Optional string identifier that gets appended to the modelname.
-    folder_name : str
-        Path of the main folder.
-    train_logger_display : int
-        How many batches should be averaged for one line in the training logs.
-    train_logger_flush : int
-        After how many lines the file should be flushed. -1 for flush at the end of the epoch only.
-    train_verbose : int
-        verbose option of keras.model.fit_generator.
-    n_events : None/int
-        For testing purposes if not the whole .h5 file should be used for training.
 
     """
     validation_data, validation_steps, callbacks = None, None, []
-    if n_events is not None: f_size = n_events  # for testing purposes
-    logger = BatchLevelPerformanceLogger(train_files=train_files, batchsize=batchsize, display=train_logger_display, model=model,
-                                         folder_name=folder_name, epoch=epoch, flush_after_n_lines=train_logger_flush)
+    if cfg.n_events is not None: f_size = cfg.n_events  # for testing purposes
+    logger = BatchLevelPerformanceLogger(train_files=cfg.train_files, batchsize=cfg.batchsize, display=cfg.train_logger_display, model=model,
+                                         main_folder=cfg.main_folder, epoch=epoch, flush_after_n_lines=cfg.train_logger_flush)
     callbacks.append(logger)
 
-    if epoch[0] > 1 and shuffle[0] is True: # just for convenience, we don't want to wait before the first epoch each time
+    if epoch[0] > 1 and cfg.shuffle[0] is True: # just for convenience, we don't want to wait before the first epoch each time
         print('Shuffling file ', f, ' before training in epoch ', epoch[0], ' and file ', file_no)
-        shuffle_h5(f, chunking=(True, batchsize), delete_flag=True)
+        shuffle_h5(f, chunking=(True, cfg.batchsize), delete_flag=True)
 
-    if shuffle[1] is not None:
-        n_preshuffled = shuffle[1]
+    if cfg.shuffle[1] is not None:
+        n_preshuffled = cfg.shuffle[1]
         f = f.replace('0.h5', str(epoch[0]-1) + '.h5') if epoch[0] <= n_preshuffled else f.replace('0.h5', str(np.random.randint(0, n_preshuffled+1)) + '.h5')
 
     print('Training in epoch', epoch[0], 'on file ', file_no, ',', f)
 
     history = model.fit_generator(
-        generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, str_ident, f_size=f_size, zero_center_image=xs_mean, swap_col=swap_4d_channels),
-        steps_per_epoch=int(f_size / batchsize), epochs=1, verbose=train_verbose, max_queue_size=10,
+        generate_batches_from_hdf5_file(cfg, f, f_size=f_size, zero_center_image=xs_mean),
+        steps_per_epoch=int(f_size / cfg.batchsize), epochs=1, verbose=cfg.train_verbose, max_queue_size=10,
         validation_data=validation_data, validation_steps=validation_steps, callbacks=callbacks)
 
     return history
 
 
-def evaluate_model(model, test_files, batchsize, n_bins, class_type, xs_mean, swap_4d_channels, str_ident, n_events=None):
+def evaluate_model(cfg, model, xs_mean):
     """
     Evaluates a model on the validation data based on the Keras evaluate_generator method.
     This is usually done after a session of training has been finished.
 
     Parameters
     ----------
+    cfg : class Settings
+        ...
     model : ks.model.Model
         Keras model instance of a neural network.
-    test_files : list(([test_filepaths], test_filesize))
-        List of tuples that contains the testfiles and their number of rows.
-    batchsize : int
-        Batchsize that is used in the evaluate_generator method.
-    n_bins : list(tuple(int))
-        Number of bins for each dimension (x,y,z,t) in both the train- and test_files. Can contain multiple n_bins tuples.
-    class_type : tuple(int, str)
-        Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
     xs_mean : ndarray
         Mean_image of the x (train-) dataset used for zero-centering the train-/testdata.
-    swap_4d_channels : None/str
-        For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
-    str_ident : str
-        Optional string identifier that gets appended to the modelname.
-    n_events : None/int
-        For testing purposes if not the whole .h5 file should be used for testing.
 
     """
     histories = []
-    for i, (f, f_size) in enumerate(test_files):
+    for i, (f, f_size) in enumerate(cfg.test_files):
         print('Testing on file ', i, ',', str(f))
 
-        if n_events is not None: f_size = n_events  # for testing purposes
+        if cfg.n_events is not None: f_size = cfg.n_events  # for testing purposes
 
         history = model.evaluate_generator(
-            generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, str_ident, swap_col=swap_4d_channels, f_size=f_size, zero_center_image=xs_mean),
-            steps=int(f_size / batchsize), max_queue_size=10, verbose=1)
+            generate_batches_from_hdf5_file(cfg, f, f_size=f_size, zero_center_image=xs_mean),
+            steps=int(f_size / cfg.batchsize), max_queue_size=10, verbose=1)
         #This history object is just a list, not a dict like with fit_generator!
         print('Test sample results: ' + str(history) + ' (' + str(model.metrics_names) + ')')
         histories.append(history)
@@ -342,7 +302,7 @@ def evaluate_model(model, test_files, batchsize, n_bins, class_type, xs_mean, sw
     return history_test
 
 
-def execute_nn(cfg, initial_model):
+def execute_nn(cfg, initial_model=None):
     """
     Core code that trains a neural network.
 
@@ -356,16 +316,20 @@ def execute_nn(cfg, initial_model):
     """
     epoch = cfg.initial_epoch
     if epoch[0] == -1 and epoch[1] == -1:
-        epoch = look_for_latest_epoch(cfg.folder_name)
+        epoch = look_for_latest_epoch(cfg.main_folder)
         print("Automatically set epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
-    n_bins = h5_get_n_bins(cfg.train_files)
+    n_bins = cfg.get_n_bins()
 
     if epoch[0] == 0 and epoch[1] == 1:
-        # Create and compile a new model
+        if initial_model is None:
+            raise ValueError("You need to provide a compiled keras model for the start of the training! (You gave None)")
         model = initial_model
     else:
         # Load an existing model
-        path_of_model = cfg.folder_name + '/saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5'
+        if initial_model is not None:
+            warnings.warn("You provided a model even though this is not the start of the training. Provided model is ignored!")
+        path_of_model = cfg.main_folder + 'saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5'
+        print("Loading saved model: "+path_of_model)
         model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
     model.summary()
 
@@ -373,8 +337,9 @@ def execute_nn(cfg, initial_model):
         xs_mean = load_zero_center_data(cfg.train_files, cfg.batchsize, n_bins, cfg.n_gpu[0])
     else:
         xs_mean = None
+
     if cfg.use_scratch_ssd:
-        train_files, test_files = use_node_local_ssd_for_input(cfg.train_files, cfg.test_files, multiple_inputs=cfg.multiple_inputs)
+        cfg.train_files, cfg.test_files = use_node_local_ssd_for_input(cfg.train_files, cfg.test_files, multiple_inputs=cfg.multiple_inputs)
 
     trained_epochs = 0
     while trained_epochs<cfg.epochs_to_train or cfg.epochs_to_train==-1:
@@ -382,19 +347,19 @@ def execute_nn(cfg, initial_model):
         trained_epochs+=1
 
 
-def make_folder_structure(folder_name):
+def make_folder_structure(main_folder):
     """
     Make subfolders for a specific model if they don't exist already. These subfolders will contain e.g. saved models,
     logfiles, etc.
 
     Parameters
     ----------
-    folder_name : str
-        Name of the main folder, e.g. "user/trained_models/example_model".
+    main_folder : str
+        Name of the main folder, e.g. "user/trained_models/example_model/".
 
     """
-    folders_to_create = [folder_name+"/log_train", folder_name+"/saved_models",
-                         folder_name+"/plots/activations", folder_name+"/predictions"]
+    folders_to_create = [main_folder+"log_train", main_folder+"saved_models",
+                         main_folder+"plots/activations", main_folder+"predictions"]
     for directory in folders_to_create:
         if not os.path.exists(directory):
             print("Creating directory: "+directory)
@@ -432,8 +397,8 @@ def parse_input():
     args = docopt(__doc__)
     config_file = args['CONFIG']
     list_file = args['LIST']
-    parent_folder = args['FOLDER'] if args['FOLDER'] is not None else "./"
-    orca_train(parent_folder, config_file, list_file)
+    main_folder = args['FOLDER'] if args['FOLDER'] is not None else "./"
+    orca_train(main_folder, list_file, config_file)
 
 
 if __name__ == '__main__':

@@ -277,7 +277,7 @@ def get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels
     return layer_names, activations, weights, y_values
 
 
-def plot_weights_and_activations(f, n_bins, class_type, xs_mean, swap_4d_channels, epoch, file_no, str_ident, folder_name):
+def plot_weights_and_activations(cfg, xs_mean, epoch, file_no):
     """
     Plots the weights of a model and the activations for one event to a .pdf file.
     :param str f: path to a .h5 file that contains images of events. Needed for plotting the activations for the event.
@@ -290,12 +290,12 @@ def plot_weights_and_activations(f, n_bins, class_type, xs_mean, swap_4d_channel
     :param str str_ident: string identifier that is parsed to the get_activations_and_weights function. Needed for some projection types.
     :param str folder_name: Path to the folder of a trained model.
     """
-    model_name = folder_name + '/saved_models/model_epoch_' + str(epoch) + '_file_' + str(file_no) + '.h5'
-    layer_names, activations, weights, y_values = get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels,
-                                            model_name, str_ident, layer_name=None, learning_phase='test')
+    model_name = cfg.main_folder + 'saved_models/model_epoch_' + str(epoch) + '_file_' + str(file_no) + '.h5'
+    layer_names, activations, weights, y_values = get_activations_and_weights(cfg.test_files[0][0], cfg.get_n_bins, cfg.class_type, xs_mean, cfg.swap_4d_channels,
+                                            model_name, cfg.str_ident, layer_name=None, learning_phase='test')
 
     fig, axes = plt.subplots()
-    pdf_name = folder_name + "/plots/activations/act_and_weights_plots_epoch_" + str(epoch) + '.pdf'
+    pdf_name = cfg.main_folder + "plots/activations/act_and_weights_plots_epoch_" + str(epoch) + '.pdf'
     pdf_activations_and_weights = PdfPages(pdf_name)
 
     # plot weights
