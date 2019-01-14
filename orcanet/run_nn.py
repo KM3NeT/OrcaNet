@@ -180,30 +180,33 @@ def update_summary_plot(folder_name):
     plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name)
 
 
-def train_and_evaluate_model(model, train_files, test_files, batchsize, n_bins, class_type, xs_mean, epoch,
-                             shuffle, lr, swap_4d_channels, str_ident, n_gpu, folder_name, train_logger_display, train_logger_flush,
-                             train_verbose, n_events):
+def train_and_evaluate_model(cfg, model, epoch, xs_mean):
     """
     Convenience function that trains (fit_generator), evaluates (evaluate_generator) and saves a Keras model.
     For documentation of the parameters, confer to the train_model and evaluate_model functions.
+
+    Parameters
+    ----------
+    cfg : class Settings
     """
+    lr = None
     lr_initial, manual_mode = 0.005, (False, 0.0003, 0.07, lr)
     test_after_n_train_files = 2
 
-    epoch, lr, lr_decay = schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=lr_initial, manual_mode=manual_mode) # begin new training step
+    epoch, lr, lr_decay = schedule_learning_rate(model, epoch, cfg.n_gpu, cfg.train_files, lr_initial=lr_initial, manual_mode=manual_mode) # begin new training step
     train_iter_step = 0 # loop n
-    for file_no, (f, f_size) in enumerate(train_files, 1):
+    for file_no, (f, f_size) in enumerate(cfg.train_files, 1):
         if file_no < epoch[1]:
             continue # skip if this file for this epoch has already been used for training
 
         train_iter_step += 1
         if train_iter_step > 1:
-            epoch, lr, lr_decay = schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=lr_initial, manual_mode=manual_mode)
+            epoch, lr, lr_decay = schedule_learning_rate(model, epoch, cfg.n_gpu, cfg.train_files, lr_initial=lr_initial, manual_mode=manual_mode)
 
         history_train = train_model(model, train_files, f, f_size, file_no, batchsize, n_bins, class_type, xs_mean, epoch,
                                     shuffle, swap_4d_channels, str_ident, folder_name, train_logger_display,
                                     train_logger_flush, train_verbose, n_events)
-        model.save(folder_name + '/saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5')
+        model.save(cfg.folder_name + '/saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5')
 
         # test after the first and else after every n-th file
         if file_no == 1 or file_no % test_after_n_train_files == 0:
@@ -345,18 +348,17 @@ def execute_nn(cfg, initial_model):
 
     Parameters
     ----------
-    cfg : Class
+    cfg : class Settings
         ...
     initial_model : ks.model
         ...
 
     """
-    train_files, test_files, multiple_inputs = read_out_list_file(cfg.list_file)
-    epoch = cfg.epoch
+    epoch = cfg.initial_epoch
     if epoch[0] == -1 and epoch[1] == -1:
         epoch = look_for_latest_epoch(cfg.folder_name)
         print("Automatically set epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
-    n_bins = h5_get_n_bins(train_files)
+    n_bins = h5_get_n_bins(cfg.train_files)
 
     if epoch[0] == 0 and epoch[1] == 1:
         # Create and compile a new model
@@ -368,19 +370,15 @@ def execute_nn(cfg, initial_model):
     model.summary()
 
     if cfg.zero_center:
-        xs_mean = load_zero_center_data(train_files, cfg.batchsize, n_bins, cfg.n_gpu[0])
+        xs_mean = load_zero_center_data(cfg.train_files, cfg.batchsize, n_bins, cfg.n_gpu[0])
     else:
         xs_mean = None
     if cfg.use_scratch_ssd:
-        train_files, test_files = use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=multiple_inputs)
+        train_files, test_files = use_node_local_ssd_for_input(cfg.train_files, cfg.test_files, multiple_inputs=cfg.multiple_inputs)
 
-    lr = None
     trained_epochs = 0
     while trained_epochs<cfg.epochs_to_train or cfg.epochs_to_train==-1:
-        epoch, lr = train_and_evaluate_model(model, train_files, test_files, batchsize, n_bins, class_type,
-                                             xs_mean, epoch, shuffle, lr, swap_4d_channels, str_ident, n_gpu,
-                                             folder_name, train_logger_display, train_logger_flush, train_verbose,
-                                             n_events)
+        epoch, lr = train_and_evaluate_model(cfg, model, epoch, xs_mean)
         trained_epochs+=1
 
 
@@ -403,27 +401,25 @@ def make_folder_structure(folder_name):
             os.makedirs(directory)
 
 
-def orca_train(parent_folder, config_file, list_file):
+def orca_train(main_folder, list_file, config_file):
     """
     Frontend function for training networks.
 
     Parameters
     ----------
-    parent_folder : str
-        Path to the folder where everything gets saved to.
-        Every model (from a .toml file) will get its own folder in here, with the name being the
-        same as the one from the .toml file.
-    config_file : str
-        Path to a .toml file which contains all the infos for training and testing of a model.
+    main_folder : str
+        Path to the folder where everything gets saved to, e.g. the summary.txt, the plots, the trained models, etc.
+        Is made to have a "/" at the end.
     list_file : str
         Path to a list file which contains pathes to all the h5 files that should be used for training and evaluation.
+    config_file : str
+        Path to a .toml file which contains all the infos for training and testing of a model.
+
 
     """
-    folder_name = parent_folder + str(os.path.splitext(os.path.basename(config_file))[0])
-    cfg = Settings(config_file, list_file, folder_name)
-
-    make_folder_structure(cfg.folder_name)
-    write_full_logfile_startup(folder_name, list_file, keyword_arguments)
+    cfg = Settings(main_folder, list_file, config_file)
+    make_folder_structure(cfg.main_folder)
+    write_full_logfile_startup(cfg)
 
     # TODO implement model
     initial_model = None #build_nn_model(nn_arch, n_bins, class_type, swap_4d_channels, str_ident, loss_opt, n_gpu, batchsize)

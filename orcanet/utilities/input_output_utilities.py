@@ -119,27 +119,29 @@ def read_out_list_file(list_file):
     return train_files, evaluation_files, multiple_inputs
 
 
-def write_full_logfile_startup(folder_name, list_filename, keyword_arguments):
+def write_full_logfile_startup(cfg):
     """
     Whenever the orca_train function is run, this logs all the input parameters in the full log file.
 
+    Parameters
+    ----------
+    cfg : class Settings
     """
-    logfile = folder_name + '/full_log.txt'
-    train_files, test_files, multiple_inputs = read_out_list_file(list_filename)
+    logfile = cfg.main_folder + 'full_log.txt'
     with open(logfile, 'a+') as f_out:
         f_out.write('--------------------------------------------------------------------------------------------------------\n')
         f_out.write('--------------------------------------------------------------------------------------------------------\n\n\n')
         f_out.write("New execution of the orca_train function started with the following options:\n")
-        f_out.write("List file path:\t"+list_filename+"\n")
+        f_out.write("List file path:\t"+cfg.list_file+"\n")
         f_out.write("Given trainfiles in the .list file:\n")
-        for train_file in train_files:
+        for train_file in cfg.train_files:
             f_out.write("   " + str(train_file)+"\n")
         f_out.write("\nGiven testfiles in the .list file:\n")
-        for test_file in test_files:
+        for test_file in cfg.test_files:
             f_out.write("   " + str(test_file) + "\n")
         f_out.write("\nGiven options in the .toml config:\n")
-        for keyword_argument in keyword_arguments.keys():
-            f_out.write("   {}:\t{}\n".format(keyword_argument, keyword_arguments[keyword_argument]))
+        for key in vars(cfg):
+            f_out.write("   {}:\t{}\n".format(key, cfg[key]))
         f_out.write("\n")
 
 
@@ -391,7 +393,7 @@ class Settings(object):
 
     Attributes
     ----------
-    list_filename : str
+    list_file : str
         Path to a list file which contains pathes to all the h5 files that should be used for training and evaluation.
     folder_name : str
         Name of the folder of this model in which everything will be saved. E.g., the summary.txt log file is located in here.
@@ -405,7 +407,7 @@ class Settings(object):
         Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
     batchsize : int
         Batchsize that should be used for the training / inferencing of the cnn.
-    epoch : List[int, int]
+    initial_epoch : List[int, int]
         Declares if a previously trained model or a new model (=0) should be loaded.
         The first argument specifies the last epoch, and the second argument is the last train file number if the train
         dataset is split over multiple files. Can also give [-1,-1] to automatically load the most recent epoch.
@@ -437,35 +439,42 @@ class Settings(object):
         For testing purposes. If not the whole .h5 file should be used for training, define the number of events.
 
     """
-    def __init__(self, config_file, list_file, folder_name):
-        self.config_file = config_file
-        self.list_file = list_file
-        self.folder_name = folder_name
+    def __init__(self, main_folder, list_file, config_file=None):
+        # Default Settings:
+        self.swap_4d_channels = None
+        self.batchsize = 64
+        self.initial_epoch = [-1, -1]
+        self.epochs_to_train = -1
+        self.n_gpu = (1, 'avolkov')
+        self.use_scratch_ssd = False
+        self.zero_center = False
+        self.shuffle = (False, None)
+        self.str_ident = ''
+        self.train_logger_display = 100
+        self.train_logger_flush = -1
+        self.train_verbose = 2
+        self.n_events = None
+        self._default_values = dict(self.__dict__)
 
-        user_values = read_out_config_file(self.config_file)
-        default_values = self.get_default_values()
-        for key in default_values:
-            setattr(self, key, default_values[key])
+        # User Settings:
+        if main_folder[-1] == "/":
+            self.main_folder = main_folder
+        else:
+            self.main_folder = main_folder+"/"
+
+        self.config_file = config_file
+        if self.config_file is not None:
+            self.set_from_config_file(self.config_file)
+
+        self.list_file = list_file
+        self.train_files, self.test_files, self.multiple_inputs = read_out_list_file(self.list_file)
+
+
+    def set_from_config_file(self, config_file):
+        """ Overwrite default attribute values with values from a config file. """
+        user_values = read_out_config_file(config_file)
         for key in user_values:
             if hasattr(self, key):
                 setattr(self, key, user_values[key])
             else:
                 raise AttributeError("Unknown option "+str(key))
-
-    @staticmethod
-    def get_default_values():
-        default_values = dict()
-        default_values["swap_4d_channels"] = None
-        default_values["batchsize"] = 64
-        default_values["epoch"] = [-1, -1]
-        default_values["epochs_to_train"] = -1
-        default_values["n_gpu"] = (1, 'avolkov')
-        default_values["use_scratch_ssd"] = False
-        default_values["zero_center"] = False
-        default_values["shuffle"] = (False, None)
-        default_values["str_ident"] = ''
-        default_values["train_logger_display"] = 100
-        default_values["train_logger_flush"] = -1
-        default_values["train_verbose"] = 2
-        default_values["n_events"] = None
-        return default_values
