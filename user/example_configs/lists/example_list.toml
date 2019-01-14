@@ -7,22 +7,22 @@
 # -----------------------------
 # [[input]]
 # train_files = [
-# "path/to/train_file_1_dimx.h5",
-# "path/to/train_file_2_dimx.h5",
+# "path/to/train_file_1_inputx.h5",
+# "path/to/train_file_2_inputx.h5",
 # ]
 #
 # evaluation_files = [
-# "path/to/test_file_1_dimx.h5",
+# "path/to/test_file_1_inputx.h5",
 # ]
 #
 # [[input]]
 # train_files = [
-# "path/to/train_file_1_dimy.h5",
-# "path/to/train_file_2_dimy.h5",
+# "path/to/train_file_1_inputy.h5",
+# "path/to/train_file_2_inputy.h5",
 # ]
 #
 # evaluation_files = [
-# "path/to/test_file_1_dimy.h5",
+# "path/to/test_file_1_inputy.h5",
 # ]
 # -----------------------------
 
