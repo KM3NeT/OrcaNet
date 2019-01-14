@@ -12,8 +12,8 @@ import numpy as np
 
 def read_out_config_file(config_file):
     """
-    Extract the variables of a model from the .toml file and convert them to a dict. It is handed to the execute_nn
-    function in run_nn.py.
+    Extract the variables of a model from the .toml file and convert them to a dict. These are stored in the
+    Settings class, and are used in the OrcaNet scripts at various occasions.
 
     Parameters
     ----------
@@ -22,19 +22,18 @@ def read_out_config_file(config_file):
     Returns
     -------
     keyword_arguments : dict
-        Arguments for the execute_nn function.
+        Values for the OrcaNet scripts, as listed in the Settings class.
 
     """
-    config = toml.load(config_file)
-    keyword_arguments = config["keyword_arguments"]
-    if "initial_epoch" in keyword_arguments:
-        keyword_arguments["initial_epoch"] = tuple(keyword_arguments["initial_epoch"])
+    f = toml.load(config_file)
+    keyword_arguments = f["config"]
     if "class_type" in keyword_arguments:
         if keyword_arguments["class_type"][0]=="None":
             keyword_arguments["class_type"][0] = None
     if "n_gpu" in keyword_arguments:
         keyword_arguments["n_gpu"][0] = int(keyword_arguments["n_gpu"][0])
-    keyword_arguments["loss_opt"] = (config["losses"], None)
+
+    keyword_arguments["loss_opt"] = (f["losses"], None)
 
     return keyword_arguments
 
@@ -439,7 +438,8 @@ class Settings(object):
         # Default Settings:
         self.swap_4d_channels = None
         self.batchsize = 64
-        self.initial_epoch = (-1, -1)
+        self.initial_epoch = -1
+        self.initial_fileno = -1
         self.epochs_to_train = -1
         self.n_gpu = (1, 'avolkov')
         self.use_scratch_ssd = False
@@ -453,22 +453,30 @@ class Settings(object):
         self.class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
 
         self._default_values = dict(self.__dict__)
-
         # User Settings:
         if main_folder[-1] == "/":
             self.main_folder = main_folder
         else:
             self.main_folder = main_folder+"/"
 
+        self.list_file = list_file
+        self.train_files = None
+        self.test_files = None
+        self.multiple_inputs = None
+        self.n_bins = None
+        if list_file is not None:
+            self.set_from_list_file(list_file)
+
         self.config_file = config_file
         if self.config_file is not None:
             self.set_from_config_file(self.config_file)
 
-        self.list_file = list_file
-        if self.list_file is None:
-            self.train_files, self.test_files, self.multiple_inputs = None, None, None
-        else:
-            self.train_files, self.test_files, self.multiple_inputs = read_out_list_file(self.list_file)
+
+    def set_from_list_file(self, list_file):
+        """ Set filepaths to the ones given in a list file. """
+        self.train_files, self.test_files, self.multiple_inputs = read_out_list_file(list_file)
+        self.n_bins = h5_get_n_bins(self.train_files)
+
 
     def set_from_config_file(self, config_file):
         """ Overwrite default attribute values with values from a config file. """
@@ -479,6 +487,6 @@ class Settings(object):
             else:
                 raise AttributeError("Unknown option "+str(key))
 
-    def get_n_bins(self):
-        n_bins = h5_get_n_bins(self.train_files)
-        return n_bins
+
+
+

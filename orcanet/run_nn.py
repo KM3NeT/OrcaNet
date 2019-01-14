@@ -314,11 +314,11 @@ def execute_nn(cfg, initial_model=None):
         ...
 
     """
-    epoch = cfg.initial_epoch
+    epoch = (cfg.initial_epoch, cfg.initial_fileno)
     if epoch[0] == -1 and epoch[1] == -1:
         epoch = look_for_latest_epoch(cfg.main_folder)
         print("Automatically set epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
-    n_bins = cfg.get_n_bins()
+    n_bins = cfg.n_bins
 
     if epoch[0] == 0 and epoch[1] == 1:
         if initial_model is None:

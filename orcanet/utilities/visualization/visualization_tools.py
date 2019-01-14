@@ -291,7 +291,7 @@ def plot_weights_and_activations(cfg, xs_mean, epoch, file_no):
     :param str folder_name: Path to the folder of a trained model.
     """
     model_name = cfg.main_folder + 'saved_models/model_epoch_' + str(epoch) + '_file_' + str(file_no) + '.h5'
-    layer_names, activations, weights, y_values = get_activations_and_weights(cfg.test_files[0][0], cfg.get_n_bins, cfg.class_type, xs_mean, cfg.swap_4d_channels,
+    layer_names, activations, weights, y_values = get_activations_and_weights(cfg.test_files[0][0], cfg.n_bins, cfg.class_type, xs_mean, cfg.swap_4d_channels,
                                             model_name, cfg.str_ident, layer_name=None, learning_phase='test')
 
     fig, axes = plt.subplots()

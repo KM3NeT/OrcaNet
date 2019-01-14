@@ -40,7 +40,7 @@ def generate_batches_from_hdf5_file(cfg, filepath, f_size=None, zero_center_imag
     n_files = len(filepath)
     dimensions = {}
     for i in range(n_files):
-        dimensions[i] = get_dimensions_encoding(cfg.get_n_bins()[i], cfg.batchsize)
+        dimensions[i] = get_dimensions_encoding(cfg.n_bins[i], cfg.batchsize)
 
     swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'xyt-z': (0, 1, 2, 4, 3), 't-xyz': (0,4,1,2,3), 'tyz-x': (0,4,2,3,1)}
 
