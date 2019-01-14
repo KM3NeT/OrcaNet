@@ -29,7 +29,7 @@ from docopt import docopt
 mpl.use('Agg')
 import warnings
 
-from utilities.input_output_utilities import use_node_local_ssd_for_input, read_out_list_file, read_out_config_file, write_summary_logfile, write_full_logfile, read_logfiles, look_for_latest_epoch, h5_get_n_bins, write_full_logfile_startup, Settings
+from utilities.input_output_utilities import use_node_local_ssd_for_input, write_summary_logfile, write_full_logfile, read_logfiles, write_full_logfile_startup, Settings
 from utilities.nn_utilities import load_zero_center_data, BatchLevelPerformanceLogger
 from utilities.data_tools.shuffle_h5 import shuffle_h5
 from utilities.visualization.visualization_tools import *
@@ -302,7 +302,7 @@ def evaluate_model(cfg, model, xs_mean):
     return history_test
 
 
-def execute_nn(cfg, initial_model=None):
+def orca_train(cfg, initial_model=None):
     """
     Core code that trains a neural network.
 
@@ -314,11 +314,13 @@ def execute_nn(cfg, initial_model=None):
         ...
 
     """
+    make_folder_structure(cfg.main_folder)
+    write_full_logfile_startup(cfg)
+
     epoch = (cfg.initial_epoch, cfg.initial_fileno)
     if epoch[0] == -1 and epoch[1] == -1:
-        epoch = look_for_latest_epoch(cfg.main_folder)
+        epoch = cfg.get_latest_epoch()
         print("Automatically set epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
-    n_bins = cfg.n_bins
 
     if epoch[0] == 0 and epoch[1] == 1:
         if initial_model is None:
@@ -334,7 +336,7 @@ def execute_nn(cfg, initial_model=None):
     model.summary()
 
     if cfg.zero_center:
-        xs_mean = load_zero_center_data(cfg.train_files, cfg.batchsize, n_bins, cfg.n_gpu[0])
+        xs_mean = load_zero_center_data(cfg.train_files, cfg.batchsize, cfg.n_bins, cfg.n_gpu[0])
     else:
         xs_mean = None
 
@@ -366,9 +368,9 @@ def make_folder_structure(main_folder):
             os.makedirs(directory)
 
 
-def orca_train(main_folder, list_file, config_file):
+def example_run(main_folder, list_file, config_file):
     """
-    Frontend function for training networks.
+    This shows how to use OrcaNet.
 
     Parameters
     ----------
@@ -380,16 +382,13 @@ def orca_train(main_folder, list_file, config_file):
     config_file : str
         Path to a .toml file which contains all the infos for training and testing of a model.
 
-
     """
     cfg = Settings(main_folder, list_file, config_file)
-    make_folder_structure(cfg.main_folder)
-    write_full_logfile_startup(cfg)
-
-    # TODO implement model
-    initial_model = None #build_nn_model(nn_arch, n_bins, class_type, swap_4d_channels, str_ident, loss_opt, n_gpu, batchsize)
-
-    execute_nn(cfg, initial_model)
+    if cfg.get_latest_epoch() == (0,1):
+        initial_model = build_nn_model(cfg)
+    else:
+        initial_model = None
+    orca_train(cfg, initial_model)
 
 
 def parse_input():
@@ -398,7 +397,7 @@ def parse_input():
     config_file = args['CONFIG']
     list_file = args['LIST']
     main_folder = args['FOLDER'] if args['FOLDER'] is not None else "./"
-    orca_train(main_folder, list_file, config_file)
+    example_run(main_folder, list_file, config_file)
 
 
 if __name__ == '__main__':

@@ -12,7 +12,7 @@
 # Info for building a OrcaNet model.
 nn_arch = 'VGG'
 
-[losses]
+[model.losses]
 dx = {function="mse", weight=10}
 dy = {function="mse", weight=10}
 dz = {function='mean_absolute_error', weight=15}

@@ -119,23 +119,13 @@ def get_optimizer_info(loss_opt, optimizer='adam'):
     return loss_functions, metrics, loss_weight, optimizer
 
 
-def build_nn_model(nn_arch, n_bins, class_type, swap_4d_channels, str_ident, loss_opt, n_gpu, batchsize):
+def build_nn_model(cfg):
     """
     Function that builds a Keras nn model with a specific type of architecture. Can also parallelize to multiple GPUs.
 
     Parameters
     ----------
-    nn_arch : str
-        Architecture of the neural network.
-    n_bins : list(tuple(int))
-        Declares the number of bins for each dimension (e.g. (x,y,z,t)) in the train- and testfiles.
-    class_type : tuple(int, str)
-        Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
-    swap_4d_channels : None/str
-        For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
-    str_ident : str
-        Optional string identifier that gets appended to the modelname. Useful when training models which would have
-        the same modelname. Also used for defining models and projections!
+    cfg : class Settings
 
     Returns
     -------

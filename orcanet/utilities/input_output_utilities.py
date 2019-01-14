@@ -1,7 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Utility code like parsing the command line input or
-technical stuff like copying the files to the node-local SSD."""
+"""
+Utility code like parsing the command line input or
+technical stuff like copying the files to the node-local SSD.
+
+Reading toml files: There are three different keywords:
+    "input" :   The input to networks.
+    "config" :  The Settings.
+    "model" :   Options for auto-generated OrcaNet models.
+
+"""
 
 import os
 import shutil
@@ -61,8 +69,8 @@ def list_get_number_of_files(file_content, keyword):
 
     """
     number_of_files = 0
-    for dataset_no in range(len(file_content["input"])):
-        current_number_of_files = len(file_content["input"][dataset_no][keyword])
+    for dataset_no in range(len(file_content)):
+        current_number_of_files = len(file_content[dataset_no][keyword])
         if dataset_no == 0:
             number_of_files = current_number_of_files
         elif current_number_of_files != number_of_files:
@@ -70,12 +78,12 @@ def list_get_number_of_files(file_content, keyword):
     return number_of_files
 
 
-def list_restructure(number_of_files, keyword, file_content_input):
+def list_restructure(number_of_files, keyword, file_content):
     """ Arrange the given files to the desired format. """
     files = []
     for file_no in range(number_of_files):
         file_set = []
-        for input_data in file_content_input:
+        for input_data in file_content:
             file_set.append(input_data[keyword][file_no])
         files.append([file_set, h5_get_number_of_rows(file_set[0])])
         #TODO Maybe files have different number of events? Should give an error
@@ -109,12 +117,12 @@ def read_out_list_file(list_file):
         simulataneosly from different files).
 
     """
-    file_content = toml.load(list_file)
+    file_content = toml.load(list_file)["input"]
     number_of_train_files = list_get_number_of_files(file_content, "train_files")
     number_of_eval_files = list_get_number_of_files(file_content, "evaluation_files")
-    train_files = list_restructure(number_of_train_files, "train_files", file_content["input"])
-    evaluation_files = list_restructure(number_of_eval_files, "evaluation_files", file_content["input"])
-    multiple_inputs = len(file_content["input"]) > 1
+    train_files = list_restructure(number_of_train_files, "train_files", file_content)
+    evaluation_files = list_restructure(number_of_eval_files, "evaluation_files", file_content)
+    multiple_inputs = len(file_content) > 1
 
     return train_files, evaluation_files, multiple_inputs
 
@@ -126,6 +134,8 @@ def write_full_logfile_startup(cfg):
     Parameters
     ----------
     cfg : class Settings
+        ...
+
     """
     logfile = cfg.main_folder + 'full_log.txt'
     with open(logfile, 'a+') as f_out:
@@ -257,32 +267,6 @@ def read_logfiles(summary_logfile):
         #file_data["Batch_float"]+=(epoch-1)
         full_train_data = np.append(full_train_data, file_data)
     return summary_data, full_train_data
-
-
-def look_for_latest_epoch(main_folder):
-    """
-    Check all saved models in the ./saved_models folder and return the highest epoch / file_no pair.
-
-    Parameters
-    ----------
-    main_folder : str
-        Name of the main folder.
-    Returns
-    -------
-    List
-        The highest epoch, file_no pair. [0,1] if the folder is empty.
-
-    """
-    files = os.listdir(main_folder + "saved_models")
-    if len(files) == 0:
-        latest_epoch = [0 , 1]
-    else:
-        epochs = []
-        for file in files:
-            epoch, file_no = file.split("model_epoch_")[-1].split(".h5")[0].split("_file_")
-            epochs.append([int(epoch), int(file_no)])
-        latest_epoch = max(epochs)
-    return latest_epoch
 
 
 def h5_get_number_of_rows(h5_filepath):
@@ -453,6 +437,7 @@ class Settings(object):
         self.class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
 
         self._default_values = dict(self.__dict__)
+
         # User Settings:
         if main_folder[-1] == "/":
             self.main_folder = main_folder
@@ -488,5 +473,29 @@ class Settings(object):
                 raise AttributeError("Unknown option "+str(key))
 
 
+    def get_default_values(self):
+        return self._default_values
+
+
+    def get_latest_epoch(self):
+        """
+        Check all saved models in the ./saved_models folder and return the highest epoch / file_no pair.
+
+        Returns
+        -------
+        latest_epoch : tuple
+            The highest epoch, file_no pair. (0,1) if the folder is empty.
+
+        """
+        files = os.listdir(self.main_folder + "saved_models")
+        if len(files) == 0:
+            latest_epoch = (0, 1)
+        else:
+            epochs = []
+            for file in files:
+                epoch, file_no = file.split("model_epoch_")[-1].split(".h5")[0].split("_file_")
+                epochs.append((int(epoch), int(file_no)))
+            latest_epoch = max(epochs)
+        return latest_epoch
 
 
