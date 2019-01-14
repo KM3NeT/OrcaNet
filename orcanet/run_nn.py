@@ -336,7 +336,7 @@ def orca_train(cfg, initial_model=None):
     model.summary()
 
     if cfg.zero_center:
-        xs_mean = load_zero_center_data(cfg.train_files, cfg.batchsize, cfg.n_bins, cfg.n_gpu[0])
+        xs_mean = load_zero_center_data(cfg.train_files, cfg.n_gpu[0])
     else:
         xs_mean = None
 

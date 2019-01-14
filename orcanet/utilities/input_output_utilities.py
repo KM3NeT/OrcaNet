@@ -448,7 +448,7 @@ class Settings(object):
         self.train_files = None
         self.test_files = None
         self.multiple_inputs = None
-        self.n_bins = None
+        #self.n_bins = None
         if list_file is not None:
             self.set_from_list_file(list_file)
 
@@ -460,7 +460,7 @@ class Settings(object):
     def set_from_list_file(self, list_file):
         """ Set filepaths to the ones given in a list file. """
         self.train_files, self.test_files, self.multiple_inputs = read_out_list_file(list_file)
-        self.n_bins = h5_get_n_bins(self.train_files)
+        #self.n_bins = h5_get_n_bins(self.train_files)
 
 
     def set_from_config_file(self, config_file):

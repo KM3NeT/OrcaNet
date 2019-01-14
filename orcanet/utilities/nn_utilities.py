@@ -320,14 +320,12 @@ def encode_targets(y_val, class_type):
 
 #------------- Functions for preprocessing -------------#
 
-def load_zero_center_data(train_files, batchsize, n_bins, n_gpu):
+def load_zero_center_data(train_files, n_gpu):
     """
     Gets the xs_mean array that can be used for zero-centering.
     The array is either loaded from a previously saved file or it is calculated on the fly.
     Currently only works for a single input training file!
     :param list(([train_filepath], train_filesize)) train_files: list of tuples that contains the list of trainfiles and their number of rows.
-    :param int batchsize: Batchsize that is being used in the data.
-    :param list(tuple) n_bins: Number of bins for each dimension (x,y,z,t) in the tran_file. Can contain multiple n_bins tuples.
     :param int n_gpu: Number of gpu's, used for calculating the available RAM space in get_mean_image().
     :return: ndarray xs_mean: mean_image of the x dataset. Can be used for zero-centering later on.
     """
@@ -343,13 +341,11 @@ def load_zero_center_data(train_files, batchsize, n_bins, n_gpu):
 
         else:
             print('Calculating the xs_mean_array in order to zero_center the data!')
-            dimensions = get_dimensions_encoding(n_bins[i], batchsize)
-
             # if the train dataset is split over multiple files, we need to average over the single xs_mean_temp arrays.
             xs_mean_temp_arr = None
             for j in range(len(train_files)):
                 filepath_j = train_files[j][0][i] # j is the index of the j-th train file, i the index of the i-th projection input
-                xs_mean_temp_step = get_mean_image(filepath_j, dimensions, n_gpu)
+                xs_mean_temp_step = get_mean_image(filepath_j, n_gpu)
 
                 if xs_mean_temp_arr is None:
                     xs_mean_temp_arr = np.zeros((len(train_files),) + xs_mean_temp_step.shape, dtype=np.float64)
@@ -365,12 +361,11 @@ def load_zero_center_data(train_files, batchsize, n_bins, n_gpu):
     return xs_mean
 
 
-def get_mean_image(filepath, dimensions, n_gpu):
+def get_mean_image(filepath, n_gpu):
     """
     Returns the mean_image of a xs dataset.
     Calculating still works if xs is larger than the available memory and also if the file is compressed!
     :param str filepath: Filepath of the data upon which the mean_image should be calculated.
-    :param tuple dimensions: Dimensions tuple for 2D, 3D or 4D data.
     :param filepath: Filepath of the input data, used as a str for saving the xs_mean_image.
     :param int n_gpu: Number of used gpu's that is related to how much RAM is available (16G per GPU).
     :return: ndarray xs_mean: mean_image of the x dataset. Can be used for zero-centering later on.
@@ -399,7 +394,7 @@ def get_mean_image(filepath, dimensions, n_gpu):
         xs_mean_arr[i] = xs_mean_temp
 
     xs_mean = np.mean(xs_mean_arr, axis=0, dtype=np.float64).astype(np.float32)
-    xs_mean = np.reshape(xs_mean, dimensions[1:]) # give the shape the channels dimension again if not 4D
+    #xs_mean = np.reshape(xs_mean, dimensions[1:]) # give the shape the channels dimension again if not 4D
 
     return xs_mean
 
@@ -423,44 +418,7 @@ def get_array_memsize(array):
 
 #------------- Various other functions -------------#
 
-def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident=''):
-    """
-    Derives the name of a model based on its number of bins and the class_type tuple.
-    The final modelname is defined as 'model_Nd_proj_class_type[1]'.
-    E.g. 'model_3d_xyz_muon-CC_to_elec-CC'.
-    :param list(tuple) n_bins: Number of bins for each dimension (x,y,z,t) of the training images. Can contain multiple n_bins tuples.
-    :param (int, str) class_type: Tuple that declares the number of output classes and a string identifier to specify the exact output classes.
-                                  I.e. (2, 'muon-CC_to_elec-CC')
-    :param str nn_arch: String that declares which neural network model architecture is used.
-    :param None/str swap_4d_channels: For 4D data input (3.5D models). Specifies the projection type.
-    :param str str_ident: Optional str identifier that gets appended to the modelname.
-    :return: str modelname: Derived modelname.
-    """
-    modelname = 'model_' + nn_arch + '_'
 
-    projection = ''
-    for i, bins in enumerate(n_bins):
-
-        dim = 4- bins.count(1)
-        if i > 0: projection += '_and_'
-        projection += str(dim) + 'd_'
-
-        if bins.count(1) == 0 and i == 0: # for 4D input # TODO FIX BUG XYZT AFTER NAME
-            if swap_4d_channels is not None:
-                projection += swap_4d_channels
-            else:
-                projection += 'xyz-c' if bins[3] == 31 else 'xyz-t'
-
-        else: # 2D/3D input
-            if bins[0] > 1: projection += 'x'
-            if bins[1] > 1: projection += 'y'
-            if bins[2] > 1: projection += 'z'
-            if bins[3] > 1: projection += 't'
-
-    str_ident = '_' + str_ident if str_ident is not '' else str_ident
-    modelname += projection + '_' + class_type[1] + str_ident
-
-    return modelname
 
 #------------- Various other functions -------------#
 

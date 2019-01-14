@@ -26,8 +26,8 @@ import matplotlib as mpl
 from docopt import docopt
 mpl.use('Agg')
 
-from utilities.input_output_utilities import use_node_local_ssd_for_input, read_out_list_file, read_out_config_file, look_for_latest_epoch, h5_get_n_bins
-from utilities.nn_utilities import load_zero_center_data, get_modelname
+from utilities.input_output_utilities import use_node_local_ssd_for_input, read_out_list_file, read_out_config_file, h5_get_n_bins
+from utilities.nn_utilities import load_zero_center_data
 from utilities.evaluation_utilities import *
 from utilities.losses import get_all_loss_functions
 
@@ -137,6 +137,46 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
             make_2d_dir_correlation_plot_different_sigmas(arr_nn_pred, modelname, folder_name, precuts=precuts)
 
 
+def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident=''):
+    """
+    Derives the name of a model based on its number of bins and the class_type tuple.
+    The final modelname is defined as 'model_Nd_proj_class_type[1]'.
+    E.g. 'model_3d_xyz_muon-CC_to_elec-CC'.
+    :param list(tuple) n_bins: Number of bins for each dimension (x,y,z,t) of the training images. Can contain multiple n_bins tuples.
+    :param (int, str) class_type: Tuple that declares the number of output classes and a string identifier to specify the exact output classes.
+                                  I.e. (2, 'muon-CC_to_elec-CC')
+    :param str nn_arch: String that declares which neural network model architecture is used.
+    :param None/str swap_4d_channels: For 4D data input (3.5D models). Specifies the projection type.
+    :param str str_ident: Optional str identifier that gets appended to the modelname.
+    :return: str modelname: Derived modelname.
+    """
+    modelname = 'model_' + nn_arch + '_'
+
+    projection = ''
+    for i, bins in enumerate(n_bins):
+
+        dim = 4- bins.count(1)
+        if i > 0: projection += '_and_'
+        projection += str(dim) + 'd_'
+
+        if bins.count(1) == 0 and i == 0: # for 4D input # TODO FIX BUG XYZT AFTER NAME
+            if swap_4d_channels is not None:
+                projection += swap_4d_channels
+            else:
+                projection += 'xyz-c' if bins[3] == 31 else 'xyz-t'
+
+        else: # 2D/3D input
+            if bins[0] > 1: projection += 'x'
+            if bins[1] > 1: projection += 'y'
+            if bins[2] > 1: projection += 'z'
+            if bins[3] > 1: projection += 't'
+
+    str_ident = '_' + str_ident if str_ident is not '' else str_ident
+    modelname += projection + '_' + class_type[1] + str_ident
+
+    return modelname
+
+
 def eval_nn(list_filename, folder_name, loss_opt, class_type, nn_arch,
                swap_4d_channels=None, batchsize=64, epoch=[-1,-1], epochs_to_train=-1, n_gpu=(1, 'avolkov'), use_scratch_ssd=False,
                zero_center=False, shuffle=(False,None), str_ident='', train_logger_display=100, train_logger_flush=-1,
@@ -154,7 +194,7 @@ def eval_nn(list_filename, folder_name, loss_opt, class_type, nn_arch,
         epoch = look_for_latest_epoch(folder_name)
         print("Automatically initialized epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
     if zero_center:
-        xs_mean = load_zero_center_data(train_files, batchsize, n_bins, n_gpu[0])
+        xs_mean = load_zero_center_data(train_files, n_gpu[0])
     else:
         xs_mean = None
     if use_scratch_ssd:
