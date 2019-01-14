@@ -6,6 +6,14 @@
 Welcome to OrcaNet's documentation!
 ===================================
 
+.. image:: https://git.km3net.de/ml/OrcaNet/badges/master/build.svg
+    :target: https://git.km3net.de/ml/OrcaNet/pipelines
+
+| OrcaNet is a part of the Deep Learning efforts for the neutrino telescope KM3NeT.
+| Find more information about KM3NeT on http://www.km3net.org.
+
+As of now, these docs only contain the API documentation.
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:

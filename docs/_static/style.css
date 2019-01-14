@@ -1,0 +1,13 @@
+ .wy-nav-content {
+    max-width: none;
+}
+
+ .section #basic-2-flip-flop-synchronizer{
+     text-align:justify;
+}
+
+ body {
+    max-width: 1000px !important;
+    margin: 0;
+    padding-left: 1em;
+}

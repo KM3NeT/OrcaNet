@@ -1,5 +1,6 @@
 __pycache__
 *.egg-info
-doc/_build
+docs/_build
+orcanet/version.txt
 
 
