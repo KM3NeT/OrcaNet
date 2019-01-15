@@ -401,12 +401,9 @@ class Settings(object):
     ----------
     main_folder : str
         Name of the folder of this model in which everything will be saved, e.g., the summary.txt log file is located in here.
-    list_file : str
-        Path to a list file with pathes to all the h5 files that should be used for training and evaluation.
-    config_file : str
-        Path to the config file with attributes that are used instead of the default ones.
     modeldata : namedtuple
-        Optional info only required for building a predefined model with OrcaNet. It is set via self.load_from_model_file.
+        Optional info only required for building a predefined model with OrcaNet.
+        It is set via self.load_from_model_file. [default: None]
 
         modeldata.nn_arch : str
             Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
@@ -471,7 +468,21 @@ class Settings(object):
 
     """
     def __init__(self, main_folder, list_file=None, config_file=None):
-        """ Set the attributes of the object. """
+        """
+        Set the attributes of the object.
+
+        Values are loaded from the given files, if provided. Otherwise, default values are used.
+
+        Parameters
+        ----------
+        main_folder : str
+            Name of the folder of this model in which everything will be saved, e.g., the summary.txt log file is located in here.
+        list_file : str
+            Path to a list file with pathes to all the h5 files that should be used for training and evaluation.
+        config_file : str
+            Path to the config file with attributes that are used instead of the default ones.
+
+        """
         # Default settings:
         self.batchsize = 64
         self.class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
@@ -492,37 +503,53 @@ class Settings(object):
         self._default_values = dict(self.__dict__)
         self.modeldata = None
 
-        # User Settings:
+        # IO attributes:
         if main_folder[-1] == "/":
             self.main_folder = main_folder
         else:
             self.main_folder = main_folder+"/"
 
-        self.list_file = list_file
-        self.train_files = None
-        self.eval_files = None
-        self.multiple_inputs = None
-        # self.n_bins = None
+        self._list_file = None
+        self._train_files = None
+        self._eval_files = None
+        self._multiple_inputs = None
+
         if list_file is not None:
             self.set_from_list_file(list_file)
 
-        self.config_file = config_file
-        if self.config_file is not None:
-            self.set_from_config_file(self.config_file)
+        self._config_file = None
+        if config_file is not None:
+            self.set_from_config_file(config_file)
 
     def set_from_list_file(self, list_file):
         """ Set filepaths to the ones given in a list file. """
-        self.train_files, self.eval_files, self.multiple_inputs = read_out_list_file(list_file)
+        if self._list_file is None:
+            self._train_files, self._eval_files, self._multiple_inputs = read_out_list_file(list_file)
+            # Save internally which path was used to load the info
+            self._list_file = list_file
+        else:
+            raise ValueError("You tried to load filepathes from a list file, but pathes have already been loaded \
+            for this object. (From the file " + self._list_file + ")\nYou should not use \
+            two different list files for one object!")
         # self.n_bins = h5_get_n_bins(self.train_files)
 
     def set_from_config_file(self, config_file):
         """ Overwrite default attribute values with values from a config file. """
-        user_values = read_out_config_file(config_file)
-        for key in user_values:
-            if hasattr(self, key):
-                setattr(self, key, user_values[key])
-            else:
-                raise AttributeError("Unknown option "+str(key))
+        if self._config_file is None:
+            user_values = read_out_config_file(config_file)
+            for key in user_values:
+                if hasattr(self, key):
+                    setattr(self, key, user_values[key])
+                else:
+                    raise AttributeError("You tried to set the attribute "+str(key)+" in your config file\n"
+                                         + config_file + "\n, but this attribute is not provided. Check \
+                                         the possible attributes in the definition of the Settings class.")
+            # Save internally which path was used to load the info
+            self._config_file = config_file
+        else:
+            raise ValueError("You tried to load settings from a config file, but they have already been loaded \
+            for this object! (From the file " + self._config_file + ")\nYou should not use \
+            two different config files for one object!")
 
     def set_from_model_file(self, model_file):
         """ Set attributes for generating models with OrcaNet. """
@@ -534,6 +561,16 @@ class Settings(object):
     def get_default_values(self):
         """ Return default values of common settings. """
         return self._default_values
+
+    def get_train_files(self):
+        return self._train_files
+
+    def get_eval_files(self):
+        return self._eval_files
+
+    def get_multiple_inputs(self):
+        # TODO Remove this attribute and make it a function instead
+        return self._multiple_inputs
 
     def get_latest_epoch(self):
         """

@@ -348,12 +348,12 @@ def orca_train(cfg, initial_model=None):
     model.summary()
 
     if cfg.zero_center:
-        xs_mean = load_zero_center_data(cfg.train_files, cfg.n_gpu[0])
+        xs_mean = load_zero_center_data(cfg.get_train_files(), cfg.n_gpu[0])
     else:
         xs_mean = None
 
     if cfg.use_scratch_ssd:
-        cfg.train_files, cfg.eval_files = use_node_local_ssd_for_input(cfg.train_files, cfg.eval_files, multiple_inputs=cfg.multiple_inputs)
+        cfg._train_files, cfg._eval_files = use_node_local_ssd_for_input(cfg.get_train_files(), cfg.get_eval_files(), multiple_inputs=cfg.get_multiple_inputs())
 
     trained_epochs = 0
     while trained_epochs < cfg.epochs_to_train or cfg.epochs_to_train == -1:
