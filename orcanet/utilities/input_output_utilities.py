@@ -17,34 +17,33 @@ import h5py
 import toml
 from time import gmtime, strftime
 import numpy as np
+from collections import namedtuple
 
 
-def read_out_config_file(config_file):
+def read_out_config_file(file):
     """
-    Extract the variables of a model from the .toml file and convert them to a dict. These are stored in the
-    Settings class, and are used in the OrcaNet scripts at various occasions.
+    Extract the variables of a model from the .toml file and convert them to a dict.
+
+    Toml can not handle arrays with mixed types of variables, so some conversion are done.
 
     Parameters
     ----------
-    config_file : str
+    file : str
         Path and name of the .toml file that defines the properties of the model.
+
     Returns
     -------
     keyword_arguments : dict
         Values for the OrcaNet scripts, as listed in the Settings class.
 
     """
-    f = toml.load(config_file)
-    keyword_arguments = f["config"]
-    if "class_type" in keyword_arguments:
-        if keyword_arguments["class_type"][0] == "None":
-            keyword_arguments["class_type"][0] = None
-    if "n_gpu" in keyword_arguments:
-        keyword_arguments["n_gpu"][0] = int(keyword_arguments["n_gpu"][0])
-
-    keyword_arguments["loss_opt"] = (f["losses"], None)
-
-    return keyword_arguments
+    file_content = toml.load(file)["config"]
+    if "class_type" in file_content:
+        if file_content["class_type"][0] == "None":
+            file_content["class_type"][0] = None
+    if "n_gpu" in file_content:
+        file_content["n_gpu"][0] = int(file_content["n_gpu"][0])
+    return file_content
 
 
 def list_get_number_of_files(file_content, keyword):
@@ -91,14 +90,14 @@ def list_restructure(number_of_files, keyword, file_content):
     return files
 
 
-def read_out_list_file(list_file):
+def read_out_list_file(file):
     """
     Reads out a list file in .toml format containing the pathes to training
     and evaluation files and bring it into the proper format.
 
     Parameters
     ----------
-    list_file : str
+    file : str
         Path to a .list file containing the paths to training and test files to be used during training.
 
     Returns
@@ -111,14 +110,14 @@ def read_out_list_file(list_file):
                  [['path/to/train_file_2_dimx.h5', 'path/to/train_file_2_dimy.h5'], number_of_events_train_files_2],
                  ...
                 ]
-    test_files : list
+    evaluation_files : list
         Like the above but for test files.
     multiple_inputs : bool
         Whether seperate sets of input files were given (e.g. for networks taking data
         simulataneosly from different files).
 
     """
-    file_content = toml.load(list_file)["input"]
+    file_content = toml.load(file)["input"]
     number_of_train_files = list_get_number_of_files(file_content, "train_files")
     number_of_eval_files = list_get_number_of_files(file_content, "evaluation_files")
     train_files = list_restructure(number_of_train_files, "train_files", file_content)
@@ -126,6 +125,32 @@ def read_out_list_file(list_file):
     multiple_inputs = len(file_content) > 1
 
     return train_files, evaluation_files, multiple_inputs
+
+
+def read_out_model_file(file):
+    """
+    Read out parameters for creating models with OrcaNet from a toml file.
+
+    Parameters
+    ----------
+    file : str
+        Path to the toml file.
+
+    Returns
+    -------
+    nn_arch : str
+        Name of the architecture to be loaded.
+    loss_opt : tuple
+        The losses and weights of the model.
+    file_content : dict
+        Keyword arguments for the model generation.
+
+    """
+    file_content = toml.load(file)["model"]
+    nn_arch = file_content.pop("nn_arch")
+    losses = file_content.pop("losses")
+    loss_opt = (losses, None)
+    return nn_arch, loss_opt, file_content
 
 
 def write_full_logfile_startup(cfg):
@@ -370,39 +395,59 @@ def use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=False)
 
 class Settings(object):
     """
-    XXXX
+    Container object for all the configurable options in the OrcaNet scripts.
 
     Attributes
     ----------
-    list_file : str
-        Path to a list file which contains pathes to all the h5 files that should be used for training and evaluation.
     main_folder : str
-        Name of the folder of this model in which everything will be saved. E.g., the summary.txt log file is located in here.
-    loss_opt : tuple(dict, dict/str/None,)
-        Tuple that contains 1) the loss_functions and loss_weights as dicts (this is the losses table from the toml file)
-        and 2) the metrics.
+        Name of the folder of this model in which everything will be saved, e.g., the summary.txt log file is located in here.
+    list_file : str
+        Path to a list file with pathes to all the h5 files that should be used for training and evaluation.
+    config_file : str
+        Path to the config file with attributes that are used instead of the default ones.
+    modeldata : namedtuple
+        Optional info only required for building a predefined model with OrcaNet. It is set via self.load_from_model_file.
+
+        modeldata.nn_arch : str
+            Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
+        modeldata.loss_opt : tuple(dict, dict/str/None,)
+            Tuple that contains 1) the loss_functions and loss_weights as dicts (this is the losses table from the toml file)
+            and 2) the metrics.
+        modeldata.args : dict
+            Keyword arguments for the model generation.
+
+    train_files : list
+        A list containing the paths to the different training files given in the list_file.
+        Example for the output format:
+                [
+                 [['path/to/train_file_1_dimx.h5', 'path/to/train_file_1_dimy.h5'], number_of_events_train_files_1],
+                 [['path/to/train_file_2_dimx.h5', 'path/to/train_file_2_dimy.h5'], number_of_events_train_files_2],
+                 ...
+                ]
+    eval_files : list
+        Like train_files but for the evaluation files.
+    multiple_inputs : bool
+        Whether seperate sets of input files were given (e.g. for networks taking data
+        simulataneosly from different files).
+
+    batchsize : int
+        Batchsize that should be used for the training / inferencing of the cnn.
     class_type : tuple(int, str)
         Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
         I.e. (2, 'track-shower')
-    nn_arch : str
-        Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
-    batchsize : int
-        Batchsize that should be used for the training / inferencing of the cnn.
-    initial_epoch : List[int, int]
-        Declares if a previously trained model or a new model (=0) should be loaded.
-        The first argument specifies the last epoch, and the second argument is the last train file number if the train
-        dataset is split over multiple files. Can also give [-1,-1] to automatically load the most recent epoch.
     epochs_to_train : int
         How many new epochs should be trained by running this function. -1 for infinite.
-    swap_4d_channels : None/str
-        For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
-        Currently available: None -> XYZ-T ; 'yzt-x' -> YZT-X, TODO add multi input options
+    initial_epoch : int
+        The epoch at which the training is supposed to start. 0 means start a new training, >0 mean resume training.
+        Can also give -1 to automatically load the most recent epoch found in the main folder.
+    initial_fileno : int
+        When using multiple files, define the file number at which the training is supposed to start, e.g.
+        1 for the first file. If both epoch and fileno are -1, automatically load the most recent file found
+        in the main folder.
+    n_events : None/int
+        For testing purposes. If not the whole .h5 file should be used for training, define the number of events.
     n_gpu : tuple(int, str)
         Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov') [1].
-    use_scratch_ssd : bool
-        Declares if the input files should be copied to the node-local SSD scratch space (only working at Erlangen CC).
-    zero_center : bool
-        Declares if the input images ('xs') should be zero-centered before training.
     shuffle : tuple(bool, None/int)
         Declares if the training data should be shuffled before the next training epoch [0].
         If the train dataset is too large to be shuffled in place, one can preshuffle them n times before running
@@ -410,36 +455,42 @@ class Settings(object):
     str_ident : str
         Optional string identifier that gets appended to the modelname. Useful when training models which would have
         the same modelname. Also used for defining models and projections!
+    swap_4d_channels : None/str
+        For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
+        Currently available: None -> XYZ-T ; 'yzt-x' -> YZT-X, TODO add multi input options
     train_logger_display : int
         How many batches should be averaged for one line in the training log files.
     train_logger_flush : int
         After how many lines the training log file should be flushed. -1 for flush at the end of the epoch only.
     train_verbose : int
         verbose option of keras.model.fit_generator.
-    n_events : None/int
-        For testing purposes. If not the whole .h5 file should be used for training, define the number of events.
+    use_scratch_ssd : bool
+        Declares if the input files should be copied to the node-local SSD scratch space (only working at Erlangen CC).
+    zero_center : bool
+        Declares if the input images ('xs') should be zero-centered before training.
 
     """
     def __init__(self, main_folder, list_file=None, config_file=None):
-        """ Set the attributes of the class."""
+        """ Set the attributes of the object. """
         # Default settings:
-        self.swap_4d_channels = None
         self.batchsize = 64
+        self.class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
+        self.epochs_to_train = -1
         self.initial_epoch = -1
         self.initial_fileno = -1
-        self.epochs_to_train = -1
+        self.n_events = None
         self.n_gpu = (1, 'avolkov')
-        self.use_scratch_ssd = False
-        self.zero_center = False
         self.shuffle = (False, None)
         self.str_ident = ''
+        self.swap_4d_channels = None
         self.train_logger_display = 100
         self.train_logger_flush = -1
         self.train_verbose = 2
-        self.n_events = None
-        self.class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
+        self.use_scratch_ssd = False
+        self.zero_center = False
 
         self._default_values = dict(self.__dict__)
+        self.modeldata = None
 
         # User Settings:
         if main_folder[-1] == "/":
@@ -449,7 +500,7 @@ class Settings(object):
 
         self.list_file = list_file
         self.train_files = None
-        self.test_files = None
+        self.eval_files = None
         self.multiple_inputs = None
         # self.n_bins = None
         if list_file is not None:
@@ -461,7 +512,7 @@ class Settings(object):
 
     def set_from_list_file(self, list_file):
         """ Set filepaths to the ones given in a list file. """
-        self.train_files, self.test_files, self.multiple_inputs = read_out_list_file(list_file)
+        self.train_files, self.eval_files, self.multiple_inputs = read_out_list_file(list_file)
         # self.n_bins = h5_get_n_bins(self.train_files)
 
     def set_from_config_file(self, config_file):
@@ -473,7 +524,15 @@ class Settings(object):
             else:
                 raise AttributeError("Unknown option "+str(key))
 
+    def set_from_model_file(self, model_file):
+        """ Set attributes for generating models with OrcaNet. """
+        nn_arch, loss_opt, args = read_out_model_file(model_file)
+        ModelData = namedtuple("ModelData", "nn_arch loss_opt args")
+        data = ModelData(nn_arch, loss_opt, args)
+        self.modeldata = data
+
     def get_default_values(self):
+        """ Return default values of common settings. """
         return self._default_values
 
     def get_latest_epoch(self):
