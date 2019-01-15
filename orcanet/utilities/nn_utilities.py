@@ -31,7 +31,7 @@ def generate_batches_from_hdf5_file(cfg, filepath, f_size=None, zero_center_imag
         mean_image of the x dataset used for zero-centering.
     yield_mc_info : bool
         Specifies if mc-infos (y_values) should be yielded as well.
-        The mc-infos are used for evaluation after training and evaluating is finished.
+        The mc-infos are used for validation after training and validation is finished.
     Yields
     -------
     output : tuple

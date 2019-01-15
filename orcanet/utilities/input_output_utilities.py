@@ -48,14 +48,14 @@ def read_out_config_file(file):
 
 def list_get_number_of_files(file_content, keyword):
     """
-    Get the number of training or evaluation files from the content of a toml list.
+    Get the number of training or validation files from the content of a toml list.
 
     Parameters
     ----------
     file_content : dict
         From a list file by toml.load().
     keyword : str
-        Keyword in the file content dictionary to look up, e.g. "train_files" or "evaluation_files".
+        Keyword in the file content dictionary to look up, e.g. "train_files" or "validation_files".
 
     Returns
     -------
@@ -93,7 +93,7 @@ def list_restructure(number_of_files, keyword, file_content):
 def read_out_list_file(file):
     """
     Reads out a list file in .toml format containing the pathes to training
-    and evaluation files and bring it into the proper format.
+    and validation files and bring it into the proper format.
 
     Parameters
     ----------
@@ -110,7 +110,7 @@ def read_out_list_file(file):
                  [['path/to/train_file_2_dimx.h5', 'path/to/train_file_2_dimy.h5'], number_of_events_train_files_2],
                  ...
                 ]
-    evaluation_files : list
+    validation_files : list
         Like the above but for test files.
     multiple_inputs : bool
         Whether seperate sets of input files were given (e.g. for networks taking data
@@ -119,12 +119,12 @@ def read_out_list_file(file):
     """
     file_content = toml.load(file)["input"]
     number_of_train_files = list_get_number_of_files(file_content, "train_files")
-    number_of_eval_files = list_get_number_of_files(file_content, "evaluation_files")
+    number_of_val_files = list_get_number_of_files(file_content, "validation_files")
     train_files = list_restructure(number_of_train_files, "train_files", file_content)
-    evaluation_files = list_restructure(number_of_eval_files, "evaluation_files", file_content)
+    validation_files = list_restructure(number_of_val_files, "validation_files", file_content)
     multiple_inputs = len(file_content) > 1
 
-    return train_files, evaluation_files, multiple_inputs
+    return train_files, validation_files, multiple_inputs
 
 
 def read_out_model_file(file):
@@ -421,8 +421,8 @@ class Settings(object):
                  [['path/to/train_file_2_dimx.h5', 'path/to/train_file_2_dimy.h5'], number_of_events_train_files_2],
                  ...
                 ]
-    eval_files : list
-        Like train_files but for the evaluation files.
+    val_files : list
+        Like train_files but for the validation files.
     multiple_inputs : bool
         Whether seperate sets of input files were given (e.g. for networks taking data
         simulataneosly from different files).
@@ -478,7 +478,7 @@ class Settings(object):
         main_folder : str
             Name of the folder of this model in which everything will be saved, e.g., the summary.txt log file is located in here.
         list_file : str
-            Path to a list file with pathes to all the h5 files that should be used for training and evaluation.
+            Path to a list file with pathes to all the h5 files that should be used for training and validation.
         config_file : str
             Path to the config file with attributes that are used instead of the default ones.
 
@@ -511,7 +511,7 @@ class Settings(object):
 
         self._list_file = None
         self._train_files = None
-        self._eval_files = None
+        self._val_files = None
         self._multiple_inputs = None
 
         if list_file is not None:
@@ -524,7 +524,7 @@ class Settings(object):
     def set_from_list_file(self, list_file):
         """ Set filepaths to the ones given in a list file. """
         if self._list_file is None:
-            self._train_files, self._eval_files, self._multiple_inputs = read_out_list_file(list_file)
+            self._train_files, self._val_files, self._multiple_inputs = read_out_list_file(list_file)
             # Save internally which path was used to load the info
             self._list_file = list_file
         else:
@@ -565,8 +565,8 @@ class Settings(object):
     def get_train_files(self):
         return self._train_files
 
-    def get_eval_files(self):
-        return self._eval_files
+    def get_val_files(self):
+        return self._val_files
 
     def get_multiple_inputs(self):
         # TODO Remove this attribute and make it a function instead
