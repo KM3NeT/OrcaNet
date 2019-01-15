@@ -11,7 +11,7 @@ Usage:
 
 Arguments:
     CONFIG  A .toml file which sets up the model and training.
-            An example can be found in config/models/example_model.toml
+            An example can be found in config/models/example_config.toml
     LIST    A .toml file which contains the pathes of the training and validation files.
             An example can be found in config/lists/example_list.toml
     FOLDER  A new subfolder will be generated in this folder, where everything from this model gets saved to.

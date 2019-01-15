@@ -401,31 +401,6 @@ class Settings(object):
     ----------
     main_folder : str
         Name of the folder of this model in which everything will be saved, e.g., the summary.txt log file is located in here.
-    modeldata : namedtuple
-        Optional info only required for building a predefined model with OrcaNet.
-        It is set via self.load_from_model_file. [default: None]
-
-        modeldata.nn_arch : str
-            Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
-        modeldata.loss_opt : tuple(dict, dict/str/None,)
-            Tuple that contains 1) the loss_functions and loss_weights as dicts (this is the losses table from the toml file)
-            and 2) the metrics.
-        modeldata.args : dict
-            Keyword arguments for the model generation.
-
-    _train_files : list
-        A list containing the paths to the different training files given in the list_file.
-        Example for the output format:
-                [
-                 [['path/to/train_file_1_dimx.h5', 'path/to/train_file_1_dimy.h5'], number_of_events_train_files_1],
-                 [['path/to/train_file_2_dimx.h5', 'path/to/train_file_2_dimy.h5'], number_of_events_train_files_2],
-                 ...
-                ]
-    _val_files : list
-        Like train_files but for the validation files.
-    _multiple_inputs : bool
-        Whether seperate sets of input files were given (e.g. for networks taking data
-        simulataneosly from different files).
 
     batchsize : int
         Batchsize that should be used for the training / inferencing of the cnn.
@@ -466,6 +441,32 @@ class Settings(object):
     zero_center : bool
         Declares if the input images ('xs') should be zero-centered before training.
 
+
+    _train_files : list
+        A list containing the paths to the different training files on which the model will be trained on.
+        Example for the output format:
+                [
+                 [['path/to/train_file_1_dimx.h5', 'path/to/train_file_1_dimy.h5'], number_of_events_train_files_1],
+                 [['path/to/train_file_2_dimx.h5', 'path/to/train_file_2_dimy.h5'], number_of_events_train_files_2],
+                 ...
+                ]
+    _val_files : list
+        Like train_files but for the validation files.
+    _multiple_inputs : bool
+        Whether seperate sets of input files were given (e.g. for networks taking data
+        simulataneosly from different files).
+    _modeldata : namedtuple
+        Optional info only required for building a predefined model with OrcaNet. [default: None]
+        It is not needed for executing orcatrain. It is set via self.load_from_model_file.
+
+        modeldata.nn_arch : str
+            Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
+        modeldata.loss_opt : tuple(dict, dict/str/None,)
+            Tuple that contains 1) the loss_functions and loss_weights as dicts (this is the losses table from the toml file)
+            and 2) the metrics.
+        modeldata.args : dict
+            Keyword arguments for the model generation.
+
     """
     def __init__(self, main_folder, list_file=None, config_file=None):
         """
@@ -501,23 +502,24 @@ class Settings(object):
         self.zero_center = False
 
         self._default_values = dict(self.__dict__)
-        self.modeldata = None
 
-        # IO attributes:
+        # Main folder:
         if main_folder[-1] == "/":
             self.main_folder = main_folder
         else:
             self.main_folder = main_folder+"/"
 
-        self._list_file = None
+        # Private attributes:
         self._train_files = None
         self._val_files = None
         self._multiple_inputs = None
+        self._list_file = None
+        self._config_file = None
+        self._modeldata = None
 
+        # Load the optionally given list and config files.
         if list_file is not None:
             self.set_from_list_file(list_file)
-
-        self._config_file = None
         if config_file is not None:
             self.set_from_config_file(config_file)
 
@@ -556,7 +558,7 @@ class Settings(object):
         nn_arch, loss_opt, args = read_out_model_file(model_file)
         ModelData = namedtuple("ModelData", "nn_arch loss_opt args")
         data = ModelData(nn_arch, loss_opt, args)
-        self.modeldata = data
+        self._modeldata = data
 
     def get_default_values(self):
         """ Return default values of common settings. """
@@ -571,6 +573,9 @@ class Settings(object):
     def get_multiple_inputs(self):
         # TODO Remove this attribute and make it a function instead
         return self._multiple_inputs
+
+    def get_modeldata(self):
+        return self._modeldata
 
     def get_latest_epoch(self):
         """

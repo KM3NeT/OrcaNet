@@ -1,7 +1,7 @@
-# Define the files for network training and evaluation in the toml format.
+# Define the files for network training and validation in the toml format.
 #
-# Give an array of train files and evaluation files.
-# If the network has multiple inputs, mark each seperate dataset with [[input]].
+# Give an array of train files and validation files. Every dataset is started with the line [[input]].
+# So if your network has multiple inputs, mark each seperate dataset with [[input]].
 #
 # Example format:
 # -----------------------------
