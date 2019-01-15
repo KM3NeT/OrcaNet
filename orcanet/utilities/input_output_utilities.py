@@ -98,7 +98,7 @@ def read_out_list_file(file):
     Parameters
     ----------
     file : str
-        Path to a .list file containing the paths to training and test files to be used during training.
+        Path to a .list file containing the paths to training and validation files to be used during training.
 
     Returns
     -------
@@ -111,7 +111,7 @@ def read_out_list_file(file):
                  ...
                 ]
     validation_files : list
-        Like the above but for test files.
+        Like the above but for validation files.
     multiple_inputs : bool
         Whether seperate sets of input files were given (e.g. for networks taking data
         simulataneosly from different files).
@@ -170,20 +170,20 @@ def write_full_logfile_startup(cfg):
         f_out.write("New execution of the orca_train function started with the following options:\n")
         f_out.write("List file path:\t"+cfg.list_file+"\n")
         f_out.write("Given trainfiles in the .list file:\n")
-        for train_file in cfg.train_files:
+        for train_file in cfg.get_train_files():
             f_out.write("   " + str(train_file)+"\n")
-        f_out.write("\nGiven testfiles in the .list file:\n")
-        for test_file in cfg.test_files:
-            f_out.write("   " + str(test_file) + "\n")
+        f_out.write("\nGiven validation files in the .list file:\n")
+        for val_file in cfg.get_val_files():
+            f_out.write("   " + str(val_file) + "\n")
         f_out.write("\nGiven options in the .toml config:\n")
         for key in vars(cfg):
             f_out.write("   {}:\t{}\n".format(key, cfg[key]))
         f_out.write("\n")
 
 
-def write_full_logfile(cfg, model, history_train, history_test, lr, lr_decay, epoch):
+def write_full_logfile(cfg, model, history_train, history_val, lr, lr_decay, epoch):
     """
-    Function for saving various information during training and testing to a .txt file.
+    Function for saving various information during training and validation to a .txt file.
 
     """
     logfile = cfg.main_folder + 'full_log.txt'
@@ -194,12 +194,12 @@ def write_full_logfile(cfg, model, history_train, history_test, lr, lr_decay, ep
         f_out.write('Decayed learning rate to ' + str(lr) + ' before epoch ' + str(epoch[0]) +
                     ' and file ' + str(epoch[1]) + ' (minus ' + str(lr_decay) + ')\n')
         f_out.write('Trained in epoch ' + str(epoch) + ' on file ' + str(epoch[1]) + ', ' + str(cfg.train_file) + '\n')
-        if history_test is not None:
-            f_out.write('Tested in epoch ' + str(epoch) + ', file ' + str(epoch[1]) + ' on test_files ' + str(cfg.test_files) + '\n')
-        f_out.write('History for training / testing: \n')
+        if history_val is not None:
+            f_out.write('Validated in epoch ' + str(epoch) + ', file ' + str(epoch[1]) + ' on val_files ' + str(cfg.get_val_files()) + '\n')
+        f_out.write('History for training / validating: \n')
         f_out.write('Train: ' + str(history_train.history) + '\n')
-        if history_test is not None:
-            f_out.write('Test: ' + str(history_test) + ' (' + str(model.metrics_names) + ')' + '\n')
+        if history_val is not None:
+            f_out.write('Validation: ' + str(history_val) + ' (' + str(model.metrics_names) + ')' + '\n')
         f_out.write('\n')
         # f_out.write('Additional Info:\n')
         # f_out.write('Batchsize=' + str(batchsize) + ', n_bins=' + str(n_bins) +
@@ -208,7 +208,7 @@ def write_full_logfile(cfg, model, history_train, history_test, lr, lr_decay, ep
         # f_out.write('\n')
 
 
-def write_summary_logfile(cfg, epoch, model, history_train, history_test, lr):
+def write_summary_logfile(cfg, epoch, model, history_train, history_val, lr):
     """
     Write to the summary.txt file in every trained model folder.
 
@@ -222,15 +222,15 @@ def write_summary_logfile(cfg, epoch, model, history_train, history_test, lr):
         Keras model instance of a neural network.
     history_train : Keras history object
         History object containing the history of the training, averaged over files.
-    history_test : List
-        List of test losses for all the metrics, averaged over all test files.
+    history_val : List
+        List of validation losses for all the metrics, averaged over all validation files.
     lr : float
         The current learning rate of the model.
 
     """
-    # Save test log
+    # Save val log
     steps_per_total_epoch, steps_cum = 0, [0]  # get this for the epoch_number_float in the logfile
-    for f, f_size in cfg.train_files:
+    for f, f_size in cfg.get_train_files():
         steps_per_file = int(f_size / cfg.batchsize)
         steps_per_total_epoch += steps_per_file
         steps_cum.append(steps_cum[-1] + steps_per_file)
@@ -242,19 +242,19 @@ def write_summary_logfile(cfg, epoch, model, history_train, history_test, lr):
         if os.stat(logfile_fname).st_size == 0:
             logfile.write('Epoch\tLR\t')
             for i, metric in enumerate(model.metrics_names):
-                logfile.write("train_" + str(metric) + "\ttest_" + str(metric))
+                logfile.write("train_" + str(metric) + "\tval_" + str(metric))
                 if i + 1 < len(model.metrics_names):
                     logfile.write("\t")
             logfile.write('\n')
-        # Write the content: Epoch, LR, train_1, test_1, ...
+        # Write the content: Epoch, LR, train_1, val_1, ...
         logfile.write("{:.4g}\t".format(float(epoch_number_float)))
         logfile.write("{:.4g}\t".format(float(lr)))
         for i, metric_name in enumerate(model.metrics_names):
             logfile.write("{:.4g}\t".format(float(history_train.history[metric_name][0])))
-            if history_test is None:
+            if history_val is None:
                 logfile.write("nan")
             else:
-                logfile.write("{:.4g}".format(float(history_test[i])))
+                logfile.write("{:.4g}".format(float(history_val[i])))
             if i + 1 < len(model.metrics_names):
                 logfile.write("\t")
         logfile.write('\n')
@@ -413,7 +413,7 @@ class Settings(object):
         modeldata.args : dict
             Keyword arguments for the model generation.
 
-    train_files : list
+    _train_files : list
         A list containing the paths to the different training files given in the list_file.
         Example for the output format:
                 [
@@ -421,9 +421,9 @@ class Settings(object):
                  [['path/to/train_file_2_dimx.h5', 'path/to/train_file_2_dimy.h5'], number_of_events_train_files_2],
                  ...
                 ]
-    val_files : list
+    _val_files : list
         Like train_files but for the validation files.
-    multiple_inputs : bool
+    _multiple_inputs : bool
         Whether seperate sets of input files were given (e.g. for networks taking data
         simulataneosly from different files).
 
@@ -530,7 +530,7 @@ class Settings(object):
         else:
             raise ValueError("You tried to load filepathes from a list file, but pathes have already been loaded \
             for this object. (From the file " + self._list_file + ")\nYou should not use \
-            two different list files for one object!")
+            two different list files for one Settings object!")
         # self.n_bins = h5_get_n_bins(self.train_files)
 
     def set_from_config_file(self, config_file):
@@ -549,7 +549,7 @@ class Settings(object):
         else:
             raise ValueError("You tried to load settings from a config file, but they have already been loaded \
             for this object! (From the file " + self._config_file + ")\nYou should not use \
-            two different config files for one object!")
+            two different config files for one Settings object!")
 
     def set_from_model_file(self, model_file):
         """ Set attributes for generating models with OrcaNet. """

@@ -203,16 +203,16 @@ def train_and_validate_model(cfg, model, epoch, xs_mean):
     validate_after_n_train_files = 2
 
     lr_initial, manual_mode = 0.005, (False, 0.0003, 0.07, lr)
-    epoch, lr, lr_decay = schedule_learning_rate(model, epoch, cfg.n_gpu, cfg.train_files, lr_initial=lr_initial, manual_mode=manual_mode)  # begin new training step
+    epoch, lr, lr_decay = schedule_learning_rate(model, epoch, cfg.n_gpu, cfg.get_train_files(), lr_initial=lr_initial, manual_mode=manual_mode)  # begin new training step
 
     train_iter_step = 0  # loop n
-    for file_no, (f, f_size) in enumerate(cfg.train_files, 1):
+    for file_no, (f, f_size) in enumerate(cfg.get_train_files(), 1):
         if file_no < epoch[1]:
             continue  # skip if this file for this epoch has already been used for training
 
         train_iter_step += 1
         if train_iter_step > 1:
-            epoch, lr, lr_decay = schedule_learning_rate(model, epoch, cfg.n_gpu, cfg.train_files, lr_initial=lr_initial, manual_mode=manual_mode)
+            epoch, lr, lr_decay = schedule_learning_rate(model, epoch, cfg.n_gpu, cfg.get_train_files(), lr_initial=lr_initial, manual_mode=manual_mode)
 
         history_train = train_model(cfg, model, f, f_size, file_no, xs_mean, epoch)
         model.save(cfg.main_folder + 'saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5')
@@ -258,7 +258,7 @@ def train_model(cfg, model, f, f_size, file_no, xs_mean, epoch):
     validation_data, validation_steps, callbacks = None, None, []
     if cfg.n_events is not None:
         f_size = cfg.n_events  # for testing purposes
-    logger = BatchLevelPerformanceLogger(train_files=cfg.train_files, batchsize=cfg.batchsize, display=cfg.train_logger_display, model=model,
+    logger = BatchLevelPerformanceLogger(train_files=cfg.get_train_files(), batchsize=cfg.batchsize, display=cfg.train_logger_display, model=model,
                                          main_folder=cfg.main_folder, epoch=epoch, flush_after_n_lines=cfg.train_logger_flush)
     callbacks.append(logger)
 

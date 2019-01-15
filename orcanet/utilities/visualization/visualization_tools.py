@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Visualization tools used with Keras.
-1) Makes performance graphs for training and testing.
+1) Makes performance graphs for training and validating.
 2) Visualizes activations for Keras models
 """
 import inspect
@@ -17,7 +17,7 @@ from utilities.losses import get_all_loss_functions
 
 def make_test_train_plot(test_train_data_list, title=""):
     """
-    Plot one or more eval/train lines in a single plot.
+    Plot one or more val/train lines in a single plot.
 
     Parameters
     ----------
@@ -68,9 +68,10 @@ def make_test_train_plot(test_train_data_list, title=""):
 
     return fig
 
+
 def plot_metrics(summary_data, full_train_data, metric_names="loss", make_auto_titles=False, color=None):
     """
-    Plot and return the training and testing history of one (or more) metrices over the epochs in a single plot.
+    Plot and return the training and validation history of one (or more) metrices over the epochs in a single plot.
 
     Parameters
     ----------
@@ -80,12 +81,12 @@ def plot_metrics(summary_data, full_train_data, metric_names="loss", make_auto_t
         Structured array containing the data from all the training log files from ./log_train/, merged into a single array.
     metric_names : list or str
         Name or list of names of metrics to be plotted over the epoch. This name is what was written in the head line
-        of the summary.txt file, except without the train_ or test_ prefix (as these will be added by this script).
+        of the summary.txt file, except without the train_ or val_ prefix (as these will be added by this script).
     make_auto_titles : bool
         If true, the title of the plot will be the name of the first metric in metric_names. Should probably not
         be used if more than one metric is given.
     color : None or str
-        The color of the train and test lines. If None is given, the default color cycle is used.
+        The color of the train and val lines. If None is given, the default color cycle is used.
 
     Returns
     -------
@@ -96,7 +97,7 @@ def plot_metrics(summary_data, full_train_data, metric_names="loss", make_auto_t
     test_train_data_list = []
     if isinstance(metric_names, str): metric_names=[metric_names,]
     for metric_name in metric_names:
-        summary_label   = "test_"+metric_name
+        summary_label = "val_"+metric_name
         train_log_label = metric_name
         if summary_data["Epoch"].shape == ():
             # This is only the case when just one line is present in the summary.txt file.
@@ -114,9 +115,10 @@ def plot_metrics(summary_data, full_train_data, metric_names="loss", make_auto_t
     fig = make_test_train_plot(test_train_data_list, title)
     return fig
 
+
 def get_epoch_xticks(x_coordinates):
     """
-    Calculates the xticks for the train and test statistics matplotlib plot.
+    Calculates the xticks for the train and validation statistics matplotlib plot.
 
     Parameters
     ----------
@@ -138,9 +140,10 @@ def get_epoch_xticks(x_coordinates):
 
     return x_ticks_major
 
+
 def plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name):
     """
-    Plot and save all metrics of the given test- and train-data from the training of a model
+    Plot and save all metrics of the given validation- and train-data from the training of a model
     into a pdf file, each metric in its own plot. If metric pairs of a variable and its error are found (e.g. e_loss
     and e_err_loss), they will have the same color and appear back to back in the plot.
 
@@ -162,7 +165,7 @@ def plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name):
         if "train_" in keyword:
             keyword = keyword.split("train_")[-1]
         else:
-            keyword = keyword.split("test_")[-1]
+            keyword = keyword.split("val_")[-1]
         if not keyword in all_metrics:
             all_metrics.append(keyword)
     all_metrics = sort_metric_names_and_errors(all_metrics)
@@ -181,7 +184,6 @@ def plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name):
             pdf.savefig(fig)
             plt.close(fig)
 
-#plot_all_metrics_to_pdf(a[0],a[1],"test.pdf")
 
 def sort_metric_names_and_errors(metric_names):
     """
@@ -291,7 +293,7 @@ def plot_weights_and_activations(cfg, xs_mean, epoch, file_no):
     :param str folder_name: Path to the folder of a trained model.
     """
     model_name = cfg.main_folder + 'saved_models/model_epoch_' + str(epoch) + '_file_' + str(file_no) + '.h5'
-    layer_names, activations, weights, y_values = get_activations_and_weights(cfg.test_files[0][0], cfg.n_bins, cfg.class_type, xs_mean, cfg.swap_4d_channels,
+    layer_names, activations, weights, y_values = get_activations_and_weights(cfg.get_val_files[0][0], cfg.n_bins, cfg.class_type, xs_mean, cfg.swap_4d_channels,
                                             model_name, cfg.str_ident, layer_name=None, learning_phase='test')
 
     fig, axes = plt.subplots()
