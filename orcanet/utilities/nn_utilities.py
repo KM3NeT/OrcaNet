@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Utility functions used for training a CNN."""
+"""Utility functions used for training a NN."""
 
 import warnings
 import re
@@ -19,8 +19,8 @@ def generate_batches_from_hdf5_file(cfg, filepath, f_size=None, zero_center_imag
 
     Parameters
     ----------
-    cfg : class Settings
-        ...
+    cfg : Object Settings
+        Contains all the configurable options in the OrcaNet scripts.
     filepath : list
         List that contains full filepath of the input h5 files, e.g. '/path/to/file/file.h5'.
     f_size : int/None
@@ -31,7 +31,7 @@ def generate_batches_from_hdf5_file(cfg, filepath, f_size=None, zero_center_imag
         mean_image of the x dataset used for zero-centering.
     yield_mc_info : bool
         Specifies if mc-infos (y_values) should be yielded as well.
-        The mc-infos are used for evaluation after training and testing is finished.
+        The mc-infos are used for evaluation after training and evaluating is finished.
     Yields
     -------
     output : tuple

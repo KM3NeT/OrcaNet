@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 
-Main code for training NN's. The main function for training, testing, logging and plotting the progress is orca_train.
+Main code for training NN's. The main function for training, evaluating, logging and plotting the progress is orca_train.
 It can also be called via a parser by running this python module as follows:
 
 Usage:
@@ -167,7 +167,7 @@ def get_new_learning_rate(epoch, lr_initial, n_train_files, n_gpu):
 
 def update_summary_plot(main_folder):
     """
-    Refresh the summary plot of a model directory, found in ./plots/summary_plot.pdf. Test- and train-data
+    Refresh the summary plot of a model directory, found in ./plots/summary_plot.pdf. Eval- and train-data
     will be read out automatically, and the loss and every metric will be plotted in a seperate page in the pdf.
 
     Parameters
@@ -189,10 +189,18 @@ def train_and_evaluate_model(cfg, model, epoch, xs_mean):
 
     Parameters
     ----------
-    cfg : class Settings
+    cfg : Object Settings
+        Contains all the configurable options in the OrcaNet scripts.
+    model : ks.Models.model
+        Compiled keras model to use for training and evaluating.
+    epoch : tuple
+        Current Epoch and Fileno.
+    xs_mean : ndarray
+        Numpy array of the zero center image.
+
     """
     lr = None
-    test_after_n_train_files = 2
+    eval_after_n_train_files = 2
 
     lr_initial, manual_mode = 0.005, (False, 0.0003, 0.07, lr)
     epoch, lr, lr_decay = schedule_learning_rate(model, epoch, cfg.n_gpu, cfg.train_files, lr_initial=lr_initial, manual_mode=manual_mode)  # begin new training step
@@ -209,13 +217,13 @@ def train_and_evaluate_model(cfg, model, epoch, xs_mean):
         history_train = train_model(cfg, model, f, f_size, file_no, xs_mean, epoch)
         model.save(cfg.main_folder + 'saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5')
 
-        # test after the first and else after every n-th file
-        if file_no == 1 or file_no % test_after_n_train_files == 0:
-            history_test = evaluate_model(cfg, model, xs_mean)
+        # Evaluate after the first and else after every n-th file
+        if file_no == 1 or file_no % eval_after_n_train_files == 0:
+            history_eval = evaluate_model(cfg, model, xs_mean)
         else:
-            history_test = None
-        write_summary_logfile(cfg, epoch, model, history_train, history_test, lr)
-        write_full_logfile(cfg, model, history_train, history_test, lr, lr_decay, epoch, f)
+            history_eval = None
+        write_summary_logfile(cfg, epoch, model, history_train, history_eval, lr)
+        write_full_logfile(cfg, model, history_train, history_eval, lr, lr_decay, epoch, f)
         update_summary_plot(cfg.main_folder)
         plot_weights_and_activations(cfg, xs_mean, epoch[0], file_no)
 
@@ -227,12 +235,12 @@ def train_model(cfg, model, f, f_size, file_no, xs_mean, epoch):
     Trains a model based on the Keras fit_generator method.
 
     If a TensorBoard callback is wished, validation data has to be passed to the fit_generator method.
-    For this purpose, the first file of the test_files is used.
+    For this purpose, the first file of the eval_files is used.
 
     Parameters
     ----------
-    cfg : class Settings
-        ...
+    cfg : Object Settings
+        Contains all the configurable options in the OrcaNet scripts.
     model : ks.model.Model
         Keras model instance of a neural network.
     f : list
@@ -242,7 +250,7 @@ def train_model(cfg, model, f, f_size, file_no, xs_mean, epoch):
     file_no : int
         If the full data is split into multiple files, this parameter indicates the current file number.
     xs_mean : ndarray
-        Mean_image of the x (train-) dataset used for zero-centering the train-/testdata.
+        Mean_image of the x (train-) dataset used for zero-centering the train-/eval-data.
     epoch : tuple(int, int)
         The number of the current epoch and the current filenumber.
 
@@ -279,17 +287,17 @@ def evaluate_model(cfg, model, xs_mean):
 
     Parameters
     ----------
-    cfg : class Settings
-        ...
+    cfg : Object Settings
+        Contains all the configurable options in the OrcaNet scripts.
     model : ks.model.Model
         Keras model instance of a neural network.
     xs_mean : ndarray
-        Mean_image of the x (train-) dataset used for zero-centering the train-/testdata.
+        Mean_image of the x (train-) dataset used for zero-centering the train-/eval-data.
 
     """
     histories = []
-    for i, (f, f_size) in enumerate(cfg.test_files):
-        print('Testing on file ', i, ',', str(f))
+    for i, (f, f_size) in enumerate(cfg.eval_files):
+        print('Evaluating on file ', i, ',', str(f))
 
         if cfg.n_events is not None:
             f_size = cfg.n_events  # for testing purposes
@@ -298,11 +306,11 @@ def evaluate_model(cfg, model, xs_mean):
             generate_batches_from_hdf5_file(cfg, f, f_size=f_size, zero_center_image=xs_mean),
             steps=int(f_size / cfg.batchsize), max_queue_size=10, verbose=1)
         # This history object is just a list, not a dict like with fit_generator!
-        print('Test sample results: ' + str(history) + ' (' + str(model.metrics_names) + ')')
+        print('Evaluation sample results: ' + str(history) + ' (' + str(model.metrics_names) + ')')
         histories.append(history)
-    history_test = [sum(col) / float(len(col)) for col in zip(*histories)] if len(histories) > 1 else histories[0]  # average over all test files if necessary
+    history_eval = [sum(col) / float(len(col)) for col in zip(*histories)] if len(histories) > 1 else histories[0]  # average over all eval files if necessary
 
-    return history_test
+    return history_eval
 
 
 def orca_train(cfg, initial_model=None):
@@ -311,10 +319,11 @@ def orca_train(cfg, initial_model=None):
 
     Parameters
     ----------
-    cfg : class Settings
-        ...
-    initial_model : ks.model
-        ...
+    cfg : Object Settings
+        Contains all the configurable options in the OrcaNet scripts.
+    initial_model : ks.models.Model
+        Compiled keras model to use for training and evaluating. Only required for the first epoch of training, as a
+        the most recent saved model will be loaded otherwise.
 
     """
     make_folder_structure(cfg.main_folder)
@@ -344,7 +353,7 @@ def orca_train(cfg, initial_model=None):
         xs_mean = None
 
     if cfg.use_scratch_ssd:
-        cfg.train_files, cfg.test_files = use_node_local_ssd_for_input(cfg.train_files, cfg.test_files, multiple_inputs=cfg.multiple_inputs)
+        cfg.train_files, cfg.eval_files = use_node_local_ssd_for_input(cfg.train_files, cfg.eval_files, multiple_inputs=cfg.multiple_inputs)
 
     trained_epochs = 0
     while trained_epochs < cfg.epochs_to_train or cfg.epochs_to_train == -1:
@@ -360,7 +369,7 @@ def make_folder_structure(main_folder):
     Parameters
     ----------
     main_folder : str
-        Name of the main folder, e.g. "user/trained_models/example_model/".
+        Name of the main folder where everything gets saved to.
 
     """
     folders_to_create = [main_folder+"log_train", main_folder+"saved_models",
@@ -379,11 +388,10 @@ def example_run(main_folder, list_file, config_file):
     ----------
     main_folder : str
         Path to the folder where everything gets saved to, e.g. the summary.txt, the plots, the trained models, etc.
-        Is made to have a "/" at the end.
     list_file : str
         Path to a list file which contains pathes to all the h5 files that should be used for training and evaluation.
     config_file : str
-        Path to a .toml file which contains all the infos for training and testing of a model.
+        Path to a .toml file which contains all the infos for training and evaluating a model.
 
     """
     cfg = Settings(main_folder, list_file, config_file)
