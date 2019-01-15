@@ -347,8 +347,8 @@ def orca_train(cfg, initial_model=None):
         model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
     model.summary()
 
-    if cfg.zero_center:
-        xs_mean = load_zero_center_data(cfg.get_train_files(), cfg.n_gpu[0])
+    if cfg.zero_center_folder is not None:
+        xs_mean = load_zero_center_data(cfg.get_train_files(), cfg.n_gpu[0], cfg.zero_center_folder)
     else:
         xs_mean = None
 

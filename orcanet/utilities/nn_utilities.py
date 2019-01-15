@@ -322,7 +322,7 @@ def encode_targets(y_val, class_type):
 
 #------------- Functions for preprocessing -------------#
 
-def load_zero_center_data(train_files, n_gpu):
+def load_zero_center_data(train_files, n_gpu, zero_center_folder):
     """
     Gets the xs_mean array that can be used for zero-centering.
     The array is either loaded from a previously saved file or it is calculated on the fly.

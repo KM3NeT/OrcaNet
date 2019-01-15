@@ -438,9 +438,10 @@ class Settings(object):
         verbose option of keras.model.fit_generator.
     use_scratch_ssd : bool
         Declares if the input files should be copied to the node-local SSD scratch space (only working at Erlangen CC).
-    zero_center : bool
-        Declares if the input images ('xs') should be zero-centered before training.
-
+    zero_center_folder : str
+        Path to a folder in which zero centering images are stored. [default: None]
+        If this path is set, zero centering images for the given dataset will either be calculated and saved
+        automatically at the start of the training, or loaded if they have been saved before.
 
     _train_files : list
         A list containing the paths to the different training files on which the model will be trained on.
@@ -499,7 +500,7 @@ class Settings(object):
         self.train_logger_flush = -1
         self.train_verbose = 2
         self.use_scratch_ssd = False
-        self.zero_center = False
+        self.zero_center_folder = None
 
         self._default_values = dict(self.__dict__)
 
