@@ -10,7 +10,8 @@ import os
 import keras as ks
 from functools import reduce
 
-#------------- Functions used for supplying images to the GPU -------------#
+# ------------- Functions used for supplying images to the GPU -------------#
+
 
 def generate_batches_from_hdf5_file(cfg, filepath, f_size=None, zero_center_image=None, yield_mc_info=False):
     """
@@ -42,7 +43,7 @@ def generate_batches_from_hdf5_file(cfg, filepath, f_size=None, zero_center_imag
     for i in range(n_files):
         dimensions[i] = get_dimensions_encoding(cfg.n_bins[i], cfg.batchsize)
 
-    swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'xyt-z': (0, 1, 2, 4, 3), 't-xyz': (0,4,1,2,3), 'tyz-x': (0,4,2,3,1)}
+    swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'xyt-z': (0, 1, 2, 4, 3), 't-xyz': (0, 4, 1, 2, 3), 'tyz-x': (0, 4, 2, 3, 1)}
 
     while 1:
         f = {}
@@ -58,9 +59,9 @@ def generate_batches_from_hdf5_file(cfg, filepath, f_size=None, zero_center_imag
         while n_entries <= (f_size - cfg.batchsize):
             # create numpy arrays of input data (features)
             xs = {}
-            xs_list = [] # list of inputs for the Keras NN
+            xs_list = []  # list of inputs for the Keras NN
             for i in range(n_files):
-                xs[i] = f[i]['x'][n_entries : n_entries + cfg.batchsize]
+                xs[i] = f[i]['x'][n_entries:n_entries + cfg.batchsize]
                 xs[i] = np.reshape(xs[i], dimensions[i]).astype(np.float32)
 
             if zero_center_image is not None:
@@ -72,23 +73,24 @@ def generate_batches_from_hdf5_file(cfg, filepath, f_size=None, zero_center_imag
                 if cfg.swap_col == 'yzt-x' or cfg.swap_4d_channels == 'xyt-z':
                     xs_list.append(np.transpose(xs, swap_4d_channels_dict[cfg.swap_4d_channels]))
                 elif cfg.swap_4d_channels == 'xyz-t_and_yzt-x':
-                    xs_list.append(xs[0]) # xyzt
+                    xs_list.append(xs[0])  # xyzt
                     xs_yzt_x = np.transpose(xs[0], swap_4d_channels_dict['yzt-x'])
                     xs_list.append(xs_yzt_x)
 
                 elif 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2' in cfg.swap_4d_channels + cfg.str_ident:
-                    xs_list.append(xs[0]) # xyz-t tight-1
-                    xs_yzt_x_tight_1 = np.transpose(xs[0], swap_4d_channels_dict['yzt-x']) # yzt-x tight-1
+                    xs_list.append(xs[0])  # xyz-t tight-1
+                    xs_yzt_x_tight_1 = np.transpose(xs[0], swap_4d_channels_dict['yzt-x'])  # yzt-x tight-1
                     xs_list.append(xs_yzt_x_tight_1)
-                    xs_list.append(xs[1]) # xyz-t tight-2
-                    xs_yzt_x_tight_2 = np.transpose(xs[1], swap_4d_channels_dict['yzt-x']) # yzt-x tight-2
+                    xs_list.append(xs[1])  # xyz-t tight-2
+                    xs_yzt_x_tight_2 = np.transpose(xs[1], swap_4d_channels_dict['yzt-x'])  # yzt-x tight-2
                     xs_list.append(xs_yzt_x_tight_2)
 
                 elif cfg.swap_4d_channels == 'xyz-t_and_xyz-c_single_input':
                     xyz_t_and_xyz_c = np.concatenate([xs[0], xs[1]], axis=-1)
-                    xs_list = xyz_t_and_xyz_c # here, it's not a list since we have only one input image
+                    xs_list = xyz_t_and_xyz_c  # here, it's not a list since we have only one input image
 
-                else: raise ValueError('The argument "swap_col"=' + str(cfg.swap_4d_channels) + ' is not valid.')
+                else:
+                    raise ValueError('The argument "swap_col"=' + str(cfg.swap_4d_channels) + ' is not valid.')
 
             else:
                 for i in range(n_files):
@@ -99,12 +101,12 @@ def generate_batches_from_hdf5_file(cfg, filepath, f_size=None, zero_center_imag
             y_values = np.reshape(y_values, (cfg.batchsize, y_values.shape[1]))
 
             if cfg.class_type[1] != 'track-shower':
-                ys = get_regression_labels(y_values, cfg.class_type) # ys: dict which contains arrays for every output key
+                ys = get_regression_labels(y_values, cfg.class_type)  # ys: dict which contains arrays for every output key
 
             else:
                 ys = np.zeros((cfg.batchsize, cfg.class_type[0]), dtype=np.float32)
                 # encode the labels such that they are all within the same range (and filter the ones we don't want for now)
-                for c, y_val in enumerate(y_values): # Could be vectorized with numba, or use dataflow from tensorpack
+                for c, y_val in enumerate(y_values):  # Could be vectorized with numba, or use dataflow from tensorpack
                     ys[c] = encode_targets(y_val, cfg.class_type)
 
             # we have read one more batch from this file

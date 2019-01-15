@@ -26,7 +26,6 @@ import os
 import keras as ks
 import matplotlib as mpl
 from docopt import docopt
-mpl.use('Agg')
 import warnings
 
 from utilities.input_output_utilities import use_node_local_ssd_for_input, write_summary_logfile, write_full_logfile, read_logfiles, write_full_logfile_startup, Settings
@@ -36,6 +35,8 @@ from utilities.visualization.visualization_tools import *
 from utilities.evaluation_utilities import *
 from utilities.losses import *
 from model_setup import build_nn_model
+
+mpl.use('Agg')
 
 # for debugging
 # from tensorflow.python import debug as tf_debug
@@ -83,7 +84,7 @@ def schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=0.003, m
         Learning rate decay that has been used to decay the lr rate used for this epoch.
 
     """
-    #TODO set learning rate outside of this function
+    # TODO set learning rate outside of this function
     if len(train_files) > epoch[1] and epoch[0] != 0:
         epoch = (epoch[0], epoch[1] + 1)  # resume from the same epoch but with the next file
     else:
@@ -97,21 +98,21 @@ def schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=0.003, m
         if epoch[0] > 1 and lr_decay > 0:
             lr *= 1 - float(lr_decay)
             K.set_value(model.optimizer.lr, lr)
-            print('Decayed learning rate to ' + str(K.get_value(model.optimizer.lr)) + \
+            print('Decayed learning rate to ' + str(K.get_value(model.optimizer.lr)) +
                   ' before epoch ' + str(epoch[0]) + ' (minus ' + '{:.1%}'.format(lr_decay) + ')')
 
     else:
-        if epoch[0] == 1 and epoch[1] == 1: # set initial learning rate for the training
+        if epoch[0] == 1 and epoch[1] == 1:  # set initial learning rate for the training
             lr, lr_decay = lr_initial, 0.00
-            #lr, lr_decay = lr_initial * n_gpu[0], 0.00
+            # lr, lr_decay = lr_initial * n_gpu[0], 0.00
             K.set_value(model.optimizer.lr, lr)
-            print('Set learning rate to ' + str(K.get_value(model.optimizer.lr)) + ' before epoch ' + str(epoch[0]) + \
+            print('Set learning rate to ' + str(K.get_value(model.optimizer.lr)) + ' before epoch ' + str(epoch[0]) +
                   ' and file ' + str(epoch[1]))
         else:
             n_train_files = len(train_files)
             lr, lr_decay = get_new_learning_rate(epoch, lr_initial, n_train_files, n_gpu[0])
             K.set_value(model.optimizer.lr, lr)
-            print('Decayed learning rate to ' + str(K.get_value(model.optimizer.lr)) + \
+            print('Decayed learning rate to ' + str(K.get_value(model.optimizer.lr)) +
                   ' before epoch ' + str(epoch[0]) + ' and file ' + str(epoch[1]) + ' (minus ' + '{:.1%}'.format(lr_decay) + ')')
 
     return epoch, lr, lr_decay
@@ -147,17 +148,17 @@ def get_new_learning_rate(epoch, lr_initial, n_train_files, n_gpu):
     n_epoch, n_file = epoch[0], epoch[1]
     n_lr_decays = (n_epoch - 1) * n_train_files + (n_file - 1)
 
-    lr_temp = lr_initial # * n_gpu TODO think about multi gpu lr
+    lr_temp = lr_initial  # * n_gpu TODO think about multi gpu lr
     lr_decay = None
 
     for i in range(n_lr_decays):
 
         if lr_temp > 0.0003:
-            lr_decay = 0.07 # standard for regression: 0.07, standard for PID: 0.02
+            lr_decay = 0.07  # standard for regression: 0.07, standard for PID: 0.02
         elif 0.0003 >= lr_temp > 0.0001:
-            lr_decay = 0.04 # standard for regression: 0.04, standard for PID: 0.01
+            lr_decay = 0.04  # standard for regression: 0.04, standard for PID: 0.01
         else:
-            lr_decay = 0.02 # standard for regression: 0.02, standard for PID: 0.005
+            lr_decay = 0.02  # standard for regression: 0.02, standard for PID: 0.005
 
         lr_temp = lr_temp * (1 - float(lr_decay))
 
@@ -194,12 +195,12 @@ def train_and_evaluate_model(cfg, model, epoch, xs_mean):
     test_after_n_train_files = 2
 
     lr_initial, manual_mode = 0.005, (False, 0.0003, 0.07, lr)
-    epoch, lr, lr_decay = schedule_learning_rate(model, epoch, cfg.n_gpu, cfg.train_files, lr_initial=lr_initial, manual_mode=manual_mode) # begin new training step
+    epoch, lr, lr_decay = schedule_learning_rate(model, epoch, cfg.n_gpu, cfg.train_files, lr_initial=lr_initial, manual_mode=manual_mode)  # begin new training step
 
-    train_iter_step = 0 # loop n
+    train_iter_step = 0  # loop n
     for file_no, (f, f_size) in enumerate(cfg.train_files, 1):
         if file_no < epoch[1]:
-            continue # skip if this file for this epoch has already been used for training
+            continue  # skip if this file for this epoch has already been used for training
 
         train_iter_step += 1
         if train_iter_step > 1:
@@ -247,7 +248,8 @@ def train_model(cfg, model, f, f_size, file_no, xs_mean, epoch):
 
     """
     validation_data, validation_steps, callbacks = None, None, []
-    if cfg.n_events is not None: f_size = cfg.n_events  # for testing purposes
+    if cfg.n_events is not None:
+        f_size = cfg.n_events  # for testing purposes
     logger = BatchLevelPerformanceLogger(train_files=cfg.train_files, batchsize=cfg.batchsize, display=cfg.train_logger_display, model=model,
                                          main_folder=cfg.main_folder, epoch=epoch, flush_after_n_lines=cfg.train_logger_flush)
     callbacks.append(logger)
@@ -289,15 +291,16 @@ def evaluate_model(cfg, model, xs_mean):
     for i, (f, f_size) in enumerate(cfg.test_files):
         print('Testing on file ', i, ',', str(f))
 
-        if cfg.n_events is not None: f_size = cfg.n_events  # for testing purposes
+        if cfg.n_events is not None:
+            f_size = cfg.n_events  # for testing purposes
 
         history = model.evaluate_generator(
             generate_batches_from_hdf5_file(cfg, f, f_size=f_size, zero_center_image=xs_mean),
             steps=int(f_size / cfg.batchsize), max_queue_size=10, verbose=1)
-        #This history object is just a list, not a dict like with fit_generator!
+        # This history object is just a list, not a dict like with fit_generator!
         print('Test sample results: ' + str(history) + ' (' + str(model.metrics_names) + ')')
         histories.append(history)
-    history_test = [sum(col) / float(len(col)) for col in zip(*histories)] if len(histories) > 1 else histories[0] # average over all test files if necessary
+    history_test = [sum(col) / float(len(col)) for col in zip(*histories)] if len(histories) > 1 else histories[0]  # average over all test files if necessary
 
     return history_test
 
@@ -344,9 +347,9 @@ def orca_train(cfg, initial_model=None):
         cfg.train_files, cfg.test_files = use_node_local_ssd_for_input(cfg.train_files, cfg.test_files, multiple_inputs=cfg.multiple_inputs)
 
     trained_epochs = 0
-    while trained_epochs<cfg.epochs_to_train or cfg.epochs_to_train==-1:
+    while trained_epochs < cfg.epochs_to_train or cfg.epochs_to_train == -1:
         epoch, lr = train_and_evaluate_model(cfg, model, epoch, xs_mean)
-        trained_epochs+=1
+        trained_epochs += 1
 
 
 def make_folder_structure(main_folder):
@@ -384,7 +387,7 @@ def example_run(main_folder, list_file, config_file):
 
     """
     cfg = Settings(main_folder, list_file, config_file)
-    if cfg.get_latest_epoch() == (0,1):
+    if cfg.get_latest_epoch() == (0, 1):
         initial_model = build_nn_model(cfg)
     else:
         initial_model = None

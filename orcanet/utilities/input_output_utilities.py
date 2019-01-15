@@ -18,6 +18,7 @@ import toml
 from time import gmtime, strftime
 import numpy as np
 
+
 def read_out_config_file(config_file):
     """
     Extract the variables of a model from the .toml file and convert them to a dict. These are stored in the
@@ -36,7 +37,7 @@ def read_out_config_file(config_file):
     f = toml.load(config_file)
     keyword_arguments = f["config"]
     if "class_type" in keyword_arguments:
-        if keyword_arguments["class_type"][0]=="None":
+        if keyword_arguments["class_type"][0] == "None":
             keyword_arguments["class_type"][0] = None
     if "n_gpu" in keyword_arguments:
         keyword_arguments["n_gpu"][0] = int(keyword_arguments["n_gpu"][0])
@@ -86,7 +87,7 @@ def list_restructure(number_of_files, keyword, file_content):
         for input_data in file_content:
             file_set.append(input_data[keyword][file_no])
         files.append([file_set, h5_get_number_of_rows(file_set[0])])
-        #TODO Maybe files have different number of events? Should give an error
+        # TODO Maybe files have different number of events? Should give an error
     return files
 
 
@@ -155,12 +156,12 @@ def write_full_logfile_startup(cfg):
         f_out.write("\n")
 
 
-def write_full_logfile(cfg, model, history_train, history_test, lr, lr_decay, epoch, f):
+def write_full_logfile(cfg, model, history_train, history_test, lr, lr_decay, epoch):
     """
     Function for saving various information during training and testing to a .txt file.
 
     """
-    logfile=cfg.main_folder + 'full_log.txt'
+    logfile = cfg.main_folder + 'full_log.txt'
     with open(logfile, 'a+') as f_out:
         f_out.write('---------------Epoch {} File {}-------------------------------------------------------------------------\n'.format(epoch[0], epoch[1]))
         f_out.write('\n')
@@ -175,11 +176,11 @@ def write_full_logfile(cfg, model, history_train, history_test, lr, lr_decay, ep
         if history_test is not None:
             f_out.write('Test: ' + str(history_test) + ' (' + str(model.metrics_names) + ')' + '\n')
         f_out.write('\n')
-        #f_out.write('Additional Info:\n')
-        #f_out.write('Batchsize=' + str(batchsize) + ', n_bins=' + str(n_bins) +
+        # f_out.write('Additional Info:\n')
+        # f_out.write('Batchsize=' + str(batchsize) + ', n_bins=' + str(n_bins) +
         #            ', class_type=' + str(class_type) + '\n' +
         #            'swap_4d_channels=' + str(swap_4d_channels) + ', str_ident=' + str_ident + '\n')
-        #f_out.write('\n')
+        # f_out.write('\n')
 
 
 def write_summary_logfile(cfg, epoch, model, history_train, history_test, lr):
@@ -203,7 +204,7 @@ def write_summary_logfile(cfg, epoch, model, history_train, history_test, lr):
 
     """
     # Save test log
-    steps_per_total_epoch, steps_cum = 0, [0] # get this for the epoch_number_float in the logfile
+    steps_per_total_epoch, steps_cum = 0, [0]  # get this for the epoch_number_float in the logfile
     for f, f_size in cfg.train_files:
         steps_per_file = int(f_size / cfg.batchsize)
         steps_per_total_epoch += steps_per_file
@@ -217,7 +218,8 @@ def write_summary_logfile(cfg, epoch, model, history_train, history_test, lr):
             logfile.write('Epoch\tLR\t')
             for i, metric in enumerate(model.metrics_names):
                 logfile.write("train_" + str(metric) + "\ttest_" + str(metric))
-                if i + 1 < len(model.metrics_names): logfile.write("\t")
+                if i + 1 < len(model.metrics_names):
+                    logfile.write("\t")
             logfile.write('\n')
         # Write the content: Epoch, LR, train_1, test_1, ...
         logfile.write("{:.4g}\t".format(float(epoch_number_float)))
@@ -228,7 +230,8 @@ def write_summary_logfile(cfg, epoch, model, history_train, history_test, lr):
                 logfile.write("nan")
             else:
                 logfile.write("{:.4g}".format(float(history_test[i])))
-            if i + 1 < len(model.metrics_names): logfile.write("\t")
+            if i + 1 < len(model.metrics_names):
+                logfile.write("\t")
         logfile.write('\n')
 
 
@@ -264,7 +267,7 @@ def read_logfiles(summary_logfile):
     train_file_data.sort()
     full_train_data = train_file_data[0][1]
     for [epoch, file_no], file_data in train_file_data[1:]:
-        #file_data["Batch_float"]+=(epoch-1)
+        # file_data["Batch_float"]+=(epoch-1)
         full_train_data = np.append(full_train_data, file_data)
     return summary_data, full_train_data
 
@@ -300,7 +303,7 @@ def h5_get_n_bins(train_files):
     n_bins : list
 
     """
-    n_bins=[]
+    n_bins = []
     for dim_file in train_files[0][0]:
         f = h5py.File(dim_file, "r")
         n_bins.append(f[list(f.keys())[0]].shape[1:])
@@ -332,7 +335,7 @@ def use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=False)
                 f_path_ssd = local_scratch_path + '/' + os.path.basename(f_path)
                 f_paths_train_ssd_temp.append(f_path_ssd)
 
-            train_files_ssd.append((f_paths_train_ssd_temp, f_size)) # f_size of all f_paths should be the same
+            train_files_ssd.append((f_paths_train_ssd_temp, f_size))  # f_size of all f_paths should be the same
             f_paths_train_ssd_temp = []
 
         for file_tuple in test_files:
@@ -343,27 +346,26 @@ def use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=False)
                 f_path_ssd = local_scratch_path + '/' + os.path.basename(f_path)
                 f_paths_test_ssd_temp.append(f_path_ssd)
 
-            test_files_ssd.append((f_paths_test_ssd_temp, f_size)) # f_size of all f_paths should be the same
+            test_files_ssd.append((f_paths_test_ssd_temp, f_size))  # f_size of all f_paths should be the same
             f_paths_test_ssd_temp = []
 
     else:
         for file_tuple in train_files:
             input_filepath, f_size = file_tuple[0][0], file_tuple[1]
 
-            shutil.copy2(input_filepath, local_scratch_path) # copy to /scratch node-local SSD
+            shutil.copy2(input_filepath, local_scratch_path)  # copy to /scratch node-local SSD
             input_filepath_ssd = local_scratch_path + '/' + os.path.basename(input_filepath)
             train_files_ssd.append(([input_filepath_ssd], f_size))
 
         for file_tuple in test_files:
             input_filepath, f_size = file_tuple[0][0], file_tuple[1]
 
-            shutil.copy2(input_filepath, local_scratch_path) # copy to /scratch node-local SSD
+            shutil.copy2(input_filepath, local_scratch_path)  # copy to /scratch node-local SSD
             input_filepath_ssd = local_scratch_path + '/' + os.path.basename(input_filepath)
             test_files_ssd.append(([input_filepath_ssd], f_size))
 
     print('Finished copying the input train/test data to the node-local SSD scratch folder')
     return train_files_ssd, test_files_ssd
-
 
 
 class Settings(object):
@@ -419,7 +421,8 @@ class Settings(object):
 
     """
     def __init__(self, main_folder, list_file=None, config_file=None):
-        # Default Settings:
+        """ Set the attributes of the class."""
+        # Default settings:
         self.swap_4d_channels = None
         self.batchsize = 64
         self.initial_epoch = -1
@@ -448,7 +451,7 @@ class Settings(object):
         self.train_files = None
         self.test_files = None
         self.multiple_inputs = None
-        #self.n_bins = None
+        # self.n_bins = None
         if list_file is not None:
             self.set_from_list_file(list_file)
 
@@ -456,12 +459,10 @@ class Settings(object):
         if self.config_file is not None:
             self.set_from_config_file(self.config_file)
 
-
     def set_from_list_file(self, list_file):
         """ Set filepaths to the ones given in a list file. """
         self.train_files, self.test_files, self.multiple_inputs = read_out_list_file(list_file)
-        #self.n_bins = h5_get_n_bins(self.train_files)
-
+        # self.n_bins = h5_get_n_bins(self.train_files)
 
     def set_from_config_file(self, config_file):
         """ Overwrite default attribute values with values from a config file. """
@@ -472,10 +473,8 @@ class Settings(object):
             else:
                 raise AttributeError("Unknown option "+str(key))
 
-
     def get_default_values(self):
         return self._default_values
-
 
     def get_latest_epoch(self):
         """
@@ -497,5 +496,4 @@ class Settings(object):
                 epochs.append((int(epoch), int(file_no)))
             latest_epoch = max(epochs)
         return latest_epoch
-
 
