@@ -488,7 +488,7 @@ class Settings(object):
             Path to the config file with attributes that are used instead of the default ones.
 
         """
-        # Default settings:
+        # Settings:
         self.batchsize = 64
         self.class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
         self.epochs_to_train = -1
@@ -556,26 +556,6 @@ class Settings(object):
         data = ModelData(nn_arch, loss_opt, args)
         self._modeldata = data
 
-    def get_default_values(self):
-        """ Return default values of common settings. """
-        return self._default_values
-
-    def get_train_files(self):
-        return self._train_files
-
-    def get_val_files(self):
-        return self._val_files
-
-    def get_multiple_inputs(self):
-        # TODO Remove this attribute and make it a function instead
-        return self._multiple_inputs
-
-    def get_modeldata(self):
-        return self._modeldata
-
-    def get_list_file(self):
-        return self._list_file
-
     def get_latest_epoch(self):
         """
         Check all saved models in the ./saved_models folder and return the highest epoch / file_no pair.
@@ -597,3 +577,31 @@ class Settings(object):
             latest_epoch = max(epochs)
         return latest_epoch
 
+    def use_local_node(self):
+        """
+        Copies the test and val files to the node-local ssd scratch folder and sets the new filepaths of the train and val data.
+        Speeds up I/O and reduces RRZE network load.
+        """
+        train_files_ssd, test_files_ssd = use_node_local_ssd_for_input(self.get_train_files(), self.get_val_files(), self.get_multiple_inputs())
+        self._train_files = train_files_ssd
+        self._val_files = test_files_ssd
+
+    def get_default_values(self):
+        """ Return default values of common settings. """
+        return self._default_values
+
+    def get_train_files(self):
+        return self._train_files
+
+    def get_val_files(self):
+        return self._val_files
+
+    def get_multiple_inputs(self):
+        # TODO Remove this attribute and make it a function instead
+        return self._multiple_inputs
+
+    def get_modeldata(self):
+        return self._modeldata
+
+    def get_list_file(self):
+        return self._list_file

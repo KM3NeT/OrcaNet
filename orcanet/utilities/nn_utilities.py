@@ -460,30 +460,25 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
     TODO
     """
     # Gibt loss aus über alle :display batches, gemittelt über die letzten :display batches
-    def __init__(self, train_files, batchsize, display, model, main_folder, epoch, flush_after_n_lines):
+    def __init__(self, cfg, epoch, model):
         """
 
         Parameters
         ----------
-        train_files
-        batchsize
-        display
+        cfg
         model
-        main_folder
         epoch
-        flush_after_n_lines : int
-            After how many lines the file should be flushed. -1 for flush at the end of the epoch only.
 
         """
         ks.callbacks.Callback.__init__(self)
-        self.display = display
+        self.display = cfg.train_logger_display
         self.epoch_number = epoch[0]
         self.f_number = epoch[1]
         self.model = model
-        self.flush = flush_after_n_lines
+        self.flush = cfg.train_logger_flush
 
         self.seen = 0
-        self.logfile_train_fname = main_folder + 'log_train/log_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.txt'
+        self.logfile_train_fname = cfg.main_folder + 'log_train/log_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.txt'
         self.loglist = []
 
         self.cum_metrics = {}
@@ -491,8 +486,8 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
             self.cum_metrics[metric] = 0
 
         self.steps_per_total_epoch, self.steps_cum = 0, [0]
-        for f, f_size in train_files:
-            steps_per_file = int(f_size / batchsize)
+        for f, f_size in cfg.get_train_files():
+            steps_per_file = int(f_size / cfg.batchsize)
             self.steps_per_total_epoch += steps_per_file
             self.steps_cum.append(self.steps_cum[-1] + steps_per_file)
 
@@ -511,8 +506,6 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
         if self.seen % self.display == 0:
             batchnumber_float = (self.seen - self.display / 2.) / float(self.steps_per_total_epoch) + self.epoch_number - 1 \
                                 + (self.steps_cum [self.f_number-1] / float(self.steps_per_total_epoch))
-                                # offset if the currently trained file is not the first one
-                                #+ (self.f_number-1) * (1/float(self.n_train_files)) # start from zero # only works if all train files have approximately the same number of entries
             line = '\n{0}\t{1}'.format(self.seen, batchnumber_float)
             for metric in self.model.metrics_names:
                 line = line + '\t' + str(self.cum_metrics[metric] / self.display)

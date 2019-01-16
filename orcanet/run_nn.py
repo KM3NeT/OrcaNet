@@ -28,7 +28,7 @@ import matplotlib as mpl
 from docopt import docopt
 import warnings
 
-from utilities.input_output_utilities import use_node_local_ssd_for_input, write_summary_logfile, write_full_logfile, read_logfiles, write_full_logfile_startup, Settings
+from utilities.input_output_utilities import write_summary_logfile, write_full_logfile, read_logfiles, write_full_logfile_startup, Settings
 from utilities.nn_utilities import load_zero_center_data, BatchLevelPerformanceLogger
 from utilities.data_tools.shuffle_h5 import shuffle_h5
 from utilities.visualization.visualization_tools import *
@@ -258,9 +258,7 @@ def train_model(cfg, model, f, f_size, file_no, xs_mean, epoch):
     validation_data, validation_steps, callbacks = None, None, []
     if cfg.n_events is not None:
         f_size = cfg.n_events  # for testing purposes
-    logger = BatchLevelPerformanceLogger(train_files=cfg.get_train_files(), batchsize=cfg.batchsize, display=cfg.train_logger_display, model=model,
-                                         main_folder=cfg.main_folder, epoch=epoch, flush_after_n_lines=cfg.train_logger_flush)
-    callbacks.append(logger)
+    callbacks.append(BatchLevelPerformanceLogger(cfg, epoch, model))
 
     if epoch[0] > 1 and cfg.shuffle[0] is True: # just for convenience, we don't want to wait before the first epoch each time
         print('Shuffling file ', f, ' before training in epoch ', epoch[0], ' and file ', file_no)
@@ -328,7 +326,6 @@ def orca_train(cfg, initial_model=None):
     """
     make_folder_structure(cfg.main_folder)
     write_full_logfile_startup(cfg)
-
     epoch = (cfg.initial_epoch, cfg.initial_fileno)
     if epoch[0] == -1 and epoch[1] == -1:
         epoch = cfg.get_latest_epoch()
@@ -353,7 +350,7 @@ def orca_train(cfg, initial_model=None):
         xs_mean = None
 
     if cfg.use_scratch_ssd:
-        cfg._train_files, cfg._val_files = use_node_local_ssd_for_input(cfg.get_train_files(), cfg.get_val_files(), multiple_inputs=cfg.get_multiple_inputs())
+        cfg.use_local_node()
 
     trained_epochs = 0
     while trained_epochs < cfg.epochs_to_train or cfg.epochs_to_train == -1:
