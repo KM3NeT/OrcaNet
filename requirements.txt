@@ -11,3 +11,4 @@ sphinx-rtd-theme
 sphinx-autoapi
 twine
 numpydoc
+natsort

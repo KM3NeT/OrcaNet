@@ -383,49 +383,153 @@ def encode_targets(y_val, class_type):
 
 #------------- Functions for preprocessing -------------#
 
-def load_zero_center_data(train_files, batchsize, n_bins, n_gpu):
+def load_zero_center_data(train_files, batchsize, n_bins, n_gpu, zero_center_folder, train_files_list_name):
     """
-    Gets the xs_mean array that can be used for zero-centering.
-    The array is either loaded from a previously saved file or it is calculated on the fly.
-    Currently only works for a single input training file!
-    :param list(([train_filepath], train_filesize)) train_files: list of tuples that contains the list of trainfiles and their number of rows.
-    :param int batchsize: Batchsize that is being used in the data.
-    :param list(tuple) n_bins: Number of bins for each dimension (x,y,z,t) in the tran_file. Can contain multiple n_bins tuples.
-    :param int n_gpu: Number of gpu's, used for calculating the available RAM space in get_mean_image().
-    :return: ndarray xs_mean: mean_image of the x dataset. Can be used for zero-centering later on.
+    Gets the xs_mean array(s) that can be used for zero-centering.
+    The arrays are either loaded from a previously saved .npz file or they are calculated on the fly.
+
+    Parameters
+    ----------
+    train_files : list(([train_filepath], train_filesize))
+        List of tuples that contains the list of trainfiles (can have multiple ones if the model has multiple inputs)
+        and their number of rows.
+    n_gpu : int
+        Number of gpu's, used for calculating the available RAM space in get_mean_image().
+        Per GPU, it is defined that 8 GB RAM are available on the local machine.
+    zero_center_folder : str
+        TODO
+    train_files_list_name : str
+        TODO
+
+    Returns
+    -------
+    xs_mean : list(ndarray)
+        List of ndarray(s) that contains the mean_image of the x dataset (1 array per model input).
+        Can be used for zero-centering later on.
+
     """
     xs_mean = []
-    for i, filepath in enumerate(train_files[0][0]): # loop over multiple input data files for a single event
-        # if the file has a shuffle index (e.g. shuffled_6.h5) and a .npy exists for the first shuffled file (shuffled.h5), we don't want to calculate the mean again
-        shuffle_index = re.search('(_file_.*)(_shuffled)(.*).h5', filepath)
-        filepath_without_index = re.sub(shuffle_index.group(1) + shuffle_index.group(2) + shuffle_index.group(3), '', filepath)
+    # loop over multiple input data files for a single event, each input needs its own xs_mean
+    for i in range(len(train_files[0][0])):
 
-        if os.path.isfile(filepath_without_index + '_zero_center_mean.npy') is True:
-            print('Loading an existing xs_mean_array in order to zero_center the data!')
-            xs_mean_temp = np.load(filepath_without_index + '_zero_center_mean.npy')
+        # load the filepaths of all precalculated zero_center .npz files, which contain the xs_mean
+        zero_center_files = load_fpaths_of_existing_zero_center_files(zero_center_folder)
+        # Collect all filepaths of the train_files for this projection in an array
+        all_train_files_for_ip_i = get_fpaths_for_train_files_input_i(train_files, i)
+
+        # get the xs_mean for this input number i, if it exists in any of the files in the zero_center_folder
+        xs_mean_for_ip_i = get_precalculated_xs_mean_if_exists(zero_center_files, all_train_files_for_ip_i)
+
+        if xs_mean_for_ip_i is not None:
+            print('Loading an existing xs_mean_array for model input ' + str(i) + ' in order to zero_center the data!')
+            xs_mean.append(xs_mean_for_ip_i)
 
         else:
-            print('Calculating the xs_mean_array in order to zero_center the data!')
+            print('Calculating the xs_mean_array for model input ' + str(i) + ' in order to zero_center the data!')
             dimensions = get_dimensions_encoding(n_bins[i], batchsize)
 
-            # if the train dataset is split over multiple files, we need to average over the single xs_mean_temp arrays.
-            xs_mean_temp_arr = None
+            # if the train dataset is split over multiple files, we need to average over the single xs_mean_for_ip arrays.
+            xs_mean_for_ip_arr_i = None
             for j in range(len(train_files)):
-                filepath_j = train_files[j][0][i] # j is the index of the j-th train file, i the index of the i-th projection input
-                xs_mean_temp_step = get_mean_image(filepath_j, dimensions, n_gpu)
+                filepath_j = train_files[j][0][i] # j is the index of the j-th train file, i the index of the i-th input
+                xs_mean_for_ip_i_step = get_mean_image(filepath_j, dimensions, n_gpu)
 
-                if xs_mean_temp_arr is None:
-                    xs_mean_temp_arr = np.zeros((len(train_files),) + xs_mean_temp_step.shape, dtype=np.float64)
-                xs_mean_temp_arr[j] = xs_mean_temp_step
+                if xs_mean_for_ip_arr_i is None:
+                    xs_mean_for_ip_arr_i = np.zeros((len(train_files),) + xs_mean_for_ip_i_step.shape, dtype=np.float64)
+                xs_mean_for_ip_arr_i[j] = xs_mean_for_ip_i_step
 
-            xs_mean_temp = np.mean(xs_mean_temp_arr, axis=0, dtype=np.float64).astype(np.float32) if len(train_files) > 1 else xs_mean_temp_arr[0]
+            xs_mean_for_ip_i = np.mean(xs_mean_for_ip_arr_i, axis=0, dtype=np.float64).astype(np.float32) if len(train_files) > 1 else xs_mean_for_ip_arr_i[0]
 
-            np.save(filepath_without_index + '_zero_center_mean.npy', xs_mean_temp)
-            print('Saved the xs_mean array with shape', xs_mean_temp.shape, ' to ', filepath_without_index, '_zero_center_mean.npy')
+            np.savez(zero_center_folder + train_files_list_name + '.npz', xs_mean=xs_mean_for_ip_i, zero_center_used_ip_files=all_train_files_for_ip_i)
+            print('Saved the xs_mean array for input ' + str(i) + ' with shape', xs_mean_for_ip_i.shape, ' to ',
+                  zero_center_folder + train_files_list_name + '.npz')
 
-        xs_mean.append(xs_mean_temp)
+        xs_mean.append(xs_mean_for_ip_i)
 
     return xs_mean
+
+
+def load_fpaths_of_existing_zero_center_files(zero_center_folder):
+    """
+    Loads the filepaths of all precalculated zero_center_files (.npz) in the zero_center_folder if they exist.
+
+    Parameters
+    ----------
+    zero_center_folder : str
+        Full path to the folder where the zero_centering arrays are / should be stored.
+
+    Returns
+    -------
+    zero_center_files : list
+        List that contains all filepaths of precalculated zero_center files.
+        Can be empty, if no zero_center_files exist in that directory.
+
+    """
+    zero_center_files = []
+    if os.path.isdir(zero_center_folder):
+        for file in os.listdir(zero_center_folder):
+            if file.endswith('.npz'):
+                zero_center_files.append(file)
+    else:
+        os.mkdir(zero_center_folder)
+
+    return zero_center_files
+
+
+def get_fpaths_for_train_files_input_i(train_files, i):
+    """
+    Gets all filepaths of the train_files for the i-th input and puts them into an array.
+
+    Parameters
+    ----------
+    train_files : list
+        TODO
+    i : int
+        Integer for the i-th file input of the network.
+
+    Returns
+    -------
+    all_train_files_for_ip_i : ndarray
+        Array that contains the filepaths of all train_files for the i-th input.
+
+    """
+    all_train_files_for_ip_i_list = []
+    for j in range(len(train_files)):
+        all_train_files_for_ip_i_list.append(train_files[j][0][i])
+
+    all_train_files_for_ip_i = np.array(all_train_files_for_ip_i_list)
+
+    return all_train_files_for_ip_i
+
+
+def get_precalculated_xs_mean_if_exists(zero_center_files, all_train_files_for_ip_i):
+    """
+    Function that searches for precalculated xs_mean arrays in the already existing zero_center_files.
+
+    Specifically, the function opens every zero_center_file (.npz) and checks if the 'zero_center_used_ip_files' array
+    is the same as the 'all_train_files_for_ip_i' array.
+
+    Parameters
+    ----------
+    zero_center_files : list
+        List that contains all filepaths of precalculated zero_center files.
+    all_train_files_for_ip_i : ndarray
+        Array that contains the filepaths of all train_files for the i-th input.
+
+    Returns
+    -------
+    xs_mean_for_ip_i : None/ndarray
+        Returns the xs_mean_for_ip_i array if it exists somewhere in the zero_center_files. If not, returns None.
+
+    """
+    xs_mean_for_ip_i = None
+    for file in zero_center_files:
+        zero_center_used_ip_files = np.load(file)['zero_center_used_ip_files']
+        if np.array_equal(zero_center_used_ip_files, all_train_files_for_ip_i):
+            xs_mean_for_ip_i = np.load(file)['xs_mean']
+            break
+
+    return xs_mean_for_ip_i
 
 
 def get_mean_image(filepath, dimensions, n_gpu):
