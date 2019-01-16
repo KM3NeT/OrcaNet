@@ -456,6 +456,9 @@ class Settings(object):
     _multiple_inputs : bool
         Whether seperate sets of input files were given (e.g. for networks taking data
         simulataneosly from different files).
+    _list_file : str
+        Path to the list file that was used to set the training and validation files. Is None if no list file
+        has been used yet.
     _modeldata : namedtuple
         Optional info only required for building a predefined model with OrcaNet. [default: None]
         It is not needed for executing orcatrain. It is set via self.load_from_model_file.
@@ -515,7 +518,6 @@ class Settings(object):
         self._val_files = None
         self._multiple_inputs = None
         self._list_file = None
-        self._config_file = None
         self._modeldata = None
 
         # Load the optionally given list and config files.
@@ -538,21 +540,14 @@ class Settings(object):
 
     def set_from_config_file(self, config_file):
         """ Overwrite default attribute values with values from a config file. """
-        if self._config_file is None:
-            user_values = read_out_config_file(config_file)
-            for key in user_values:
-                if hasattr(self, key):
-                    setattr(self, key, user_values[key])
-                else:
-                    raise AttributeError("You tried to set the attribute "+str(key)+" in your config file\n"
-                                         + config_file + "\n, but this attribute is not provided. Check \
-                                         the possible attributes in the definition of the Settings class.")
-            # Save internally which path was used to load the info
-            self._config_file = config_file
-        else:
-            raise ValueError("You tried to load settings from a config file, but they have already been loaded \
-            for this object! (From the file " + self._config_file + ")\nYou should not use \
-            two different config files for one Settings object!")
+        user_values = read_out_config_file(config_file)
+        for key in user_values:
+            if hasattr(self, key):
+                setattr(self, key, user_values[key])
+            else:
+                raise AttributeError("You tried to set the attribute "+str(key)+" in your config file\n"
+                                     + config_file + "\n, but this attribute is not provided. Check \
+                                     the possible attributes in the definition of the Settings class.")
 
     def set_from_model_file(self, model_file):
         """ Set attributes for generating models with OrcaNet. """
@@ -577,6 +572,9 @@ class Settings(object):
 
     def get_modeldata(self):
         return self._modeldata
+
+    def get_list_file(self):
+        return self._list_file
 
     def get_latest_epoch(self):
         """
