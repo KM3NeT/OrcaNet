@@ -404,7 +404,6 @@ def load_zero_center_data(cfg):
 
     """
     train_files = cfg.get_train_files()
-    n_gpu = cfg.n_gpu[0]
     zero_center_folder = cfg.zero_center_folder
     train_files_list_name = cfg.get_list_name()
 
@@ -430,7 +429,7 @@ def load_zero_center_data(cfg):
             xs_mean_for_ip_arr_i = None
             for j in range(len(train_files)):
                 filepath_j = train_files[j][0][i]  # j is the index of the j-th train file, i the index of the i-th input
-                xs_mean_for_ip_i_step = get_mean_image(filepath_j, n_gpu)
+                xs_mean_for_ip_i_step = get_mean_image(filepath_j, cfg.n_gpu[0])
 
                 if xs_mean_for_ip_arr_i is None:
                     xs_mean_for_ip_arr_i = np.zeros((len(train_files),) + xs_mean_for_ip_i_step.shape, dtype=np.float64)

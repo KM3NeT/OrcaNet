@@ -6,16 +6,17 @@ Main code for training NN's. The main function for training, validating, logging
 It can also be called via a parser by running this python module as follows:
 
 Usage:
-    run_nn.py CONFIG LIST [FOLDER]
+    run_nn.py FOLDER LIST CONFIG MODEL
     run_nn.py (-h | --help)
 
 Arguments:
-    CONFIG  A .toml file which sets up the model and training.
-            An example can be found in config/models/example_config.toml
+    FOLDER  Path to the folder where everything gets saved to, e.g. the summary.txt, the plots, the trained models, etc.
     LIST    A .toml file which contains the pathes of the training and validation files.
             An example can be found in config/lists/example_list.toml
-    FOLDER  A new subfolder will be generated in this folder, where everything from this model gets saved to.
-            Default is the current working directory.
+    CONFIG  A .toml file which sets up the training.
+            An example can be found in config/models/example_config.toml. The possible parameters are listed in
+            utilities/input_output_utilities.py in the class Settings.
+    MODEL   Path to a .toml file with infos about a model.
 
 Options:
     -h --help                       Show this screen.
@@ -199,7 +200,7 @@ def train_and_validate_model(cfg, model, epoch):
 
     """
     if cfg.zero_center_folder is not None:
-        xs_mean = load_zero_center_data(cfg.get_train_files(), cfg.n_gpu[0], cfg.zero_center_folder, cfg.get_list_name())
+        xs_mean = load_zero_center_data(cfg)
     else:
         xs_mean = None
 
@@ -365,7 +366,7 @@ def make_folder_structure(main_folder):
             os.makedirs(directory)
 
 
-def example_run(main_folder, list_file, config_file):
+def example_run(main_folder, list_file, config_file, model_file):
     """
     This shows how to use OrcaNet.
 
@@ -377,10 +378,13 @@ def example_run(main_folder, list_file, config_file):
         Path to a list file which contains pathes to all the h5 files that should be used for training and validation.
     config_file : str
         Path to a .toml file which contains all the infos for training and validating a model.
+    model_file : str
+        Path to a file with parameters to build a model of a predefined architecture with OrcaNet.
 
     """
     cfg = Settings(main_folder, list_file, config_file)
     if cfg.get_latest_epoch() == (0, 1):
+        cfg.set_from_model_file(model_file)
         initial_model = build_nn_model(cfg)
     else:
         initial_model = None
@@ -390,14 +394,12 @@ def example_run(main_folder, list_file, config_file):
 def parse_input():
     """ Run the orca_train function with a parser. """
     args = docopt(__doc__)
-    config_file = args['CONFIG']
+    main_folder = args['FOLDER']
     list_file = args['LIST']
-    main_folder = args['FOLDER'] if args['FOLDER'] is not None else "./"
-    example_run(main_folder, list_file, config_file)
+    config_file = args['CONFIG']
+    model_file = args['MODEL']
+    example_run(main_folder, list_file, config_file, model_file)
 
 
 if __name__ == '__main__':
     parse_input()
-
-
-
