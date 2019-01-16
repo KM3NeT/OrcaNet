@@ -14,6 +14,8 @@ test:
     image: docker.km3net.de/base/python:3.6
     stage: test
     script:
+        - echo $CUDA_VISIBLE_DEVICES
+        - CUDA_VISIBLE_DEVICES=""
         - make test
 
 
