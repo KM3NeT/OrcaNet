@@ -1,19 +1,33 @@
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+
 stages:
   - test
   - doc
   - release
 
 
-before_script:
-  - apt-get update -qq && apt-get install -y -qq libhdf5-dev
-  - pip install -U pip setuptools wheel numpy
-  - pip install .
+cache:
+  paths:
+    - .cache/pip
+    - venv/
+  key: "$CI_COMMIT_REF_SLUG"
+
+
+.virtualenv_template: &virtualenv_definition |
+  python -V
+  pip install virtualenv
+  virtualenv venv
+  source venv/bin/activate
+  make install
 
 
 test:
     image: docker.km3net.de/base/python:3.6
     stage: test
     script:
+        - *virtualenv_definition
         - make test
 
 
@@ -21,6 +35,7 @@ pages:
     image: docker.km3net.de/base/python:3.6
     stage: doc
     script:
+        - *virtualenv_definition
         - cd docs && make html
         - mv _build/html/ ../public/
     artifacts:
