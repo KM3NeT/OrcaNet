@@ -30,7 +30,6 @@ import warnings
 
 from utilities.input_output_utilities import write_summary_logfile, write_full_logfile, read_logfiles, write_full_logfile_startup, Settings
 from utilities.nn_utilities import load_zero_center_data, BatchLevelPerformanceLogger
-from utilities.data_tools.shuffle_h5 import shuffle_h5
 from utilities.visualization.visualization_tools import *
 from utilities.evaluation_utilities import *
 from utilities.losses import *
@@ -182,10 +181,12 @@ def update_summary_plot(main_folder):
     plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name)
 
 
-def train_and_validate_model(cfg, model, epoch, xs_mean):
+def train_and_validate_model(cfg, model, epoch):
     """
-    Convenience function that trains (fit_generator), validates (evaluate_generator) and saves a Keras model.
-    For documentation of the parameters, confer to the train_model and validate_model functions.
+    Train a model for one epoch.
+
+    Convenience function that trains (fit_generator), validates (evaluate_generator) and a Keras model on the provided
+    training and validation files. The model can saved with an automatically generated filename.
 
     Parameters
     ----------
@@ -195,12 +196,14 @@ def train_and_validate_model(cfg, model, epoch, xs_mean):
         Compiled keras model to use for training and validating.
     epoch : tuple
         Current Epoch and Fileno.
-    xs_mean : ndarray
-        Numpy array of the zero center image.
 
     """
+    if cfg.zero_center_folder is not None:
+        xs_mean = load_zero_center_data(cfg.get_train_files(), cfg.n_gpu[0], cfg.zero_center_folder)
+    else:
+        xs_mean = None
+
     lr = None
-    validate_after_n_train_files = 2
 
     lr_initial, manual_mode = 0.005, (False, 0.0003, 0.07, lr)
     epoch, lr, lr_decay = schedule_learning_rate(model, epoch, cfg.n_gpu, cfg.get_train_files(), lr_initial=lr_initial, manual_mode=manual_mode)  # begin new training step
@@ -218,7 +221,7 @@ def train_and_validate_model(cfg, model, epoch, xs_mean):
         model.save(cfg.main_folder + 'saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5')
 
         # Validate after the first and else after every n-th file
-        if file_no == 1 or file_no % validate_after_n_train_files == 0:
+        if file_no == 1 or file_no % cfg.validate_after_n_train_files == 0:
             history_val = validate_model(cfg, model, xs_mean)
         else:
             history_val = None
@@ -259,15 +262,6 @@ def train_model(cfg, model, f, f_size, file_no, xs_mean, epoch):
     if cfg.n_events is not None:
         f_size = cfg.n_events  # for testing purposes
     callbacks.append(BatchLevelPerformanceLogger(cfg, epoch, model))
-
-    if epoch[0] > 1 and cfg.shuffle[0] is True: # just for convenience, we don't want to wait before the first epoch each time
-        print('Shuffling file ', f, ' before training in epoch ', epoch[0], ' and file ', file_no)
-        shuffle_h5(f, chunking=(True, cfg.batchsize), delete_flag=True)
-
-    if cfg.shuffle[1] is not None:
-        n_preshuffled = cfg.shuffle[1]
-        f = f.replace('0.h5', str(epoch[0]-1) + '.h5') if epoch[0] <= n_preshuffled else f.replace('0.h5', str(np.random.randint(0, n_preshuffled+1)) + '.h5')
-
     print('Training in epoch', epoch[0], 'on file ', file_no, ',', f)
 
     history = model.fit_generator(
@@ -344,17 +338,12 @@ def orca_train(cfg, initial_model=None):
         model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
     model.summary()
 
-    if cfg.zero_center_folder is not None:
-        xs_mean = load_zero_center_data(cfg.get_train_files(), cfg.n_gpu[0], cfg.zero_center_folder)
-    else:
-        xs_mean = None
-
     if cfg.use_scratch_ssd:
         cfg.use_local_node()
 
     trained_epochs = 0
     while trained_epochs < cfg.epochs_to_train or cfg.epochs_to_train == -1:
-        epoch, lr = train_and_validate_model(cfg, model, epoch, xs_mean)
+        epoch, lr = train_and_validate_model(cfg, model, epoch)
         trained_epochs += 1
 
 

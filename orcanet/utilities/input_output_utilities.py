@@ -420,10 +420,6 @@ class Settings(object):
         For testing purposes. If not the whole .h5 file should be used for training, define the number of events.
     n_gpu : tuple(int, str)
         Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov') [1].
-    shuffle : tuple(bool, None/int)
-        Declares if the training data should be shuffled before the next training epoch [0].
-        If the train dataset is too large to be shuffled in place, one can preshuffle them n times before running
-        OrcaNet, the number n should then be put into [1].
     str_ident : str
         Optional string identifier that gets appended to the modelname. Useful when training models which would have
         the same modelname. Also used for defining models and projections!
@@ -438,6 +434,8 @@ class Settings(object):
         verbose option of keras.model.fit_generator.
     use_scratch_ssd : bool
         Declares if the input files should be copied to the node-local SSD scratch space (only working at Erlangen CC).
+    validate_after_n_train_files : int
+        Validate the model after every.
     zero_center_folder : str
         Path to a folder in which zero centering images are stored. [default: None]
         If this path is set, zero centering images for the given dataset will either be calculated and saved
@@ -496,13 +494,13 @@ class Settings(object):
         self.initial_fileno = -1
         self.n_events = None
         self.n_gpu = (1, 'avolkov')
-        self.shuffle = (False, None)
         self.str_ident = ''
         self.swap_4d_channels = None
         self.train_logger_display = 100
         self.train_logger_flush = -1
         self.train_verbose = 2
         self.use_scratch_ssd = False
+        self.validate_after_n_train_files = 2
         self.zero_center_folder = None
 
         self._default_values = dict(self.__dict__)
