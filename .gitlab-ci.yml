@@ -1,7 +1,26 @@
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+
 stages:
   - test
   - doc
   - release
+
+
+cache:
+  paths:
+    - .cache/pip
+    - venv/
+  key: "$CI_COMMIT_REF_SLUG"
+
+
+.virtualenv_template: &virtualenv_definition |
+  python -V
+  pip install virtualenv
+  virtualenv venv
+  source venv/bin/activate
+  make install
 
 
 before_script:
@@ -14,8 +33,7 @@ test:
     image: docker.km3net.de/base/python:3.6
     stage: test
     script:
-        - echo $CUDA_VISIBLE_DEVICES
-        - CUDA_VISIBLE_DEVICES=""
+        - *virtualenv_definition
         - make test
 
 
