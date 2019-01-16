@@ -405,7 +405,7 @@ def load_zero_center_data(cfg):
     """
     train_files = cfg.get_train_files()
     zero_center_folder = cfg.zero_center_folder
-    train_files_list_name = cfg.get_list_name()
+    train_files_list_name = cfg.get_list_file()
 
     xs_mean = []
     # loop over multiple input data files for a single event, each input needs its own xs_mean
@@ -551,7 +551,7 @@ def get_mean_image(filepath, n_gpu):
     xs_mean_arr = None
 
     for i in range(steps):
-        print('Calculating the mean_image of the xs dataset in step ' + str(i))
+        print('Calculating the mean_image of the xs dataset in step ' + str(i) + " of " + str(steps))
         if xs_mean_arr is None:  # create xs_mean_arr that stores intermediate mean_temp results
             xs_mean_arr = np.zeros((steps, ) + f['x'].shape[1:], dtype=np.float64)
 

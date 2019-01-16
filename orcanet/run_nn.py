@@ -318,7 +318,6 @@ def orca_train(cfg, initial_model=None):
         the most recent saved model will be loaded otherwise.
 
     """
-    make_folder_structure(cfg.main_folder)
     write_full_logfile_startup(cfg)
     epoch = (cfg.initial_epoch, cfg.initial_fileno)
     if epoch[0] == -1 and epoch[1] == -1:
@@ -345,25 +344,6 @@ def orca_train(cfg, initial_model=None):
     while trained_epochs < cfg.epochs_to_train or cfg.epochs_to_train == -1:
         epoch, lr = train_and_validate_model(cfg, model, epoch)
         trained_epochs += 1
-
-
-def make_folder_structure(main_folder):
-    """
-    Make subfolders for a specific model if they don't exist already. These subfolders will contain e.g. saved models,
-    logfiles, etc.
-
-    Parameters
-    ----------
-    main_folder : str
-        Name of the main folder where everything gets saved to.
-
-    """
-    folders_to_create = [main_folder+"log_train", main_folder+"saved_models",
-                         main_folder+"plots/activations", main_folder+"predictions"]
-    for directory in folders_to_create:
-        if not os.path.exists(directory):
-            print("Creating directory: "+directory)
-            os.makedirs(directory)
 
 
 def example_run(main_folder, list_file, config_file, model_file):

@@ -168,7 +168,7 @@ def write_full_logfile_startup(cfg):
         f_out.write('--------------------------------------------------------------------------------------------------------\n')
         f_out.write('--------------------------------------------------------------------------------------------------------\n\n\n')
         f_out.write("New execution of the orca_train function started with the following options:\n")
-        f_out.write("List file path:\t"+cfg.list_file+"\n")
+        f_out.write("List file path:\t"+cfg.get_list_file()+"\n")
         f_out.write("Given trainfiles in the .list file:\n")
         for train_file in cfg.get_train_files():
             f_out.write("   " + str(train_file)+"\n")
@@ -177,7 +177,7 @@ def write_full_logfile_startup(cfg):
             f_out.write("   " + str(val_file) + "\n")
         f_out.write("\nGiven options in the .toml config:\n")
         for key in vars(cfg):
-            f_out.write("   {}:\t{}\n".format(key, cfg[key]))
+            f_out.write("   {}:\t{}\n".format(key, getattr(cfg, key)))
         f_out.write("\n")
 
 
@@ -511,6 +511,8 @@ class Settings(object):
             self.main_folder = main_folder
         else:
             self.main_folder = main_folder+"/"
+        # TODO Maybe only make the folders once they are needed for the first time?
+        self.make_folder_structure()
 
         # Private attributes:
         self._train_files = None
@@ -583,6 +585,20 @@ class Settings(object):
         train_files_ssd, test_files_ssd = use_node_local_ssd_for_input(self.get_train_files(), self.get_val_files(), self.get_multiple_inputs())
         self._train_files = train_files_ssd
         self._val_files = test_files_ssd
+
+    def make_folder_structure(self):
+        """
+        Make subfolders for a specific model if they don't exist already. These subfolders will contain e.g. saved models,
+        logfiles, etc.
+
+        """
+        main_folder = self.main_folder
+        folders_to_create = [main_folder + "log_train", main_folder + "saved_models",
+                             main_folder + "plots/activations", main_folder + "predictions"]
+        for directory in folders_to_create:
+            if not os.path.exists(directory):
+                print("Creating directory: " + directory)
+                os.makedirs(directory)
 
     def get_n_bins(self):
         return h5_get_n_bins(self._train_files)
