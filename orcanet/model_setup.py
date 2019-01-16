@@ -9,7 +9,6 @@ import keras as ks
 from model_archs.short_cnn_models import create_vgg_like_model_multi_input_from_single_nns, create_vgg_like_model
 from model_archs.wide_resnet import create_wide_residual_network
 from utilities.losses import *
-from utilities.multi_gpu.multi_gpu import get_available_gpus, make_parallel, print_mgpu_modelsummary
 
 
 def parallelize_model_to_n_gpus(model, n_gpu, batchsize, loss_functions, optimizer, metrics, loss_weight):
@@ -48,6 +47,8 @@ def parallelize_model_to_n_gpus(model, n_gpu, batchsize, loss_functions, optimiz
             return model, batchsize
         else:
             assert n_gpu[0] > 1 and isinstance(n_gpu[0], int), 'You probably made a typo: n_gpu must be an int with n_gpu >= 1!'
+            
+            from utilities.multi_gpu.multi_gpu import get_available_gpus, make_parallel, print_mgpu_modelsummary
 
             gpus_list = get_available_gpus(n_gpu[0])
             ngpus = len(gpus_list)

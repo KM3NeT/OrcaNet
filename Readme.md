@@ -21,6 +21,3 @@ The repository currently contains two folders: <br />
     - utility code: concatenating h5 files, shuffling h5 files, h5 cnn read-in, multi-gpu cnn support,...
 
 - utilities: utility tools that are not related to running the cnn.
-
-
-

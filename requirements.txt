@@ -2,7 +2,7 @@ keras
 numpy
 h5py
 matplotlib
-tensorflow-gpu
+tensorflow
 toml
 docopt
 setuptools_scm
@@ -11,3 +11,10 @@ sphinx-rtd-theme
 sphinx-autoapi
 twine
 numpydoc
+pydocstyle
+pytest
+pytest-cov
+pytest-flake8
+pytest-pylint
+pytest-watch
+yapf
