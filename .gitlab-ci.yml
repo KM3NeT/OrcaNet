@@ -1,5 +1,5 @@
 stages:
-  - install
+  - test
   - doc
   - release
 
@@ -10,11 +10,11 @@ before_script:
   - pip install .
 
 
-install-os:
+test:
     image: docker.km3net.de/base/python:3.6
-    stage: install
+    stage: test
     script:
-        - pip install .
+        - make test
 
 
 pages:
