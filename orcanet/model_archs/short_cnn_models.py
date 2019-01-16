@@ -9,9 +9,10 @@ from keras.layers import Input, Dense, Dropout, Activation, Flatten, Convolution
 from keras import backend as K
 from keras.regularizers import l2
 
-from utilities.nn_utilities import get_dimensions_encoding
+from orcanet.utilities.nn_utilities import get_dimensions_encoding
 
-#------------- VGG-like model -------------#
+# ------------- VGG-like model -------------#
+
 
 def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident = ''):
     """

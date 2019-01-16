@@ -6,9 +6,9 @@ Scripts for making specific models.
 
 import keras as ks
 
-from model_archs.short_cnn_models import create_vgg_like_model_multi_input_from_single_nns, create_vgg_like_model
-from model_archs.wide_resnet import create_wide_residual_network
-from utilities.losses import *
+from orcanet.model_archs.short_cnn_models import create_vgg_like_model_multi_input_from_single_nns, create_vgg_like_model
+from orcanet.model_archs.wide_resnet import create_wide_residual_network
+from orcanet.utilities.losses import *
 
 
 def parallelize_model_to_n_gpus(model, n_gpu, batchsize, loss_functions, optimizer, metrics, loss_weight):
