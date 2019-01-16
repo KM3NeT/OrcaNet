@@ -378,28 +378,23 @@ def encode_targets(y_val, class_type):
 
     return train_y
 
-#------------- Functions used for supplying images to the GPU -------------#
+# ------------- Functions used for supplying images to the GPU -------------#
 
 
-#------------- Functions for preprocessing -------------#
+# ------------- Functions for preprocessing -------------#
 
-def load_zero_center_data(train_files, batchsize, n_bins, n_gpu, zero_center_folder, train_files_list_name):
+def load_zero_center_data(cfg):
     """
     Gets the xs_mean array(s) that can be used for zero-centering.
-    The arrays are either loaded from a previously saved .npz file or they are calculated on the fly.
+
+    The arrays are either loaded from a previously saved .npz file or they are calculated on the fly by
+    calculating the mean value per bin for the given training files. The name of the saved image is derived from the
+    name of the list file which was given to the cfg.
 
     Parameters
     ----------
-    train_files : list(([train_filepath], train_filesize))
-        List of tuples that contains the list of trainfiles (can have multiple ones if the model has multiple inputs)
-        and their number of rows.
-    n_gpu : int
-        Number of gpu's, used for calculating the available RAM space in get_mean_image().
-        Per GPU, it is defined that 8 GB RAM are available on the local machine.
-    zero_center_folder : str
-        TODO
-    train_files_list_name : str
-        TODO
+    cfg : Object Settings
+        Contains all the configurable options in the OrcaNet scripts.
 
     Returns
     -------
@@ -408,6 +403,11 @@ def load_zero_center_data(train_files, batchsize, n_bins, n_gpu, zero_center_fol
         Can be used for zero-centering later on.
 
     """
+    train_files = cfg.get_train_files()
+    n_gpu = cfg.n_gpu[0]
+    zero_center_folder = cfg.zero_center_folder
+    train_files_list_name = cfg.get_list_name()
+
     xs_mean = []
     # loop over multiple input data files for a single event, each input needs its own xs_mean
     for i in range(len(train_files[0][0])):
@@ -426,13 +426,11 @@ def load_zero_center_data(train_files, batchsize, n_bins, n_gpu, zero_center_fol
 
         else:
             print('Calculating the xs_mean_array for model input ' + str(i) + ' in order to zero_center the data!')
-            dimensions = get_dimensions_encoding(n_bins[i], batchsize)
-
             # if the train dataset is split over multiple files, we need to average over the single xs_mean_for_ip arrays.
             xs_mean_for_ip_arr_i = None
             for j in range(len(train_files)):
-                filepath_j = train_files[j][0][i] # j is the index of the j-th train file, i the index of the i-th input
-                xs_mean_for_ip_i_step = get_mean_image(filepath_j, dimensions, n_gpu)
+                filepath_j = train_files[j][0][i]  # j is the index of the j-th train file, i the index of the i-th input
+                xs_mean_for_ip_i_step = get_mean_image(filepath_j, n_gpu)
 
                 if xs_mean_for_ip_arr_i is None:
                     xs_mean_for_ip_arr_i = np.zeros((len(train_files),) + xs_mean_for_ip_i_step.shape, dtype=np.float64)
@@ -483,7 +481,7 @@ def get_fpaths_for_train_files_input_i(train_files, i):
     Parameters
     ----------
     train_files : list
-        TODO
+        List of training files.
     i : int
         Integer for the i-th file input of the network.
 
@@ -532,12 +530,11 @@ def get_precalculated_xs_mean_if_exists(zero_center_files, all_train_files_for_i
     return xs_mean_for_ip_i
 
 
-def get_mean_image(filepath, dimensions, n_gpu):
+def get_mean_image(filepath, n_gpu):
     """
     Returns the mean_image of a xs dataset.
     Calculating still works if xs is larger than the available memory and also if the file is compressed!
     :param str filepath: Filepath of the data upon which the mean_image should be calculated.
-    :param tuple dimensions: Dimensions tuple for 2D, 3D or 4D data.
     :param filepath: Filepath of the input data, used as a str for saving the xs_mean_image.
     :param int n_gpu: Number of used gpu's that is related to how much RAM is available (16G per GPU).
     :return: ndarray xs_mean: mean_image of the x dataset. Can be used for zero-centering later on.
@@ -545,8 +542,8 @@ def get_mean_image(filepath, dimensions, n_gpu):
     f = h5py.File(filepath, "r")
 
     # check available memory and divide the mean calculation in steps
-    total_memory = n_gpu * 8e9 # In bytes. Take 1/2 of what is available per GPU (16G), just to make sure.
-    filesize =  get_array_memsize(f['x'])
+    total_memory = n_gpu * 8e9  # In bytes. Take 1/2 of what is available per GPU (16G), just to make sure.
+    filesize = get_array_memsize(f['x'])
 
     steps = int(np.ceil(filesize/total_memory))
     n_rows = f['x'].shape[0]
@@ -556,17 +553,16 @@ def get_mean_image(filepath, dimensions, n_gpu):
 
     for i in range(steps):
         print('Calculating the mean_image of the xs dataset in step ' + str(i))
-        if xs_mean_arr is None: # create xs_mean_arr that stores intermediate mean_temp results
+        if xs_mean_arr is None:  # create xs_mean_arr that stores intermediate mean_temp results
             xs_mean_arr = np.zeros((steps, ) + f['x'].shape[1:], dtype=np.float64)
 
-        if i == steps-1 or steps == 1: # for the last step, calculate mean till the end of the file
+        if i == steps-1 or steps == 1:  # for the last step, calculate mean till the end of the file
             xs_mean_temp = np.mean(f['x'][i * stepsize: n_rows], axis=0, dtype=np.float64)
         else:
-            xs_mean_temp = np.mean(f['x'][i*stepsize : (i+1) * stepsize], axis=0, dtype=np.float64)
+            xs_mean_temp = np.mean(f['x'][i*stepsize: (i+1) * stepsize], axis=0, dtype=np.float64)
         xs_mean_arr[i] = xs_mean_temp
 
     xs_mean = np.mean(xs_mean_arr, axis=0, dtype=np.float64).astype(np.float32)
-    xs_mean = np.reshape(xs_mean, dimensions[1:]) # give the shape the channels dimension again if not 4D
 
     return xs_mean
 
@@ -578,17 +574,17 @@ def get_array_memsize(array):
     :return: float memsize: size of the array in bytes.
     """
     shape = array.shape
-    n_numbers = reduce(lambda x, y: x*y, shape) # number of entries in an array
-    precision = 8 # Precision of each entry, typically uint8 for xs datasets
-    memsize = (n_numbers * precision) / float(8) # in bytes
+    n_numbers = reduce(lambda x, y: x*y, shape)  # number of entries in an array
+    precision = 8  # Precision of each entry, typically uint8 for xs datasets
+    memsize = (n_numbers * precision) / float(8)  # in bytes
 
     return memsize
 
 
-#------------- Functions for preprocessing -------------#
+# ------------- Functions for preprocessing -------------#
 
 
-#------------- Various other functions -------------#
+# ------------- Various other functions -------------#
 
 def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident=''):
     """

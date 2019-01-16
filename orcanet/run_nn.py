@@ -199,7 +199,7 @@ def train_and_validate_model(cfg, model, epoch):
 
     """
     if cfg.zero_center_folder is not None:
-        xs_mean = load_zero_center_data(cfg.get_train_files(), cfg.n_gpu[0], cfg.zero_center_folder)
+        xs_mean = load_zero_center_data(cfg.get_train_files(), cfg.n_gpu[0], cfg.zero_center_folder, cfg.get_list_name())
     else:
         xs_mean = None
 
