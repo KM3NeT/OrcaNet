@@ -4,6 +4,9 @@ from keras import backend as K
 from keras.layers import Dropout
 from unittest import TestCase
 
+from orcanet import model_setup
+from orcanet.utilities.input_output_utilities import Settings
+
 # filepath = '/home/woody/capn/mppi033h/Code/HPC/cnns/models/trained/trained_model_VGG_4d_xyz-t_and_yzt-x_muon-CC_to_elec-CC_double_input_single_train_epoch1.h5'
 # trained_model = ks.models.load_model(filepath)
 #
@@ -23,3 +26,9 @@ class TestTest(TestCase):
 
     def test_true(self):
         self.assertTrue(True)
+
+    def test_build_model(self):
+        model_toml = "examples/settings_files/example_model.toml"
+        cfg = Settings("test")
+        cfg.set_from_model_file(model_toml)
+        model = model_setup.build_nn_model(cfg)
