@@ -1,7 +1,7 @@
 [model]
 # Info for building an OrcaNet model. This is not required for using orca_train.
 # nn_arch is mandatory, as it is the name of the architecture that will be loaded.
-Other options like the number of layers can also be given.
+# Other options like the number of layers can also be given.
 #
 nn_arch = 'VGG'
 no_of_layers = "TEST"

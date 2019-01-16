@@ -152,8 +152,8 @@ def build_nn_model(cfg):
             model = create_vgg_like_model_multi_input_from_single_nns(n_bins, str_ident, nb_classes=class_type[0],
                                                                       dropout=dropout, swap_4d_channels=swap_4d_channels)
         else:
-            dropout = args.dropout
-            n_filters = args.n_filters
+            dropout = args["dropout"]
+            n_filters = args["n_filters"]
             model = create_vgg_like_model(n_bins, class_type, dropout=dropout,
                                           n_filters=n_filters, swap_4d_channels=swap_4d_channels)  # 2 more layers
     else:
