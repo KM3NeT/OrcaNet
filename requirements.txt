@@ -11,6 +11,7 @@ sphinx-rtd-theme
 sphinx-autoapi
 twine
 numpydoc
+natsort
 pydocstyle
 pytest
 pytest-cov

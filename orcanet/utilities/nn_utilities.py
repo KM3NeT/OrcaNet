@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Utility functions used for training a NN."""
+"""Utility functions used for training a CNN."""
 
 import warnings
 import re
@@ -10,40 +10,33 @@ import os
 import keras as ks
 from functools import reduce
 
-# ------------- Functions used for supplying images to the GPU -------------#
+#------------- Functions used for supplying images to the GPU -------------#
 
-
-def generate_batches_from_hdf5_file(cfg, filepath, f_size=None, zero_center_image=None, yield_mc_info=False):
+def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, str_ident, f_size=None, zero_center_image=None, yield_mc_info=False, swap_col=None):
     """
     Generator that returns batches of (multiple-) images ('xs') and labels ('ys') from single or multiple h5 files.
-
-    Parameters
-    ----------
-    cfg : Object Settings
-        Contains all the configurable options in the OrcaNet scripts.
-    filepath : list
-        List that contains full filepath of the input h5 files, e.g. '/path/to/file/file.h5'.
-    f_size : int/None
-        Specifies the filesize (#images) of the .h5 file if not the whole .h5 file
-        but a fraction of it (e.g. 10%) should be used for yielding the xs/ys arrays.
-        This is important if you run fit_generator(epochs>1) with a filesize (and hence # of steps) that is smaller than the .h5 file.
-    zero_center_image : ndarray
-        mean_image of the x dataset used for zero-centering.
-    yield_mc_info : bool
-        Specifies if mc-infos (y_values) should be yielded as well.
-        The mc-infos are used for validation after training and validation is finished.
-    Yields
-    -------
-    output : tuple
-        A tuple which contains a full batch of images and labels (+ mc_info if yield_mc_info=True).
-
+    :param list filepath: List that contains full filepath of the input h5 files, e.g. '/path/to/file/file.h5'.
+    :param int batchsize: Size of the batches that should be generated. Ideally same as the chunksize in the h5 file.
+    :param tuple n_bins: Number of bins for each dimension (x,y,z,t) in the h5 file.
+    :param (int, str) class_type: Tuple with the umber of output classes and a string identifier to specify the exact output classes.
+                                  I.e. (2, 'muon-CC_to_elec-CC')
+    :param str str_ident: string identifier that specifies the projection type / model inputs in certain cases.
+    :param int/None f_size: Specifies the filesize (#images) of the .h5 file if not the whole .h5 file
+                       but a fraction of it (e.g. 10%) should be used for yielding the xs/ys arrays.
+                       This is important if you run fit_generator(epochs>1) with a filesize (and hence # of steps) that is smaller than the .h5 file.
+    :param ndarray zero_center_image: mean_image of the x dataset used for zero-centering.
+    :param bool yield_mc_info: Specifies if mc-infos (y_values) should be yielded as well.
+                               The mc-infos are used for evaluation after training and testing is finished.
+    :param bool/str swap_col: Specifies, if the index of the columns for xs should be swapped. Necessary for 3.5D nets.
+                          Currently available: 'yzt-x' -> [3,1,2,0] from [0,1,2,3]
+    :return: tuple output: Yields a tuple which contains a full batch of images and labels (+ mc_info if yield_mc_info=True).
     """
     n_files = len(filepath)
     dimensions = {}
     for i in range(n_files):
-        dimensions[i] = get_dimensions_encoding(cfg.n_bins[i], cfg.batchsize)
+        dimensions[i] = get_dimensions_encoding(n_bins[i], batchsize)
 
-    swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'xyt-z': (0, 1, 2, 4, 3), 't-xyz': (0, 4, 1, 2, 3), 'tyz-x': (0, 4, 2, 3, 1)}
+    swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'xyt-z': (0, 1, 2, 4, 3), 't-xyz': (0,4,1,2,3), 'tyz-x': (0,4,2,3,1)}
 
     while 1:
         f = {}
@@ -56,61 +49,61 @@ def generate_batches_from_hdf5_file(cfg, filepath, f_size=None, zero_center_imag
                           'is not equal to the f_size of the true .h5 file. Should be ok if you use the tb_callback.')
 
         n_entries = 0
-        while n_entries <= (f_size - cfg.batchsize):
+        while n_entries <= (f_size - batchsize):
             # create numpy arrays of input data (features)
             xs = {}
-            xs_list = []  # list of inputs for the Keras NN
+            xs_list = [] # list of inputs for the Keras NN
             for i in range(n_files):
-                xs[i] = f[i]['x'][n_entries:n_entries + cfg.batchsize]
+                xs[i] = f[i]['x'][n_entries : n_entries + batchsize]
                 xs[i] = np.reshape(xs[i], dimensions[i]).astype(np.float32)
 
             if zero_center_image is not None:
                 for i in range(n_files):
                     xs[i] = np.subtract(xs[i], zero_center_image[i])
 
-            if cfg.swap_4d_channels is not None:
+            if swap_col is not None:
+
                 # single image input
-                if cfg.swap_col == 'yzt-x' or cfg.swap_4d_channels == 'xyt-z':
-                    xs_list.append(np.transpose(xs, swap_4d_channels_dict[cfg.swap_4d_channels]))
-                elif cfg.swap_4d_channels == 'xyz-t_and_yzt-x':
-                    xs_list.append(xs[0])  # xyzt
+                if swap_col == 'yzt-x' or swap_col == 'xyt-z':
+                    xs_list.append(np.transpose(xs, swap_4d_channels_dict[swap_col]))
+                elif swap_col == 'xyz-t_and_yzt-x':
+                    xs_list.append(xs[0]) # xyzt
                     xs_yzt_x = np.transpose(xs[0], swap_4d_channels_dict['yzt-x'])
                     xs_list.append(xs_yzt_x)
 
-                elif 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2' in cfg.swap_4d_channels + cfg.str_ident:
-                    xs_list.append(xs[0])  # xyz-t tight-1
-                    xs_yzt_x_tight_1 = np.transpose(xs[0], swap_4d_channels_dict['yzt-x'])  # yzt-x tight-1
+                elif 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2' in swap_col + str_ident:
+                    xs_list.append(xs[0]) # xyz-t tight-1
+                    xs_yzt_x_tight_1 = np.transpose(xs[0], swap_4d_channels_dict['yzt-x']) # yzt-x tight-1
                     xs_list.append(xs_yzt_x_tight_1)
-                    xs_list.append(xs[1])  # xyz-t tight-2
-                    xs_yzt_x_tight_2 = np.transpose(xs[1], swap_4d_channels_dict['yzt-x'])  # yzt-x tight-2
+                    xs_list.append(xs[1]) # xyz-t tight-2
+                    xs_yzt_x_tight_2 = np.transpose(xs[1], swap_4d_channels_dict['yzt-x']) # yzt-x tight-2
                     xs_list.append(xs_yzt_x_tight_2)
 
-                elif cfg.swap_4d_channels == 'xyz-t_and_xyz-c_single_input':
+                elif swap_col == 'xyz-t_and_xyz-c_single_input':
                     xyz_t_and_xyz_c = np.concatenate([xs[0], xs[1]], axis=-1)
-                    xs_list = xyz_t_and_xyz_c  # here, it's not a list since we have only one input image
+                    xs_list = xyz_t_and_xyz_c # here, it's not a list since we have only one input image
 
-                else:
-                    raise ValueError('The argument "swap_col"=' + str(cfg.swap_4d_channels) + ' is not valid.')
+                else: raise ValueError('The argument "swap_col"=' + str(swap_col) + ' is not valid.')
 
             else:
                 for i in range(n_files):
                     xs_list.append(xs[i])
 
             # and mc info (labels). Since the labels are same (!!) for all the multiple files, use first file for this
-            y_values = f[0]['y'][n_entries:n_entries+cfg.batchsize]
-            y_values = np.reshape(y_values, (cfg.batchsize, y_values.shape[1]))
+            y_values = f[0]['y'][n_entries:n_entries+batchsize]
+            y_values = np.reshape(y_values, (batchsize, y_values.shape[1]))
 
-            if cfg.class_type[1] != 'track-shower':
-                ys = get_regression_labels(y_values, cfg.class_type)  # ys: dict which contains arrays for every output key
+            if class_type[1] != 'track-shower':
+                ys = get_regression_labels(y_values, class_type) # ys: dict which contains arrays for every output key
 
             else:
-                ys = np.zeros((cfg.batchsize, cfg.class_type[0]), dtype=np.float32)
+                ys = np.zeros((batchsize, class_type[0]), dtype=np.float32)
                 # encode the labels such that they are all within the same range (and filter the ones we don't want for now)
-                for c, y_val in enumerate(y_values):  # Could be vectorized with numba, or use dataflow from tensorpack
-                    ys[c] = encode_targets(y_val, cfg.class_type)
+                for c, y_val in enumerate(y_values): # Could be vectorized with numba, or use dataflow from tensorpack
+                    ys[c] = encode_targets(y_val, class_type)
 
             # we have read one more batch from this file
-            n_entries += cfg.batchsize
+            n_entries += batchsize
 
             output = (xs_list, ys) if yield_mc_info is False else (xs_list, ys) + (y_values,)
 
@@ -118,6 +111,74 @@ def generate_batches_from_hdf5_file(cfg, filepath, f_size=None, zero_center_imag
 
         for i in range(n_files):
             f[i].close()
+
+
+# def gen_batches_from_single_file(filepath, batchsize, n_bins, class_type, f_size=None, zero_center_image=None, yield_mc_info=False, swap_col=None):
+#     """
+#     Generator that returns batches of images ('xs') and labels ('ys') from a h5 file.
+#     :param string filepath: Full filepath of the input h5 file, e.g. '/path/to/file/file.h5'.
+#     :param int batchsize: Size of the batches that should be generated. Ideally same as the chunksize in the h5 file.
+#     :param tuple n_bins: Number of bins for each dimension (x,y,z,t) in the h5 file.
+#     :param (int, str) class_type: Tuple with the umber of output classes and a string identifier to specify the exact output classes.
+#                                   I.e. (2, 'muon-CC_to_elec-CC')
+#     :param int/None f_size: Specifies the filesize (#images) of the .h5 file if not the whole .h5 file
+#                        but a fraction of it (e.g. 10%) should be used for yielding the xs/ys arrays.
+#                        This is important if you run fit_generator(epochs>1) with a filesize (and hence # of steps) that is smaller than the .h5 file.
+#     :param ndarray zero_center_image: mean_image of the x dataset used for zero-centering.
+#     :param bool yield_mc_info: Specifies if mc-infos (y_values) should be yielded as well.
+#                                The mc-infos are used for evaluation after training and testing is finished.
+#     :param bool/str swap_col: Specifies, if the index of the columns for xs should be swapped. Necessary for 3.5D nets.
+#                           Currently available: 'yzt-x' -> [3,1,2,0] from [0,1,2,3]
+#     :return: tuple output: Yields a tuple which contains a full batch of images and labels (+ mc_info if yield_mc_info=True).
+#     """
+#     dimensions = get_dimensions_encoding(n_bins, batchsize)
+#     swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'tyz-x': (0, 4, 2, 3, 1), 't-xyz': (0, 4, 1, 2, 3), 'xyt-z': (0, 1, 2, 4, 3)}
+#
+#     while 1:
+#         f = h5py.File(filepath, 'r')
+#         if f_size is None:
+#             f_size = len(f['y'])
+#             warnings.warn('f_size=None could produce unexpected results if the f_size used in fit_generator(steps=int(f_size / batchsize)) with epochs > 1 '
+#                           'is not equal to the f_size of the true .h5 file. ')
+#
+#         n_entries = 0
+#         while n_entries <= (f_size - batchsize):
+#             # create numpy arrays of input data (features)
+#             xs = f['x'][n_entries : n_entries + batchsize]
+#             xs = np.reshape(xs, dimensions).astype(np.float32)
+#
+#             if zero_center_image is not None: xs = np.subtract(xs, zero_center_image[0])
+#
+#             if swap_col is not None:
+#                 if swap_col == 'yzt-x' or swap_col == 'xyt-z':
+#                     xs = np.transpose(xs, swap_4d_channels_dict[swap_col])
+#                 elif swap_col == 'xyz-t_and_yzt-x':
+#                     xs_xyz_t = xs
+#                     xs_yzt_x = np.transpose(xs, swap_4d_channels_dict['yzt-x'])
+#                     xs = [xs_xyz_t, xs_yzt_x]
+#                 else: raise ValueError('The argument "swap_col"=' + str(swap_col) + ' is not valid.')
+#
+#             # and mc info (labels)
+#             y_values = f['y'][n_entries:n_entries+batchsize]
+#             y_values = np.reshape(y_values, (batchsize, y_values.shape[1])) #TODO simplify with (y_values, y_values.shape) ?
+#
+#             if class_type[1] != 'track-shower':
+#                 ys = get_regression_labels(y_values, class_type) # ys: dict which contains arrays for every output key
+#
+#             else:
+#                 ys = np.zeros((batchsize, class_type[0]), dtype=np.float32) # ys: arr
+#                 # encode the labels such that they are all within the same range (and filter the ones we don't want for now)
+#                 for c, y_val in enumerate(y_values): # Could be vectorized with numba, or use dataflow from tensorpack
+#                     ys[c] = encode_targets(y_val, class_type)
+#
+#             # we have read one more batch from this file
+#             n_entries += batchsize
+#
+#             output = (xs, ys) if yield_mc_info is False else (xs, ys) + (y_values,)
+#
+#             yield output
+#
+#         f.close() # this line of code is actually not reached if steps=f_size/batchsize
 
 
 def get_dimensions_encoding(n_bins, batchsize):
@@ -322,52 +383,161 @@ def encode_targets(y_val, class_type):
 
 #------------- Functions for preprocessing -------------#
 
-def load_zero_center_data(train_files, n_gpu, zero_center_folder):
+def load_zero_center_data(train_files, batchsize, n_bins, n_gpu, zero_center_folder, train_files_list_name):
     """
-    Gets the xs_mean array that can be used for zero-centering.
-    The array is either loaded from a previously saved file or it is calculated on the fly.
-    Currently only works for a single input training file!
-    :param list(([train_filepath], train_filesize)) train_files: list of tuples that contains the list of trainfiles and their number of rows.
-    :param int n_gpu: Number of gpu's, used for calculating the available RAM space in get_mean_image().
-    :return: ndarray xs_mean: mean_image of the x dataset. Can be used for zero-centering later on.
+    Gets the xs_mean array(s) that can be used for zero-centering.
+    The arrays are either loaded from a previously saved .npz file or they are calculated on the fly.
+
+    Parameters
+    ----------
+    train_files : list(([train_filepath], train_filesize))
+        List of tuples that contains the list of trainfiles (can have multiple ones if the model has multiple inputs)
+        and their number of rows.
+    n_gpu : int
+        Number of gpu's, used for calculating the available RAM space in get_mean_image().
+        Per GPU, it is defined that 8 GB RAM are available on the local machine.
+    zero_center_folder : str
+        TODO
+    train_files_list_name : str
+        TODO
+
+    Returns
+    -------
+    xs_mean : list(ndarray)
+        List of ndarray(s) that contains the mean_image of the x dataset (1 array per model input).
+        Can be used for zero-centering later on.
+
     """
     xs_mean = []
-    for i, filepath in enumerate(train_files[0][0]): # loop over multiple input data files for a single event
-        # if the file has a shuffle index (e.g. shuffled_6.h5) and a .npy exists for the first shuffled file (shuffled.h5), we don't want to calculate the mean again
-        shuffle_index = re.search('(_file_.*)(_shuffled)(.*).h5', filepath)
-        filepath_without_index = re.sub(shuffle_index.group(1) + shuffle_index.group(2) + shuffle_index.group(3), '', filepath)
+    # loop over multiple input data files for a single event, each input needs its own xs_mean
+    for i in range(len(train_files[0][0])):
 
-        if os.path.isfile(filepath_without_index + '_zero_center_mean.npy') is True:
-            print('Loading an existing xs_mean_array in order to zero_center the data!')
-            xs_mean_temp = np.load(filepath_without_index + '_zero_center_mean.npy')
+        # load the filepaths of all precalculated zero_center .npz files, which contain the xs_mean
+        zero_center_files = load_fpaths_of_existing_zero_center_files(zero_center_folder)
+        # Collect all filepaths of the train_files for this projection in an array
+        all_train_files_for_ip_i = get_fpaths_for_train_files_input_i(train_files, i)
+
+        # get the xs_mean for this input number i, if it exists in any of the files in the zero_center_folder
+        xs_mean_for_ip_i = get_precalculated_xs_mean_if_exists(zero_center_files, all_train_files_for_ip_i)
+
+        if xs_mean_for_ip_i is not None:
+            print('Loading an existing xs_mean_array for model input ' + str(i) + ' in order to zero_center the data!')
+            xs_mean.append(xs_mean_for_ip_i)
 
         else:
-            print('Calculating the xs_mean_array in order to zero_center the data!')
-            # if the train dataset is split over multiple files, we need to average over the single xs_mean_temp arrays.
-            xs_mean_temp_arr = None
+            print('Calculating the xs_mean_array for model input ' + str(i) + ' in order to zero_center the data!')
+            dimensions = get_dimensions_encoding(n_bins[i], batchsize)
+
+            # if the train dataset is split over multiple files, we need to average over the single xs_mean_for_ip arrays.
+            xs_mean_for_ip_arr_i = None
             for j in range(len(train_files)):
-                filepath_j = train_files[j][0][i] # j is the index of the j-th train file, i the index of the i-th projection input
-                xs_mean_temp_step = get_mean_image(filepath_j, n_gpu)
+                filepath_j = train_files[j][0][i] # j is the index of the j-th train file, i the index of the i-th input
+                xs_mean_for_ip_i_step = get_mean_image(filepath_j, dimensions, n_gpu)
 
-                if xs_mean_temp_arr is None:
-                    xs_mean_temp_arr = np.zeros((len(train_files),) + xs_mean_temp_step.shape, dtype=np.float64)
-                xs_mean_temp_arr[j] = xs_mean_temp_step
+                if xs_mean_for_ip_arr_i is None:
+                    xs_mean_for_ip_arr_i = np.zeros((len(train_files),) + xs_mean_for_ip_i_step.shape, dtype=np.float64)
+                xs_mean_for_ip_arr_i[j] = xs_mean_for_ip_i_step
 
-            xs_mean_temp = np.mean(xs_mean_temp_arr, axis=0, dtype=np.float64).astype(np.float32) if len(train_files) > 1 else xs_mean_temp_arr[0]
+            xs_mean_for_ip_i = np.mean(xs_mean_for_ip_arr_i, axis=0, dtype=np.float64).astype(np.float32) if len(train_files) > 1 else xs_mean_for_ip_arr_i[0]
 
-            np.save(filepath_without_index + '_zero_center_mean.npy', xs_mean_temp)
-            print('Saved the xs_mean array with shape', xs_mean_temp.shape, ' to ', filepath_without_index, '_zero_center_mean.npy')
+            np.savez(zero_center_folder + train_files_list_name + '.npz', xs_mean=xs_mean_for_ip_i, zero_center_used_ip_files=all_train_files_for_ip_i)
+            print('Saved the xs_mean array for input ' + str(i) + ' with shape', xs_mean_for_ip_i.shape, ' to ',
+                  zero_center_folder + train_files_list_name + '.npz')
 
-        xs_mean.append(xs_mean_temp)
+        xs_mean.append(xs_mean_for_ip_i)
 
     return xs_mean
 
 
-def get_mean_image(filepath, n_gpu):
+def load_fpaths_of_existing_zero_center_files(zero_center_folder):
+    """
+    Loads the filepaths of all precalculated zero_center_files (.npz) in the zero_center_folder if they exist.
+
+    Parameters
+    ----------
+    zero_center_folder : str
+        Full path to the folder where the zero_centering arrays are / should be stored.
+
+    Returns
+    -------
+    zero_center_files : list
+        List that contains all filepaths of precalculated zero_center files.
+        Can be empty, if no zero_center_files exist in that directory.
+
+    """
+    zero_center_files = []
+    if os.path.isdir(zero_center_folder):
+        for file in os.listdir(zero_center_folder):
+            if file.endswith('.npz'):
+                zero_center_files.append(file)
+    else:
+        os.mkdir(zero_center_folder)
+
+    return zero_center_files
+
+
+def get_fpaths_for_train_files_input_i(train_files, i):
+    """
+    Gets all filepaths of the train_files for the i-th input and puts them into an array.
+
+    Parameters
+    ----------
+    train_files : list
+        TODO
+    i : int
+        Integer for the i-th file input of the network.
+
+    Returns
+    -------
+    all_train_files_for_ip_i : ndarray
+        Array that contains the filepaths of all train_files for the i-th input.
+
+    """
+    all_train_files_for_ip_i_list = []
+    for j in range(len(train_files)):
+        all_train_files_for_ip_i_list.append(train_files[j][0][i])
+
+    all_train_files_for_ip_i = np.array(all_train_files_for_ip_i_list)
+
+    return all_train_files_for_ip_i
+
+
+def get_precalculated_xs_mean_if_exists(zero_center_files, all_train_files_for_ip_i):
+    """
+    Function that searches for precalculated xs_mean arrays in the already existing zero_center_files.
+
+    Specifically, the function opens every zero_center_file (.npz) and checks if the 'zero_center_used_ip_files' array
+    is the same as the 'all_train_files_for_ip_i' array.
+
+    Parameters
+    ----------
+    zero_center_files : list
+        List that contains all filepaths of precalculated zero_center files.
+    all_train_files_for_ip_i : ndarray
+        Array that contains the filepaths of all train_files for the i-th input.
+
+    Returns
+    -------
+    xs_mean_for_ip_i : None/ndarray
+        Returns the xs_mean_for_ip_i array if it exists somewhere in the zero_center_files. If not, returns None.
+
+    """
+    xs_mean_for_ip_i = None
+    for file in zero_center_files:
+        zero_center_used_ip_files = np.load(file)['zero_center_used_ip_files']
+        if np.array_equal(zero_center_used_ip_files, all_train_files_for_ip_i):
+            xs_mean_for_ip_i = np.load(file)['xs_mean']
+            break
+
+    return xs_mean_for_ip_i
+
+
+def get_mean_image(filepath, dimensions, n_gpu):
     """
     Returns the mean_image of a xs dataset.
     Calculating still works if xs is larger than the available memory and also if the file is compressed!
     :param str filepath: Filepath of the data upon which the mean_image should be calculated.
+    :param tuple dimensions: Dimensions tuple for 2D, 3D or 4D data.
     :param filepath: Filepath of the input data, used as a str for saving the xs_mean_image.
     :param int n_gpu: Number of used gpu's that is related to how much RAM is available (16G per GPU).
     :return: ndarray xs_mean: mean_image of the x dataset. Can be used for zero-centering later on.
@@ -396,7 +566,7 @@ def get_mean_image(filepath, n_gpu):
         xs_mean_arr[i] = xs_mean_temp
 
     xs_mean = np.mean(xs_mean_arr, axis=0, dtype=np.float64).astype(np.float32)
-    #xs_mean = np.reshape(xs_mean, dimensions[1:]) # give the shape the channels dimension again if not 4D
+    xs_mean = np.reshape(xs_mean, dimensions[1:]) # give the shape the channels dimension again if not 4D
 
     return xs_mean
 
@@ -420,7 +590,44 @@ def get_array_memsize(array):
 
 #------------- Various other functions -------------#
 
+def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident=''):
+    """
+    Derives the name of a model based on its number of bins and the class_type tuple.
+    The final modelname is defined as 'model_Nd_proj_class_type[1]'.
+    E.g. 'model_3d_xyz_muon-CC_to_elec-CC'.
+    :param list(tuple) n_bins: Number of bins for each dimension (x,y,z,t) of the training images. Can contain multiple n_bins tuples.
+    :param (int, str) class_type: Tuple that declares the number of output classes and a string identifier to specify the exact output classes.
+                                  I.e. (2, 'muon-CC_to_elec-CC')
+    :param str nn_arch: String that declares which neural network model architecture is used.
+    :param None/str swap_4d_channels: For 4D data input (3.5D models). Specifies the projection type.
+    :param str str_ident: Optional str identifier that gets appended to the modelname.
+    :return: str modelname: Derived modelname.
+    """
+    modelname = 'model_' + nn_arch + '_'
 
+    projection = ''
+    for i, bins in enumerate(n_bins):
+
+        dim = 4- bins.count(1)
+        if i > 0: projection += '_and_'
+        projection += str(dim) + 'd_'
+
+        if bins.count(1) == 0 and i == 0: # for 4D input # TODO FIX BUG XYZT AFTER NAME
+            if swap_4d_channels is not None:
+                projection += swap_4d_channels
+            else:
+                projection += 'xyz-c' if bins[3] == 31 else 'xyz-t'
+
+        else: # 2D/3D input
+            if bins[0] > 1: projection += 'x'
+            if bins[1] > 1: projection += 'y'
+            if bins[2] > 1: projection += 'z'
+            if bins[3] > 1: projection += 't'
+
+    str_ident = '_' + str_ident if str_ident is not '' else str_ident
+    modelname += projection + '_' + class_type[1] + str_ident
+
+    return modelname
 
 #------------- Various other functions -------------#
 
@@ -460,25 +667,30 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
     TODO
     """
     # Gibt loss aus über alle :display batches, gemittelt über die letzten :display batches
-    def __init__(self, cfg, epoch, model):
+    def __init__(self, train_files, batchsize, display, model, folder_name, epoch, flush_after_n_lines):
         """
 
         Parameters
         ----------
-        cfg
+        train_files
+        batchsize
+        display
         model
+        folder_name
         epoch
+        flush_after_n_lines : int
+            After how many lines the file should be flushed. -1 for flush at the end of the epoch only.
 
         """
         ks.callbacks.Callback.__init__(self)
-        self.display = cfg.train_logger_display
+        self.display = display
         self.epoch_number = epoch[0]
         self.f_number = epoch[1]
         self.model = model
-        self.flush = cfg.train_logger_flush
+        self.flush = flush_after_n_lines
 
         self.seen = 0
-        self.logfile_train_fname = cfg.main_folder + 'log_train/log_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.txt'
+        self.logfile_train_fname = folder_name + '/log_train/log_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.txt'
         self.loglist = []
 
         self.cum_metrics = {}
@@ -486,8 +698,8 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
             self.cum_metrics[metric] = 0
 
         self.steps_per_total_epoch, self.steps_cum = 0, [0]
-        for f, f_size in cfg.get_train_files():
-            steps_per_file = int(f_size / cfg.batchsize)
+        for f, f_size in train_files:
+            steps_per_file = int(f_size / batchsize)
             self.steps_per_total_epoch += steps_per_file
             self.steps_cum.append(self.steps_cum[-1] + steps_per_file)
 
@@ -506,6 +718,8 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
         if self.seen % self.display == 0:
             batchnumber_float = (self.seen - self.display / 2.) / float(self.steps_per_total_epoch) + self.epoch_number - 1 \
                                 + (self.steps_cum [self.f_number-1] / float(self.steps_per_total_epoch))
+                                # offset if the currently trained file is not the first one
+                                #+ (self.f_number-1) * (1/float(self.n_train_files)) # start from zero # only works if all train files have approximately the same number of entries
             line = '\n{0}\t{1}'.format(self.seen, batchnumber_float)
             for metric in self.model.metrics_names:
                 line = line + '\t' + str(self.cum_metrics[metric] / self.display)
