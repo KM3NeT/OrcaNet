@@ -3,7 +3,6 @@ numpy
 h5py
 matplotlib
 tensorflow
-tensorflow-gpu
 toml
 docopt
 setuptools_scm
