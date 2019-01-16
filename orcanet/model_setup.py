@@ -133,8 +133,15 @@ def build_nn_model(cfg):
         A Keras nn instance.
 
     """
+    modeldata = cfg.get_modeldata()
+    nn_arch = modeldata.nn_arch
+    loss_opt = modeldata.loss_opt
+    args = modeldata.args
+    n_bins = cfg.get_n_bins()
+
     if nn_arch == 'WRN':
         model = create_wide_residual_network(n_bins[0], nb_classes=class_type[0], n=1, k=1, dropout=0.2, k_size=3, swap_4d_channels=swap_4d_channels)
+
     elif nn_arch == 'VGG':
         if 'multi_input_single_train' in str_ident:
             dropout=(0,0.1)
@@ -149,7 +156,7 @@ def build_nn_model(cfg):
         raise ValueError('Currently, only "WRN" or "VGG" are available as nn_arch')
 
     loss_functions, metrics, loss_weight, optimizer = get_optimizer_info(loss_opt, optimizer='adam')
-    model, batchsize = parallelize_model_to_n_gpus(model, n_gpu, batchsize, loss_functions, optimizer, metrics,
+    model, batchsize = parallelize_model_to_n_gpus(model, cfg.n_gpu, cfg.batchsize, loss_functions, optimizer, metrics,
                                                    loss_weight)
     model.compile(loss=loss_functions, optimizer=optimizer, metrics=metrics, loss_weights=loss_weight)
 

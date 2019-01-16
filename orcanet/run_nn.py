@@ -185,8 +185,8 @@ def train_and_validate_model(cfg, model, epoch):
     """
     Train a model for one epoch.
 
-    Convenience function that trains (fit_generator), validates (evaluate_generator) and a Keras model on the provided
-    training and validation files. The model can saved with an automatically generated filename.
+    Trains (fit_generator) and validates (evaluate_generator) a Keras model once on the provided
+    training and validation files. The model is saved with an automatically generated filename based on the epoch.
 
     Parameters
     ----------
@@ -204,7 +204,6 @@ def train_and_validate_model(cfg, model, epoch):
         xs_mean = None
 
     lr = None
-
     lr_initial, manual_mode = 0.005, (False, 0.0003, 0.07, lr)
     epoch, lr, lr_decay = schedule_learning_rate(model, epoch, cfg.n_gpu, cfg.get_train_files(), lr_initial=lr_initial, manual_mode=manual_mode)  # begin new training step
 
@@ -220,8 +219,8 @@ def train_and_validate_model(cfg, model, epoch):
         history_train = train_model(cfg, model, f, f_size, file_no, xs_mean, epoch)
         model.save(cfg.main_folder + 'saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5')
 
-        # Validate after the first and else after every n-th file
-        if file_no == 1 or file_no % cfg.validate_after_n_train_files == 0:
+        # Validate every n-th file, starting with the first
+        if (file_no - 1) % cfg.validate_after_n_train_files == 0:
             history_val = validate_model(cfg, model, xs_mean)
         else:
             history_val = None

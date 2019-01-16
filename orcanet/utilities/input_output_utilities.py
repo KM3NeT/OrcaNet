@@ -435,7 +435,8 @@ class Settings(object):
     use_scratch_ssd : bool
         Declares if the input files should be copied to the node-local SSD scratch space (only working at Erlangen CC).
     validate_after_n_train_files : int
-        Validate the model after every.
+        Validate the model after this many training files have been trained on in an epoch, starting from the first.
+        E.g. if validate_after_n_train_files == 3, it will be validated after file 1,4,7,...
     zero_center_folder : str
         Path to a folder in which zero centering images are stored. [default: None]
         If this path is set, zero centering images for the given dataset will either be calculated and saved
@@ -534,7 +535,6 @@ class Settings(object):
             raise ValueError("You tried to load filepathes from a list file, but pathes have already been loaded \
             for this object. (From the file " + self._list_file + ")\nYou should not use \
             two different list files for one Settings object!")
-        # self.n_bins = h5_get_n_bins(self.train_files)
 
     def set_from_config_file(self, config_file):
         """ Overwrite default attribute values with values from a config file. """
@@ -583,6 +583,9 @@ class Settings(object):
         train_files_ssd, test_files_ssd = use_node_local_ssd_for_input(self.get_train_files(), self.get_val_files(), self.get_multiple_inputs())
         self._train_files = train_files_ssd
         self._val_files = test_files_ssd
+
+    def get_n_bins(self):
+        return h5_get_n_bins(self._train_files)
 
     def get_default_values(self):
         """ Return default values of common settings. """
