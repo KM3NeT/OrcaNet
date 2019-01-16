@@ -11,7 +11,7 @@ at http://ml.pages.km3net.de/OrcaNet
 
 ### Environment
 
-- KM3Pipe version:
+- OrcaNet version:
 - Python version (`python --version`):
 - OS: (`uname -a`)
 
