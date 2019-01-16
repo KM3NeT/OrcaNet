@@ -5,6 +5,8 @@ Other options like the number of layers can also be given.
 #
 nn_arch = 'VGG'
 no_of_layers = "TEST"
+dropout = 0.0
+n_filters = [64, 64, 64, 64, 64, 64, 128, 128, 128, 128]
 
 [model.losses]
 # The loss(es) of the model are listed here. Every loss has an identifier as a keyword,

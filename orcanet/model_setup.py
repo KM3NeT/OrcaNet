@@ -94,19 +94,19 @@ def get_optimizer_info(loss_opt, optimizer='adam'):
 
     """
     if optimizer == 'adam':
-        optimizer = ks.optimizers.Adam(beta_1=0.9, beta_2=0.999, epsilon=0.1, decay=0.0) # epsilon=1 for deep networks
+        optimizer = ks.optimizers.Adam(beta_1=0.9, beta_2=0.999, epsilon=0.1, decay=0.0)  # epsilon=1 for deep networks
     elif optimizer == "sgd":
         optimizer = ks.optimizers.SGD(momentum=0.9, decay=0, nesterov=True)
     else:
         raise NameError("Unknown optimizer name ({})".format(optimizer))
     custom_objects = get_all_loss_functions()
-    loss_functions, loss_weight = {},{}
+    loss_functions, loss_weight = {}, {}
     for loss_key in loss_opt[0].keys():
         # Replace function string with the actual function if it is custom
         if loss_opt[0][loss_key]["function"] in custom_objects:
-            loss_function=custom_objects[loss_opt[0][loss_key]["function"]]
+            loss_function = custom_objects[loss_opt[0][loss_key]["function"]]
         else:
-            loss_function=loss_opt[0][loss_key]["function"]
+            loss_function = loss_opt[0][loss_key]["function"]
         # Use given weight, else use default weight of 1
         if "weight" in loss_opt[0][loss_key]:
             weight = loss_opt[0][loss_key]["weight"]
@@ -138,20 +138,23 @@ def build_nn_model(cfg):
     loss_opt = modeldata.loss_opt
     args = modeldata.args
     n_bins = cfg.get_n_bins()
+    class_type = cfg.class_type
+    str_ident = cfg.str_ident
+    swap_4d_channels = cfg.swap_4d_channels
 
     if nn_arch == 'WRN':
         model = create_wide_residual_network(n_bins[0], nb_classes=class_type[0], n=1, k=1, dropout=0.2, k_size=3, swap_4d_channels=swap_4d_channels)
 
     elif nn_arch == 'VGG':
         if 'multi_input_single_train' in str_ident:
-            dropout=(0,0.1)
+            dropout = (0, 0.1)
             model = create_vgg_like_model_multi_input_from_single_nns(n_bins, str_ident, nb_classes=class_type[0],
                                                                       dropout=dropout, swap_4d_channels=swap_4d_channels)
         else:
-            dropout=0.0
-            n_filters=(64, 64, 64, 64, 64, 64, 128, 128, 128, 128)
+            dropout = args.dropout
+            n_filters = args.n_filters
             model = create_vgg_like_model(n_bins, class_type, dropout=dropout,
-                                          n_filters=n_filters, swap_4d_channels=swap_4d_channels) # 2 more layers
+                                          n_filters=n_filters, swap_4d_channels=swap_4d_channels)  # 2 more layers
     else:
         raise ValueError('Currently, only "WRN" or "VGG" are available as nn_arch')
 
