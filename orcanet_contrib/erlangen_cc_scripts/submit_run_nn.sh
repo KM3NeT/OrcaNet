@@ -12,7 +12,7 @@ list="configs/lists/example_list.list"
 folder="trained_models/"
 
 #Setup environment
-. ./env_cnn.sh
+. env_cnn.sh
 #Execute training
 python ../OrcaNet/orcanet/run_nn.py $model $list $folder
 
