@@ -15,9 +15,9 @@ import os
 import shutil
 import h5py
 import toml
-from time import gmtime, strftime
 import numpy as np
 from collections import namedtuple
+from datetime import datetime
 
 
 def read_out_config_file(file):
@@ -159,20 +159,20 @@ def write_full_logfile_startup(cfg):
 
     Parameters
     ----------
-    cfg : class Settings
-        ...
+    cfg : Object Settings
+        Contains all the configurable options in the OrcaNet scripts.
 
     """
     logfile = cfg.main_folder + 'full_log.txt'
     with open(logfile, 'a+') as f_out:
         f_out.write('--------------------------------------------------------------------------------------------------------\n')
-        f_out.write('--------------------------------------------------------------------------------------------------------\n\n\n')
-        f_out.write("New execution of the orca_train function started with the following options:\n")
+        f_out.write('----------------------------------'+str(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))+'---------------------------------------------------\n\n')
+        f_out.write("New execution of the orca_train function started with the following options:\n\n")
         f_out.write("List file path:\t"+cfg.get_list_file()+"\n")
         f_out.write("Given trainfiles in the .list file:\n")
         for train_file in cfg.get_train_files():
             f_out.write("   " + str(train_file)+"\n")
-        f_out.write("\nGiven validation files in the .list file:\n")
+        f_out.write("Given validation files in the .list file:\n")
         for val_file in cfg.get_val_files():
             f_out.write("   " + str(val_file) + "\n")
         f_out.write("\nGiven options in the .toml config:\n")
@@ -190,7 +190,7 @@ def write_full_logfile(cfg, model, history_train, history_val, lr, lr_decay, epo
     with open(logfile, 'a+') as f_out:
         f_out.write('---------------Epoch {} File {}-------------------------------------------------------------------------\n'.format(epoch[0], epoch[1]))
         f_out.write('\n')
-        f_out.write('Current time: ' + strftime("%Y-%m-%d %H:%M:%S", gmtime()) + '\n')
+        f_out.write('Current time: ' + str(datetime.now().strftime('%Y-%m-%d %H:%M:%S')) + '\n')
         f_out.write('Decayed learning rate to ' + str(lr) + ' before epoch ' + str(epoch[0]) +
                     ' and file ' + str(epoch[1]) + ' (minus ' + str(lr_decay) + ')\n')
         f_out.write('Trained in epoch ' + str(epoch) + ' on file ' + str(epoch[1]) + ', ' + str(cfg.train_file) + '\n')
