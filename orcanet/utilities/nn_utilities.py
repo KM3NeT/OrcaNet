@@ -405,7 +405,7 @@ def load_zero_center_data(cfg):
     """
     train_files = cfg.get_train_files()
     zero_center_folder = cfg.zero_center_folder
-    train_files_list_name = cfg.get_list_file()
+    train_files_list_name = os.path.basename(cfg.get_list_file())
 
     xs_mean = []
     # loop over multiple input data files for a single event, each input needs its own xs_mean
