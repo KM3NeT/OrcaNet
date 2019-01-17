@@ -319,14 +319,14 @@ def orca_train(cfg, initial_model=None):
     """
     cfg.make_folder_structure()
     write_full_logfile_startup(cfg)
+    # The epoch that will be incremented during the scripts:
     epoch = (cfg.initial_epoch, cfg.initial_fileno)
     if epoch[0] == -1 and epoch[1] == -1:
         epoch = cfg.get_latest_epoch()
         print("Automatically set epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
 
     if epoch[0] == 0 and epoch[1] == 1:
-        if initial_model is None:
-            raise ValueError("You need to provide a compiled keras model for the start of the training! (You gave None)")
+        assert initial_model is not None, "You need to provide a compiled keras model for the start of the training! (You gave None)"
         model = initial_model
     else:
         # Load an existing model
@@ -336,7 +336,6 @@ def orca_train(cfg, initial_model=None):
         print("Loading saved model: "+path_of_model)
         model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
     model.summary()
-
     if cfg.use_scratch_ssd:
         cfg.use_local_node()
 

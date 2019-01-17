@@ -402,6 +402,10 @@ class Settings(object):
     """
     Container object for all the configurable options in the OrcaNet scripts.
 
+    Sensible default values were chosen for the settings.
+    You can change the all of these public attributes (the ones without a leading underscore _) either directly or with a
+    .toml config file via the method set_from_config_file().
+
     Attributes
     ----------
     main_folder : str
@@ -421,35 +425,36 @@ class Settings(object):
         When using multiple files, define the file number at which the training is supposed to start, e.g.
         1 for the first file. If both epoch and fileno are -1, automatically load the most recent file found
         in the main folder.
-    n_events : None/int
+    n_events : None or int
         For testing purposes. If not the whole .h5 file should be used for training, define the number of events.
     n_gpu : tuple(int, str)
         Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov') [1].
     str_ident : str
         Optional string identifier that gets appended to the modelname. Useful when training models which would have
         the same modelname. Also used for defining models and projections!
-    swap_4d_channels : None/str
+    swap_4d_channels : None or str
         For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
         Currently available: None -> XYZ-T ; 'yzt-x' -> YZT-X, TODO add multi input options
     train_logger_display : int
         How many batches should be averaged for one line in the training log files.
     train_logger_flush : int
-        After how many lines the training log file should be flushed. -1 for flush at the end of the epoch only.
+        After how many lines the training log file should be flushed (updated on the disk).
+        -1 for flush at the end of the file only.
     train_verbose : int
         verbose option of keras.model.fit_generator.
     use_scratch_ssd : bool
         Declares if the input files should be copied to the node-local SSD scratch space (only working at Erlangen CC).
     validate_after_n_train_files : int
         Validate the model after this many training files have been trained on in an epoch, starting from the first.
-        E.g. if validate_after_n_train_files == 3, it will be validated after file 1,4,7,...
-    zero_center_folder : str
+        E.g. if validate_after_n_train_files == 3, validation will happen after file 1,4,7,...
+    zero_center_folder : None or str
         Path to a folder in which zero centering images are stored. [default: None]
         If this path is set, zero centering images for the given dataset will either be calculated and saved
         automatically at the start of the training, or loaded if they have been saved before.
 
     Private attributes
     ------------------
-    _train_files : list
+    _train_files : list or None
         A list containing the paths to the different training files on which the model will be trained on.
         Example for the output format:
                 [
@@ -457,12 +462,12 @@ class Settings(object):
                  [['path/to/train_file_2_dimx.h5', 'path/to/train_file_2_dimy.h5'], number_of_events_train_files_2],
                  ...
                 ]
-    _val_files : list
+    _val_files : list or None
         Like train_files but for the validation files.
-    _multiple_inputs : bool
+    _multiple_inputs : bool or None
         Whether seperate sets of input files were given (e.g. for networks taking data
         simulataneosly from different files).
-    _list_file : str
+    _list_file : str or None
         Path to the list file that was used to set the training and validation files. Is None if no list file
         has been used yet.
     _modeldata : namedtuple or None
@@ -480,7 +485,7 @@ class Settings(object):
     """
     def __init__(self, main_folder, list_file=None, config_file=None):
         """
-        Set the attributes of the object.
+        Set the attributes of the Settings object.
 
         Values are loaded from the given files, if provided. Otherwise, default values are used.
 
@@ -488,9 +493,9 @@ class Settings(object):
         ----------
         main_folder : str
             Name of the folder of this model in which everything will be saved, e.g., the summary.txt log file is located in here.
-        list_file : str
+        list_file : str or None
             Path to a list file with pathes to all the h5 files that should be used for training and validation.
-        config_file : str
+        config_file : str or None
             Path to the config file with attributes that are used instead of the default ones.
 
         """
@@ -539,7 +544,7 @@ class Settings(object):
             # Save internally which path was used to load the info
             self._list_file = list_file
         else:
-            raise ValueError("You tried to load filepathes from a list file, but pathes have already been loaded \
+            raise AssertionError("You tried to load filepathes from a list file, but pathes have already been loaded \
             for this object. (From the file " + self._list_file + ")\nYou should not use \
             two different list files for one Settings object!")
 
@@ -550,7 +555,7 @@ class Settings(object):
             if hasattr(self, key):
                 setattr(self, key, user_values[key])
             else:
-                raise AttributeError("You tried to set the attribute "+str(key)+" in your config file\n"
+                raise AssertionError("You tried to set the attribute "+str(key)+" in your config file\n"
                                      + config_file + "\n, but this attribute is not provided. Check \
                                      the possible attributes in the definition of the Settings class.")
 
