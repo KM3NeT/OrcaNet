@@ -436,10 +436,9 @@ def load_zero_center_data(cfg):
                 xs_mean_for_ip_arr_i[j] = xs_mean_for_ip_i_step
 
             xs_mean_for_ip_i = np.mean(xs_mean_for_ip_arr_i, axis=0, dtype=np.float64).astype(np.float32) if len(train_files) > 1 else xs_mean_for_ip_arr_i[0]
-
-            np.savez(zero_center_folder + train_files_list_name + '_' + str(i) + '.npz', xs_mean=xs_mean_for_ip_i, zero_center_used_ip_files=all_train_files_for_ip_i)
-            print('Saved the xs_mean array for input ' + str(i) + ' with shape', xs_mean_for_ip_i.shape, ' to ',
-                  zero_center_folder + train_files_list_name + '.npz')
+            filename = zero_center_folder + train_files_list_name + '_' + str(i) + '.npz'
+            np.savez(filename, xs_mean=xs_mean_for_ip_i, zero_center_used_ip_files=all_train_files_for_ip_i)
+            print('Saved the xs_mean array for input ' + str(i) + ' with shape', xs_mean_for_ip_i.shape, ' to ', filename)
 
         xs_mean.append(xs_mean_for_ip_i)
 
@@ -466,7 +465,7 @@ def load_fpaths_of_existing_zero_center_files(zero_center_folder):
     if os.path.isdir(zero_center_folder):
         for file in os.listdir(zero_center_folder):
             if file.endswith('.npz'):
-                zero_center_files.append(file)
+                zero_center_files.append(zero_center_folder + file)
     else:
         os.mkdir(zero_center_folder)
 
@@ -521,6 +520,7 @@ def get_precalculated_xs_mean_if_exists(zero_center_files, all_train_files_for_i
     """
     xs_mean_for_ip_i = None
     for file in zero_center_files:
+        print(file)
         zero_center_used_ip_files = np.load(file)['zero_center_used_ip_files']
         if np.array_equal(zero_center_used_ip_files, all_train_files_for_ip_i):
             xs_mean_for_ip_i = np.load(file)['xs_mean']
