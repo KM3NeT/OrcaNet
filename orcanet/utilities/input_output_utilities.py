@@ -175,9 +175,14 @@ def write_full_logfile_startup(cfg):
         f_out.write("Given validation files in the .list file:\n")
         for val_file in cfg.get_val_files():
             f_out.write("   " + str(val_file) + "\n")
-        f_out.write("\nGiven options in the .toml config:\n")
+        f_out.write("\nSettings used:\n")
         for key in vars(cfg):
-            f_out.write("   {}:\t{}\n".format(key, getattr(cfg, key)))
+            if not key.startswith("_"):
+                f_out.write("   {}:\t{}\n".format(key, getattr(cfg, key)))
+        f_out.write("\nPrivate attributes:\n")
+        for key in vars(cfg):
+            if key.startswith("_"):
+                f_out.write("   {}:\t{}\n".format(key, getattr(cfg, key)))
         f_out.write("\n")
 
 
