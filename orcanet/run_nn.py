@@ -314,10 +314,11 @@ def orca_train(cfg, initial_model=None):
     cfg : Object Settings
         Contains all the configurable options in the OrcaNet scripts.
     initial_model : ks.models.Model
-        Compiled keras model to use for training and validation. Only required for the first epoch of training, as a
+        Compiled keras model to use for training and validation. Only required for the first epoch of training, as
         the most recent saved model will be loaded otherwise.
 
     """
+    cfg.make_folder_structure()
     write_full_logfile_startup(cfg)
     epoch = (cfg.initial_epoch, cfg.initial_fileno)
     if epoch[0] == -1 and epoch[1] == -1:
@@ -353,20 +354,25 @@ def example_run(main_folder, list_file, config_file, model_file):
     Parameters
     ----------
     main_folder : str
-        Path to the folder where everything gets saved to, e.g. the summary.txt, the plots, the trained models, etc.
+        Path to the folder where everything gets saved to, e.g. the summary log file, the plots, the trained models, etc.
     list_file : str
         Path to a list file which contains pathes to all the h5 files that should be used for training and validation.
     config_file : str
-        Path to a .toml file which contains all the infos for training and validating a model.
+        Path to a .toml file which overwrite some of the default settings for training and validating a model.
     model_file : str
         Path to a file with parameters to build a model of a predefined architecture with OrcaNet.
 
     """
+    # Set up the cfg object with the input data
     cfg = Settings(main_folder, list_file, config_file)
+    # If this is the start of the training, a compiled model needs to be handed to the orca_train function
     if cfg.get_latest_epoch() == (0, 1):
+        # Add Info for building a model with OrcaNet to the cfg object
         cfg.set_from_model_file(model_file)
+        # Build it
         initial_model = build_nn_model(cfg)
     else:
+        # No model is required if the training is continued, as it will be loaded automatically
         initial_model = None
     orca_train(cfg, initial_model)
 

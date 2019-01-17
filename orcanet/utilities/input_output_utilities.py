@@ -511,8 +511,6 @@ class Settings(object):
             self.main_folder = main_folder
         else:
             self.main_folder = main_folder+"/"
-        # TODO Maybe only make the folders once they are needed for the first time?
-        self.make_folder_structure()
 
         # Private attributes:
         self._train_files = None
@@ -563,18 +561,21 @@ class Settings(object):
         Returns
         -------
         latest_epoch : tuple
-            The highest epoch, file_no pair. (0,1) if the folder is empty.
+            The highest epoch, file_no pair. (0,1) if the folder is empty or does not exist yet.
 
         """
-        files = os.listdir(self.main_folder + "saved_models")
-        if len(files) == 0:
-            latest_epoch = (0, 1)
+        if os.path.exists(self.main_folder + "saved_models"):
+            files = os.listdir(self.main_folder + "saved_models")
+            if len(files) == 0:
+                latest_epoch = (0, 1)
+            else:
+                epochs = []
+                for file in files:
+                    epoch, file_no = file.split("model_epoch_")[-1].split(".h5")[0].split("_file_")
+                    epochs.append((int(epoch), int(file_no)))
+                latest_epoch = max(epochs)
         else:
-            epochs = []
-            for file in files:
-                epoch, file_no = file.split("model_epoch_")[-1].split(".h5")[0].split("_file_")
-                epochs.append((int(epoch), int(file_no)))
-            latest_epoch = max(epochs)
+            latest_epoch = (0, 1)
         return latest_epoch
 
     def use_local_node(self):
