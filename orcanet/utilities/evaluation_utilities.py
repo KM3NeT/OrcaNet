@@ -553,7 +553,7 @@ def make_prob_hists(arr_nn_pred, folder_name, modelname, precuts=(False, '3-100_
     make_prob_hist_class(arr_nn_pred_ecut, axes, particle_types_dict, 'tau-CC', 0, plot_range=(0,1), color='g', linestyle='-')
     make_prob_hist_class(arr_nn_pred_ecut, axes, particle_types_dict, 'a_tau-CC', 0, plot_range=(0, 1), color='g', linestyle='--')
 
-    configure_hstack_plot(plot_title='Probability to be classified as shower, 3-40GeV', savepath=folder_name + '/plots/ts_prob_shower_' + modelname)
+    configure_hstack_plot(plot_title='Probability to be classified as shower, 3-40GeV', savepath=folder_name + 'plots/ts_prob_shower_' + modelname)
     plt.cla()
 
     make_prob_hist_class(arr_nn_pred_ecut, axes, particle_types_dict, 'muon-CC', 1, plot_range=(0,1), color='b', linestyle='-')
@@ -566,7 +566,7 @@ def make_prob_hists(arr_nn_pred, folder_name, modelname, precuts=(False, '3-100_
     make_prob_hist_class(arr_nn_pred_ecut, axes, particle_types_dict, 'a_tau-CC', 1, plot_range=(0, 1), color='g', linestyle='--')
 
 
-    configure_hstack_plot(plot_title='Probability to be classified as track, 3-40GeV', savepath=folder_name + '/plots/ts_prob_track_' + modelname)
+    configure_hstack_plot(plot_title='Probability to be classified as track, 3-40GeV', savepath=folder_name + 'plots/ts_prob_track_' + modelname)
     plt.cla()
 
 
@@ -708,7 +708,7 @@ def make_hist_2d_property_vs_property(arr_nn_pred, folder_name, modelname, prope
 
     for key in iter(list(particle_types_dict.keys())):
         make_hist_2d_class(prop_1, prop_2, arr_nn_pred, particle_types_dict, e_cut, key,
-                           savepath=folder_name + '/plots/ts_hist_2d_' + key + '_' + property_types[0] + '_vs_'
+                           savepath=folder_name + 'plots/ts_hist_2d_' + key + '_' + property_types[0] + '_vs_'
                                     + property_types[1] + '_e_cut_' + str(e_cut[0]) + '_' + str(e_cut[1]) + '_' + modelname)
 
     # make multiple cuts in range
@@ -717,7 +717,7 @@ def make_hist_2d_property_vs_property(arr_nn_pred, folder_name, modelname, prope
     pdf_pages = {}
 
     for key in iter(list(particle_types_dict.keys())):
-        pdf_pages[key] = mpl.backends.backend_pdf.PdfPages(folder_name + '/plots/ts_hist_2d_' + key + '_'
+        pdf_pages[key] = mpl.backends.backend_pdf.PdfPages(folder_name + 'plots/ts_hist_2d_' + key + '_'
                                                          + property_types[0] + '_vs_' + property_types[1] + '_e_cut_'
                                                            + str(e_cut[0]) + '_' + str(e_cut[1]) + '_multiple_' + modelname + '.pdf')
 
@@ -861,8 +861,8 @@ def calculate_and_plot_separation_pid(arr_nn_pred, folder_name, modelname, precu
     plt.xscale('log')
     plt.text(0.05, 0.92, 'KM3NeT Preliminary', transform=axes.transAxes, weight='bold')
 
-    plt.savefig(folder_name + '/plots/ts_Correlation_Coefficients_' + modelname + '.pdf')
-    plt.savefig(folder_name + '/plots/ts_Correlation_Coefficients_' + modelname + '.png', dpi=600)
+    plt.savefig(folder_name + 'plots/ts_Correlation_Coefficients_' + modelname + '.pdf')
+    plt.savefig(folder_name + 'plots/ts_Correlation_Coefficients_' + modelname + '.png', dpi=600)
 
     plt.close()
 
@@ -895,7 +895,7 @@ def make_2d_energy_resolution_plot(arr_nn_pred, modelname, folder_name, energy_b
     energy_pred = arr_nn_pred[:, 9]
 
     fig, ax = plt.subplots()
-    pdf_plots = mpl.backends.backend_pdf.PdfPages(folder_name + '/plots/energy_resolution_' + modelname + '.pdf')
+    pdf_plots = mpl.backends.backend_pdf.PdfPages(folder_name + 'plots/energy_resolution_' + modelname + '.pdf')
 
     for ic in ic_list.keys():
         is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], ic)
@@ -1052,7 +1052,7 @@ def make_1d_energy_reco_metric_vs_energy_plot(arr_nn_pred, modelname, folder_nam
                'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
 
     fig, ax = plt.subplots()
-    pdf_plots = mpl.backends.backend_pdf.PdfPages(folder_name + '/plots/energy_resolution_' + modelname + '.pdf')
+    pdf_plots = mpl.backends.backend_pdf.PdfPages(folder_name + 'plots/energy_resolution_' + modelname + '.pdf')
 
     for ic in ic_list.keys():
 
@@ -1225,7 +1225,7 @@ def make_1d_energy_std_div_e_true_plot(arr_nn_pred, modelname, folder_name, ener
                'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
 
     fig, ax = plt.subplots()
-    pdf_plots = mpl.backends.backend_pdf.PdfPages(folder_name + '/plots/energy_std_rel_' + modelname + '.pdf')
+    pdf_plots = mpl.backends.backend_pdf.PdfPages(folder_name + 'plots/energy_std_rel_' + modelname + '.pdf')
 
     for ic in ic_list.keys():
         std_rel_ic = get_std_rel_plot_data(arr_nn_pred, ic, energy_bins)
@@ -1316,7 +1316,7 @@ def make_1d_dir_metric_vs_energy_plot(arr_nn_pred, modelname, folder_name, metri
                'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
 
     fig, ax = plt.subplots()
-    pdf_plots = mpl.backends.backend_pdf.PdfPages(folder_name + '/plots/dir_resolution_' + modelname + '.pdf')
+    pdf_plots = mpl.backends.backend_pdf.PdfPages(folder_name + 'plots/dir_resolution_' + modelname + '.pdf')
     reco_name = 'OrcaNet: ' if modelname != 'shallow_reco' else 'Standard Reco: '
 
     for ic in ic_list.keys():
@@ -1374,7 +1374,7 @@ def make_2d_dir_correlation_plot(arr_nn_pred, modelname, folder_name, precuts=(F
                'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
 
     fig, ax = plt.subplots()
-    pdf_plots = mpl.backends.backend_pdf.PdfPages(folder_name + '/plots/dir_correlation_' + modelname + '.pdf')
+    pdf_plots = mpl.backends.backend_pdf.PdfPages(folder_name + 'plots/dir_correlation_' + modelname + '.pdf')
 
     for ic in ic_list.keys():
         is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], ic)
@@ -1505,7 +1505,7 @@ def make_1d_bjorken_y_metric_vs_energy_plot(arr_nn_pred, modelname, folder_name,
                'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
 
     fig, ax = plt.subplots()
-    pdf_plots = mpl.backends.backend_pdf.PdfPages(folder_name + '/plots/bjorken_y_' + modelname + '.pdf')
+    pdf_plots = mpl.backends.backend_pdf.PdfPages(folder_name + 'plots/bjorken_y_' + modelname + '.pdf')
 
     # correct by to 1 for e-NC events
     abs_particle_type, is_cc = np.abs(arr_nn_pred[:, 2]), arr_nn_pred[:, 3]
@@ -1561,7 +1561,7 @@ def make_2d_bjorken_y_resolution_plot(arr_nn_pred, modelname, folder_name, by_bi
                'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
 
     fig, ax = plt.subplots()
-    pdf_plots = mpl.backends.backend_pdf.PdfPages(folder_name + '/plots/bjorken-y_resolution_' + modelname + '.pdf')
+    pdf_plots = mpl.backends.backend_pdf.PdfPages(folder_name + 'plots/bjorken-y_resolution_' + modelname + '.pdf')
 
     #arr_nn_pred = arr_nn_pred[arr_nn_pred[:, 4] > 3]
 
@@ -1621,7 +1621,7 @@ def make_1d_reco_err_div_by_std_plot(arr_nn_pred, modelname, folder_name, precut
     # do this for energy, bj-y, dir_x, dir_y, dir_z
     # 1d (y_true - y_reco) / std_reco
     fig, ax = plt.subplots()
-    pdf_plots = mpl.backends.backend_pdf.PdfPages(folder_name + '/plots/1d_std_errors_reco_err_div_by_std_' + modelname + '.pdf')
+    pdf_plots = mpl.backends.backend_pdf.PdfPages(folder_name + 'plots/1d_std_errors_reco_err_div_by_std_' + modelname + '.pdf')
 
     plot_1d_reco_err_div_by_std_for_label(arr_nn_pred, fig, ax, pdf_plots, 'energy')
     plot_1d_reco_err_div_by_std_for_label(arr_nn_pred, fig, ax, pdf_plots, 'bjorken-y')
@@ -1684,7 +1684,7 @@ def make_1d_reco_err_to_reco_residual_plot(arr_nn_pred, modelname, folder_name, 
         arr_nn_pred = arr_nn_pred_select_pheid_events(arr_nn_pred, invert=False, precuts=precuts[1])
 
     fig, ax = plt.subplots()
-    pdf_plots = mpl.backends.backend_pdf.PdfPages(folder_name + '/plots/1d_reco_errors_to_reco_residual_' + modelname + '.pdf')
+    pdf_plots = mpl.backends.backend_pdf.PdfPages(folder_name + 'plots/1d_reco_errors_to_reco_residual_' + modelname + '.pdf')
 
     # correct by to 1 for e-NC events
     abs_particle_type, is_cc = np.abs(arr_nn_pred[:, 2]), arr_nn_pred[:, 3]
@@ -1883,7 +1883,7 @@ def make_2d_dir_correlation_plot_different_sigmas(arr_nn_pred, modelname, folder
                'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
 
     fig, ax = plt.subplots()
-    pdf_plots = mpl.backends.backend_pdf.PdfPages(folder_name + '/plots/correlation_diff_sigmas_' + modelname + '.pdf')
+    pdf_plots = mpl.backends.backend_pdf.PdfPages(folder_name + 'plots/correlation_diff_sigmas_' + modelname + '.pdf')
 
     for ic in ic_list.keys():
         is_ic = get_boolean_interaction_channel_separation(arr_nn_pred[:, 2], arr_nn_pred[:, 3], ic)

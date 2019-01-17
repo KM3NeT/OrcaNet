@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-
 Main code for training NN's. The main function for training, validating, logging and plotting the progress is orca_train.
 It can also be called via a parser by running this python module as follows:
 

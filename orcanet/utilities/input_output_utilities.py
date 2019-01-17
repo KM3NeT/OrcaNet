@@ -401,7 +401,7 @@ class Settings(object):
     ----------
     main_folder : str
         Name of the folder of this model in which everything will be saved, e.g., the summary.txt log file is located in here.
-
+        Has a '/' at the end.
     batchsize : int
         Batchsize that should be used for the training / inferencing of the cnn.
     class_type : tuple(int, str)
@@ -442,6 +442,8 @@ class Settings(object):
         If this path is set, zero centering images for the given dataset will either be calculated and saved
         automatically at the start of the training, or loaded if they have been saved before.
 
+    Private attributes
+    ------------------
     _train_files : list
         A list containing the paths to the different training files on which the model will be trained on.
         Example for the output format:
@@ -458,7 +460,7 @@ class Settings(object):
     _list_file : str
         Path to the list file that was used to set the training and validation files. Is None if no list file
         has been used yet.
-    _modeldata : namedtuple
+    _modeldata : namedtuple or None
         Optional info only required for building a predefined model with OrcaNet. [default: None]
         It is not needed for executing orcatrain. It is set via self.load_from_model_file.
 

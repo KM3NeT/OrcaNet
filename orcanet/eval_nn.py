@@ -1,21 +1,21 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-
 Main code for evaluating NN's.
 It can also be called via a parser by running this python module as follows:
 
 Usage:
-    run_nn.py CONFIG LIST [FOLDER]
-    run_nn.py (-h | --help)
+    eval_nn.py FOLDER LIST CONFIG MODEL
+    eval_nn.py (-h | --help)
 
 Arguments:
-    CONFIG  A .toml file which sets up the model and training.
-            An example can be found in config/models/example_config.toml
-    LIST    A .list file which contains the files to be trained on.
+    FOLDER  Path to the folder where everything gets saved to, e.g. the summary.txt, the plots, the trained models, etc.
+    LIST    A .toml file which contains the pathes of the training and validation files.
             An example can be found in config/lists/example_list.toml
-    FOLDER  A new subfolder will be generated in this folder, where everything from this model gets saved to.
-            Default is the current working directory.
+    CONFIG  A .toml file which sets up the training.
+            An example can be found in config/models/example_config.toml. The possible parameters are listed in
+            utilities/input_output_utilities.py in the class Settings.
+    MODEL   Path to a .toml file with infos about a model.
 
 Options:
     -h --help                       Show this screen.
@@ -25,11 +25,10 @@ Options:
 import matplotlib as mpl
 from docopt import docopt
 mpl.use('Agg')
-
-from utilities.input_output_utilities import use_node_local_ssd_for_input, read_out_list_file, read_out_config_file, h5_get_n_bins
 from utilities.nn_utilities import load_zero_center_data
 from utilities.evaluation_utilities import *
 from utilities.losses import get_all_loss_functions
+from utilities.input_output_utilities import Settings
 
 
 def predict_and_investigate_model_performance(model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
@@ -77,14 +76,13 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
         print("Done! Saving prediction as:\n   "+arr_filename)
         np.save(arr_filename, arr_nn_pred)
 
-
-    #arr_nn_pred = np.load('results/plots/saved_predictions/arr_nn_pred_' + modelname + '_final_stateful_false.npy')
-    #arr_nn_pred = np.load('results/plots/saved_predictions//arr_nn_pred_model_VGG_4d_xyz-t_and_yzt-x_and_4d_xyzt_track-shower_multi_input_single_train_tight-1_tight-2_lr_0.003_tr_st_test_st_final_stateful_false_1-100GeV_precut.npy')
+    # arr_nn_pred = np.load('results/plots/saved_predictions/arr_nn_pred_' + modelname + '_final_stateful_false.npy')
+    # arr_nn_pred = np.load('results/plots/saved_predictions//arr_nn_pred_model_VGG_4d_xyz-t_and_yzt-x_and_4d_xyzt_track-shower_multi_input_single_train_tight-1_tight-2_lr_0.003_tr_st_test_st_final_stateful_false_1-100GeV_precut.npy')
 
     if class_type[1] == 'track-shower':  # categorical
         precuts = (False, '3-100_GeV_prod')
 
-        make_energy_to_accuracy_plot_multiple_classes(arr_nn_pred, title='Classified as track', filename=folder_name + '/plots/ts_' + modelname,
+        make_energy_to_accuracy_plot_multiple_classes(arr_nn_pred, title='Classified as track', filename=folder_name + 'plots/ts_' + modelname,
                                                       precuts=precuts, corr_cut_pred_0=0.5)
 
         make_prob_hists(arr_nn_pred, folder_name, modelname=modelname, precuts=precuts)
@@ -94,7 +92,7 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
 
     else:  # regression
         arr_nn_pred_shallow = np.load('/home/woody/capn/mppi033h/Data/various/arr_nn_pred.npy')
-        #precuts = (True, 'regr_3-100_GeV_prod_and_1-3_GeV_prod')
+        # precuts = (True, 'regr_3-100_GeV_prod_and_1-3_GeV_prod')
         precuts = (False, '3-100_GeV_prod')
         if 'energy' in class_type[1]:
             print('Generating plots for energy performance investigations')
@@ -132,7 +130,7 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
         if 'errors' in class_type[1]:
             print('Generating plots for error performance investigations')
 
-            make_1d_reco_err_div_by_std_plot(arr_nn_pred, modelname, folder_name, precuts=precuts) # TODO take precuts from above?
+            make_1d_reco_err_div_by_std_plot(arr_nn_pred, modelname, folder_name, precuts=precuts)  # TODO take precuts from above?
             make_1d_reco_err_to_reco_residual_plot(arr_nn_pred, modelname, folder_name, precuts=precuts)
             make_2d_dir_correlation_plot_different_sigmas(arr_nn_pred, modelname, folder_name, precuts=precuts)
 
@@ -155,17 +153,18 @@ def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident=''):
     projection = ''
     for i, bins in enumerate(n_bins):
 
-        dim = 4- bins.count(1)
-        if i > 0: projection += '_and_'
+        dim = 4 - bins.count(1)
+        if i > 0:
+            projection += '_and_'
         projection += str(dim) + 'd_'
 
-        if bins.count(1) == 0 and i == 0: # for 4D input # TODO FIX BUG XYZT AFTER NAME
+        if bins.count(1) == 0 and i == 0:  # for 4D input # TODO FIX BUG XYZT AFTER NAME
             if swap_4d_channels is not None:
                 projection += swap_4d_channels
             else:
                 projection += 'xyz-c' if bins[3] == 31 else 'xyz-t'
 
-        else: # 2D/3D input
+        else:  # 2D/3D input
             if bins[0] > 1: projection += 'x'
             if bins[1] > 1: projection += 'y'
             if bins[2] > 1: projection += 'z'
@@ -177,66 +176,76 @@ def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident=''):
     return modelname
 
 
-def eval_nn(list_filename, folder_name, loss_opt, class_type, nn_arch,
-               swap_4d_channels=None, batchsize=64, epoch=[-1,-1], epochs_to_train=-1, n_gpu=(1, 'avolkov'), use_scratch_ssd=False,
-               zero_center=False, shuffle=(False,None), str_ident='', train_logger_display=100, train_logger_flush=-1,
-               train_verbose=2, n_events=None):
+def orca_eval(cfg):
     """
     Core code that evaluates a neural network. The input parameters are the same as for orca_train, so that it is compatible
     with the .toml file.
     TODO Should be directly callable on a saved model, so that less arguments are required, and maybe no .toml is needed?
 
     """
+    folder_name = cfg.main_folder
+    test_files = cfg.get_val_files()
+    n_bins = cfg.get_n_bins()
+    class_type = cfg.class_type
+    swap_4d_channels = cfg.swap_4d_channels
+    batchsize = cfg.batchsize
+    str_ident = cfg.str_ident
+    list_name = os.path.basename(cfg.get_list_file()).split(".")[0]
+    nn_arch = cfg.get_modeldata().nn_arch
 
-    train_files, test_files, multiple_inputs = read_out_list_file(list_filename)
-    n_bins = h5_get_n_bins(train_files)
-    if epoch == [-1, -1]:
-        epoch = look_for_latest_epoch(folder_name)
-        print("Automatically initialized epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
-    if zero_center:
-        xs_mean = load_zero_center_data(train_files, n_gpu[0])
+    epoch = (cfg.initial_epoch, cfg.initial_fileno)
+    if epoch[0] == -1 and epoch[1] == -1:
+        epoch = cfg.get_latest_epoch()
+        print("Automatically set epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
+
+    if cfg.zero_center_folder is not None:
+        xs_mean = load_zero_center_data(cfg)
     else:
         xs_mean = None
-    if use_scratch_ssd:
-        train_files, test_files = use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=multiple_inputs)
 
-    path_of_model = folder_name + '/saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5'
+    if cfg.use_scratch_ssd:
+        cfg.use_local_node()
+
+    path_of_model = folder_name + 'saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5'
     model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
     modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident)
-    arr_filename = folder_name + '/predictions/pred_model_epoch_{}_file_{}_on_{}.npy'.format(str(epoch[0]), str(epoch[1]), list_filename[:-5].split("/")[-1])
+    arr_filename = folder_name + 'predictions/pred_model_epoch_{}_file_{}_on_{}_val_files.npy'.format(str(epoch[0]), str(epoch[1]), list_name[:-5])
 
     predict_and_investigate_model_performance(model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
                                               str_ident, modelname, xs_mean, arr_filename, folder_name)
 
 
-def orca_eval(trained_models_folder, config_file, list_file):
+def example_run(main_folder, list_file, config_file, model_file):
     """
-    Frontend function for evaluating networks.
+    This shows how to use OrcaNet.
 
     Parameters
     ----------
-    trained_models_folder : str
-        Path to the folder where everything gets saved to.
-        Every model (from a .toml file) will get its own folder in here, with the name being the
-        same as the one from the .toml file.
-    config_file : str
-        Path to a .toml file which contains all the infos for training and testing of a model.
+    main_folder : str
+        Path to the folder where everything gets saved to, e.g. the summary log file, the plots, the trained models, etc.
     list_file : str
-        Path to a list file which contains pathes to all the h5 files that should be used for training.
+        Path to a list file which contains pathes to all the h5 files that should be used for training and validation.
+    config_file : str
+        Path to a .toml file which overwrite some of the default settings for training and validating a model.
+    model_file : str
+        Path to a file with parameters to build a model of a predefined architecture with OrcaNet.
 
     """
-    keyword_arguments = read_out_config_file(config_file)
-    folder_name = trained_models_folder + str(os.path.splitext(os.path.basename(config_file))[0])
-    eval_nn(list_file, folder_name, **keyword_arguments)
+    # Set up the cfg object with the input data
+    cfg = Settings(main_folder, list_file, config_file)
+    # Currently, the eval scripts are only supported for automatically generated models, so nn_arch is needed.
+    cfg.set_from_model_file(model_file)
+    orca_eval(cfg)
 
 
 def parse_input():
-    """ Run the orca_eval function with a parser. """
+    """ Run the orca_train function with a parser. """
     args = docopt(__doc__)
-    config_file = args['CONFIG']
+    main_folder = args['FOLDER']
     list_file = args['LIST']
-    trained_models_folder = args['FOLDER'] if args['FOLDER'] is not None else "./"
-    orca_eval(trained_models_folder, config_file, list_file)
+    config_file = args['CONFIG']
+    model_file = args['MODEL']
+    example_run(main_folder, list_file, config_file, model_file)
 
 
 if __name__ == '__main__':
