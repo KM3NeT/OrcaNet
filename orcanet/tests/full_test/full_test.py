@@ -4,44 +4,57 @@
 import numpy as np
 import h5py
 import os
+from keras.models import Model
+from keras.layers import Dense, Input
 from orcanet.utilities.input_output_utilities import Settings
 from orcanet.run_nn import orca_train
-from orcanet.model_setup import build_nn_model
+# from orcanet.model_setup import build_nn_model
 
 
 def example_run():
     """
     This shows how to use OrcaNet.
     """
-    # Set up the cfg object with the input data
+    temp_dir = "temp/"
+
+    main_folder = temp_dir + "model/"
+    list_file = temp_dir + "test_list.toml"
+    config_file = temp_dir + "test_config.toml"
+    # model_file = temp_dir + "test_model.toml"
+
     cfg = Settings(main_folder, list_file, config_file)
-    # If this is the start of the training, a compiled model needs to be handed to the orca_train function
-    if cfg.get_latest_epoch() == (0, 1):
-        # Add Info for building a model with OrcaNet to the cfg object
-        cfg.set_from_model_file(model_file)
-        # Build it
-        initial_model = build_nn_model(cfg)
-    else:
-        # No model is required if the training is continued, as it will be loaded automatically
-        initial_model = None
+    initial_model = preperation(temp_dir)
+
     orca_train(cfg, initial_model)
 
-
-def make_dummy_data(name, delete=False):
-    filepath = "temp/" + name + ".h5py"
-    if not delete:
-        x = np.concatenate([np.ones((100, 10, 10)), np.zeros((100, 10, 10))])
-        y = np.ones((200, 1))
-        h5f = h5py.File(filepath, 'w')
-        h5f.create_dataset('x', data=x, dtype='uint8')
-        h5f.create_dataset('y', data=y, dtype='float32')
-        h5f.close()
-        print("Created file ", filepath)
-    else:
-        os.remove(filepath)
-        print("Deleted file ", filepath)
+# os.remove(filepath)
 
 
-def preperation(delete):
-    make_dummy_data("train", delete=delete)
-    make_dummy_data("test", delete=delete)
+def make_dummy_data(name, temp_dir):
+    filepath = temp_dir + name + ".h5"
+    shape = (10, )
+
+    x = np.concatenate([np.ones((1000,) + shape), np.zeros((1000,) + shape)])
+    y = np.ones((2000, 1))
+
+    h5f = h5py.File(filepath, 'w')
+    h5f.create_dataset('x', data=x, dtype='uint8')
+    h5f.create_dataset('y', data=y, dtype='float32')
+    h5f.close()
+    print("Created file ", filepath)
+    return shape
+
+
+def make_dummy_model(shape):
+    inp = Input(shape=shape)
+    x = Dense(10)(inp)
+    model = Model(inp, x)
+    return model
+
+
+def preperation(temp_dir):
+    os.makedirs(temp_dir, exist_ok=True)
+    shape = make_dummy_data("train", temp_dir)
+    make_dummy_data("val", temp_dir)
+    model = make_dummy_model(shape)
+    return model
