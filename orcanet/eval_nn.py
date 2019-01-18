@@ -25,10 +25,10 @@ Options:
 import matplotlib as mpl
 from docopt import docopt
 mpl.use('Agg')
-from utilities.nn_utilities import load_zero_center_data
-from utilities.evaluation_utilities import *
-from utilities.losses import get_all_loss_functions
-from utilities.input_output_utilities import Settings
+from orcanet.utilities.nn_utilities import load_zero_center_data
+from orcanet.utilities.evaluation_utilities import *
+from orcanet.utilities.losses import get_all_loss_functions
+from orcanet.utilities.input_output_utilities import Settings
 
 
 # TODO Remove unnecessary input parameters to the following functions if they are already in the cfg
