@@ -438,7 +438,7 @@ def load_zero_center_data(cfg):
                 xs_mean_for_ip_arr_i[j] = xs_mean_for_ip_i_step
 
             xs_mean_for_ip_i = np.mean(xs_mean_for_ip_arr_i, axis=0, dtype=np.float64).astype(np.float32) if len(train_files) > 1 else xs_mean_for_ip_arr_i[0]
-            filename = zero_center_folder + train_files_list_name + '_' + str(i) + '.npz'
+            filename = zero_center_folder + train_files_list_name + '_input_' + str(i) + '.npz'
             np.savez(filename, xs_mean=xs_mean_for_ip_i, zero_center_used_ip_files=all_train_files_for_ip_i)
             print('Saved the xs_mean array for input ' + str(i) + ' with shape', xs_mean_for_ip_i.shape, ' to ', filename)
 
