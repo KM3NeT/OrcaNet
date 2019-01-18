@@ -37,15 +37,15 @@ def generate_batches_from_hdf5_file(cfg, filepath, f_size=None, zero_center_imag
     for i in range(n_files):
         dimensions[i] = get_dimensions_encoding(n_bins[i], batchsize)
 
-    swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'xyt-z': (0, 1, 2, 4, 3), 't-xyz': (0,4,1,2,3), 'tyz-x': (0,4,2,3,1)}
+    swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'xyt-z': (0, 1, 2, 4, 3), 't-xyz': (0, 4, 1, 2, 3), 'tyz-x': (0, 4, 2, 3, 1)}
 
     while 1:
         f = {}
         for i in range(n_files):
             f[i] = h5py.File(filepath[i], 'r')
 
-        if f_size is None: # Should be same for all files!
-            f_size = len(f[0]['y']) # Take len of first file in filepaths, should be same for all files
+        if f_size is None:  # Should be same for all files!
+            f_size = len(f[0]['y'])  # Take len of first file in filepaths, should be same for all files
             warnings.warn('f_size=None could produce unexpected results if the f_size used in fit_generator(steps=int(f_size / batchsize)) with epochs > 1 '
                           'is not equal to the f_size of the true .h5 file. Should be ok if you use the tb_callback.')
 
@@ -53,14 +53,15 @@ def generate_batches_from_hdf5_file(cfg, filepath, f_size=None, zero_center_imag
         while n_entries <= (f_size - batchsize):
             # create numpy arrays of input data (features)
             xs = {}
-            xs_list = [] # list of inputs for the Keras NN
+            xs_list = []  # list of inputs for the Keras NN
             for i in range(n_files):
-                xs[i] = f[i]['x'][n_entries : n_entries + batchsize]
+                xs[i] = f[i]['x'][n_entries: n_entries + batchsize]
                 xs[i] = np.reshape(xs[i], dimensions[i]).astype(np.float32)
 
             if zero_center_image is not None:
                 for i in range(n_files):
-                    xs[i] = np.subtract(xs[i], zero_center_image[i])
+                    xs_mean = np.reshape(zero_center_image[i], dimensions[i][1:]).astype(np.float32)
+                    xs[i] = np.subtract(xs[i], xs_mean)
 
             if swap_col is not None:
 
@@ -68,23 +69,24 @@ def generate_batches_from_hdf5_file(cfg, filepath, f_size=None, zero_center_imag
                 if swap_col == 'yzt-x' or swap_col == 'xyt-z':
                     xs_list.append(np.transpose(xs, swap_4d_channels_dict[swap_col]))
                 elif swap_col == 'xyz-t_and_yzt-x':
-                    xs_list.append(xs[0]) # xyzt
+                    xs_list.append(xs[0])  # xyzt
                     xs_yzt_x = np.transpose(xs[0], swap_4d_channels_dict['yzt-x'])
                     xs_list.append(xs_yzt_x)
 
                 elif 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2' in swap_col + str_ident:
-                    xs_list.append(xs[0]) # xyz-t tight-1
-                    xs_yzt_x_tight_1 = np.transpose(xs[0], swap_4d_channels_dict['yzt-x']) # yzt-x tight-1
+                    xs_list.append(xs[0])  # xyz-t tight-1
+                    xs_yzt_x_tight_1 = np.transpose(xs[0], swap_4d_channels_dict['yzt-x'])  # yzt-x tight-1
                     xs_list.append(xs_yzt_x_tight_1)
-                    xs_list.append(xs[1]) # xyz-t tight-2
-                    xs_yzt_x_tight_2 = np.transpose(xs[1], swap_4d_channels_dict['yzt-x']) # yzt-x tight-2
+                    xs_list.append(xs[1])  # xyz-t tight-2
+                    xs_yzt_x_tight_2 = np.transpose(xs[1], swap_4d_channels_dict['yzt-x'])  # yzt-x tight-2
                     xs_list.append(xs_yzt_x_tight_2)
 
                 elif swap_col == 'xyz-t_and_xyz-c_single_input':
                     xyz_t_and_xyz_c = np.concatenate([xs[0], xs[1]], axis=-1)
-                    xs_list = xyz_t_and_xyz_c # here, it's not a list since we have only one input image
+                    xs_list = xyz_t_and_xyz_c  # here, it's not a list since we have only one input image
 
-                else: raise ValueError('The argument "swap_col"=' + str(swap_col) + ' is not valid.')
+                else:
+                    raise ValueError('The argument "swap_col"=' + str(swap_col) + ' is not valid.')
 
             else:
                 for i in range(n_files):
@@ -95,12 +97,12 @@ def generate_batches_from_hdf5_file(cfg, filepath, f_size=None, zero_center_imag
             y_values = np.reshape(y_values, (batchsize, y_values.shape[1]))
 
             if class_type[1] != 'track-shower':
-                ys = get_regression_labels(y_values, class_type) # ys: dict which contains arrays for every output key
+                ys = get_regression_labels(y_values, class_type)  # ys: dict which contains arrays for every output key
 
             else:
                 ys = np.zeros((batchsize, class_type[0]), dtype=np.float32)
                 # encode the labels such that they are all within the same range (and filter the ones we don't want for now)
-                for c, y_val in enumerate(y_values): # Could be vectorized with numba, or use dataflow from tensorpack
+                for c, y_val in enumerate(y_values):  # Could be vectorized with numba, or use dataflow from tensorpack
                     ys[c] = encode_targets(y_val, class_type)
 
             # we have read one more batch from this file
@@ -442,7 +444,7 @@ def load_zero_center_data(cfg):
             np.savez(filename, xs_mean=xs_mean_for_ip_i, zero_center_used_ip_files=all_train_files_for_ip_i)
             print('Saved the xs_mean array for input ' + str(i) + ' with shape', xs_mean_for_ip_i.shape, ' to ', filename)
 
-        xs_mean.append(xs_mean_for_ip_i)
+        xs_mean.append(xs_mean_for_ip_i["xs_mean"])
 
     return xs_mean
 
