@@ -210,7 +210,7 @@ def orca_eval(cfg):
     path_of_model = folder_name + 'saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5'
     model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
     modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident)
-    arr_filename = folder_name + 'predictions/pred_model_epoch_{}_file_{}_on_{}_val_files.npy'.format(str(epoch[0]), str(epoch[1]), list_name[:-5])
+    arr_filename = folder_name + 'predictions/pred_model_epoch_{}_file_{}_on_{}_val_files.npy'.format(str(epoch[0]), str(epoch[1]), list_name)
 
     predict_and_investigate_model_performance(cfg, model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
                                               str_ident, modelname, xs_mean, arr_filename, folder_name)
