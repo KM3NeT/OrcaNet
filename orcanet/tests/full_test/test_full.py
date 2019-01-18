@@ -16,22 +16,24 @@ from orcanet.model_setup import build_nn_model
 class DatasetTest(TestCase):
     """ Tests which require a dataset. """
     def setUp(self):
-        """ Generate some dummy data for the models in a temp folder, and a list file. """
+        """
+        Make a .temp directory, generate dummy data in it and also a list .toml file which points to these datasets.
+        """
         self.temp_dir = os.path.join(os.path.dirname(__file__), ".temp/")
-        print("Using temp directory: " + self.temp_dir)
+        self.list_file_path = self.temp_dir + "list.toml"
+
         os.makedirs(self.temp_dir)
         shape = (5, 5, 5, 5)
         train_filepath = self.temp_dir + "train.h5"
         val_filepath = self.temp_dir + "val.h5"
         make_dummy_data(train_filepath, shape)
         make_dummy_data(val_filepath, shape)
-
-        self.list_file_path = self.temp_dir + "list.toml"
         with open(self.list_file_path, "w") as list_file:
             list_content = '[[input]]\ntrain_files = ["{}",]\nvalidation_files = ["{}",]'.format(train_filepath, val_filepath)
             list_file.write(list_content)
 
     def tearDown(self):
+        """ Remove the .temp directory. """
         if os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
 
