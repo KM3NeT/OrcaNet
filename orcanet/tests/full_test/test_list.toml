@@ -28,9 +28,9 @@
 
 [[input]]
 train_files = [
-"temp/train.h5",
+".temp/train.h5",
 ]
 
 validation_files = [
-"temp/val.h5",
+".temp/val.h5",
 ]

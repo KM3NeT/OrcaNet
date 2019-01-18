@@ -16,13 +16,20 @@ from orcanet.model_setup import build_nn_model
 class DatasetTest(TestCase):
     """ Tests which require a dataset. """
     def setUp(self):
-        """ Generate some dummy data for the models in a temp folder. """
-        self.temp_dir = ".temp/"
-
+        """ Generate some dummy data for the models in a temp folder, and a list file. """
+        self.temp_dir = os.path.join(os.path.dirname(__file__), ".temp/")
+        print("Using temp directory: " + self.temp_dir)
         os.makedirs(self.temp_dir)
         shape = (5, 5, 5, 5)
-        make_dummy_data("train", self.temp_dir, shape)
-        make_dummy_data("val", self.temp_dir, shape)
+        train_filepath = self.temp_dir + "train.h5"
+        val_filepath = self.temp_dir + "val.h5"
+        make_dummy_data(train_filepath, shape)
+        make_dummy_data(val_filepath, shape)
+
+        self.list_file_path = self.temp_dir + "list.toml"
+        with open(self.list_file_path, "w") as list_file:
+            list_content = '[[input]]\ntrain_files = ["{}",]\nvalidation_files = ["{}",]'.format(train_filepath, val_filepath)
+            list_file.write(list_content)
 
     def tearDown(self):
         if os.path.exists(self.temp_dir):
@@ -30,9 +37,9 @@ class DatasetTest(TestCase):
 
     def test_multi_input_model(self):
         """ Make a model and train it with the test toml files provided. """
-        list_file = "test_list.toml"
-        config_file = "test_config.toml"
-        model_file = "test_model.toml"
+        list_file = self.list_file_path
+        config_file = os.path.join(os.path.dirname(__file__), "test_config.toml")
+        model_file = os.path.join(os.path.dirname(__file__), "test_model.toml")
 
         main_folder = self.temp_dir + "model/"
         cfg = Settings(main_folder, list_file, config_file)
@@ -42,9 +49,7 @@ class DatasetTest(TestCase):
         orca_train(cfg, initial_model)
 
 
-def make_dummy_data(name, temp_dir, shape):
-    filepath = temp_dir + name + ".h5"
-
+def make_dummy_data(filepath, shape):
     x = np.concatenate([np.ones((500,) + shape), np.zeros((500,) + shape)])
     y = np.ones((1000, 14))
 
