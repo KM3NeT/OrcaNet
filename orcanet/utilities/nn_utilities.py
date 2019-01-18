@@ -32,6 +32,11 @@ def generate_batches_from_hdf5_file(cfg, filepath, f_size=None, zero_center_imag
     str_ident = cfg.str_ident
     swap_col = cfg.swap_4d_channels
 
+    # If the batchsize is larger than the f_size, make batchsize smaller or nothing would be yielded
+    if f_size is not None:
+        if f_size < batchsize:
+            batchsize = f_size
+
     n_files = len(filepath)
     dimensions = {}
     for i in range(n_files):
