@@ -31,7 +31,8 @@ from utilities.losses import get_all_loss_functions
 from utilities.input_output_utilities import Settings
 
 
-def predict_and_investigate_model_performance(model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
+# TODO Remove unnecessary input parameters to the following functions if they are already in the cfg
+def predict_and_investigate_model_performance(cfg, model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
                                               str_ident, modelname, xs_mean, arr_filename, folder_name):
     """
     Function that 1) makes predictions based on a Keras nn model and 2) investigates the performance of the model based on the predictions.
@@ -72,7 +73,7 @@ def predict_and_investigate_model_performance(model, test_files, n_bins, batchsi
         arr_nn_pred = np.load(arr_filename)
     else:
         print("Generating new prediction.")
-        arr_nn_pred = get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, samples=None)
+        arr_nn_pred = get_nn_predictions_and_mc_info(cfg, model, test_files, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, samples=None)
         print("Done! Saving prediction as:\n   "+arr_filename)
         np.save(arr_filename, arr_nn_pred)
 
@@ -211,7 +212,7 @@ def orca_eval(cfg):
     modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident)
     arr_filename = folder_name + 'predictions/pred_model_epoch_{}_file_{}_on_{}_val_files.npy'.format(str(epoch[0]), str(epoch[1]), list_name[:-5])
 
-    predict_and_investigate_model_performance(model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
+    predict_and_investigate_model_performance(cfg, model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
                                               str_ident, modelname, xs_mean, arr_filename, folder_name)
 
 

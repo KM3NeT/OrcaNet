@@ -226,23 +226,19 @@ def sort_metric_names_and_errors(metric_names):
     return sorted_metrics
 
 
-def get_activations_and_weights(f, n_bins, class_type, xs_mean, swap_4d_channels, model_name, str_ident, layer_name=None, learning_phase='test'):
+def get_activations_and_weights(cfg, xs_mean, model_name, layer_name=None, learning_phase='test'):
     """
-    Get the weights of a model and also the activations of the model for a single event.
-    :param str f: path to a .h5 file that contains images of events. Needed for plotting the activations for the event.
-    :param list(tuple) n_bins: the number of bins for each dimension (x,y,z,t) in the supplied file. Can contain multiple n_bins tuples.
-    :param (int, str) class_type: the number of output classes and a string identifier to specify the exact output classes.
+    Get the weights of a model and also the activations of the model for a single event in the validation set.
     :param ndarray xs_mean: mean_image of the x (train-) dataset used for zero-centering the data.
-    :param None/int swap_4d_channels: for 3.5D, param for the gen to specify, if the default channel (t) should be swapped with another dim.
     :param str model_name: Path of the model in order to load it.
-    :param str str_ident: string identifier that is parsed to the generator. Needed for some projection types.
     :param None/str layer_name: if only the activations of a single layer should be collected.
     :param str learning_phase: string identifier to specify the learning phase during the calculation of the activations.
                                'test', 'train': Dropout, Batchnorm etc. in test/train mode
     """
+    f = cfg.get_val_files[0][0],
     lp = 0. if learning_phase == 'test' else 1.
 
-    generator = generate_batches_from_hdf5_file(f, 1, n_bins, class_type, str_ident, zero_center_image=xs_mean, swap_col=swap_4d_channels, yield_mc_info=True)
+    generator = generate_batches_from_hdf5_file(cfg, f, f_size=1, zero_center_image=xs_mean, yield_mc_info=True)
     model_inputs, ys, y_values = next(generator) # y_values = mc_info for the event
 
     custom_objects = get_all_loss_functions()
@@ -283,18 +279,12 @@ def plot_weights_and_activations(cfg, xs_mean, epoch, file_no):
     """
     Plots the weights of a model and the activations for one event to a .pdf file.
     :param str f: path to a .h5 file that contains images of events. Needed for plotting the activations for the event.
-    :param list(tuple) n_bins: the number of bins for each dimension (x,y,z,t) in the supplied file. Can contain multiple n_bins tuples.
-    :param (int, str) class_type: the number of output classes and a string identifier to specify the exact output classes.
     :param ndarray xs_mean: mean_image of the x (train-) dataset used for zero-centering the data.
-    :param None/int swap_4d_channels: for 3.5D, param for the gen to specify, if the default channel (t) should be swapped with another dim.
     :param int epoch: epoch of the model.
     :param int file_no: File Number of the trained model in this epoch (if multiple files are trained per epoch).
-    :param str str_ident: string identifier that is parsed to the get_activations_and_weights function. Needed for some projection types.
-    :param str folder_name: Path to the folder of a trained model.
     """
     model_name = cfg.main_folder + 'saved_models/model_epoch_' + str(epoch) + '_file_' + str(file_no) + '.h5'
-    layer_names, activations, weights, y_values = get_activations_and_weights(cfg.get_val_files[0][0], cfg.n_bins, cfg.class_type, xs_mean, cfg.swap_4d_channels,
-                                            model_name, cfg.str_ident, layer_name=None, learning_phase='test')
+    layer_names, activations, weights, y_values = get_activations_and_weights(cfg, xs_mean, model_name, layer_name=None, learning_phase='test')
 
     fig, axes = plt.subplots()
     pdf_name = cfg.main_folder + "plots/activations/act_and_weights_plots_epoch_" + str(epoch) + '.pdf'

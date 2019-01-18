@@ -10,27 +10,28 @@ import os
 import keras as ks
 from functools import reduce
 
-#------------- Functions used for supplying images to the GPU -------------#
+# ------------- Functions used for supplying images to the GPU -------------#
 
-def generate_batches_from_hdf5_file(filepath, batchsize, n_bins, class_type, str_ident, f_size=None, zero_center_image=None, yield_mc_info=False, swap_col=None):
+
+def generate_batches_from_hdf5_file(cfg, filepath, f_size=None, zero_center_image=None, yield_mc_info=False):
     """
     Generator that returns batches of (multiple-) images ('xs') and labels ('ys') from single or multiple h5 files.
+    :param Object cfg: ...
     :param list filepath: List that contains full filepath of the input h5 files, e.g. '/path/to/file/file.h5'.
-    :param int batchsize: Size of the batches that should be generated. Ideally same as the chunksize in the h5 file.
-    :param tuple n_bins: Number of bins for each dimension (x,y,z,t) in the h5 file.
-    :param (int, str) class_type: Tuple with the umber of output classes and a string identifier to specify the exact output classes.
-                                  I.e. (2, 'muon-CC_to_elec-CC')
-    :param str str_ident: string identifier that specifies the projection type / model inputs in certain cases.
     :param int/None f_size: Specifies the filesize (#images) of the .h5 file if not the whole .h5 file
                        but a fraction of it (e.g. 10%) should be used for yielding the xs/ys arrays.
                        This is important if you run fit_generator(epochs>1) with a filesize (and hence # of steps) that is smaller than the .h5 file.
     :param ndarray zero_center_image: mean_image of the x dataset used for zero-centering.
     :param bool yield_mc_info: Specifies if mc-infos (y_values) should be yielded as well.
                                The mc-infos are used for evaluation after training and testing is finished.
-    :param bool/str swap_col: Specifies, if the index of the columns for xs should be swapped. Necessary for 3.5D nets.
-                          Currently available: 'yzt-x' -> [3,1,2,0] from [0,1,2,3]
     :return: tuple output: Yields a tuple which contains a full batch of images and labels (+ mc_info if yield_mc_info=True).
     """
+    batchsize = cfg.batchsize
+    n_bins = cfg.get_n_bins()
+    class_type = cfg.class_type
+    str_ident = cfg.str_ident
+    swap_col = cfg.swap_4d_channels
+
     n_files = len(filepath)
     dimensions = {}
     for i in range(n_files):
@@ -549,9 +550,10 @@ def get_mean_image(filepath, n_gpu):
     stepsize = int(n_rows / float(steps))
 
     xs_mean_arr = None
-
+    print("Calculating the mean_image of the xs dataset for file: " + filepath)
     for i in range(steps):
-        print('Calculating the mean_image of the xs dataset in step ' + str(i) + " of " + str(steps))
+        if i % 5 == 0:
+            print('   Step ' + str(i) + " of " + str(steps))
         if xs_mean_arr is None:  # create xs_mean_arr that stores intermediate mean_temp results
             xs_mean_arr = np.zeros((steps, ) + f['x'].shape[1:], dtype=np.float64)
 
@@ -560,7 +562,7 @@ def get_mean_image(filepath, n_gpu):
         else:
             xs_mean_temp = np.mean(f['x'][i*stepsize: (i+1) * stepsize], axis=0, dtype=np.float64)
         xs_mean_arr[i] = xs_mean_temp
-
+    print("Done!")
     xs_mean = np.mean(xs_mean_arr, axis=0, dtype=np.float64).astype(np.float32)
 
     return xs_mean
@@ -624,10 +626,10 @@ def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident=''):
 
     return modelname
 
-#------------- Various other functions -------------#
+# ------------- Various other functions -------------#
 
 
-#------------- Classes -------------#
+# ------------- Classes -------------#
 
 class TensorBoardWrapper(ks.callbacks.TensorBoard):
     """Up to now (05.10.17), Keras doesn't accept TensorBoard callbacks with validation data that is fed by a generator.
@@ -662,39 +664,25 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
     TODO
     """
     # Gibt loss aus über alle :display batches, gemittelt über die letzten :display batches
-    def __init__(self, train_files, batchsize, display, model, folder_name, epoch, flush_after_n_lines):
-        """
-
-        Parameters
-        ----------
-        train_files
-        batchsize
-        display
-        model
-        folder_name
-        epoch
-        flush_after_n_lines : int
-            After how many lines the file should be flushed. -1 for flush at the end of the epoch only.
-
-        """
+    def __init__(self, cfg, model, epoch):
         ks.callbacks.Callback.__init__(self)
-        self.display = display
+        self.display = cfg.train_logger_display
         self.epoch_number = epoch[0]
         self.f_number = epoch[1]
         self.model = model
-        self.flush = flush_after_n_lines
+        self.flush = cfg.train_logger_flush
 
         self.seen = 0
-        self.logfile_train_fname = folder_name + '/log_train/log_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.txt'
+        self.logfile_train_fname = cfg.main_folder + 'log_train/log_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.txt'
         self.loglist = []
 
         self.cum_metrics = {}
-        for metric in self.model.metrics_names: # set up dict with all model metrics
+        for metric in self.model.metrics_names:  # set up dict with all model metrics
             self.cum_metrics[metric] = 0
 
         self.steps_per_total_epoch, self.steps_cum = 0, [0]
-        for f, f_size in train_files:
-            steps_per_file = int(f_size / batchsize)
+        for f, f_size in cfg.get_train_files():
+            steps_per_file = int(f_size / cfg.batchsize)
             self.steps_per_total_epoch += steps_per_file
             self.steps_cum.append(self.steps_cum[-1] + steps_per_file)
 
@@ -712,9 +700,7 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
 
         if self.seen % self.display == 0:
             batchnumber_float = (self.seen - self.display / 2.) / float(self.steps_per_total_epoch) + self.epoch_number - 1 \
-                                + (self.steps_cum [self.f_number-1] / float(self.steps_per_total_epoch))
-                                # offset if the currently trained file is not the first one
-                                #+ (self.f_number-1) * (1/float(self.n_train_files)) # start from zero # only works if all train files have approximately the same number of entries
+                                + (self.steps_cum[self.f_number-1] / float(self.steps_per_total_epoch))
             line = '\n{0}\t{1}'.format(self.seen, batchnumber_float)
             for metric in self.model.metrics_names:
                 line = line + '\t' + str(self.cum_metrics[metric] / self.display)
@@ -725,7 +711,7 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
                 with open(self.logfile_train_fname, 'a') as logfile_train:
                     for batch_statistics in self.loglist:
                         logfile_train.write(batch_statistics)
-                    self.loglist=[]
+                    self.loglist = []
                     logfile_train.flush()
                     os.fsync(logfile_train.fileno())
 
@@ -736,6 +722,3 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
                 logfile_train.write(batch_statistics)
             logfile_train.flush()
             os.fsync(logfile_train.fileno())
-
-
-#------------- Classes -------------#

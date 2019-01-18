@@ -13,9 +13,10 @@ import matplotlib.pyplot as plt
 
 from utilities.nn_utilities import generate_batches_from_hdf5_file
 
-#------------- Functions used in evaluating the performance of model -------------#
+# ------------- Functions used in evaluating the performance of model -------------#
 
-def get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, samples=None):
+
+def get_nn_predictions_and_mc_info(cfg, model, test_files, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, samples=None):
     """
     Creates an arr_nn_pred array based on the test_data.
     :param ks.model.Model model: Fully trained Keras model of a neural network.
@@ -45,7 +46,7 @@ def get_nn_predictions_and_mc_info(model, test_files, n_bins, class_type, batchs
             samples_f = samples
         steps = int(samples_f/batchsize)
 
-        generator = generate_batches_from_hdf5_file(f[0], batchsize, n_bins, class_type, str_ident, zero_center_image=xs_mean, yield_mc_info=True, swap_col=swap_4d_channels) # f_size=samples prob not necessary
+        generator = generate_batches_from_hdf5_file(cfg, f[0], zero_center_image=xs_mean, yield_mc_info=True)
 
         arr_nn_pred_row_start = cum_number_of_steps[f_number] * batchsize
         for s in range(steps):

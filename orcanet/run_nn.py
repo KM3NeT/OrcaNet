@@ -260,7 +260,7 @@ def train_model(cfg, model, f, f_size, file_no, xs_mean, epoch):
     validation_data, validation_steps, callbacks = None, None, []
     if cfg.n_events is not None:
         f_size = cfg.n_events  # for testing purposes
-    callbacks.append(BatchLevelPerformanceLogger(cfg, epoch, model))
+    callbacks.append(BatchLevelPerformanceLogger(cfg, model, epoch))
     print('Training in epoch', epoch[0], 'on file ', file_no, ',', f)
 
     history = model.fit_generator(
