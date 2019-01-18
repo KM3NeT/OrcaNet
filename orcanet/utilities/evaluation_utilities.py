@@ -11,7 +11,7 @@ import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 
-from utilities.nn_utilities import generate_batches_from_hdf5_file
+from orcanet.utilities.nn_utilities import generate_batches_from_hdf5_file
 
 # ------------- Functions used in evaluating the performance of model -------------#
 

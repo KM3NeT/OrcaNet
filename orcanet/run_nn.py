@@ -27,15 +27,14 @@ import keras as ks
 import matplotlib as mpl
 from docopt import docopt
 import warnings
-
-from utilities.input_output_utilities import write_summary_logfile, write_full_logfile, read_logfiles, write_full_logfile_startup, Settings
-from utilities.nn_utilities import load_zero_center_data, BatchLevelPerformanceLogger
-from utilities.visualization.visualization_tools import *
-from utilities.evaluation_utilities import *
-from utilities.losses import *
-from model_setup import build_nn_model
-
 mpl.use('Agg')
+from orcanet.utilities.input_output_utilities import write_summary_logfile, write_full_logfile, read_logfiles, write_full_logfile_startup, Settings
+from orcanet.utilities.nn_utilities import load_zero_center_data, BatchLevelPerformanceLogger
+from orcanet.utilities.visualization.visualization_tools import *
+from orcanet.utilities.evaluation_utilities import *
+from orcanet.utilities.losses import *
+from orcanet.model_setup import build_nn_model
+
 
 # for debugging
 # from tensorflow.python import debug as tf_debug
@@ -225,7 +224,7 @@ def train_and_validate_model(cfg, model, epoch):
         else:
             history_val = None
         write_summary_logfile(cfg, epoch, model, history_train, history_val, lr)
-        write_full_logfile(cfg, model, history_train, history_val, lr, lr_decay, epoch)
+        write_full_logfile(cfg, model, history_train, history_val, lr, lr_decay, epoch, f)
         update_summary_plot(cfg.main_folder)
         plot_weights_and_activations(cfg, xs_mean, epoch[0], file_no)
 

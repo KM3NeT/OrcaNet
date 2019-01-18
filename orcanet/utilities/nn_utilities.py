@@ -64,7 +64,6 @@ def generate_batches_from_hdf5_file(cfg, filepath, f_size=None, zero_center_imag
                     xs[i] = np.subtract(xs[i], xs_mean)
 
             if swap_col is not None:
-
                 # single image input
                 if swap_col == 'yzt-x' or swap_col == 'xyt-z':
                     xs_list.append(np.transpose(xs, swap_4d_channels_dict[swap_col]))
@@ -425,7 +424,7 @@ def load_zero_center_data(cfg):
         if xs_mean_for_ip_i_path is not None:
             print('Loading an existing zero center image for model input ' + str(i) +
                   ':\n   ' + xs_mean_for_ip_i_path)
-            xs_mean_for_ip_i = np.load(xs_mean_for_ip_i_path)
+            xs_mean_for_ip_i = np.load(xs_mean_for_ip_i_path)["xs_mean"]
 
         else:
             print('Calculating the xs_mean_array for model input ' + str(i) + ' in order to zero_center the data!')
@@ -444,7 +443,7 @@ def load_zero_center_data(cfg):
             np.savez(filename, xs_mean=xs_mean_for_ip_i, zero_center_used_ip_files=all_train_files_for_ip_i)
             print('Saved the xs_mean array for input ' + str(i) + ' with shape', xs_mean_for_ip_i.shape, ' to ', filename)
 
-        xs_mean.append(xs_mean_for_ip_i["xs_mean"])
+        xs_mean.append(xs_mean_for_ip_i)
 
     return xs_mean
 

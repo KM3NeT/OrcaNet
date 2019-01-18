@@ -186,7 +186,7 @@ def write_full_logfile_startup(cfg):
         f_out.write("\n")
 
 
-def write_full_logfile(cfg, model, history_train, history_val, lr, lr_decay, epoch):
+def write_full_logfile(cfg, model, history_train, history_val, lr, lr_decay, epoch, train_file):
     """
     Function for saving various information during training and validation to a .txt file.
 
@@ -198,7 +198,7 @@ def write_full_logfile(cfg, model, history_train, history_val, lr, lr_decay, epo
         f_out.write('Current time: ' + str(datetime.now().strftime('%Y-%m-%d %H:%M:%S')) + '\n')
         f_out.write('Decayed learning rate to ' + str(lr) + ' before epoch ' + str(epoch[0]) +
                     ' and file ' + str(epoch[1]) + ' (minus ' + str(lr_decay) + ')\n')
-        f_out.write('Trained in epoch ' + str(epoch) + ' on file ' + str(epoch[1]) + ', ' + str(cfg.train_file) + '\n')
+        f_out.write('Trained in epoch ' + str(epoch) + ' on file ' + str(epoch[1]) + ', ' + str(train_file) + '\n')
         if history_val is not None:
             f_out.write('Validated in epoch ' + str(epoch) + ', file ' + str(epoch[1]) + ' on val_files ' + str(cfg.get_val_files()) + '\n')
         f_out.write('History for training / validating: \n')

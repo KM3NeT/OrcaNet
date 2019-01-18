@@ -11,8 +11,8 @@ import keras.backend as K
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
-from utilities.nn_utilities import generate_batches_from_hdf5_file
-from utilities.losses import get_all_loss_functions
+from orcanet.utilities.nn_utilities import generate_batches_from_hdf5_file
+from orcanet.utilities.losses import get_all_loss_functions
 
 
 def make_test_train_plot(test_train_data_list, title=""):
@@ -235,11 +235,11 @@ def get_activations_and_weights(cfg, xs_mean, model_name, layer_name=None, learn
     :param str learning_phase: string identifier to specify the learning phase during the calculation of the activations.
                                'test', 'train': Dropout, Batchnorm etc. in test/train mode
     """
-    f = cfg.get_val_files[0][0],
+    f = cfg.get_val_files()[0][0]
     lp = 0. if learning_phase == 'test' else 1.
 
     generator = generate_batches_from_hdf5_file(cfg, f, f_size=1, zero_center_image=xs_mean, yield_mc_info=True)
-    model_inputs, ys, y_values = next(generator) # y_values = mc_info for the event
+    model_inputs, ys, y_values = next(generator)  # y_values = mc_info for the event
 
     custom_objects = get_all_loss_functions()
     saved_model = ks.models.load_model(model_name, custom_objects=custom_objects)
@@ -248,7 +248,7 @@ def get_activations_and_weights(cfg, xs_mean, model_name, layer_name=None, learn
     model_multi_inputs_cond = True if len(model_inputs) > 1 else False
 
     if not isinstance(inp, list):
-        inp = [inp] # only one input! let's wrap it in a list.
+        inp = [inp]  # only one input! let's wrap it in a list.
 
     outputs = [layer.output for layer in saved_model.layers if
                layer.name == layer_name or layer_name is None]  # all layer outputs -> empty tf.tensors
@@ -257,7 +257,7 @@ def get_activations_and_weights(cfg, xs_mean, model_name, layer_name=None, learn
     weights = [layer.get_weights() for layer in saved_model.layers if
                layer.name == layer_name or layer_name is None]
 
-    outputs = outputs[1:] # remove the first input_layer from fetch
+    outputs = outputs[1:]  # remove the first input_layer from fetch
     funcs = [K.function(inp + [K.learning_phase()], [out]) for out in outputs]  # evaluation functions
 
     if model_multi_inputs_cond:

@@ -3,8 +3,9 @@
 # They overwrite the default values which are listed in the definition of the Settings class.
 #
 [config]
+class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
 batchsize = 10
-zero_center_folder = "./"
-train_logger_display=250
+train_logger_display=10
 train_logger_flush=-1
 train_verbose = 1
+epochs_to_train = 1
