@@ -416,12 +416,13 @@ def load_zero_center_data(cfg):
         # Collect all filepaths of the train_files for this projection in an array
         all_train_files_for_ip_i = get_fpaths_for_train_files_input_i(train_files, i)
 
-        # get the xs_mean for this input number i, if it exists in any of the files in the zero_center_folder
-        xs_mean_for_ip_i = get_precalculated_xs_mean_if_exists(zero_center_files, all_train_files_for_ip_i)
+        # get the xs_mean path for this input number i, if it exists in any of the files in the zero_center_folder
+        xs_mean_for_ip_i_path = get_precalculated_xs_mean_if_exists(zero_center_files, all_train_files_for_ip_i)
 
-        if xs_mean_for_ip_i is not None:
-            print('Loading an existing xs_mean_array for model input ' + str(i) + ' in order to zero_center the data!')
-            xs_mean.append(xs_mean_for_ip_i)
+        if xs_mean_for_ip_i_path is not None:
+            print('Loading an existing zero center image for model input ' + str(i) +
+                  ':\n   ' + xs_mean_for_ip_i_path)
+            xs_mean_for_ip_i = np.load(xs_mean_for_ip_i_path)
 
         else:
             print('Calculating the xs_mean_array for model input ' + str(i) + ' in order to zero_center the data!')
@@ -515,15 +516,14 @@ def get_precalculated_xs_mean_if_exists(zero_center_files, all_train_files_for_i
     Returns
     -------
     xs_mean_for_ip_i : None/ndarray
-        Returns the xs_mean_for_ip_i array if it exists somewhere in the zero_center_files. If not, returns None.
+        Returns the filepath to the xs_mean_for_ip_i array if it exists somewhere in the zero_center_files. If not, returns None.
 
     """
     xs_mean_for_ip_i = None
     for file in zero_center_files:
-        print(file)
         zero_center_used_ip_files = np.load(file)['zero_center_used_ip_files']
         if np.array_equal(zero_center_used_ip_files, all_train_files_for_ip_i):
-            xs_mean_for_ip_i = np.load(file)['xs_mean']
+            xs_mean_for_ip_i = file
             break
 
     return xs_mean_for_ip_i
