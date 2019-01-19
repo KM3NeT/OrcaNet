@@ -1,0 +1,38 @@
+# Define the files for network training and validation in the toml format.
+#
+# Give an array of train files and validation files. Every dataset is started with the line [[input]].
+# So if your network has multiple inputs, mark each seperate dataset with [[input]].
+#
+# Example format:
+# -----------------------------
+# [[input]]
+# train_files = [
+# "path/to/train_file_1_inputx.h5",
+# "path/to/train_file_2_inputx.h5",
+# ]
+#
+# validation_files = [
+# "path/to/val_file_1_inputx.h5",
+# ]
+#
+# [[input]]
+# train_files = [
+# "path/to/train_file_1_inputy.h5",
+# "path/to/train_file_2_inputy.h5",
+# ]
+#
+# validation_files = [
+# "path/to/val_file_1_inputy.h5",
+# ]
+# -----------------------------
+
+[[input]]
+train_files = [
+"/home/woody/capn/mppi033h/orcasong_output/4dTo4d/xyzt/JTE_KM3Sim_gseagen_elec-NC_3-100GeV-3_4E6-1bin-3_0gspec_ORCA115_9m_2016_518_xyzt.h5",
+]
+
+validation_files = [
+"/home/woody/capn/mppi033h/orcasong_output/4dTo4d/xyzt/JTE_KM3Sim_gseagen_muon-CC_3-100GeV-9_1E7-1bin-3_0gspec_ORCA115_9m_2016_776_xyzt.h5",
+]
+
+
