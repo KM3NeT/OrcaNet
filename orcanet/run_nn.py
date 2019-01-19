@@ -295,6 +295,7 @@ def validate_model(cfg, model, xs_mean):
         history = model.evaluate_generator(
             generate_batches_from_hdf5_file(cfg, f, f_size=f_size, zero_center_image=xs_mean),
             steps=int(f_size / cfg.batchsize), max_queue_size=10, verbose=1)
+
         # This history object is just a list, not a dict like with fit_generator!
         print('Validation sample results: ' + str(history) + ' (' + str(model.metrics_names) + ')')
         histories.append(history)

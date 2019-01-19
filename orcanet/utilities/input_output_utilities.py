@@ -309,7 +309,10 @@ def h5_get_number_of_rows(h5_filepath):
     :return: int number_of_rows: number of rows of the .h5 file in the first dataset.
     """
     f = h5py.File(h5_filepath, 'r')
-    number_of_rows = f[list(f.keys())[0]].shape[0]
+    # remove any keys to pytables folders that may be in the file
+    f_keys_stripped = [x for x in list(f.keys()) if '_i_' not in x]
+
+    number_of_rows = f[f_keys_stripped[0]].shape[0]
     f.close()
     return number_of_rows
 
@@ -317,6 +320,7 @@ def h5_get_number_of_rows(h5_filepath):
 def h5_get_n_bins(train_files):
     """
     Get the number of bins from the training files. Only the first files are looked up, the others should be identical.
+    CAREFUL: The name of the neural network 'images' dataset in the files MUST be 'x'.
 
     Parameters
     ----------
@@ -336,7 +340,7 @@ def h5_get_n_bins(train_files):
     n_bins = []
     for dim_file in train_files[0][0]:
         f = h5py.File(dim_file, "r")
-        n_bins.append(f[list(f.keys())[0]].shape[1:])
+        n_bins.append(f['x'].shape[1:])
     return n_bins
 
 

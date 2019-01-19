@@ -266,7 +266,7 @@ def add_dense_layers_to_cnn(conv_output_flat, class_type, dropout=0, activation=
     outputs = []
 
     if class_type[1] == 'track-shower':  # categorical problem
-        x = Dense(nb_classes, activation='softmax', kernel_initializer='he_normal')(x)
+        x = Dense(nb_classes, activation='softmax', kernel_initializer='he_normal', name='ts_output')(x)
         outputs.append(x)
 
     else:  # regression case, one output for each regression label
