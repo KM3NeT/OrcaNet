@@ -67,7 +67,7 @@ def generate_batches_from_hdf5_file(cfg, filepath, f_size=None, zero_center_imag
                     xs[i] = np.subtract(xs[i], xs_mean)
 
             # Get input images for the nn
-            xs_list = get_input_images(xs, swap_col, str_ident)
+            xs_list = get_input_images(xs, n_files, swap_col, str_ident)
 
             # Get labels for the nn. Since the labels are same for all the multiple files, use the first file.
             y_values = f[0]['y'][n_entries:n_entries+batchsize]
@@ -137,7 +137,7 @@ def get_dimensions_encoding(n_bins, batchsize):
     return dimensions
 
 
-def get_input_images(xs, swap_col, str_ident):
+def get_input_images(xs, n_files, swap_col, str_ident):
     """
     TODO add docs
     TODO change xs_list to dict like y_values
