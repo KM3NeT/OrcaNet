@@ -171,19 +171,14 @@ def train_and_validate_model(cfg, model, start_epoch):
         xs_mean = load_zero_center_data(cfg)
     else:
         xs_mean = None
-    train_files = cfg.get_train_files()
-    n_train_files = len(train_files)
 
-    # lr_initial, manual_mode = 0.005, (False, 0.0003, 0.07, lr)
-    # epoch, lr, lr_decay = schedule_learning_rate(model, epoch, cfg.n_gpu, cfg.get_train_files(), lr_initial=lr_initial, manual_mode=manual_mode)  # begin new training step
-
-    for file_no, (f, f_size) in enumerate(train_files, 1):
+    for file_no, (f, f_size) in enumerate(cfg.get_train_files(), 1):
         # Only the file number changes during training, as this function trains only for one epoch
         curr_epoch = (start_epoch[0], file_no)
         # skip to the file with the target file number given in the epoch tuple.
         if curr_epoch[1] < start_epoch[1]:
             continue
-        lr = get_learning_rate(curr_epoch, cfg.learning_rate, n_train_files)
+        lr = get_learning_rate(cfg, curr_epoch)
         K.set_value(model.optimizer.lr, lr)
         print("Set learning rate to " + str(lr))
 
