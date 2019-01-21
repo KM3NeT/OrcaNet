@@ -5,7 +5,7 @@ from keras.layers import Dropout
 from unittest import TestCase
 
 from orcanet import model_setup
-from orcanet.utilities.input_output_utilities import Settings
+from orcanet.utilities.input_output_utilities import Configuration
 
 # filepath = '/home/woody/capn/mppi033h/Code/HPC/cnns/models/trained/trained_model_VGG_4d_xyz-t_and_yzt-x_muon-CC_to_elec-CC_double_input_single_train_epoch1.h5'
 # trained_model = ks.models.load_model(filepath)
@@ -29,7 +29,7 @@ class TestTest(TestCase):
 
     def test_build_model(self):
         model_toml = "examples/settings_files/example_model.toml"
-        cfg = Settings("test")
+        cfg = Configuration("test")
         cfg.set_from_model_file(model_toml)
 
         # building a model requires n_bins, which requires a dataset. Disable for testing:

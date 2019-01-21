@@ -8,7 +8,7 @@ import shutil
 from keras.models import Model
 from keras.layers import Dense, Input, Flatten
 from unittest import TestCase
-from orcanet.utilities.input_output_utilities import Settings
+from orcanet.utilities.input_output_utilities import Configuration
 from orcanet.run_nn import orca_train
 from orcanet.model_setup import build_nn_model
 from orcanet.eval_nn import orca_eval
@@ -49,7 +49,7 @@ class DatasetTest(TestCase):
         model_file = os.path.join(os.path.dirname(__file__), "model_test.toml")
 
         main_folder = self.temp_dir + "model/"
-        cfg = Settings(main_folder, list_file, config_file)
+        cfg = Configuration(main_folder, list_file, config_file)
         cfg.zero_center_folder = self.temp_dir
         cfg.class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
         cfg.set_from_model_file(model_file)

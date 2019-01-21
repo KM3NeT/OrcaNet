@@ -126,7 +126,7 @@ def build_nn_model(cfg):
 
     Parameters
     ----------
-    cfg : Object Settings
+    cfg : Object Configuration
         Contains all the configurable options in the OrcaNet scripts.
     Returns
     -------

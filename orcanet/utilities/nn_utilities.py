@@ -16,7 +16,9 @@ from functools import reduce
 def generate_batches_from_hdf5_file(cfg, filepath, f_size=None, zero_center_image=None, yield_mc_info=False):
     """
     Generator that returns batches of (multiple-) images ('xs') and labels ('ys') from single or multiple h5 files.
-    :param Object cfg: ...
+
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
     :param list filepath: List that contains full filepath of the input h5 files, e.g. '/path/to/file/file.h5'.
     :param int/None f_size: Specifies the filesize (#images) of the .h5 file if not the whole .h5 file
                        but a fraction of it (e.g. 10%) should be used for yielding the xs/ys arrays.
@@ -350,8 +352,8 @@ def load_zero_center_data(cfg):
 
     Parameters
     ----------
-    cfg : Object Settings
-        Contains all the configurable options in the OrcaNet scripts.
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
 
     Returns
     -------
@@ -617,10 +619,20 @@ class TensorBoardWrapper(ks.callbacks.TensorBoard):
 
 class BatchLevelPerformanceLogger(ks.callbacks.Callback):
     """
+    Gibt loss aus über alle :display batches, gemittelt über die letzten :display batches
     TODO
     """
-    # Gibt loss aus über alle :display batches, gemittelt über die letzten :display batches
+
     def __init__(self, cfg, model, epoch):
+        """
+
+        Parameters
+        ----------
+        cfg : object Configuration
+            Configuration object containing all the configurable options in the OrcaNet scripts.
+        model
+        epoch
+        """
         ks.callbacks.Callback.__init__(self)
         self.display = cfg.train_logger_display
         self.epoch_number = epoch[0]

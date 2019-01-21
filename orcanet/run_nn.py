@@ -14,7 +14,7 @@ Arguments:
             An example can be found in config/lists/example_list.toml
     CONFIG  A .toml file which sets up the training.
             An example can be found in config/models/example_config.toml. The possible parameters are listed in
-            utilities/input_output_utilities.py in the class Settings.
+            utilities/input_output_utilities.py in the class Configuration.
     MODEL   Path to a .toml file with infos about a model.
 
 Options:
@@ -29,7 +29,7 @@ from docopt import docopt
 from inspect import signature
 import warnings
 mpl.use('Agg')
-from orcanet.utilities.input_output_utilities import write_summary_logfile, write_full_logfile, read_logfiles, write_full_logfile_startup, Settings
+from orcanet.utilities.input_output_utilities import write_summary_logfile, write_full_logfile, read_logfiles, write_full_logfile_startup, Configuration
 from orcanet.utilities.nn_utilities import load_zero_center_data, BatchLevelPerformanceLogger
 from orcanet.utilities.visualization.visualization_tools import *
 from orcanet.utilities.evaluation_utilities import *
@@ -48,8 +48,8 @@ def get_learning_rate(cfg, epoch):
 
     Parameters
     ----------
-    cfg : object Settings
-        ...
+    cfg : object  Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
     epoch : tuple
         Epoch and file number.
 
@@ -108,8 +108,8 @@ def triple_decay(n_epoch, n_file, cfg):
         The number of the current epoch which is used to calculate the new learning rate.
     n_file : int
         The number of the current filenumber which is used to calculate the new learning rate.
-    cfg : object Settings
-        ...
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
 
     Returns
     -------
@@ -159,8 +159,8 @@ def train_and_validate_model(cfg, model, start_epoch):
 
     Parameters
     ----------
-    cfg : Object Settings
-        Contains all the configurable options in the OrcaNet scripts.
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
     model : ks.Models.model
         Compiled keras model to use for training and validating.
     start_epoch : tuple
@@ -206,8 +206,8 @@ def train_model(cfg, model, f, f_size, xs_mean, curr_epoch):
 
     Parameters
     ----------
-    cfg : Object Settings
-        Contains all the configurable options in the OrcaNet scripts.
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
     model : ks.model.Model
         Keras model instance of a neural network.
     f : list
@@ -240,8 +240,8 @@ def validate_model(cfg, model, xs_mean):
 
     Parameters
     ----------
-    cfg : Object Settings
-        Contains all the configurable options in the OrcaNet scripts.
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
     model : ks.model.Model
         Keras model instance of a neural network.
     xs_mean : ndarray
@@ -273,8 +273,8 @@ def orca_train(cfg, initial_model=None):
 
     Parameters
     ----------
-    cfg : Object Settings
-        Contains all the configurable options in the OrcaNet scripts.
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
     initial_model : ks.models.Model
         Compiled keras model to use for training and validation. Only required for the first epoch of training, as
         the most recent saved model will be loaded otherwise.
@@ -328,7 +328,7 @@ def example_run(main_folder, list_file, config_file, model_file):
 
     """
     # Set up the cfg object with the input data
-    cfg = Settings(main_folder, list_file, config_file)
+    cfg = Configuration(main_folder, list_file, config_file)
     # If this is the start of the training, a compiled model needs to be handed to the orca_train function
     if cfg.get_latest_epoch() == (0, 1):
         # Add Info for building a model with OrcaNet to the cfg object

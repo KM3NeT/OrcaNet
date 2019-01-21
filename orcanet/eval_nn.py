@@ -14,7 +14,7 @@ Arguments:
             An example can be found in config/lists/example_list.toml
     CONFIG  A .toml file which sets up the training.
             An example can be found in config/models/example_config.toml. The possible parameters are listed in
-            utilities/input_output_utilities.py in the class Settings.
+            utilities/input_output_utilities.py in the class Configuration.
     MODEL   Path to a .toml file with infos about a model.
 
 Options:
@@ -28,7 +28,7 @@ mpl.use('Agg')
 from orcanet.utilities.nn_utilities import load_zero_center_data
 from orcanet.utilities.evaluation_utilities import *
 from orcanet.utilities.losses import get_all_loss_functions
-from orcanet.utilities.input_output_utilities import Settings
+from orcanet.utilities.input_output_utilities import Configuration
 
 
 # TODO Remove unnecessary input parameters to the following functions if they are already in the cfg
@@ -39,6 +39,8 @@ def predict_and_investigate_model_performance(cfg, model, test_files, n_bins, ba
 
     Parameters
     ----------
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
     model : ks.model.Model
         Keras model of a neural network.
     test_files : list(([test_filepaths], test_filesize))
@@ -184,6 +186,11 @@ def orca_eval(cfg):
     with the .toml file.
     TODO Should be directly callable on a saved model, so that less arguments are required, and maybe no .toml is needed?
 
+    Parameters
+    ----------
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
+
     """
     folder_name = cfg.main_folder
     test_files = cfg.get_val_files()
@@ -237,7 +244,7 @@ def example_run(main_folder, list_file, config_file, model_file):
 
     """
     # Set up the cfg object with the input data
-    cfg = Settings(main_folder, list_file, config_file)
+    cfg = Configuration(main_folder, list_file, config_file)
     # Currently, the eval scripts are only supported for automatically generated models, so nn_arch is needed.
     cfg.set_from_model_file(model_file)
     orca_eval(cfg)

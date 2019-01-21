@@ -6,7 +6,7 @@ technical stuff like copying the files to the node-local SSD.
 
 Reading toml files: There are three different keywords:
     "input" :   The input to networks.
-    "config" :  The Settings.
+    "config" :  The Configuration.
     "model" :   Options for auto-generated OrcaNet models.
 
 """
@@ -34,7 +34,7 @@ def read_out_config_file(file):
     Returns
     -------
     keyword_arguments : dict
-        Values for the OrcaNet scripts, as listed in the Settings class.
+        Values for the OrcaNet scripts, as listed in the Configuration class.
 
     """
     file_content = toml.load(file)["config"]
@@ -159,8 +159,8 @@ def write_full_logfile_startup(cfg):
 
     Parameters
     ----------
-    cfg : Object Settings
-        Contains all the configurable options in the OrcaNet scripts.
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
 
     """
     logfile = cfg.main_folder + 'full_log.txt'
@@ -175,7 +175,7 @@ def write_full_logfile_startup(cfg):
         f_out.write("Given validation files in the .list file:\n")
         for val_file in cfg.get_val_files():
             f_out.write("   " + str(val_file) + "\n")
-        f_out.write("\nSettings used:\n")
+        f_out.write("\nConfiguration used:\n")
         for key in vars(cfg):
             if not key.startswith("_"):
                 f_out.write("   {}:\t{}\n".format(key, getattr(cfg, key)))
@@ -189,6 +189,11 @@ def write_full_logfile_startup(cfg):
 def write_full_logfile(cfg, model, history_train, history_val, lr, epoch, train_file):
     """
     Function for saving various information during training and validation to a .txt file.
+
+    Parameters
+    ----------
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
 
     """
     logfile = cfg.main_folder + 'full_log.txt'
@@ -219,8 +224,8 @@ def write_summary_logfile(cfg, epoch, model, history_train, history_val, lr):
 
     Parameters
     ----------
-    cfg : class Settings
-        ...
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
     epoch : tuple(int, int)
         The number of the current epoch and the current filenumber.
     model : ks.model.Model
@@ -402,7 +407,7 @@ def use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=False)
     return train_files_ssd, test_files_ssd
 
 
-class Settings(object):
+class Configuration(object):
     """
     Container object for all the configurable options in the OrcaNet scripts.
 
@@ -498,7 +503,7 @@ class Settings(object):
     """
     def __init__(self, main_folder, list_file=None, config_file=None):
         """
-        Set the attributes of the Settings object.
+        Set the attributes of the Configuration object.
 
         Values are loaded from the given files, if provided. Otherwise, default values are used.
 
@@ -512,7 +517,7 @@ class Settings(object):
             Path to the config file with attributes that are used instead of the default ones.
 
         """
-        # Settings:
+        # Configuration:
         self.batchsize = 64
         self.class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
         self.epochs_to_train = -1
@@ -561,7 +566,7 @@ class Settings(object):
         else:
             raise AssertionError("You tried to load filepathes from a list file, but pathes have already been loaded \
             for this object. (From the file " + self._list_file + ")\nYou should not use \
-            two different list files for one Settings object!")
+            two different list files for one Configuration object!")
 
     def set_from_config_file(self, config_file):
         """ Overwrite default attribute values with values from a config file. """
@@ -572,7 +577,7 @@ class Settings(object):
             else:
                 raise AssertionError("You tried to set the attribute "+str(key)+" in your config file\n"
                                      + config_file + "\n, but this attribute is not provided. Check \
-                                     the possible attributes in the definition of the Settings class.")
+                                     the possible attributes in the definition of the Configuration class.")
 
     def set_from_model_file(self, model_file):
         """ Set attributes for generating models with OrcaNet. """
