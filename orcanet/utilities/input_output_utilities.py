@@ -430,12 +430,13 @@ class Configuration(object):
     epochs_to_train : int
         How many new epochs should be trained by running this function. -1 for infinite.
     initial_epoch : int
-        The epoch at which the training is supposed to start. 0 means start a new training, >0 mean resume training.
-        Can also give -1 to automatically load the most recent epoch found in the main folder.
+        The epoch of the model with which the training is supposed to start, e.g. 0 means start a new training,
+        1 means load the saved model from epoch 1 and continue training.
+        Can also give -1 to automatically load the most recent epoch found in the main folder, if present.
     initial_fileno : int
-        When using multiple files, define the file number at which the training is supposed to start, e.g.
-        1 for the first file. If both epoch and fileno are -1, automatically load the most recent file found
-        in the main folder.
+        When using multiple files, define the file number with which the training is supposed to start, e.g.
+        1 for load the model trained on the first file. If both epoch and fileno are -1, automatically load the most
+        recent file found in the main folder, if present.
     learning_rate : float or tuple or function
         The learning rate for the training.
         If it is a float, the learning rate will be constantly this value.
@@ -593,13 +594,13 @@ class Configuration(object):
         Returns
         -------
         latest_epoch : tuple
-            The highest epoch, file_no pair. (0,1) if the folder is empty or does not exist yet.
+            The highest epoch, file_no pair. (0,0) if the folder is empty or does not exist yet.
 
         """
         if os.path.exists(self.main_folder + "saved_models"):
             files = os.listdir(self.main_folder + "saved_models")
             if len(files) == 0:
-                latest_epoch = (0, 1)
+                latest_epoch = (0, 0)
             else:
                 epochs = []
                 for file in files:
@@ -607,8 +608,28 @@ class Configuration(object):
                     epochs.append((int(epoch), int(file_no)))
                 latest_epoch = max(epochs)
         else:
-            latest_epoch = (0, 1)
+            latest_epoch = (0, 0)
         return latest_epoch
+
+    def get_next_epoch(self, epoch):
+        """
+        TODO
+
+        Parameters
+        ----------
+        epoch
+
+        Returns
+        -------
+
+        """
+        if epoch[0] == 0 and epoch[1] == 0:
+            next_epoch = (1, 1)
+        elif epoch[1] == len(self.get_train_files()):
+            next_epoch = (epoch[0] + 1, 1)
+        else:
+            next_epoch = (epoch[0], epoch[1] + 1)
+        return next_epoch
 
     def use_local_node(self):
         """

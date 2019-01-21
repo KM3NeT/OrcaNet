@@ -164,7 +164,7 @@ def train_and_validate_model(cfg, model, start_epoch):
     model : ks.Models.model
         Compiled keras model to use for training and validating.
     start_epoch : tuple
-        Epoch and file number to start this training with.
+        Upcoming epoch and file number to start this training with.
 
     """
     if cfg.zero_center_folder is not None:
@@ -181,9 +181,11 @@ def train_and_validate_model(cfg, model, start_epoch):
         lr = get_learning_rate(cfg, curr_epoch)
         K.set_value(model.optimizer.lr, lr)
         print("Set learning rate to " + str(lr))
-        # Train the model on one file
+        # Train the model on one file and save it afterwards
         history_train = train_model(cfg, model, f, f_size, xs_mean, curr_epoch)
-        model.save(cfg.main_folder + 'saved_models/model_epoch_' + str(curr_epoch[0]) + '_file_' + str(curr_epoch[1]) + '.h5')
+        model_filename = cfg.main_folder + 'saved_models/model_epoch_' + str(curr_epoch[0]) + '_file_' + str(curr_epoch[1]) + '.h5'
+        model.save(model_filename)
+        print("Saved model as " + model_filename)
         # Validate after every n-th file, starting with the first
         if (curr_epoch[1] - 1) % cfg.validate_after_n_train_files == 0:
             history_val = validate_model(cfg, model, xs_mean)
@@ -289,8 +291,8 @@ def orca_train(cfg, initial_model=None):
     if epoch[0] == -1 and epoch[1] == -1:
         epoch = cfg.get_latest_epoch()
         print("Automatically set epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
-
-    if epoch[0] == 0 and epoch[1] == 1:
+    # Epoch here is the epoch of the currently existing model (or 0,0 if there is none)
+    if epoch[0] == 0 and epoch[1] == 0:
         assert initial_model is not None, "You need to provide a compiled keras model for the start of the training! (You gave None)"
         model = initial_model
     else:
@@ -306,9 +308,9 @@ def orca_train(cfg, initial_model=None):
 
     trained_epochs = 0
     while trained_epochs < cfg.epochs_to_train or cfg.epochs_to_train == -1:
+        epoch = cfg.get_next_epoch(epoch)
         train_and_validate_model(cfg, model, epoch)
         trained_epochs += 1
-        epoch = (epoch[0] + 1, 1)
 
 
 def example_run(main_folder, list_file, config_file, model_file):

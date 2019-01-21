@@ -60,6 +60,7 @@ def make_test_train_plot(train_datas, val_datas, labels, colors=None, title=""):
         all_y_coordinates_test.extend(val_data[1][~np.isnan(val_data[1])])
         all_y_coordinates_train.extend(train_data[1][~np.isnan(train_data[1])])
 
+    # TODO also incorporate the train curve somehow into the limits
     if not len(all_y_coordinates_test) == 0:
         test_metric_min_to_max = np.amax(all_y_coordinates_test) - np.amin(all_y_coordinates_test)
         y_lim = (np.amin(all_y_coordinates_test) - 0.25 * test_metric_min_to_max,
