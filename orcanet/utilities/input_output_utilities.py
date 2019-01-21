@@ -186,7 +186,7 @@ def write_full_logfile_startup(cfg):
         f_out.write("\n")
 
 
-def write_full_logfile(cfg, model, history_train, history_val, lr, lr_decay, epoch, train_file):
+def write_full_logfile(cfg, model, history_train, history_val, lr, epoch, train_file):
     """
     Function for saving various information during training and validation to a .txt file.
 
@@ -197,7 +197,7 @@ def write_full_logfile(cfg, model, history_train, history_val, lr, lr_decay, epo
         f_out.write('\n')
         f_out.write('Current time: ' + str(datetime.now().strftime('%Y-%m-%d %H:%M:%S')) + '\n')
         f_out.write('Decayed learning rate to ' + str(lr) + ' before epoch ' + str(epoch[0]) +
-                    ' and file ' + str(epoch[1]) + ' (minus ' + str(lr_decay) + ')\n')
+                    ' and file ' + str(epoch[1]) + ')\n')
         f_out.write('Trained in epoch ' + str(epoch) + ' on file ' + str(epoch[1]) + ', ' + str(train_file) + '\n')
         if history_val is not None:
             f_out.write('Validated in epoch ' + str(epoch) + ', file ' + str(epoch[1]) + ' on val_files ' + str(cfg.get_val_files()) + '\n')
@@ -431,6 +431,13 @@ class Settings(object):
         When using multiple files, define the file number at which the training is supposed to start, e.g.
         1 for the first file. If both epoch and fileno are -1, automatically load the most recent file found
         in the main folder.
+    learning_rate : float or tuple or function
+        The learning rate for the training.
+        If it is a float, the learning rate will be constantly this value.
+        If it is a tuple of two floats, the first float gives the learning rate in epoch 1 file 1, and the second
+        float gives the decrease of the learning rate per file (e.g. 0.1 for 10% decrease per file).
+        You can also give an arbitrary function, which takes as an input the epoch, the file number and the
+        Configuration object, and returns the learning rate.
     n_events : None or int
         For testing purposes. If not the whole .h5 file should be used for training, define the number of events.
     n_gpu : tuple(int, str)
@@ -512,6 +519,7 @@ class Settings(object):
         self.filter_out_tf_garbage = True
         self.initial_epoch = -1
         self.initial_fileno = -1
+        self.learning_rate = 0.001
         self.n_events = None
         self.n_gpu = (1, 'avolkov')
         self.str_ident = ''

@@ -45,8 +45,8 @@ class DatasetTest(TestCase):
         Also resumes training after the first epoch to check if that works.
         """
         list_file = self.list_file_path
-        config_file = os.path.join(os.path.dirname(__file__), "test_config.toml")
-        model_file = os.path.join(os.path.dirname(__file__), "test_model.toml")
+        config_file = os.path.join(os.path.dirname(__file__), "config_test.toml")
+        model_file = os.path.join(os.path.dirname(__file__), "model_test.toml")
 
         main_folder = self.temp_dir + "model/"
         cfg = Settings(main_folder, list_file, config_file)
@@ -73,3 +73,12 @@ def make_dummy_data(filepath, shape):
     h5f.create_dataset('x', data=xs, dtype='uint8')
     h5f.create_dataset('y', data=ys, dtype=dtypes)
     h5f.close()
+
+
+def make_dummy_model(shape):
+    inp = Input(shape=shape)
+    x = Flatten()(inp)
+    x = Dense(5)(x)
+    model = Model(inp, x)
+    model.compile("sgd", loss="mse")
+    return model

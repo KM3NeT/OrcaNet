@@ -26,6 +26,7 @@ import os
 import keras as ks
 import matplotlib as mpl
 from docopt import docopt
+from inspect import signature
 import warnings
 mpl.use('Agg')
 from orcanet.utilities.input_output_utilities import write_summary_logfile, write_full_logfile, read_logfiles, write_full_logfile_startup, Settings
@@ -41,82 +42,59 @@ from orcanet.model_setup import build_nn_model
 # K.set_session(tf_debug.LocalCLIDebugWrapperSession(tf.Session()))
 
 
-def schedule_learning_rate(model, epoch, n_gpu, train_files, lr_initial=0.003, manual_mode=(False, None, 0.0, None)):
+def get_learning_rate(cfg, epoch):
     """
-    Function that schedules a learning rate during training.
-
-    If manual_mode[0] is False, the current lr will be automatically calculated if the training is resumed, based on the epoch variable.
-    If manual_mode[0] is True, the final lr during the last training session (manual_mode[1]) and the lr_decay (manual_mode[1])
-    have to be set manually.
+    Get the learning rate for the current epoch and file number.
 
     Parameters
     ----------
-    model : ks.model.Model
-        Keras model of a neural network.
-    epoch : tuple(int, int)
-        Declares if a previously trained model or a new model (=0) should be loaded.
-        The first argument specifies the last epoch, and the second argument is the last train file number if the train
-        dataset is split over multiple files.
-    n_gpu : tuple(int, str)
-        Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov') [1].
-        Needed, because the lr is modified with multi GPU training.
-    train_files : list(([train_filepaths], train_filesize))
-        List with the paths and the filesizes of the train_files. Needed for calculating the lr.
-    lr_initial : float
-        Initial learning rate for the first epoch (and first file).
-    manual_mode : tuple
-        tuple(bool, None/float, float, None/float)
-        Tuple that controls the options for the manual mode.
-        manual_mode[0] = flag to enable the manual mode
-        manual_mode[1] = lr value, of which the manual mode should start off
-        manual_mode[2] = lr_decay during epochs
-        manual_mode[3] = current lr, only used to check if this is the first instance of the while loop
+    cfg : object Settings
+        ...
+    epoch : tuple
+        Epoch and file number.
 
     Returns
     -------
-    epoch : tuple(int, int)
-        The new train file number +=1 (& new epoch if last train_file).
-    lr : int
-        Learning rate that has been set for the model and for this epoch.
-    lr_decay : float
-        Learning rate decay that has been used to decay the lr rate used for this epoch.
+    lr : float
+        The learning rate.
+
+    Raises
+    ------
+    AssertionError
+        If the type of the user_lr is not right.
 
     """
-    # TODO set learning rate outside of this function
-    if len(train_files) > epoch[1] and epoch[0] != 0:
-        epoch = (epoch[0], epoch[1] + 1)  # resume from the same epoch but with the next file
-    else:
-        epoch = (epoch[0] + 1, 1)  # start new epoch from file 1
+    user_lr = cfg.learning_rate
+    error_msg = "The learning rate must be either a float, a tuple of two floats or a function."
+    if isinstance(user_lr, float):
+        # Constant LR
+        lr = user_lr
 
-    if manual_mode[0] is True:
-        lr = manual_mode[1] if manual_mode[3] is None else K.get_value(model.optimizer.lr)
-        lr_decay = manual_mode[2]
-        K.set_value(model.optimizer.lr, lr)
-
-        if epoch[0] > 1 and lr_decay > 0:
-            lr *= 1 - float(lr_decay)
-            K.set_value(model.optimizer.lr, lr)
-            print('Decayed learning rate to ' + str(K.get_value(model.optimizer.lr)) +
-                  ' before epoch ' + str(epoch[0]) + ' (minus ' + '{:.1%}'.format(lr_decay) + ')')
-
-    else:
-        if epoch[0] == 1 and epoch[1] == 1:  # set initial learning rate for the training
-            lr, lr_decay = lr_initial, 0.00
-            # lr, lr_decay = lr_initial * n_gpu[0], 0.00
-            K.set_value(model.optimizer.lr, lr)
-            print('Set learning rate to ' + str(K.get_value(model.optimizer.lr)) + ' before epoch ' + str(epoch[0]) +
-                  ' and file ' + str(epoch[1]))
+    elif isinstance(user_lr, tuple) or isinstance(user_lr, list):
+        if len(user_lr) == 2:
+            # Exponentially decaying LR
+            lr = user_lr[0] * (1 - user_lr[1])**(epoch[1] + epoch[0]*len(cfg.get_train_files()))
         else:
-            n_train_files = len(train_files)
-            lr, lr_decay = get_new_learning_rate(epoch, lr_initial, n_train_files, n_gpu[0])
-            K.set_value(model.optimizer.lr, lr)
-            print('Decayed learning rate to ' + str(K.get_value(model.optimizer.lr)) +
-                  ' before epoch ' + str(epoch[0]) + ' and file ' + str(epoch[1]) + ' (minus ' + '{:.1%}'.format(lr_decay) + ')')
+            raise AssertionError(error_msg)
 
-    return epoch, lr, lr_decay
+    elif isinstance(user_lr, str):
+        if user_lr == "triple_decay":
+            lr = triple_decay(epoch[0], epoch[1], cfg)
+        else:
+            raise NameError(user_lr, "is an unknown learning rate string!")
+
+    elif isinstance(user_lr, function):
+        # User defined function
+        assert len(signature(user_lr).parameters) == 3, "A custom learning rate function must have three input parameters: \
+        The epoch, the file number and the Configuration object."
+        lr = user_lr(epoch[0], epoch[1], cfg)
+
+    else:
+        raise AssertionError(error_msg)
+    return lr
 
 
-def get_new_learning_rate(epoch, lr_initial, n_train_files, n_gpu):
+def triple_decay(n_epoch, n_file, cfg):
     """
     Function that calculates the current learning rate based on the number of already trained epochs.
 
@@ -126,41 +104,33 @@ def get_new_learning_rate(epoch, lr_initial, n_train_files, n_gpu):
 
     Parameters
     ----------
-    epoch : tuple(int, int)
-        The number of the current epoch and the current filenumber which is used to calculate the new learning rate.
-    lr_initial : float
-        Initial lr for the first epoch. Typically 0.01 for SGD and 0.001 for Adam.
-    n_train_files : int
-        Specifies into how many files the training dataset is split.
-    n_gpu : int
-        Number of gpu's that are used during the training. Used for scaling the lr.
+    n_epoch : int
+        The number of the current epoch which is used to calculate the new learning rate.
+    n_file : int
+        The number of the current filenumber which is used to calculate the new learning rate.
+    cfg : object Settings
+        ...
 
     Returns
     -------
     lr_temp : float
         Calculated learning rate for this epoch.
-    lr_decay : float
-        Latest learning rate decay that has been used.
 
     """
-    n_epoch, n_file = epoch[0], epoch[1]
-    n_lr_decays = (n_epoch - 1) * n_train_files + (n_file - 1)
 
-    lr_temp = lr_initial  # * n_gpu TODO think about multi gpu lr
-    lr_decay = None
+    n_lr_decays = (n_epoch - 1) * len(cfg.get_train_files()) + (n_file - 1)
+    lr_temp = 0.005  # * n_gpu TODO think about multi gpu lr
 
     for i in range(n_lr_decays):
-
         if lr_temp > 0.0003:
             lr_decay = 0.07  # standard for regression: 0.07, standard for PID: 0.02
         elif 0.0003 >= lr_temp > 0.0001:
             lr_decay = 0.04  # standard for regression: 0.04, standard for PID: 0.01
         else:
             lr_decay = 0.02  # standard for regression: 0.02, standard for PID: 0.005
-
         lr_temp = lr_temp * (1 - float(lr_decay))
 
-    return lr_temp, lr_decay
+    return lr_temp
 
 
 def update_summary_plot(main_folder):
@@ -180,9 +150,9 @@ def update_summary_plot(main_folder):
     plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name)
 
 
-def train_and_validate_model(cfg, model, epoch):
+def train_and_validate_model(cfg, model, start_epoch):
     """
-    Train a model for one epoch.
+    Train a model for one epoch, i.e. on all (remaining) train files once.
 
     Trains (fit_generator) and validates (evaluate_generator) a Keras model once on the provided
     training and validation files. The model is saved with an automatically generated filename based on the epoch.
@@ -193,48 +163,47 @@ def train_and_validate_model(cfg, model, epoch):
         Contains all the configurable options in the OrcaNet scripts.
     model : ks.Models.model
         Compiled keras model to use for training and validating.
-    epoch : tuple
-        Current Epoch and Fileno.
+    start_epoch : tuple
+        Epoch and file number to start this training with.
 
     """
     if cfg.zero_center_folder is not None:
         xs_mean = load_zero_center_data(cfg)
     else:
         xs_mean = None
+    train_files = cfg.get_train_files()
+    n_train_files = len(train_files)
 
-    lr = None
-    lr_initial, manual_mode = 0.005, (False, 0.0003, 0.07, lr)
-    epoch, lr, lr_decay = schedule_learning_rate(model, epoch, cfg.n_gpu, cfg.get_train_files(), lr_initial=lr_initial, manual_mode=manual_mode)  # begin new training step
+    # lr_initial, manual_mode = 0.005, (False, 0.0003, 0.07, lr)
+    # epoch, lr, lr_decay = schedule_learning_rate(model, epoch, cfg.n_gpu, cfg.get_train_files(), lr_initial=lr_initial, manual_mode=manual_mode)  # begin new training step
 
-    train_iter_step = 0  # loop n
-    for file_no, (f, f_size) in enumerate(cfg.get_train_files(), 1):
-        # skip if this file for this epoch has already been used for training
-        if file_no < epoch[1]:
+    for file_no, (f, f_size) in enumerate(train_files, 1):
+        # Only the file number changes during training, as this function trains only for one epoch
+        curr_epoch = (start_epoch[0], file_no)
+        # skip to the file with the target file number given in the epoch tuple.
+        if curr_epoch[1] < start_epoch[1]:
             continue
+        lr = get_learning_rate(curr_epoch, cfg.learning_rate, n_train_files)
+        K.set_value(model.optimizer.lr, lr)
+        print("Set learning rate to " + str(lr))
 
-        train_iter_step += 1
-        if train_iter_step > 1:
-            epoch, lr, lr_decay = schedule_learning_rate(model, epoch, cfg.n_gpu, cfg.get_train_files(), lr_initial=lr_initial, manual_mode=manual_mode)
-
-        history_train = train_model(cfg, model, f, f_size, file_no, xs_mean, epoch)
-        model.save(cfg.main_folder + 'saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5')
+        history_train = train_model(cfg, model, f, f_size, xs_mean, curr_epoch)
+        model.save(cfg.main_folder + 'saved_models/model_epoch_' + str(curr_epoch[0]) + '_file_' + str(curr_epoch[1]) + '.h5')
 
         # Validate every n-th file, starting with the first
-        if (file_no - 1) % cfg.validate_after_n_train_files == 0:
+        if (curr_epoch[1] - 1) % cfg.validate_after_n_train_files == 0:
             history_val = validate_model(cfg, model, xs_mean)
         else:
             history_val = None
-        write_summary_logfile(cfg, epoch, model, history_train, history_val, lr)
-        write_full_logfile(cfg, model, history_train, history_val, lr, lr_decay, epoch, f)
+        write_summary_logfile(cfg, curr_epoch, model, history_train, history_val, K.get_value(model.optimizer.lr))
+        write_full_logfile(cfg, model, history_train, history_val, K.get_value(model.optimizer.lr), curr_epoch, f)
         update_summary_plot(cfg.main_folder)
-        plot_weights_and_activations(cfg, xs_mean, epoch[0], file_no)
-
-    return epoch, lr
+        plot_weights_and_activations(cfg, xs_mean, curr_epoch)
 
 
-def train_model(cfg, model, f, f_size, file_no, xs_mean, epoch):
+def train_model(cfg, model, f, f_size, xs_mean, curr_epoch):
     """
-    Trains a model based on the Keras fit_generator method.
+    Trains a model on a file based on the Keras fit_generator method.
 
     If a TensorBoard callback is wished, validation data has to be passed to the fit_generator method.
     For this purpose, the first file of the val_files is used.
@@ -246,28 +215,25 @@ def train_model(cfg, model, f, f_size, file_no, xs_mean, epoch):
     model : ks.model.Model
         Keras model instance of a neural network.
     f : list
-        Full filepaths of the files that should be used for training.
+        Full filepath of the file (or files for multiple inputs) that should be used for training.
     f_size : int
         Number of images contained in f.
-    file_no : int
-        If the full data is split into multiple files, this parameter indicates the current file number.
     xs_mean : ndarray
         Mean_image of the x (train-) dataset used for zero-centering the train-/val-data.
-    epoch : tuple(int, int)
+    curr_epoch : tuple(int, int)
         The number of the current epoch and the current filenumber.
 
     """
     validation_data, validation_steps, callbacks = None, None, []
     if cfg.n_events is not None:
         f_size = cfg.n_events  # for testing purposes
-    callbacks.append(BatchLevelPerformanceLogger(cfg, model, epoch))
-    print('Training in epoch', epoch[0], 'on file ', file_no, ',', f)
+    callbacks.append(BatchLevelPerformanceLogger(cfg, model, curr_epoch))
+    print('Training in epoch ' + str(curr_epoch[0]) + ' on file ' + str(curr_epoch[1]) + ' ,', f)
 
     history = model.fit_generator(
         generate_batches_from_hdf5_file(cfg, f, f_size=f_size, zero_center_image=xs_mean),
         steps_per_epoch=int(f_size / cfg.batchsize), epochs=1, verbose=cfg.train_verbose, max_queue_size=10,
         validation_data=validation_data, validation_steps=validation_steps, callbacks=callbacks)
-
     return history
 
 
@@ -344,8 +310,10 @@ def orca_train(cfg, initial_model=None):
 
     trained_epochs = 0
     while trained_epochs < cfg.epochs_to_train or cfg.epochs_to_train == -1:
-        epoch, lr = train_and_validate_model(cfg, model, epoch)
+        train_and_validate_model(cfg, model, epoch)
         trained_epochs += 1
+        epoch[0] += 1
+        epoch[1] = 1
 
 
 def example_run(main_folder, list_file, config_file, model_file):

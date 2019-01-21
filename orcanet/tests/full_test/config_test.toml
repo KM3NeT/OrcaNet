@@ -6,6 +6,7 @@
 class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
 str_ident = 'lp_tight-1_60b_errors_mse_w_vtx'
 
+learning_rate = "triple_decay"
 batchsize = 5
 train_logger_display=5
 train_logger_flush=-1

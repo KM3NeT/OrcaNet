@@ -292,15 +292,14 @@ def get_activations_and_weights(cfg, xs_mean, model_name, layer_name=None, learn
     return layer_names, activations, weights, y_values
 
 
-def plot_weights_and_activations(cfg, xs_mean, epoch, file_no):
+def plot_weights_and_activations(cfg, xs_mean, epoch):
     """
     Plots the weights of a model and the activations for one event to a .pdf file.
     :param str f: path to a .h5 file that contains images of events. Needed for plotting the activations for the event.
     :param ndarray xs_mean: mean_image of the x (train-) dataset used for zero-centering the data.
-    :param int epoch: epoch of the model.
-    :param int file_no: File Number of the trained model in this epoch (if multiple files are trained per epoch).
+    :param tuple epoch: epoch and fileno of the model.
     """
-    model_name = cfg.main_folder + 'saved_models/model_epoch_' + str(epoch) + '_file_' + str(file_no) + '.h5'
+    model_name = cfg.main_folder + 'saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5'
     layer_names, activations, weights, y_values = get_activations_and_weights(cfg, xs_mean, model_name, layer_name=None, learning_phase='test')
 
     fig, axes = plt.subplots()
