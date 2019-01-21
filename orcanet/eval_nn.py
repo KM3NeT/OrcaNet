@@ -194,8 +194,11 @@ def orca_eval(cfg):
     str_ident = cfg.str_ident
     list_name = os.path.basename(cfg.get_list_file()).split(".")[0]
     nn_arch = cfg.get_modeldata().nn_arch
-
     epoch = (cfg.initial_epoch, cfg.initial_fileno)
+
+    if cfg.filter_out_tf_garbage:
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+
     if epoch[0] == -1 and epoch[1] == -1:
         epoch = cfg.get_latest_epoch()
         print("Automatically set epoch to epoch {} file {}.".format(epoch[0], epoch[1]))

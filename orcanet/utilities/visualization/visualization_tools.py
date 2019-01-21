@@ -15,18 +15,20 @@ from orcanet.utilities.nn_utilities import generate_batches_from_hdf5_file
 from orcanet.utilities.losses import get_all_loss_functions
 
 
-def make_test_train_plot(test_train_data_list, title=""):
+def make_test_train_plot(train_datas, val_datas, labels, colors=None, title=""):
     """
     Plot one or more val/train lines in a single plot.
 
     Parameters
     ----------
-    test_train_data_list : list
-        Every entry [i] is one set of a test and a train line, together with plotting options:
-        test_train_data_list[i][0] = x and y test data as a list. Will be plotted as connected dots.
-        test_train_data_list[i][1] = x and y train data as a list. Will be plotted as a faint solid line.
-        test_train_data_list[i][2] = label used for the train/test line.
-        test_train_data_list[i][3] = color used for the train/test line.
+    train_datas : list
+        x and y test data as a list. Will be plotted as connected dots.
+    val_datas : list
+        x and y train data as a list. Will be plotted as a faint solid line.
+    labels : list
+        Labels used for the train/test line.
+    colors : list
+        Colors used for the train/test line.
     title : str
         Title of the plot.
 
@@ -38,26 +40,37 @@ def make_test_train_plot(test_train_data_list, title=""):
     """
     fig, ax = plt.subplots()
     # Record all the datapoints in the plot for proper scaling.
-    all_x_coordinates_test, all_x_coordinates_train = [],[]
-    all_y_coordinates_test, all_y_coordinates_train = [],[]
-    for test_train_data in test_train_data_list:
-        test_data, train_data, label, color = test_train_data
-        if color is None:
-            test_plot = plt.plot(test_data[0], test_data[1], marker='o', zorder=3, label='eval ' + label)
+    all_x_coordinates_test, all_x_coordinates_train = [], []
+    all_y_coordinates_test, all_y_coordinates_train = [], []
+    for set_no in range(len(train_datas)):
+        train_data = train_datas[set_no]
+        val_data = val_datas[set_no]
+        label = labels[set_no]
+
+        if colors is None:
+            test_plot = plt.plot(val_data[0], val_data[1], marker='o', zorder=3, label='eval ' + label)
         else:
-            test_plot = plt.plot(test_data[0], test_data[1], color=color, marker='o', zorder=3, label='eval ' + label)
+            test_plot = plt.plot(val_data[0], val_data[1], color=colors[set_no], marker='o', zorder=3, label='eval ' + label)
         plt.plot(train_data[0], train_data[1], color=test_plot[0].get_color(), ls='--', zorder=3,
                  label='train ' + label, lw=0.6, alpha=0.5)
-        all_x_coordinates_test.extend(test_data[0])
+
+        all_x_coordinates_test.extend(val_data[0])
         all_x_coordinates_train.extend(train_data[0])
         # Remove the occasional np.nan from the y data
-        all_y_coordinates_test.extend(test_data[1][~np.isnan(test_data[1])])
+        all_y_coordinates_test.extend(val_data[1][~np.isnan(val_data[1])])
         all_y_coordinates_train.extend(train_data[1][~np.isnan(train_data[1])])
-    plt.xticks(get_epoch_xticks(all_x_coordinates_test+all_x_coordinates_train))
-    test_metric_min_to_max = np.amax(all_y_coordinates_test) - np.amin(all_y_coordinates_test)
-    y_lim = (np.amin(all_y_coordinates_test) - 0.25 * test_metric_min_to_max,
-             np.amax(all_y_coordinates_test) + 0.25 * test_metric_min_to_max)
+
+    if not len(all_y_coordinates_test) == 0:
+        test_metric_min_to_max = np.amax(all_y_coordinates_test) - np.amin(all_y_coordinates_test)
+        y_lim = (np.amin(all_y_coordinates_test) - 0.25 * test_metric_min_to_max,
+                 np.amax(all_y_coordinates_test) + 0.25 * test_metric_min_to_max)
+    else:
+        test_metric_min_to_max = np.amax(all_y_coordinates_train) - np.amin(all_y_coordinates_train)
+        y_lim = (np.amin(all_y_coordinates_train) - 0.25 * test_metric_min_to_max,
+                 np.amax(all_y_coordinates_train) + 0.25 * test_metric_min_to_max)
+
     plt.ylim(y_lim)
+    plt.xticks(get_epoch_xticks(all_x_coordinates_test + all_x_coordinates_train))
 
     ax.legend(loc='upper right')
     plt.xlabel('Epoch [#]')
@@ -94,8 +107,10 @@ def plot_metrics(summary_data, full_train_data, metric_names="loss", make_auto_t
         The plot.
 
     """
-    test_train_data_list = []
-    if isinstance(metric_names, str): metric_names=[metric_names,]
+    if isinstance(metric_names, str):
+        metric_names = [metric_names, ]
+
+    train_datas, val_datas, labels, colors = [], [], [], []
     for metric_name in metric_names:
         summary_label = "val_"+metric_name
         train_log_label = metric_name
@@ -105,14 +120,16 @@ def plot_metrics(summary_data, full_train_data, metric_names="loss", make_auto_t
         else:
             test_data = [summary_data["Epoch"], summary_data[summary_label]]
         train_data = [full_train_data["Batch_float"], full_train_data[train_log_label]]
-        label = metric_name
-        test_train_data = test_data, train_data, label, color
-        test_train_data_list.append(test_train_data)
+        train_datas.append(train_data)
+        val_datas.append(test_data)
+        labels.append(metric_name)
+        colors.append(color)
+
     if make_auto_titles:
         title = metric_names[0]
     else:
         title = ""
-    fig = make_test_train_plot(test_train_data_list, title)
+    fig = make_test_train_plot(train_datas, val_datas, labels, colors, title)
     return fig
 
 
@@ -135,7 +152,7 @@ def get_epoch_xticks(x_coordinates):
     start_epoch, end_epoch = np.floor(minimum), np.ceil(maximum)
     # reduce number of x_ticks by factor of 2 if n_epochs > 20
     n_epochs = end_epoch - start_epoch
-    x_ticks_stepsize = 1 + np.floor(n_epochs / 20.) # 20 ticks max, increase stepsize if n_epochs >= 20
+    x_ticks_stepsize = 1 + np.floor(n_epochs / 20.)  # 20 ticks max, increase stepsize if n_epochs >= 20
     x_ticks_major = np.arange(start_epoch, end_epoch + x_ticks_stepsize, x_ticks_stepsize)
 
     return x_ticks_major
@@ -160,13 +177,13 @@ def plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name):
     # Extract the names of the metrics
     all_metrics = []
     for keyword in summary_data.dtype.names:
-        if keyword == "Epoch" or keyword=="LR":
+        if keyword == "Epoch" or keyword == "LR":
             continue
         if "train_" in keyword:
             keyword = keyword.split("train_")[-1]
         else:
             keyword = keyword.split("val_")[-1]
-        if not keyword in all_metrics:
+        if keyword not in all_metrics:
             all_metrics.append(keyword)
     all_metrics = sort_metric_names_and_errors(all_metrics)
     # Plot them
@@ -179,7 +196,7 @@ def plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name):
             # If this metric is an err metric of a variable, color it the same
             if all_metrics[metric_no-1] == metric.replace("_err", ""):
                 color_counter -= 1
-            fig = plot_metrics(summary_data, full_train_data, metric_names=metric, make_auto_titles=True, color=colors[color_counter%len(colors)])
+            fig = plot_metrics(summary_data, full_train_data, metric_names=metric, make_auto_titles=True, color=colors[color_counter % len(colors)])
             color_counter += 1
             pdf.savefig(fig)
             plt.close(fig)
@@ -295,7 +312,7 @@ def plot_weights_and_activations(cfg, xs_mean, epoch, file_no):
     energy = y_values[0][2]
 
     try:
-        run_id = int(y_values[0][9]) # if it doesn't exist in the file
+        run_id = int(y_values[0][9])  # if it doesn't exist in the file
     except IndexError:
         run_id = ''
 
@@ -310,7 +327,8 @@ def plot_weights_and_activations(cfg, xs_mean, epoch, file_no):
     for i, layer_weights in enumerate(weights):
         w = None
 
-        if not layer_weights: continue  # skip if layer weights are empty
+        if not layer_weights:
+            continue  # skip if layer weights are empty
         for j, w_temp in enumerate(layer_weights):
             # ignore different origins of the weights
             if j == 0:

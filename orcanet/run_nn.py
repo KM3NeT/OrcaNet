@@ -208,8 +208,9 @@ def train_and_validate_model(cfg, model, epoch):
 
     train_iter_step = 0  # loop n
     for file_no, (f, f_size) in enumerate(cfg.get_train_files(), 1):
+        # skip if this file for this epoch has already been used for training
         if file_no < epoch[1]:
-            continue  # skip if this file for this epoch has already been used for training
+            continue
 
         train_iter_step += 1
         if train_iter_step > 1:
@@ -317,6 +318,8 @@ def orca_train(cfg, initial_model=None):
         the most recent saved model will be loaded otherwise.
 
     """
+    if cfg.filter_out_tf_garbage:
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
     cfg.make_folder_structure()
     write_full_logfile_startup(cfg)
     # The epoch that will be incremented during the scripts:

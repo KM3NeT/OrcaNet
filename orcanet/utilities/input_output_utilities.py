@@ -420,6 +420,8 @@ class Settings(object):
     class_type : tuple(int, str)
         Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
         I.e. (2, 'track-shower')
+    filter_out_tf_garbage : bool
+        If true, surpresses the tensorflow info logs which usually spam the terminal.
     epochs_to_train : int
         How many new epochs should be trained by running this function. -1 for infinite.
     initial_epoch : int
@@ -507,6 +509,7 @@ class Settings(object):
         self.batchsize = 64
         self.class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
         self.epochs_to_train = -1
+        self.filter_out_tf_garbage = True
         self.initial_epoch = -1
         self.initial_fileno = -1
         self.n_events = None
