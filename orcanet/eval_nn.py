@@ -92,6 +92,7 @@ def predict_and_investigate_model_performance(cfg, model, test_files, n_bins, ba
         calculate_and_plot_separation_pid(arr_nn_pred, folder_name, modelname, precuts=precuts)
 
     else:  # regression
+        # TODO make the shallow reco not hardcoded
         arr_nn_pred_shallow = np.load('/home/woody/capn/mppi033h/Data/various/arr_nn_pred.npy')
         # precuts = (True, 'regr_3-100_GeV_prod_and_1-3_GeV_prod')
         precuts = (False, '3-100_GeV_prod')

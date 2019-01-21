@@ -56,14 +56,20 @@ class DatasetTest(TestCase):
         initial_model = build_nn_model(cfg)
         orca_train(cfg, initial_model)
         orca_train(cfg)
-        orca_eval(cfg)
+        # orca_eval(cfg)
 
 
 def make_dummy_data(filepath, shape):
-    x = np.concatenate([np.ones((100,) + shape), np.zeros((100,) + shape)])
-    y = np.ones((200, 14))
+    xs = np.concatenate([np.ones((100,) + shape), np.zeros((100,) + shape)])
+
+    y = np.ones((200, 16))
+    dtypes = [('event_id', '<f8'), ('particle_type', '<f8'), ('energy', '<f8'), ('is_cc', '<f8'), ('bjorkeny', '<f8'),
+           ('dir_x', '<f8'), ('dir_y', '<f8'), ('dir_z', '<f8'), ('time_interaction', '<f8'), ('run_id', '<f8'),
+           ('vertex_pos_x', '<f8'), ('vertex_pos_y', '<f8'), ('vertex_pos_z', '<f8'), ('time_residual_vertex', '<f8'),
+           ('prod_ident', '<f8'), ('group_id', '<i8')]
+    ys = y.ravel().view(dtype=dtypes)
 
     h5f = h5py.File(filepath, 'w')
-    h5f.create_dataset('x', data=x, dtype='uint8')
-    h5f.create_dataset('y', data=y, dtype='float32')
+    h5f.create_dataset('x', data=xs, dtype='uint8')
+    h5f.create_dataset('y', data=ys, dtype=dtypes)
     h5f.close()

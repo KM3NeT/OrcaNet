@@ -3,6 +3,7 @@
 # They overwrite the default values which are listed in the definition of the Settings class.
 #
 [config]
+class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
 str_ident = 'lp_tight-1_60b_errors_mse_w_vtx'
 
 batchsize = 5
