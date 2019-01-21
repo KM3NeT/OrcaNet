@@ -278,9 +278,10 @@ def get_labels(y_values, class_type):
         is_muon_cc = np.logical_and(np.abs(particle_type) == 14, is_cc == 1)
         is_not_muon_cc = np.invert(is_muon_cc)
 
-        categorical_ts = np.zeros(2, dtype='bool')  # categorical [shower, track] -> [1,0] = shower, [0,1] = track
-        categorical_ts[is_not_muon_cc][0] = 1
-        categorical_ts[is_muon_cc][1] = 1
+        batchsize = y_values.shape[0]
+        categorical_ts = np.zeros((batchsize, 2), dtype='bool')  # categorical [shower, track] -> [1,0] = shower, [0,1] = track
+        categorical_ts[is_not_muon_cc][:, 0] = 1
+        categorical_ts[is_muon_cc][:, 1] = 1
 
         ys['ts_output'] = categorical_ts.astype(np.float32)
 
