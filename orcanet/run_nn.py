@@ -60,7 +60,7 @@ def get_learning_rate(cfg, epoch):
         else:
             raise NameError(user_lr, "is an unknown learning rate string!")
 
-    elif isinstance(user_lr, function):
+    elif callable(user_lr):
         # User defined function
         assert len(signature(user_lr).parameters) == 3, "A custom learning rate function must have three input parameters: \
         The epoch, the file number and the Configuration object."
