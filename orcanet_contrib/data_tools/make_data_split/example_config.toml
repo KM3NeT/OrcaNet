@@ -1,0 +1,19 @@
+# Example configuration file for make_data_split.py
+#
+# TODO add docs
+# output
+n_train_files = 5
+n_test_files = 3
+fraction_train = 0.75 # 0.75 = 75%
+
+[muon_cc_3_100]
+dir = ""
+contribution_train = 0.75
+contribution_test = 0.75
+
+[muon_cc_1_5]
+dir = ""
+contribution_train = 0.25
+contribution_test = 0.25
+
+
