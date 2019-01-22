@@ -1,38 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Main code for training NN's. The main function for training, validating, logging and plotting the progress is orca_train.
-It can also be called via a parser by running this python module as follows:
-
-Usage:
-    run_nn.py FOLDER LIST CONFIG MODEL
-    run_nn.py (-h | --help)
-
-Arguments:
-    FOLDER  Path to the folder where everything gets saved to, e.g. the summary.txt, the plots, the trained models, etc.
-    LIST    A .toml file which contains the pathes of the training and validation files.
-            An example can be found in config/lists/example_list.toml
-    CONFIG  A .toml file which sets up the training.
-            An example can be found in config/models/example_config.toml. The possible parameters are listed in
-            utilities/input_output_utilities.py in the class Configuration.
-    MODEL   Path to a .toml file with infos about a model.
-
-Options:
-    -h --help                       Show this screen.
-
+Main code for training and validating NN's.
 """
 
 import matplotlib as mpl
-from docopt import docopt
 from inspect import signature
 mpl.use('Agg')
-from orcanet.core import orca_train, Configuration
 from orcanet.utilities.input_output_utilities import write_summary_logfile, write_full_logfile, read_logfiles
 from orcanet.utilities.nn_utilities import load_zero_center_data, BatchLevelPerformanceLogger
 from orcanet.utilities.visualization.visualization_tools import *
 from orcanet.utilities.evaluation_utilities import *
 from orcanet.utilities.losses import *
-from orcanet.model_setup import build_nn_model
 
 
 # for debugging
@@ -264,46 +243,3 @@ def validate_model(cfg, model, xs_mean):
 
     return history_val
 
-
-def example_run(main_folder, list_file, config_file, model_file):
-    """
-    This shows how to use OrcaNet.
-
-    Parameters
-    ----------
-    main_folder : str
-        Path to the folder where everything gets saved to, e.g. the summary log file, the plots, the trained models, etc.
-    list_file : str
-        Path to a list file which contains pathes to all the h5 files that should be used for training and validation.
-    config_file : str
-        Path to a .toml file which overwrite some of the default settings for training and validating a model.
-    model_file : str
-        Path to a file with parameters to build a model of a predefined architecture with OrcaNet.
-
-    """
-    # Set up the cfg object with the input data
-    cfg = Configuration(main_folder, list_file, config_file)
-    # If this is the start of the training, a compiled model needs to be handed to the orca_train function
-    if cfg.get_latest_epoch() == (0, 1):
-        # Add Info for building a model with OrcaNet to the cfg object
-        cfg.set_from_model_file(model_file)
-        # Build it
-        initial_model = build_nn_model(cfg)
-    else:
-        # No model is required if the training is continued, as it will be loaded automatically
-        initial_model = None
-    orca_train(cfg, initial_model)
-
-
-def parse_input():
-    """ Run the orca_train function with a parser. """
-    args = docopt(__doc__)
-    main_folder = args['FOLDER']
-    list_file = args['LIST']
-    config_file = args['CONFIG']
-    model_file = args['MODEL']
-    example_run(main_folder, list_file, config_file, model_file)
-
-
-if __name__ == '__main__':
-    parse_input()

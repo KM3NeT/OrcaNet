@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+"""
+Core scripts for the OrcaNet package.
+"""
 
 import os
 import warnings

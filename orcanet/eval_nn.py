@@ -2,31 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 Main code for evaluating NN's.
-It can also be called via a parser by running this python module as follows:
-
-Usage:
-    eval_nn.py FOLDER LIST CONFIG MODEL
-    eval_nn.py (-h | --help)
-
-Arguments:
-    FOLDER  Path to the folder where everything gets saved to, e.g. the summary.txt, the plots, the trained models, etc.
-    LIST    A .toml file which contains the pathes of the training and validation files.
-            An example can be found in config/lists/example_list.toml
-    CONFIG  A .toml file which sets up the training.
-            An example can be found in config/models/example_config.toml. The possible parameters are listed in
-            utilities/input_output_utilities.py in the class Configuration.
-    MODEL   Path to a .toml file with infos about a model.
-
-Options:
-    -h --help                       Show this screen.
-
 """
 
 import matplotlib as mpl
-from docopt import docopt
 mpl.use('Agg')
 from orcanet.utilities.evaluation_utilities import *
-from orcanet.core import Configuration, orca_eval
 
 
 # TODO Remove unnecessary input parameters to the following functions if they are already in the cfg
@@ -177,39 +157,3 @@ def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident=''):
 
     return modelname
 
-
-def example_run(main_folder, list_file, config_file, model_file):
-    """
-    This shows how to use OrcaNet.
-
-    Parameters
-    ----------
-    main_folder : str
-        Path to the folder where everything gets saved to, e.g. the summary log file, the plots, the trained models, etc.
-    list_file : str
-        Path to a list file which contains pathes to all the h5 files that should be used for training and validation.
-    config_file : str
-        Path to a .toml file which overwrite some of the default settings for training and validating a model.
-    model_file : str
-        Path to a file with parameters to build a model of a predefined architecture with OrcaNet.
-
-    """
-    # Set up the cfg object with the input data
-    cfg = Configuration(main_folder, list_file, config_file)
-    # Currently, the eval scripts are only supported for automatically generated models, so nn_arch is needed.
-    cfg.set_from_model_file(model_file)
-    orca_eval(cfg)
-
-
-def parse_input():
-    """ Run the orca_train function with a parser. """
-    args = docopt(__doc__)
-    main_folder = args['FOLDER']
-    list_file = args['LIST']
-    config_file = args['CONFIG']
-    model_file = args['MODEL']
-    example_run(main_folder, list_file, config_file, model_file)
-
-
-if __name__ == '__main__':
-    parse_input()

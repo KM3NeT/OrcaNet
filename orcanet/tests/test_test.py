@@ -1,10 +1,6 @@
-import keras as ks
-import numpy as np
-from keras import backend as K
-from keras.layers import Dropout
 from unittest import TestCase
 
-from orcanet import model_setup
+from orcanet.model_archs import model_setup
 from orcanet.core import Configuration
 
 # filepath = '/home/woody/capn/mppi033h/Code/HPC/cnns/models/trained/trained_model_VGG_4d_xyz-t_and_yzt-x_muon-CC_to_elec-CC_double_input_single_train_epoch1.h5'
