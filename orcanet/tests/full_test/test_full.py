@@ -42,7 +42,7 @@ class DatasetTest(TestCase):
     def test_multi_input_model(self):
         """
         Make a model and train it with the test toml files provided to check if it throws an error.
-        Also resumes training after the first epoch to check if that works.
+        Also resumes training after the first epoch with a custom lr to check if that works.
         """
         list_file = self.list_file_path
         config_file = os.path.join(os.path.dirname(__file__), "config_test.toml")
@@ -55,6 +55,11 @@ class DatasetTest(TestCase):
         cfg.set_from_model_file(model_file)
         initial_model = build_nn_model(cfg)
         orca_train(cfg, initial_model)
+
+        def test_learning_rate(epoch, fileno, cfg):
+            lr = (1 + epoch)*(1 + fileno) * 0.001
+            return lr
+        cfg.learning_rate = test_learning_rate
         orca_train(cfg)
         # orca_eval(cfg)
 

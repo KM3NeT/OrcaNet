@@ -430,20 +430,21 @@ class Configuration(object):
     epochs_to_train : int
         How many new epochs should be trained by running this function. -1 for infinite.
     initial_epoch : int
-        The epoch of the model with which the training is supposed to start, e.g. 0 means start a new training,
-        1 means load the saved model from epoch 1 and continue training.
-        Can also give -1 to automatically load the most recent epoch found in the main folder, if present.
+        The epoch of the model with which the training is supposed to start, e.g. 1 means load the saved model from
+        epoch 1 and continue training. 0 means start a new training (initial_fileno also has to be 0 for this).
+        Can also give -1 to automatically load the most recent epoch found in the main folder, if present, or make
+        a new model otherwise.
     initial_fileno : int
         When using multiple files, define the file number with which the training is supposed to start, e.g.
-        1 for load the model trained on the first file. If both epoch and fileno are -1, automatically load the most
-        recent file found in the main folder, if present.
+        1 for load the model trained on the first file. If both epoch and fileno are -1, automatically set to the most
+        recent file found in the main folder.
     learning_rate : float or tuple or function
         The learning rate for the training.
         If it is a float, the learning rate will be constantly this value.
         If it is a tuple of two floats, the first float gives the learning rate in epoch 1 file 1, and the second
         float gives the decrease of the learning rate per file (e.g. 0.1 for 10% decrease per file).
         You can also give an arbitrary function, which takes as an input the epoch, the file number and the
-        Configuration object, and returns the learning rate.
+        Configuration object (in this order), and returns the learning rate.
     n_events : None or int
         For testing purposes. If not the whole .h5 file should be used for training, define the number of events.
     n_gpu : tuple(int, str)
@@ -461,6 +462,7 @@ class Configuration(object):
         -1 for flush at the end of the file only.
     train_verbose : int
         verbose option of keras.model.fit_generator.
+        0 = silent, 1 = progress bar, 2 = one line per epoch.
     use_scratch_ssd : bool
         Declares if the input files should be copied to the node-local SSD scratch space (only working at Erlangen CC).
     validate_after_n_train_files : int
@@ -613,14 +615,17 @@ class Configuration(object):
 
     def get_next_epoch(self, epoch):
         """
-        TODO
+        Return the next epoch / fileno tuple (depends on how many train files there are).
 
         Parameters
         ----------
-        epoch
+        epoch : tuple
+            Current epoch and file number.
 
         Returns
         -------
+        next_epoch : tuple
+            Next epoch and file number.
 
         """
         if epoch[0] == 0 and epoch[1] == 0:

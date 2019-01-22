@@ -135,8 +135,10 @@ def triple_decay(n_epoch, n_file, cfg):
 
 def update_summary_plot(main_folder):
     """
-    Refresh the summary plot of a model directory, found in ./plots/summary_plot.pdf. Val- and train-data
-    will be read out automatically, and the loss and every metric will be plotted in a seperate page in the pdf.
+    Refresh the summary plot of a model directory, found in ./plots/summary_plot.pdf.
+
+    Validation and Train-data will be read out automatically, and the loss as well as every metric will be plotted in
+    a seperate page in the pdf.
 
     Parameters
     ----------
@@ -155,7 +157,8 @@ def train_and_validate_model(cfg, model, start_epoch):
     Train a model for one epoch, i.e. on all (remaining) train files once.
 
     Trains (fit_generator) and validates (evaluate_generator) a Keras model once on the provided
-    training and validation files. The model is saved with an automatically generated filename based on the epoch.
+    training and validation files. The model is saved with an automatically generated filename based on the epoch,
+    log files are written and plots are made.
 
     Parameters
     ----------
@@ -172,17 +175,17 @@ def train_and_validate_model(cfg, model, start_epoch):
     else:
         xs_mean = None
 
-    for file_no, (f, f_size) in enumerate(cfg.get_train_files(), 1):
+    for file_no, (files, f_size) in enumerate(cfg.get_train_files(), 1):
         # Only the file number changes during training, as this function trains only for one epoch
         curr_epoch = (start_epoch[0], file_no)
-        # skip to the file with the target file number given in the epoch tuple.
+        # skip to the file with the target file number given in the start_epoch tuple.
         if curr_epoch[1] < start_epoch[1]:
             continue
         lr = get_learning_rate(cfg, curr_epoch)
         K.set_value(model.optimizer.lr, lr)
         print("Set learning rate to " + str(lr))
         # Train the model on one file and save it afterwards
-        history_train = train_model(cfg, model, f, f_size, xs_mean, curr_epoch)
+        history_train = train_model(cfg, model, files, f_size, xs_mean, curr_epoch)
         model_filename = cfg.main_folder + 'saved_models/model_epoch_' + str(curr_epoch[0]) + '_file_' + str(curr_epoch[1]) + '.h5'
         model.save(model_filename)
         print("Saved model as " + model_filename)
@@ -193,18 +196,17 @@ def train_and_validate_model(cfg, model, start_epoch):
             history_val = None
         # Write logfiles
         write_summary_logfile(cfg, curr_epoch, model, history_train, history_val, K.get_value(model.optimizer.lr))
-        write_full_logfile(cfg, model, history_train, history_val, K.get_value(model.optimizer.lr), curr_epoch, f)
+        write_full_logfile(cfg, model, history_train, history_val, K.get_value(model.optimizer.lr), curr_epoch, files)
         # Make plots
         update_summary_plot(cfg.main_folder)
         plot_weights_and_activations(cfg, xs_mean, curr_epoch)
 
 
-def train_model(cfg, model, f, f_size, xs_mean, curr_epoch):
+def train_model(cfg, model, files, f_size, xs_mean, curr_epoch):
     """
-    Trains a model on a file based on the Keras fit_generator method.
+    Trains a model on one file based on the Keras fit_generator method.
 
-    If a TensorBoard callback is wished, validation data has to be passed to the fit_generator method.
-    For this purpose, the first file of the val_files is used.
+    The progress of the training is also logged.
 
     Parameters
     ----------
@@ -212,7 +214,7 @@ def train_model(cfg, model, f, f_size, xs_mean, curr_epoch):
         Configuration object containing all the configurable options in the OrcaNet scripts.
     model : ks.model.Model
         Keras model instance of a neural network.
-    f : list
+    files : list
         Full filepath of the file (or files for multiple inputs) that should be used for training.
     f_size : int
         Number of images contained in f.
@@ -222,22 +224,20 @@ def train_model(cfg, model, f, f_size, xs_mean, curr_epoch):
         The number of the current epoch and the current filenumber.
 
     """
-    validation_data, validation_steps, callbacks = None, None, []
+    print('Training in epoch ' + str(curr_epoch[0]) + ' on file ' + str(curr_epoch[1]) + ' ,', files)
     if cfg.n_events is not None:
         f_size = cfg.n_events  # for testing purposes
-    callbacks.append(BatchLevelPerformanceLogger(cfg, model, curr_epoch))
-    print('Training in epoch ' + str(curr_epoch[0]) + ' on file ' + str(curr_epoch[1]) + ' ,', f)
-
-    history = model.fit_generator(
-        generate_batches_from_hdf5_file(cfg, f, f_size=f_size, zero_center_image=xs_mean),
-        steps_per_epoch=int(f_size / cfg.batchsize), epochs=1, verbose=cfg.train_verbose, max_queue_size=10,
-        validation_data=validation_data, validation_steps=validation_steps, callbacks=callbacks)
+    callbacks = [BatchLevelPerformanceLogger(cfg, model, curr_epoch), ]
+    training_generator = generate_batches_from_hdf5_file(cfg, files, f_size=f_size, zero_center_image=xs_mean)
+    history = model.fit_generator(training_generator, steps_per_epoch=int(f_size / cfg.batchsize), epochs=1,
+                                  verbose=cfg.train_verbose, max_queue_size=10, callbacks=callbacks)
     return history
 
 
 def validate_model(cfg, model, xs_mean):
     """
-    Validates a model on the validation data based on the Keras evaluate_generator method.
+    Validates a model on all the validation datafiles based on the Keras evaluate_generator method.
+
     This is usually done after a session of training has been finished.
 
     Parameters
@@ -250,17 +250,15 @@ def validate_model(cfg, model, xs_mean):
         Mean_image of the x (train-) dataset used for zero-centering the train-/val-data.
 
     """
+    # One history for each val file
     histories = []
     for i, (f, f_size) in enumerate(cfg.get_val_files()):
         print('Validating on file ', i, ',', str(f))
 
         if cfg.n_events is not None:
             f_size = cfg.n_events  # for testing purposes
-
-        history = model.evaluate_generator(
-            generate_batches_from_hdf5_file(cfg, f, f_size=f_size, zero_center_image=xs_mean),
-            steps=int(f_size / cfg.batchsize), max_queue_size=10, verbose=1)
-
+        val_generator = generate_batches_from_hdf5_file(cfg, f, f_size=f_size, zero_center_image=xs_mean)
+        history = model.evaluate_generator(val_generator, steps=int(f_size / cfg.batchsize), max_queue_size=10, verbose=1)
         # This history object is just a list, not a dict like with fit_generator!
         print('Validation sample results: ' + str(history) + ' (' + str(model.metrics_names) + ')')
         histories.append(history)
@@ -273,11 +271,14 @@ def orca_train(cfg, initial_model=None):
     """
     Core code that trains a neural network.
 
+    Set up everything for the training (like the folder structure and potentially loading in a saved model)
+    and train for the given number of epochs.
+
     Parameters
     ----------
     cfg : object Configuration
         Configuration object containing all the configurable options in the OrcaNet scripts.
-    initial_model : ks.models.Model
+    initial_model : ks.models.Model or None
         Compiled keras model to use for training and validation. Only required for the first epoch of training, as
         the most recent saved model will be loaded otherwise.
 
@@ -308,6 +309,7 @@ def orca_train(cfg, initial_model=None):
 
     trained_epochs = 0
     while trained_epochs < cfg.epochs_to_train or cfg.epochs_to_train == -1:
+        # Set epoch to the next file
         epoch = cfg.get_next_epoch(epoch)
         train_and_validate_model(cfg, model, epoch)
         trained_epochs += 1
