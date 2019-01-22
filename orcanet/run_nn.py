@@ -22,14 +22,12 @@ Options:
 
 """
 
-import os
-import keras as ks
 import matplotlib as mpl
 from docopt import docopt
 from inspect import signature
-import warnings
 mpl.use('Agg')
-from orcanet.utilities.input_output_utilities import write_summary_logfile, write_full_logfile, read_logfiles, write_full_logfile_startup, Configuration
+from orcanet.core import orca_train, Configuration
+from orcanet.utilities.input_output_utilities import write_summary_logfile, write_full_logfile, read_logfiles
 from orcanet.utilities.nn_utilities import load_zero_center_data, BatchLevelPerformanceLogger
 from orcanet.utilities.visualization.visualization_tools import *
 from orcanet.utilities.evaluation_utilities import *
@@ -265,54 +263,6 @@ def validate_model(cfg, model, xs_mean):
     history_val = [sum(col) / float(len(col)) for col in zip(*histories)] if len(histories) > 1 else histories[0]  # average over all val files if necessary
 
     return history_val
-
-
-def orca_train(cfg, initial_model=None):
-    """
-    Core code that trains a neural network.
-
-    Set up everything for the training (like the folder structure and potentially loading in a saved model)
-    and train for the given number of epochs.
-
-    Parameters
-    ----------
-    cfg : object Configuration
-        Configuration object containing all the configurable options in the OrcaNet scripts.
-    initial_model : ks.models.Model or None
-        Compiled keras model to use for training and validation. Only required for the first epoch of training, as
-        the most recent saved model will be loaded otherwise.
-
-    """
-    if cfg.filter_out_tf_garbage:
-        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-    cfg.make_folder_structure()
-    write_full_logfile_startup(cfg)
-    # The epoch that will be incremented during the scripts:
-    epoch = (cfg.initial_epoch, cfg.initial_fileno)
-    if epoch[0] == -1 and epoch[1] == -1:
-        epoch = cfg.get_latest_epoch()
-        print("Automatically set epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
-    # Epoch here is the epoch of the currently existing model (or 0,0 if there is none)
-    if epoch[0] == 0 and epoch[1] == 0:
-        assert initial_model is not None, "You need to provide a compiled keras model for the start of the training! (You gave None)"
-        model = initial_model
-    else:
-        # Load an existing model
-        if initial_model is not None:
-            warnings.warn("You provided a model even though this is not the start of the training. Provided model is ignored!")
-        path_of_model = cfg.main_folder + 'saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5'
-        print("Loading saved model: "+path_of_model)
-        model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
-    model.summary()
-    if cfg.use_scratch_ssd:
-        cfg.use_local_node()
-
-    trained_epochs = 0
-    while trained_epochs < cfg.epochs_to_train or cfg.epochs_to_train == -1:
-        # Set epoch to the next file
-        epoch = cfg.get_next_epoch(epoch)
-        train_and_validate_model(cfg, model, epoch)
-        trained_epochs += 1
 
 
 def example_run(main_folder, list_file, config_file, model_file):

@@ -25,10 +25,8 @@ Options:
 import matplotlib as mpl
 from docopt import docopt
 mpl.use('Agg')
-from orcanet.utilities.nn_utilities import load_zero_center_data
 from orcanet.utilities.evaluation_utilities import *
-from orcanet.utilities.losses import get_all_loss_functions
-from orcanet.utilities.input_output_utilities import Configuration
+from orcanet.core import Configuration, orca_eval
 
 
 # TODO Remove unnecessary input parameters to the following functions if they are already in the cfg
@@ -178,53 +176,6 @@ def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident=''):
     modelname += projection + '_' + class_type[1] + str_ident
 
     return modelname
-
-
-def orca_eval(cfg):
-    """
-    Core code that evaluates a neural network. The input parameters are the same as for orca_train, so that it is compatible
-    with the .toml file.
-    TODO Should be directly callable on a saved model, so that less arguments are required, and maybe no .toml is needed?
-
-    Parameters
-    ----------
-    cfg : object Configuration
-        Configuration object containing all the configurable options in the OrcaNet scripts.
-
-    """
-    folder_name = cfg.main_folder
-    test_files = cfg.get_val_files()
-    n_bins = cfg.get_n_bins()
-    class_type = cfg.class_type
-    swap_4d_channels = cfg.swap_4d_channels
-    batchsize = cfg.batchsize
-    str_ident = cfg.str_ident
-    list_name = os.path.basename(cfg.get_list_file()).split(".")[0]
-    nn_arch = cfg.get_modeldata().nn_arch
-    epoch = (cfg.initial_epoch, cfg.initial_fileno)
-
-    if cfg.filter_out_tf_garbage:
-        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-
-    if epoch[0] == -1 and epoch[1] == -1:
-        epoch = cfg.get_latest_epoch()
-        print("Automatically set epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
-
-    if cfg.zero_center_folder is not None:
-        xs_mean = load_zero_center_data(cfg)
-    else:
-        xs_mean = None
-
-    if cfg.use_scratch_ssd:
-        cfg.use_local_node()
-
-    path_of_model = folder_name + 'saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5'
-    model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
-    modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident)
-    arr_filename = folder_name + 'predictions/pred_model_epoch_{}_file_{}_on_{}_val_files.npy'.format(str(epoch[0]), str(epoch[1]), list_name)
-
-    predict_and_investigate_model_performance(cfg, model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
-                                              str_ident, modelname, xs_mean, arr_filename, folder_name)
 
 
 def example_run(main_folder, list_file, config_file, model_file):

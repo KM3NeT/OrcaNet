@@ -8,10 +8,9 @@ import shutil
 from keras.models import Model
 from keras.layers import Dense, Input, Flatten
 from unittest import TestCase
-from orcanet.utilities.input_output_utilities import Configuration
-from orcanet.run_nn import orca_train
+
+from orcanet.core import Configuration, orca_train, orca_eval
 from orcanet.model_setup import build_nn_model
-from orcanet.eval_nn import orca_eval
 
 
 class DatasetTest(TestCase):
