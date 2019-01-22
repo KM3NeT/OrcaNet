@@ -42,7 +42,7 @@ def run_train(main_folder, list_file, config_file, model_file):
     # Set up the cfg object with the input data
     cfg = Configuration(main_folder, list_file, config_file)
     # If this is the start of the training, a compiled model needs to be handed to the orca_train function
-    if cfg.get_latest_epoch() == (0, 1):
+    if cfg.get_latest_epoch() == (0, 0):
         # Add Info for building a model with OrcaNet to the cfg object
         cfg.set_from_model_file(model_file)
         # Build it
