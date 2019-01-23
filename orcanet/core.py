@@ -74,9 +74,12 @@ class Configuration(object):
     validate_after_n_train_files : int
         Validate the model after this many training files have been trained on in an epoch, starting from the first.
         E.g. if validate_after_n_train_files == 3, validation will happen after file 1,4,7,...
-    verbose : int
-        verbose option of keras.model.fit_generator and evaluate_generator.
+    verbose_train : int
+        verbose option of keras.model.fit_generator.
         0 = silent, 1 = progress bar, 2 = one line per epoch.
+    verbose_val : int
+        verbose option of evaluate_generator.
+        0 = silent, 1 = progress bar.
     zero_center_folder : None or str
         Path to a folder in which zero centering images are stored. [default: None]
         If this path is set, zero centering images for the given dataset will either be calculated and saved
@@ -145,7 +148,8 @@ class Configuration(object):
         self.train_logger_flush = -1
         self.use_scratch_ssd = False
         self.validate_after_n_train_files = 2
-        self.verbose = 2
+        self.verbose_train = 2
+        self.verbose_val = 1
         self.zero_center_folder = None
 
         self._default_values = dict(self.__dict__)

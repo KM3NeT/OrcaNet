@@ -206,7 +206,7 @@ def train_model(cfg, model, files, f_size, xs_mean, curr_epoch):
     callbacks = [BatchLevelPerformanceLogger(cfg, model, curr_epoch), ]
     training_generator = generate_batches_from_hdf5_file(cfg, files, f_size=f_size, zero_center_image=xs_mean)
     history = model.fit_generator(training_generator, steps_per_epoch=int(f_size / cfg.batchsize), epochs=1,
-                                  verbose=cfg.verbose, max_queue_size=10, callbacks=callbacks)
+                                  verbose=cfg.verbose_train, max_queue_size=10, callbacks=callbacks)
     return history
 
 
@@ -234,7 +234,7 @@ def validate_model(cfg, model, xs_mean):
         if cfg.n_events is not None:
             f_size = cfg.n_events  # for testing purposes
         val_generator = generate_batches_from_hdf5_file(cfg, f, f_size=f_size, zero_center_image=xs_mean)
-        history = model.evaluate_generator(val_generator, steps=int(f_size / cfg.batchsize), max_queue_size=10, verbose=cfg.verbose)
+        history = model.evaluate_generator(val_generator, steps=int(f_size / cfg.batchsize), max_queue_size=10, verbose=cfg.verbose_val)
         # This history object is just a list, not a dict like with fit_generator!
         print('Validation sample results: ' + str(history) + ' (' + str(model.metrics_names) + ')')
         histories.append(history)
