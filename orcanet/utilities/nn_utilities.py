@@ -13,77 +13,88 @@ from functools import reduce
 # ------------- Functions used for supplying images to the GPU -------------#
 
 
-def generate_batches_from_hdf5_file(cfg, filepath, f_size=None, zero_center_image=None, yield_mc_info=False):
+def generate_batches_from_hdf5_file(cfg, filepaths, f_size=None, zero_center_image=None, yield_mc_info=False):
     """
-    Generator that returns batches of (multiple-) images ('xs') and labels ('ys') from single or multiple h5 files.
+    Yields batches of input data from h5 files.
 
+    This will go through one file, or multiple files in parallel, and yield one batch of data, which can then
+    be used as an input to a model. Since multiple filepaths can be given to read out in parallel,
+    this can also be used for models with multiple inputs.
+
+    Parameters
+    ----------
     cfg : object Configuration
         Configuration object containing all the configurable options in the OrcaNet scripts.
-    :param list filepath: List that contains full filepath of the input h5 files, e.g. '/path/to/file/file.h5'.
-    :param int/None f_size: Specifies the filesize (#images) of the .h5 file if not the whole .h5 file
-                       but a fraction of it (e.g. 10%) should be used for yielding the xs/ys arrays.
-                       This is important if you run fit_generator(epochs>1) with a filesize (and hence # of steps) that is smaller than the .h5 file.
-    :param ndarray zero_center_image: mean_image of the x dataset used for zero-centering.
-    :param bool yield_mc_info: Specifies if mc-infos (y_values) should be yielded as well.
-                               The mc-infos are used for evaluation after training and testing is finished.
-    :return: tuple output: Yields a tuple which contains a full batch of images and labels (+ mc_info if yield_mc_info=True).
+    filepaths : list
+        List that contains the full filepath of the input h5 files, e.g. ['/path/to/file.h5', ].
+    f_size : int or None
+        Specifies the filesize (#images) of the .h5 file if not the whole .h5 file
+        should be used for yielding the xs/ys arrays. This is important if you run fit_generator(epochs>1) with
+        a filesize (and hence # of steps) that is smaller than the .h5 file.
+    zero_center_image : ndarray
+        Mean image of the dataset used for zero-centering.
+    yield_mc_info : bool
+        Specifies if mc-infos (y_values) should be yielded as well.
+        The mc-infos are used for evaluation after training and testing is finished.
+
+    Yields
+    ------
+    output : tuple
+        A tuple of length 2 or 3 which contains a full batch of images and labels (and mc_info if yield_mc_info=True).
+
     """
     batchsize = cfg.batchsize
     n_bins = cfg.get_n_bins()
     class_type = cfg.class_type
     str_ident = cfg.str_ident
     swap_col = cfg.swap_4d_channels
+    n_files = len(filepaths)
+    # name of the datagroups in the file
+    samples_key = "x"
+    mc_key = "y"
 
     # If the batchsize is larger than the f_size, make batchsize smaller or nothing would be yielded
     if f_size is not None:
         if f_size < batchsize:
             batchsize = f_size
 
-    n_files = len(filepath)
-    dimensions = {}
-    for i in range(n_files):
-        dimensions[i] = get_dimensions_encoding(n_bins[i], batchsize)
-
+    # TODO dont make it loop forever but just enough for the preload to be possible
     while 1:
-        f = {}
-        for i in range(n_files):
-            f[i] = h5py.File(filepath[i], 'r')
-
-        if f_size is None:  # Should be same for all files!
-            f_size = len(f[0]['y'])  # Take len of first file in filepaths, should be same for all files
-            warnings.warn('f_size=None could produce unexpected results if the f_size used in fit_generator(steps=int(f_size / batchsize)) with epochs > 1 '
-                          'is not equal to the f_size of the true .h5 file. Should be ok if you use the tb_callback.')
+        files = {}
+        file_lengths = []
+        # open the files and make sure they have the same length
+        for input_no in range(n_files):
+            files[input_no] = h5py.File(filepaths[input_no], 'r')
+            file_lengths.append(len(files[input_no][samples_key]))
+        if not file_lengths.count(file_lengths[0]) == len(file_lengths):
+            raise AssertionError("All data files must have the same length! Yours have:\n " + str(file_lengths))
+        if f_size is None:
+            f_size = file_lengths[0]
 
         n_entries = 0
+        # Only full batches will be yielded
         while n_entries <= (f_size - batchsize):
-
+            # Read one batch of samples from the files and zero center
+            # Every input gets its own entry in the dict, with the key name currently being the index TODO change key to name of input layer
             xs = {}
-            for i in range(n_files):
-                # Read input images from file
-                xs[i] = f[i]['x'][n_entries: n_entries + batchsize]
-                xs[i] = np.reshape(xs[i], dimensions[i]).astype(np.float32)
-
-            if zero_center_image is not None:
-                for i in range(n_files):
-                    xs_mean = np.reshape(zero_center_image[i], dimensions[i][1:]).astype(np.float32)
-                    xs[i] = np.subtract(xs[i], xs_mean)
-
-            # Get input images for the nn
+            for input_no in range(n_files):
+                if zero_center_image is not None:
+                    xs[input_no] = np.subtract(files[input_no][samples_key][n_entries: n_entries + batchsize], zero_center_image[input_no])
+                else:
+                    xs[input_no] = files[input_no][samples_key][n_entries: n_entries + batchsize]
+            # Get labels for the nn. Since the labels are hopefully the same for all the files, use the ones from the first
+            y_values = files[0][mc_key][n_entries:n_entries + batchsize]
+            # Modify the samples and the labels batchwise
             xs_list = get_input_images(xs, n_files, swap_col, str_ident)
-
-            # Get labels for the nn. Since the labels are same for all the multiple files, use the first file.
-            y_values = f[0]['y'][n_entries:n_entries+batchsize]
             ys = get_labels(y_values, class_type)
 
             # we have read one more batch from this file
             n_entries += batchsize
-
-            output = (xs_list, ys) if yield_mc_info is False else (xs_list, ys) + (y_values,)
-
+            output = (xs_list, ys) if yield_mc_info is False else (xs_list, ys, y_values)
             yield output
 
         for i in range(n_files):
-            f[i].close()
+            files[i].close()
 
 
 def get_dimensions_encoding(n_bins, batchsize):

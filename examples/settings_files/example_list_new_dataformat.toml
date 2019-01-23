@@ -28,11 +28,12 @@
 
 [[input]]
 train_files = [
-"/home/woody/capn/mppi033h/orcasong_output/4dTo4d/xyzt/JTE_KM3Sim_gseagen_elec-NC_3-100GeV-3_4E6-1bin-3_0gspec_ORCA115_9m_2016_518_xyzt.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/elec-NC/1_5_and_3_100GeV/xyzt/JTE_KM3Sim_gseagen_elec-NC_3-100GeV-3_4E6-1bin-3_0gspec_ORCA115_9m_2016_518_xyzt.h5",
 ]
 
 validation_files = [
-"/home/woody/capn/mppi033h/orcasong_output/4dTo4d/xyzt/JTE_KM3Sim_gseagen_muon-CC_3-100GeV-9_1E7-1bin-3_0gspec_ORCA115_9m_2016_776_xyzt.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/muon-CC/1_5_and_3_100GeV/xyzt/JTE_KM3Sim_gseagen_muon-CC_3-100GeV-9_1E7-1bin-3_0gspec_ORCA115_9m_2016_776_xyzt.h5",
 ]
+
 
 
