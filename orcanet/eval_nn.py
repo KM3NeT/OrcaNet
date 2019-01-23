@@ -4,9 +4,25 @@
 Main code for evaluating NN's.
 """
 
+import os
+import numpy as np
 import matplotlib as mpl
 mpl.use('Agg')
-from orcanet.utilities.evaluation_utilities import *
+from orcanet.utilities.evaluation_utilities import (get_nn_predictions_and_mc_info,
+                                                    make_energy_to_accuracy_plot_multiple_classes,
+                                                    make_prob_hists,
+                                                    make_hist_2d_property_vs_property,
+                                                    calculate_and_plot_separation_pid,
+                                                    make_2d_energy_resolution_plot,
+                                                    make_1d_energy_reco_metric_vs_energy_plot,
+                                                    make_1d_energy_std_div_e_true_plot,
+                                                    make_1d_dir_metric_vs_energy_plot,
+                                                    make_2d_dir_correlation_plot,
+                                                    make_1d_bjorken_y_metric_vs_energy_plot,
+                                                    make_2d_bjorken_y_resolution_plot,
+                                                    make_1d_reco_err_div_by_std_plot,
+                                                    make_1d_reco_err_to_reco_residual_plot,
+                                                    make_2d_dir_correlation_plot_different_sigmas)
 
 
 # TODO Remove unnecessary input parameters to the following functions if they are already in the cfg

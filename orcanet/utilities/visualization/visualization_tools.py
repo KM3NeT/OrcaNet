@@ -283,7 +283,7 @@ def get_activations_and_weights(cfg, xs_mean, model_name, layer_name=None, learn
         list_inputs.extend(model_inputs)
         list_inputs.append(lp)
     else:
-        list_inputs = [model_inputs[0], lp]
+        list_inputs = [model_inputs, lp]
 
     layer_outputs = [func(list_inputs)[0] for func in funcs]
     activations = []

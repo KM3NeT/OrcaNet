@@ -69,14 +69,14 @@ class Configuration(object):
     train_logger_flush : int
         After how many lines the training log file should be flushed (updated on the disk).
         -1 for flush at the end of the file only.
-    train_verbose : int
-        verbose option of keras.model.fit_generator.
-        0 = silent, 1 = progress bar, 2 = one line per epoch.
     use_scratch_ssd : bool
         Declares if the input files should be copied to the node-local SSD scratch space (only working at Erlangen CC).
     validate_after_n_train_files : int
         Validate the model after this many training files have been trained on in an epoch, starting from the first.
         E.g. if validate_after_n_train_files == 3, validation will happen after file 1,4,7,...
+    verbose : int
+        verbose option of keras.model.fit_generator and evaluate_generator.
+        0 = silent, 1 = progress bar, 2 = one line per epoch.
     zero_center_folder : None or str
         Path to a folder in which zero centering images are stored. [default: None]
         If this path is set, zero centering images for the given dataset will either be calculated and saved
@@ -143,9 +143,9 @@ class Configuration(object):
         self.swap_4d_channels = None
         self.train_logger_display = 100
         self.train_logger_flush = -1
-        self.train_verbose = 2
         self.use_scratch_ssd = False
         self.validate_after_n_train_files = 2
+        self.verbose = 2
         self.zero_center_folder = None
 
         self._default_values = dict(self.__dict__)
