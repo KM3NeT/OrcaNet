@@ -12,5 +12,5 @@ str_ident = 'lp_tight-1_60b_errors_mse_w_vtx'
 zero_center_folder = "/home/woody/capn/mppi013h/Code/work/zero_center_folder/"
 train_logger_display=250
 train_logger_flush=-1
-train_verbose = 1
+verbose_train = 1
 #n_events = 32000

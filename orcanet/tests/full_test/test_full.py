@@ -22,7 +22,8 @@ class DatasetTest(TestCase):
         self.temp_dir = os.path.join(os.getcwd(), ".temp/")
         self.list_file_path = self.temp_dir + "list.toml"
 
-        assert not os.path.exists(self.temp_dir)
+        # Make sure temp dir does either not exist or is empty
+        assert not os.path.exists(self.temp_dir) or len(os.listdir('/home/varun/temp')) == 0
         os.makedirs(self.temp_dir)
 
         shape = (3, 3, 3, 3)
@@ -50,7 +51,6 @@ class DatasetTest(TestCase):
         main_folder = self.temp_dir + "model/"
         cfg = Configuration(main_folder, list_file, config_file)
         cfg.zero_center_folder = self.temp_dir
-        cfg.class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
         cfg.set_from_model_file(model_file)
         initial_model = build_nn_model(cfg)
         orca_train(cfg, initial_model)

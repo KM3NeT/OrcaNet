@@ -175,7 +175,7 @@ def train_and_validate_model(cfg, model, start_epoch):
         write_full_logfile(cfg, model, history_train, history_val, K.get_value(model.optimizer.lr), curr_epoch, files)
         # Make plots
         update_summary_plot(cfg.main_folder)
-        plot_weights_and_activations(cfg, xs_mean, curr_epoch)
+        plot_weights_and_activations(cfg, model, xs_mean, curr_epoch)
 
 
 def train_model(cfg, model, files, f_size, xs_mean, curr_epoch):
@@ -202,6 +202,7 @@ def train_model(cfg, model, files, f_size, xs_mean, curr_epoch):
     """
     print('Training in epoch ' + str(curr_epoch[0]) + ' on file ' + str(curr_epoch[1]) + ' ,', files)
     if cfg.n_events is not None:
+        # TODO Can throw an error if n_events is larger than the file
         f_size = cfg.n_events  # for testing purposes
     callbacks = [BatchLevelPerformanceLogger(cfg, model, curr_epoch), ]
     training_generator = generate_batches_from_hdf5_file(cfg, files, f_size=f_size, zero_center_image=xs_mean)
