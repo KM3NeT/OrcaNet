@@ -78,10 +78,10 @@ def generate_batches_from_hdf5_file(cfg, filepaths, f_size=None, zero_center_ima
             xs = {}
             # print(n_entries)
             for input_no in range(n_files):
+                xs[input_no] = files[input_no][samples_key][n_entries: n_entries + batchsize]
                 if zero_center_image is not None:
-                    xs[input_no] = np.subtract(files[input_no][samples_key][n_entries: n_entries + batchsize], zero_center_image[input_no])
-                else:
-                    xs[input_no] = files[input_no][samples_key][n_entries: n_entries + batchsize]
+                    xs[input_no] = np.subtract(xs[input_no], zero_center_image[input_no])
+
             # Get labels for the nn. Since the labels are hopefully the same for all the files, use the ones from the first
             y_values = files[0][mc_key][n_entries:n_entries + batchsize]
             # Modify the samples and the labels batchwise
@@ -122,8 +122,12 @@ def generate_batches_from_hdf5_file_shuffle(cfg, filepaths, f_size=None, zero_ce
 
     Yields
     ------
-    output : tuple
-        A tuple of length 2 or 3 which contains a full batch of images and labels (and mc_info if yield_mc_info=True).
+    xs : dict
+        Data for the model train on.
+    ys : dict
+        Labels for the model to train on.
+    mc_info : ndarray, optional
+        Mc info from the file. Only yielded if yield_mc_info is True.
 
     """
     batchsize = cfg.batchsize
@@ -140,7 +144,6 @@ def generate_batches_from_hdf5_file_shuffle(cfg, filepaths, f_size=None, zero_ce
         if f_size < batchsize:
             batchsize = f_size
 
-    # TODO dont make it loop forever but just enough for the preload to be possible
     while 1:
         files = {}
         file_lengths = []
@@ -163,20 +166,22 @@ def generate_batches_from_hdf5_file_shuffle(cfg, filepaths, f_size=None, zero_ce
             # Read one batch of samples from the files and zero center
             # Every input gets its own entry in the dict, with the key name currently being the index TODO change key to name of input layer
             xs = {}
-            # print(sample_n)
             for input_no in range(n_files):
                 xs[input_no] = files[input_no][samples_key][sample_n: sample_n + batchsize]
                 if zero_center_image is not None:
                     xs[input_no] = np.subtract(xs[input_no], zero_center_image[input_no])
-
             # Get labels for the nn. Since the labels are hopefully the same for all the files, use the ones from the first
             y_values = files[0][mc_key][sample_n:sample_n + batchsize]
-            # Modify the samples and the labels batchwise
-            xs_list = get_input_images(xs, n_files, swap_col, str_ident)
-            ys = y_values  # TODO get_labels(y_values, class_type)
 
-            output = (xs_list, ys) if yield_mc_info is False else (xs_list, ys, y_values)
-            yield output
+            # Modify the samples and the labels batchwise
+            if swap_col is not None:
+                xs = get_input_images(xs, n_files, swap_col, str_ident)
+            ys = get_labels(y_values, class_type)
+
+            if not yield_mc_info:
+                yield xs, ys
+            else:
+                yield xs, ys, y_values
 
         for i in range(n_files):
             files[i].close()
@@ -237,8 +242,7 @@ def get_dimensions_encoding(n_bins, batchsize):
 
 def get_input_images(xs, n_files, swap_col, str_ident):
     """
-    TODO add docs
-    TODO change xs_list to dict like y_values
+    Permute columns, or add permuted columns to xs.
 
     Parameters
     ----------
@@ -248,7 +252,7 @@ def get_input_images(xs, n_files, swap_col, str_ident):
         The ordering of the i inputs in the dict is defined by the input file .list file!
         E.g., if you have 2 inputs (XYZ-T: 11,13,18,60 ; and XYZ-C: 11,13,18,31), the dict looks as follows:
         xs[0] = ndarray(batchsize, 11, 13, 18, 60)
-        xs[0] = ndarray(batchsize, 11, 13, 18, 31)
+        xs[1] = ndarray(batchsize, 11, 13, 18, 31)
     swap_col : None/str
         TODO
     str_ident : str
@@ -256,44 +260,36 @@ def get_input_images(xs, n_files, swap_col, str_ident):
 
     Returns
     -------
-    xs_list : list
-        List that contains the input images for a Keras NN.
+    xs_dict : list
+        Dict that contains the input images for a Keras NN.
 
     """
     # list of inputs for the Keras NN
-    xs_list = []
+    xs_dict = {}
     swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'xyt-z': (0, 1, 2, 4, 3), 't-xyz': (0, 4, 1, 2, 3),
                              'tyz-x': (0, 4, 2, 3, 1)}
 
-    if swap_col is not None:
-        # single image input
-        if swap_col == 'yzt-x' or swap_col == 'xyt-z':
-            xs_list.append(np.transpose(xs, swap_4d_channels_dict[swap_col]))
-        elif swap_col == 'xyz-t_and_yzt-x':
-            xs_list.append(xs[0])  # xyzt
-            xs_yzt_x = np.transpose(xs[0], swap_4d_channels_dict['yzt-x'])
-            xs_list.append(xs_yzt_x)
+    # single image input
+    if swap_col == 'yzt-x' or swap_col == 'xyt-z':
+        xs_dict[0] = np.transpose(xs, swap_4d_channels_dict[swap_col])
 
-        elif 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2' in swap_col + str_ident:
-            xs_list.append(xs[0])  # xyz-t tight-1
-            xs_yzt_x_tight_1 = np.transpose(xs[0], swap_4d_channels_dict['yzt-x'])  # yzt-x tight-1
-            xs_list.append(xs_yzt_x_tight_1)
-            xs_list.append(xs[1])  # xyz-t tight-2
-            xs_yzt_x_tight_2 = np.transpose(xs[1], swap_4d_channels_dict['yzt-x'])  # yzt-x tight-2
-            xs_list.append(xs_yzt_x_tight_2)
+    elif swap_col == 'xyz-t_and_yzt-x':
+        xs_dict[0] = xs[0]  # xyzt
+        xs_dict[1] = np.transpose(xs[0], swap_4d_channels_dict['yzt-x'])
 
-        elif swap_col == 'xyz-t_and_xyz-c_single_input':
-            xyz_t_and_xyz_c = np.concatenate([xs[0], xs[1]], axis=-1)
-            xs_list = xyz_t_and_xyz_c  # here, it's not a list since we have only one input image
+    elif 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2' in swap_col + str_ident:
+        xs_dict[0] = xs[0]  # xyz-t tight-1
+        xs_dict[1] = np.transpose(xs[0], swap_4d_channels_dict['yzt-x'])  # yzt-x tight-1
+        xs_dict[2] = xs[1]  # xyz-t tight-2
+        xs_dict[3] = np.transpose(xs[1], swap_4d_channels_dict['yzt-x'])  # yzt-x tight-2
 
-        else:
-            raise ValueError('The argument "swap_col"=' + str(swap_col) + ' is not valid.')
+    elif swap_col == 'xyz-t_and_xyz-c_single_input':
+        xs_dict[0] = np.concatenate([xs[0], xs[1]], axis=-1)
 
     else:
-        for i in range(n_files):
-            xs_list.append(xs[i])
+        raise ValueError('The argument "swap_col"=' + str(swap_col) + ' is not valid.')
 
-    return xs_list
+    return xs_dict
 
 
 def get_labels(y_values, class_type):
@@ -339,17 +335,15 @@ def get_labels(y_values, class_type):
     ys = dict()
 
     if class_type[1] == 'energy_dir_bjorken-y_vtx_errors':
-
         particle_type, is_cc = y_values['particle_type'], y_values['is_cc']
         elec_nc_bool_idx = np.logical_and(np.abs(particle_type) == 12, is_cc == 0)
 
         # correct energy to visible energy
         visible_energy = y_values[elec_nc_bool_idx]['energy'] * y_values[elec_nc_bool_idx]['bjorkeny']
         # fix energy to visible energy
-        np.place(y_values['energy'], elec_nc_bool_idx, visible_energy) # TODO fix numpy warning
+        np.place(y_values['energy'], elec_nc_bool_idx, visible_energy)  # TODO fix numpy warning
         # set bjorkeny label of nc events to 1
         np.place(y_values['bjorkeny'], elec_nc_bool_idx, 1)
-
 
         ys['dx'], ys['dx_err'] = y_values['dir_x'], y_values['dir_x']
         ys['dy'], ys['dy_err'] = y_values['dir_y'], y_values['dir_y']
@@ -366,10 +360,11 @@ def get_labels(y_values, class_type):
             ys[key_label] = ys[key_label].astype(np.float32)
 
     elif class_type[1] == 'track-shower':
+        # for every sample, [0,1] for shower, or [1,0] for track
 
-        # {(12, 0): 0, (12, 1): 1, (14, 1): 2, (16, 1): 3}  # 0: elec_NC, 1: elec_CC, 2: muon_CC, 3: tau_CC
+        # {(12, 0): 0, (12, 1): 1, (14, 1): 2, (16, 1): 3}
+        # 0: elec_NC, 1: elec_CC, 2: muon_CC, 3: tau_CC
         # label is always shower, except if muon-CC
-
         particle_type, is_cc = y_values['particle_type'], y_values['is_cc']
         is_muon_cc = np.logical_and(np.abs(particle_type) == 14, is_cc == 1)
         is_not_muon_cc = np.invert(is_muon_cc)
