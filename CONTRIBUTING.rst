@@ -76,9 +76,3 @@ Make sure to regularly ``git fetch upstream`` and merge changes to your own bran
 
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Go to https://git.km3net.de/ml/OrcaNet/merge_requests/new and select
-your source branch, which contains the changes you want to be included in OrcaNet
-and select the `develop` branch as target branch.
-
-That's it, the merge will be accepted if everything is OK ;)
