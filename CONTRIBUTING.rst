@@ -29,7 +29,7 @@ don't have to do anything special.
 
 Go to http://git.km3net.de/ml/OrcaNet and click on "Fork".
 
-After that, you will have a full copy of KM3Pipe with write access under an URL
+After that, you will have a full copy of OrcaNet with write access under an URL
 like this: ``http://git.km3net.de/your_git_username/OrcaNet``
 
 Clone your Fork to your PC
