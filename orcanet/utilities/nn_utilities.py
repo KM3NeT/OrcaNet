@@ -44,7 +44,6 @@ def generate_batches_from_hdf5_file(cfg, filepaths, f_size=None, zero_center_ima
 
     """
     batchsize = cfg.batchsize
-    n_bins = cfg.get_n_bins()
     class_type = cfg.class_type
     str_ident = cfg.str_ident
     swap_col = cfg.swap_4d_channels
@@ -77,6 +76,7 @@ def generate_batches_from_hdf5_file(cfg, filepaths, f_size=None, zero_center_ima
             # Read one batch of samples from the files and zero center
             # Every input gets its own entry in the dict, with the key name currently being the index TODO change key to name of input layer
             xs = {}
+            # print(n_entries)
             for input_no in range(n_files):
                 if zero_center_image is not None:
                     xs[input_no] = np.subtract(files[input_no][samples_key][n_entries: n_entries + batchsize], zero_center_image[input_no])
@@ -86,10 +86,95 @@ def generate_batches_from_hdf5_file(cfg, filepaths, f_size=None, zero_center_ima
             y_values = files[0][mc_key][n_entries:n_entries + batchsize]
             # Modify the samples and the labels batchwise
             xs_list = get_input_images(xs, n_files, swap_col, str_ident)
-            ys = get_labels(y_values, class_type)
-
+            ys = y_values  # TODO get_labels(y_values, class_type)
             # we have read one more batch from this file
             n_entries += batchsize
+            output = (xs_list, ys) if yield_mc_info is False else (xs_list, ys, y_values)
+            yield output
+
+        for i in range(n_files):
+            files[i].close()
+
+
+def generate_batches_from_hdf5_file_shuffle(cfg, filepaths, f_size=None, zero_center_image=None, yield_mc_info=False, shuffle=False):
+    """
+    Yields batches of input data from h5 files.
+
+    This will go through one file, or multiple files in parallel, and yield one batch of data, which can then
+    be used as an input to a model. Since multiple filepaths can be given to read out in parallel,
+    this can also be used for models with multiple inputs.
+
+    Parameters
+    ----------
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
+    filepaths : list
+        List that contains the full filepath of the input h5 files, e.g. ['/path/to/file.h5', ].
+    f_size : int or None
+        Specifies the filesize (#images) of the .h5 file if not the whole .h5 file
+        should be used for yielding the xs/ys arrays. This is important if you run fit_generator(epochs>1) with
+        a filesize (and hence # of steps) that is smaller than the .h5 file.
+    zero_center_image : ndarray
+        Mean image of the dataset used for zero-centering.
+    yield_mc_info : bool
+        Specifies if mc-infos (y_values) should be yielded as well.
+        The mc-infos are used for evaluation after training and testing is finished.
+
+    Yields
+    ------
+    output : tuple
+        A tuple of length 2 or 3 which contains a full batch of images and labels (and mc_info if yield_mc_info=True).
+
+    """
+    batchsize = cfg.batchsize
+    class_type = cfg.class_type
+    str_ident = cfg.str_ident
+    swap_col = cfg.swap_4d_channels
+    n_files = len(filepaths)
+    # name of the datagroups in the file
+    samples_key = "x"
+    mc_key = "y"
+
+    # If the batchsize is larger than the f_size, make batchsize smaller or nothing would be yielded
+    if f_size is not None:
+        if f_size < batchsize:
+            batchsize = f_size
+
+    # TODO dont make it loop forever but just enough for the preload to be possible
+    while 1:
+        files = {}
+        file_lengths = []
+        # open the files and make sure they have the same length
+        for input_no in range(n_files):
+            files[input_no] = h5py.File(filepaths[input_no], 'r')
+            file_lengths.append(len(files[input_no][samples_key]))
+        if not file_lengths.count(file_lengths[0]) == len(file_lengths):
+            raise AssertionError("All data files must have the same length! Yours have:\n " + str(file_lengths))
+        if f_size is None:
+            f_size = file_lengths[0]
+        # number of full batches available
+        total_no_of_batches = int(f_size/batchsize)
+        # positions of the samples in the file
+        sample_pos = np.arange(total_no_of_batches) * batchsize
+        if shuffle:
+            np.random.shuffle(sample_pos)
+
+        for sample_n in sample_pos:
+            # Read one batch of samples from the files and zero center
+            # Every input gets its own entry in the dict, with the key name currently being the index TODO change key to name of input layer
+            xs = {}
+            # print(sample_n)
+            for input_no in range(n_files):
+                xs[input_no] = files[input_no][samples_key][sample_n: sample_n + batchsize]
+                if zero_center_image is not None:
+                    xs[input_no] = np.subtract(xs[input_no], zero_center_image[input_no])
+
+            # Get labels for the nn. Since the labels are hopefully the same for all the files, use the ones from the first
+            y_values = files[0][mc_key][sample_n:sample_n + batchsize]
+            # Modify the samples and the labels batchwise
+            xs_list = get_input_images(xs, n_files, swap_col, str_ident)
+            ys = y_values  # TODO get_labels(y_values, class_type)
+
             output = (xs_list, ys) if yield_mc_info is False else (xs_list, ys, y_values)
             yield output
 

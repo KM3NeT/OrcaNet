@@ -1,0 +1,8 @@
+[[input]]
+train_files = [
+"/home/woody/capn/mppi033h/Data/ORCA_JTE_NEMOWATER/ip_images_1-100GeV/4dTo4d/time_-250+500_w_gf_60b/concatenated/muon-cc_and_elec-cc-nc/elec-CC_and_elec-NC_and_muon-CC_xyzt_train_file_0_shuffled_0.h5",
+]
+
+validation_files = [
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/muon-CC/3-100GeV/xyzt/JTE_KM3Sim_gseagen_muon-CC_3-100GeV-9_1E7-1bin-3_0gspec_ORCA115_9m_2016_776_xyzt.h5",
+]
