@@ -239,17 +239,80 @@ def make_dsplit_list_files(cfg):
 
     for dsplit in ['train', 'validate', 'rest']:
 
-        n_output_files = len(list(cfg['output_' + dsplit].keys())[0])
-        print(cfg['output_' + dsplit].keys())
+        if 'output_' + dsplit not in cfg:
+            continue
+
+        first_key = list(cfg['output_' + dsplit].keys())[0]
+        n_output_files = len(cfg['output_' + dsplit][first_key])
 
         for i in range(n_output_files):
             fpath_output = cfg['output_file_folder'] + '/' + cfg['output_file_name'] + '_' + dsplit + '_' + str(i) + '.list'
 
+            # for later usage
+            if 'output_lists' not in cfg:
+                cfg['output_lists'] = list()
+            cfg['output_lists'].append(fpath_output)
+
+
             with open(fpath_output, 'w') as f_out:
                 for group_key in cfg['output_' + dsplit]:
-                    print(len(cfg['output_' + dsplit][group_key]))
                     for fpath in cfg['output_' + dsplit][group_key][i]:
                         f_out.write(fpath + '\n')  # TODO strip last \n?
+
+
+def submit_concatenate_list_files(cfg):
+    """
+    Function that writes qsub .sh files which concatenates all files inside the .list files.
+
+    Parameters
+    ----------
+    cfg : dict
+        Dict that contains all configuration options and additional information.
+
+    """
+    """
+    Function that writes a qsub .sh files which concatenates all files inside the .list files from the <savenames> list.
+    :param list savenames: list that contains the savenames of all created .list files.
+    :param str dirpath: path of the directory where the .h5 files are located.
+    :param str p_type_str: string with particle type information for the name of the .list file, e.g. 'elec-CC_and_muon-CC'.
+    :param str proj_type: string with the projection type of the .h5 files in the filepath strings, e.g. 'xyzt'.
+    :param (bool, int) chunking: specifies if chunks should be used and if yes which size the chunks should have.
+    :param (None/str, None/int) compress: Tuple that specifies if a compression should be used for saving.
+    :param bool cuts: specifies if cuts should be used during the concatenation process step.
+    """
+    dirpath = cfg['output_file_folder']
+
+    if not os.path.exists(dirpath + '/logs/cout'): # check if /logs/cout folder exists, if not create it.
+        os.makedirs(dirpath + '/logs/cout')
+    if not os.path.exists(dirpath + '/concatenated/logs'): # check if /concatenated/logs folder exists, if not create it.
+        os.makedirs(dirpath + '/concatenated/logs')
+
+    # make qsub .sh file
+    for listfile_name in cfg['output_lists']:
+        listfile_fpath = cfg['output_file_folder'] + listfile_name
+        listfile_name_wout_ext = os.path.splitext(listfile_name)[0]
+        conc_outputfile_fpath = cfg['output_file_folder'] + listfile_name_wout_ext
+
+        fpath_bash_script = dirpath + '/submit_concatenate_h5_' + listfile_name_wout_ext + '.sh'
+
+        with open(fpath_bash_script, 'w') as f:
+            f.write('#!/usr/bin/env bash\n')
+            f.write('#\n')
+            f.write('#PBS -o ' + cfg['logs_folder'] + '/submit_concatenate_h5_' + listfile_name_wout_ext + '.out'
+                    ' -e ' + cfg['logs_folder'] + '/submit_concatenate_h5_' + listfile_name_wout_ext + '.err\n')
+            f.write('\n')
+            f.write('CodeFolder="' + cfg['data_tools_folder'] + '"\n')
+            f.write('cd ${CodeFolder}\n')
+            f.write('source activate ' + cfg['venv_path'] +'\n')
+            f.write('\n')
+            f.write('# Concatenate the files in the list\n')
+
+            f.write('time python concatenate_h5.py -l ' + listfile_fpath + ' ' + conc_outputfile_fpath +
+                    ' --chunksize ' + cfg['chunksize'] + ' --complib ' + cfg['complib'] +
+                    ' --complevel ' + cfg['complevel'])
+
+        if cfg['submit_jobs'] is True:
+            os.system('qsub -l nodes=1:ppn=4,walltime=01:01:00 ' + fpath_bash_script)
 
 
 def make_data_split():
@@ -258,7 +321,6 @@ def make_data_split():
     """
 
     cfg = parse_input()
-    # TODO check if user input makes sense
 
     ip_group_keys = get_all_ip_group_keys(cfg)
 
@@ -280,9 +342,11 @@ def make_data_split():
 
     for key in ip_group_keys:
         add_fpaths_for_data_split_to_cfg(cfg, key)
-        print(list(cfg['output_train'].keys()))
 
     make_dsplit_list_files(cfg)
+
+    if cfg['make_qsub_bash_files'] is True:
+        submit_concatenate_list_files(cfg)
 
 
 if __name__ == '__main__':

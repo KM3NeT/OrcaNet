@@ -3,19 +3,27 @@
 # TODO add docs
 # output
 
-print_only = false
-submit_jobs = false
-submit_jobs_logs_folder = ""
-submit_jobs_data_tools_folder = ""
-submit_jobs_chunksize = 32
-submit_jobs_complib = "gzip"
-submit_jobs_complevel = 1
-
+# --- Main options ---#
 n_files_train = 5
 n_files_validate = 3
 #n_files_rest = 1
 output_file_folder = "/home/woody/capn/mppi033h/make_dsplit_test"
 output_file_name = "xyzc_tight_0"
+print_only = false
+# --- Main options ---#
+
+# --- Options, for submitting jobs to concatenate the .list files --- #
+make_qsub_bash_files = true
+submit_jobs = false # cannot be true, if above is false!
+venv_path = ""
+logs_folder = ""
+data_tools_folder = ""
+chunksize = 32
+complib = "gzip"
+complevel = 1
+# --- Options, for submitting jobs to concatenate the .list files --- #
+
+
 
 #fraction_train = 0.75 # 0.75 = 75%
 
@@ -34,43 +42,43 @@ output_file_name = "xyzc_tight_0"
 
 [muon_cc_3_100] # 1 to 2400
 dir = "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/muon-CC/3-100GeV/xyzc"
-run_ids_train = [601, 603]
+run_ids_train = [601, 2400]
 run_ids_validate = [1, 600]
 #run_id_rest = []
 
 [muon_cc_1_5] # 1 to 600
 dir = "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/muon-CC/1-5GeV/xyzc"
-run_ids_train = [151, 154]
+run_ids_train = [151, 600]
 run_ids_validate = [1, 150]
 
 
-#[elec_cc_3_100] # 1 to 2400
-#dir = "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/elec-CC/3-100GeV/xyzc"
-#run_ids_train = [301, 1200]
-#run_ids_validate = [1, 300]
-##run_id_rest = []
-#
-#[elec_cc_1_5] # 1 to 600
-#dir = "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/elec-CC/1-5GeV/xyzc"
-#run_ids_train = [301, 1200]
-#run_ids_validate = [1, 300]
-#
-#
-#[elec_nc_3_100] # 1 to 2400
-#dir = "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/elec-NC/3-100GeV/xyzc"
-#run_ids_train = [301, 1200]
-#run_ids_validate = [1, 300]
-##run_id_rest = []
-#
-#[elec_nc_1_5] # 1 to 600
-#dir = "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/elec-NC/1-5GeV/xyzc"
-#run_ids_train = [301, 1200]
-#run_ids_validate = [1, 300]
-#
-#
-#[tau_cc_3_100] # 1 to 1800
-#dir = "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/tau-CC/3-100GeV/xyzc"
-#run_ids_validate = [1, 1800]
+[elec_cc_3_100] # 1 to 2400
+dir = "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/elec-CC/3-100GeV/xyzc"
+run_ids_train = [301, 1200]
+run_ids_validate = [1, 300]
+#run_id_rest = []
+
+[elec_cc_1_5] # 1 to 600
+dir = "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/elec-CC/1-5GeV/xyzc"
+run_ids_train = [301, 1200]
+run_ids_validate = [1, 300]
+
+
+[elec_nc_3_100] # 1 to 2400
+dir = "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/elec-NC/3-100GeV/xyzc"
+run_ids_train = [301, 1200]
+run_ids_validate = [1, 300]
+#run_id_rest = []
+
+[elec_nc_1_5] # 1 to 600
+dir = "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/elec-NC/1-5GeV/xyzc"
+run_ids_train = [301, 1200]
+run_ids_validate = [1, 300]
+
+
+[tau_cc_3_100] # 1 to 1800
+dir = "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/tau-CC/3-100GeV/xyzc"
+run_ids_validate = [1, 1800]
 
 
 
