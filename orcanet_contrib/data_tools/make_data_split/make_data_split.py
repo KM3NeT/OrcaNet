@@ -282,24 +282,24 @@ def submit_concatenate_list_files(cfg):
     """
     dirpath = cfg['output_file_folder']
 
-    if not os.path.exists(dirpath + '/logs/cout'): # check if /logs/cout folder exists, if not create it.
-        os.makedirs(dirpath + '/logs/cout')
-    if not os.path.exists(dirpath + '/concatenated/logs'): # check if /concatenated/logs folder exists, if not create it.
-        os.makedirs(dirpath + '/concatenated/logs')
+    if not os.path.exists(dirpath + '/logs'): # check if /logs/cout folder exists, if not create it.
+        os.makedirs(dirpath + '/logs')
+    if not os.path.exists(dirpath + '/job_scripts'): # check if /logs/cout folder exists, if not create it.
+        os.makedirs(dirpath + '/job_scripts')
 
     # make qsub .sh file
-    for listfile_name in cfg['output_lists']:
-        listfile_fpath = cfg['output_file_folder'] + listfile_name
-        listfile_name_wout_ext = os.path.splitext(listfile_name)[0]
-        conc_outputfile_fpath = cfg['output_file_folder'] + listfile_name_wout_ext
+    for listfile_fpath in cfg['output_lists']:
+        listfile_fname =os.path.basename(listfile_fpath)
+        listfile_fname_wout_ext = os.path.splitext(listfile_fname)[0]
+        conc_outputfile_fpath = cfg['output_file_folder'] + listfile_fname_wout_ext
 
-        fpath_bash_script = dirpath + '/submit_concatenate_h5_' + listfile_name_wout_ext + '.sh'
+        fpath_bash_script = dirpath + '/job_scripts/submit_concatenate_h5_' + listfile_fname_wout_ext + '.sh'
 
         with open(fpath_bash_script, 'w') as f:
             f.write('#!/usr/bin/env bash\n')
             f.write('#\n')
-            f.write('#PBS -o ' + cfg['logs_folder'] + '/submit_concatenate_h5_' + listfile_name_wout_ext + '.out'
-                    ' -e ' + cfg['logs_folder'] + '/submit_concatenate_h5_' + listfile_name_wout_ext + '.err\n')
+            f.write('#PBS -o ' + cfg['output_file_folder'] + '/logs/submit_concatenate_h5_' + listfile_fname_wout_ext + '.out'
+                    ' -e ' + cfg['output_file_folder'] + '/logs/submit_concatenate_h5_' + listfile_fname_wout_ext + '.err\n')
             f.write('\n')
             f.write('CodeFolder="' + cfg['data_tools_folder'] + '"\n')
             f.write('cd ${CodeFolder}\n')
@@ -308,8 +308,8 @@ def submit_concatenate_list_files(cfg):
             f.write('# Concatenate the files in the list\n')
 
             f.write('time python concatenate_h5.py -l ' + listfile_fpath + ' ' + conc_outputfile_fpath +
-                    ' --chunksize ' + cfg['chunksize'] + ' --complib ' + cfg['complib'] +
-                    ' --complevel ' + cfg['complevel'])
+                    ' --chunksize ' + str(cfg['chunksize']) + ' --complib ' + str(cfg['complib']) +
+                    ' --complevel ' + str(cfg['complevel']))
 
         if cfg['submit_jobs'] is True:
             os.system('qsub -l nodes=1:ppn=4,walltime=01:01:00 ' + fpath_bash_script)

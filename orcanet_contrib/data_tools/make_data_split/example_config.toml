@@ -16,7 +16,6 @@ print_only = false
 make_qsub_bash_files = true
 submit_jobs = false # cannot be true, if above is false!
 venv_path = ""
-logs_folder = ""
 data_tools_folder = ""
 chunksize = 32
 complib = "gzip"
