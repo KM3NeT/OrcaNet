@@ -2,6 +2,19 @@
 For testing how long generators take.
 
 Will show the average time per batch a generator takes, as well as the average training time per batch of a model.
+
+Shuffle test:
+-------------
+Generator shuffles the order in which data gets read out.
+Tested on 5000 batches each of (64, 11, 13, 18, 60) xyzt data with the vgg model with 3,000,000 params.
+Results:
+
+            Read-time per batch (s)    Train time per batch (s)
+No Shuffle        0.07755                    0.2017
+Shuffle           0.1276                     0.198
+
++65% due to shuffle! Still lower than train time though.
+
 """
 import os
 import time

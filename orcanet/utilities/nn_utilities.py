@@ -26,7 +26,8 @@ def generate_batches_from_hdf5_file(cfg, filepaths, f_size=None, zero_center_ima
     cfg : object Configuration
         Configuration object containing all the configurable options in the OrcaNet scripts.
     filepaths : list
-        List that contains the full filepath of the input h5 files, e.g. ['/path/to/file.h5', ].
+        List that contains the full filepath of the input h5 file, e.g. ['/path/to/file.h5', ]
+        (or multiple files to read out in parallel).
     f_size : int or None
         Specifies the filesize (#images) of the .h5 file if not the whole .h5 file
         should be used for yielding the xs/ys arrays. This is important if you run fit_generator(epochs>1) with
@@ -368,50 +369,42 @@ def load_zero_center_data(cfg):
 
     Returns
     -------
-    xs_mean : list(ndarray)
-        List of ndarray(s) that contains the mean_image of the x dataset (1 array per model input).
+    xs_mean : dict
+        Dict of ndarray(s) that contains the mean_image of the x dataset (1 array per list input).
         Can be used for zero-centering later on.
+        Example format:
+        { "input_A" : ndarray, "input_B" : ndarray }
 
     """
-    train_files = cfg.get_train_files()
+    all_train_files = cfg.get_train_files()
     zero_center_folder = cfg.zero_center_folder
     train_files_list_name = os.path.basename(cfg.get_list_file())
 
-    xs_mean = []
+    xs_mean = {}
     # loop over multiple input data files for a single event, each input needs its own xs_mean
-    for i in range(len(train_files[0][0])):
-
+    for input_key in all_train_files:
+        # Collect all filepaths of the train_files for this projection in an array
+        all_train_files_for_ip_i = all_train_files[input_key]
         # load the filepaths of all precalculated zero_center .npz files, which contain the xs_mean
         zero_center_files = load_fpaths_of_existing_zero_center_files(zero_center_folder)
-        # Collect all filepaths of the train_files for this projection in an array
-        all_train_files_for_ip_i = get_fpaths_for_train_files_input_i(train_files, i)
-
         # get the xs_mean path for this input number i, if it exists in any of the files in the zero_center_folder
         xs_mean_for_ip_i_path = get_precalculated_xs_mean_if_exists(zero_center_files, all_train_files_for_ip_i)
 
         if xs_mean_for_ip_i_path is not None:
-            print('Loading an existing zero center image for model input ' + str(i) +
+            print('Loading an existing zero center image for list input ' + str(input_key) +
                   ':\n   ' + xs_mean_for_ip_i_path)
             xs_mean_for_ip_i = np.load(xs_mean_for_ip_i_path)["xs_mean"]
 
         else:
-            print('Calculating the xs_mean_array for model input ' + str(i) + ' in order to zero_center the data!')
+            print('Calculating the xs_mean_array for list input ' + str(input_key) + ' in order to zero_center the data!')
             # if the train dataset is split over multiple files, we need to average over the single xs_mean_for_ip arrays.
-            xs_mean_for_ip_arr_i = None
-            for j in range(len(train_files)):
-                filepath_j = train_files[j][0][i]  # j is the index of the j-th train file, i the index of the i-th input
-                xs_mean_for_ip_i_step = get_mean_image(filepath_j, cfg.n_gpu[0])
+            xs_mean_for_ip_i = get_mean_image(all_train_files_for_ip_i, cfg.n_gpu[0])
 
-                if xs_mean_for_ip_arr_i is None:
-                    xs_mean_for_ip_arr_i = np.zeros((len(train_files),) + xs_mean_for_ip_i_step.shape, dtype=np.float64)
-                xs_mean_for_ip_arr_i[j] = xs_mean_for_ip_i_step
-
-            xs_mean_for_ip_i = np.mean(xs_mean_for_ip_arr_i, axis=0, dtype=np.float64).astype(np.float32) if len(train_files) > 1 else xs_mean_for_ip_arr_i[0]
-            filename = zero_center_folder + train_files_list_name + '_input_' + str(i) + '.npz'
+            filename = zero_center_folder + train_files_list_name + '_input_' + str(input_key) + '.npz'
             np.savez(filename, xs_mean=xs_mean_for_ip_i, zero_center_used_ip_files=all_train_files_for_ip_i)
-            print('Saved the xs_mean array for input ' + str(i) + ' with shape', xs_mean_for_ip_i.shape, ' to ', filename)
+            print('Saved the xs_mean array for input ' + str(input_key) + ' with shape', xs_mean_for_ip_i.shape, ' to ', filename)
 
-        xs_mean.append(xs_mean_for_ip_i)
+        xs_mean[input_key] = xs_mean_for_ip_i
 
     return xs_mean
 
@@ -443,32 +436,6 @@ def load_fpaths_of_existing_zero_center_files(zero_center_folder):
     return zero_center_files
 
 
-def get_fpaths_for_train_files_input_i(train_files, i):
-    """
-    Gets all filepaths of the train_files for the i-th input and puts them into an array.
-
-    Parameters
-    ----------
-    train_files : list
-        List of training files.
-    i : int
-        Integer for the i-th file input of the network.
-
-    Returns
-    -------
-    all_train_files_for_ip_i : ndarray
-        Array that contains the filepaths of all train_files for the i-th input.
-
-    """
-    all_train_files_for_ip_i_list = []
-    for j in range(len(train_files)):
-        all_train_files_for_ip_i_list.append(train_files[j][0][i])
-
-    all_train_files_for_ip_i = np.array(all_train_files_for_ip_i_list)
-
-    return all_train_files_for_ip_i
-
-
 def get_precalculated_xs_mean_if_exists(zero_center_files, all_train_files_for_ip_i):
     """
     Function that searches for precalculated xs_mean arrays in the already existing zero_center_files.
@@ -480,8 +447,8 @@ def get_precalculated_xs_mean_if_exists(zero_center_files, all_train_files_for_i
     ----------
     zero_center_files : list
         List that contains all filepaths of precalculated zero_center files.
-    all_train_files_for_ip_i : ndarray
-        Array that contains the filepaths of all train_files for the i-th input.
+    all_train_files_for_ip_i : list
+        Contains the filepaths of all train_files for the i-th input.
 
     Returns
     -------
@@ -499,41 +466,51 @@ def get_precalculated_xs_mean_if_exists(zero_center_files, all_train_files_for_i
     return xs_mean_for_ip_i
 
 
-def get_mean_image(filepath, n_gpu):
+def get_mean_image(filepaths, n_gpu):
     """
     Returns the mean_image of a xs dataset.
     Calculating still works if xs is larger than the available memory and also if the file is compressed!
-    :param str filepath: Filepath of the data upon which the mean_image should be calculated.
+    :param list filepath: Filepaths of the data upon which the mean_image should be calculated.
     :param filepath: Filepath of the input data, used as a str for saving the xs_mean_image.
     :param int n_gpu: Number of used gpu's that is related to how much RAM is available (16G per GPU).
     :return: ndarray xs_mean: mean_image of the x dataset. Can be used for zero-centering later on.
     """
-    f = h5py.File(filepath, "r")
-
     # check available memory and divide the mean calculation in steps
     total_memory = n_gpu * 8e9  # In bytes. Take 1/2 of what is available per GPU (16G), just to make sure.
-    filesize = get_array_memsize(f['x'])
 
-    steps = int(np.ceil(filesize/total_memory))
-    n_rows = f['x'].shape[0]
-    stepsize = int(n_rows / float(steps))
+    xs_means = []
+    file_sizes = []
+    for filepath in filepaths:
+        file = h5py.File(filepath, "r")
 
-    xs_mean_arr = None
-    print("Calculating the mean_image of the xs dataset for file: " + filepath)
-    for i in range(steps):
-        if i % 5 == 0:
-            print('   Step ' + str(i) + " of " + str(steps))
-        if xs_mean_arr is None:  # create xs_mean_arr that stores intermediate mean_temp results
-            xs_mean_arr = np.zeros((steps, ) + f['x'].shape[1:], dtype=np.float64)
+        filesize = get_array_memsize(file['x'])
+        steps = int(np.ceil(filesize/total_memory))
+        n_rows = file['x'].shape[0]
+        stepsize = int(n_rows / float(steps))
 
-        if i == steps-1 or steps == 1:  # for the last step, calculate mean till the end of the file
-            xs_mean_temp = np.mean(f['x'][i * stepsize: n_rows], axis=0, dtype=np.float64)
-        else:
-            xs_mean_temp = np.mean(f['x'][i*stepsize: (i+1) * stepsize], axis=0, dtype=np.float64)
-        xs_mean_arr[i] = xs_mean_temp
-    print("Done!")
-    xs_mean = np.mean(xs_mean_arr, axis=0, dtype=np.float64).astype(np.float32)
+        # create xs_mean_arr that stores intermediate mean_temp results
+        xs_mean_arr = np.zeros((steps, ) + file['x'].shape[1:], dtype=np.float64)
+        print("Calculating the mean_image of the xs dataset for file: " + filepath)
+        for i in range(steps):
+            if i % 5 == 0:
+                print('   Step ' + str(i) + " of " + str(steps))
 
+            # for the last step, calculate mean till the end of the file
+            if i == steps-1 or steps == 1:
+                xs_mean_temp = np.mean(file['x'][i * stepsize: n_rows], axis=0, dtype=np.float64)
+            else:
+                xs_mean_temp = np.mean(file['x'][i*stepsize: (i+1) * stepsize], axis=0, dtype=np.float64)
+
+            xs_mean_arr[i] = xs_mean_temp
+
+        print("Done!")
+        # The mean for this file
+        xs_means.append(np.mean(xs_mean_arr, axis=0, dtype=np.float64).astype(np.float32))
+        # the number of samples in this file
+        file_sizes.append(n_rows)
+    # calculate weighted average depending on no of samples in the files
+    file_sizes = [size / max(file_sizes) for size in file_sizes]
+    xs_mean = np.average(xs_means, weights=file_sizes)
     return xs_mean
 
 

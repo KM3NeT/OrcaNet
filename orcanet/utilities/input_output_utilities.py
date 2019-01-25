@@ -45,50 +45,6 @@ def read_out_config_file(file):
     return file_content
 
 
-def list_get_number_of_files(file_content, keyword):
-    """
-    Get the number of training or validation files from the content of a toml list.
-
-    Parameters
-    ----------
-    file_content : dict
-        From a list file by toml.load().
-    keyword : str
-        Keyword in the file content dictionary to look up, e.g. "train_files" or "validation_files".
-
-    Returns
-    -------
-    number_of_files : int
-        The number of files.
-
-    Raises
-    -------
-    ValueError
-        If different inputs have a different number of files.
-
-    """
-    number_of_files = 0
-    for dataset_no in range(len(file_content)):
-        current_number_of_files = len(file_content[dataset_no][keyword])
-        if dataset_no == 0:
-            number_of_files = current_number_of_files
-        elif current_number_of_files != number_of_files:
-            raise ValueError("Error: The specified inputs do not all have the same number of files ("+keyword+")")
-    return number_of_files
-
-
-def list_restructure(number_of_files, keyword, file_content):
-    """ Arrange the given files to the desired format. """
-    files = []
-    for file_no in range(number_of_files):
-        file_set = []
-        for input_data in file_content:
-            file_set.append(input_data[keyword][file_no])
-        files.append([file_set, h5_get_number_of_rows(file_set[0])])
-        # TODO Maybe files have different number of events? Should give an error
-    return files
-
-
 def read_out_list_file(file):
     """
     Reads out a list file in .toml format containing the pathes to training
@@ -101,29 +57,45 @@ def read_out_list_file(file):
 
     Returns
     -------
-    train_files : list
-        A list containing the paths to the different training files given in the list_file.
+    train_files : dict
+        A dict containing the paths to the different training files given in the list_file.
         Example for the output format:
-                [
-                 [['path/to/train_file_1_dimx.h5', 'path/to/train_file_1_dimy.h5'], number_of_events_train_files_1],
-                 [['path/to/train_file_2_dimx.h5', 'path/to/train_file_2_dimy.h5'], number_of_events_train_files_2],
+                {
+                 "input_A" : ['path/to/set_A_train_file_1.h5', 'path/to/set_A_train_file_2.h5', ...]
+                 "input_B" : ['path/to/set_B_train_file_1.h5', 'path/to/set_B_train_file_2.h5', ...]
                  ...
-                ]
-    validation_files : list
+                }
+    validation_files : dict
         Like the above but for validation files.
-    multiple_inputs : bool
-        Whether seperate sets of input files were given (e.g. for networks taking data
-        simulataneosly from different files).
+    n_train : int
+        The number of train files.
+    n_val : int
+        The number of validation files.
+
+    Raises
+    -------
+    AssertionError
+        If different inputs have a different number of training or validation files.
 
     """
-    file_content = toml.load(file)["input"]
-    number_of_train_files = list_get_number_of_files(file_content, "train_files")
-    number_of_val_files = list_get_number_of_files(file_content, "validation_files")
-    train_files = list_restructure(number_of_train_files, "train_files", file_content)
-    validation_files = list_restructure(number_of_val_files, "validation_files", file_content)
-    multiple_inputs = len(file_content) > 1
+    # a dict with inputnames as keys and dicts with the lists of train/val files as values
+    file_content = toml.load(file)
 
-    return train_files, validation_files, multiple_inputs
+    train_files, validation_files = {}, {}
+    # no of train/val fiels in each input set
+    n_train, n_val = [], []
+    for input_key in file_content:
+        train_files[input_key] = file_content[input_key]["train_files"]
+        validation_files[input_key] = file_content[input_key]["validation_files"]
+        n_train.append(len(train_files[input_key]))
+        n_val.append(len(validation_files[input_key]))
+
+    if not n_train.count(n_train[0]) == len(n_train):
+        raise AssertionError("The specified training inputs do not all have the same number of files")
+    if not n_val.count(n_val[0]) == len(n_val):
+        raise AssertionError("The specified validation inputs do not all have the same number of files")
+    # TODO Maybe files have different number of events? Should give an error
+    return train_files, validation_files, n_train, n_val
 
 
 def read_out_model_file(file):
@@ -169,11 +141,9 @@ def write_full_logfile_startup(cfg):
         f_out.write("New execution of the orca_train function started with the following options:\n\n")
         f_out.write("List file path:\t"+cfg.get_list_file()+"\n")
         f_out.write("Given trainfiles in the .list file:\n")
-        for train_file in cfg.get_train_files():
-            f_out.write("   " + str(train_file)+"\n")
+        f_out.write(str(cfg.get_train_files())+"\n")
         f_out.write("Given validation files in the .list file:\n")
-        for val_file in cfg.get_val_files():
-            f_out.write("   " + str(val_file) + "\n")
+        f_out.write(str(cfg.get_val_files()) + "\n")
         f_out.write("\nConfiguration used:\n")
         for key in vars(cfg):
             if not key.startswith("_"):
@@ -237,14 +207,15 @@ def write_summary_logfile(cfg, epoch, model, history_train, history_val, lr):
         The current learning rate of the model.
 
     """
-    # Save val log
-    steps_per_total_epoch, steps_cum = 0, [0]  # get this for the epoch_number_float in the logfile
-    for f, f_size in cfg.get_train_files():
+    # get this for the epoch_number_float in the logfile
+    steps_per_total_epoch, steps_cum = 0, [0]
+    for f_size in cfg.get_train_file_sizes():
         steps_per_file = int(f_size / cfg.batchsize)
         steps_per_total_epoch += steps_per_file
         steps_cum.append(steps_cum[-1] + steps_per_file)
-
     epoch_number_float = epoch[0] - (steps_per_total_epoch - steps_cum[epoch[1]]) / float(steps_per_total_epoch)
+
+    # Write the logfile
     logfile_fname = cfg.main_folder + 'summary.txt'
     with open(logfile_fname, 'a+') as logfile:
         # Write the headline
@@ -348,59 +319,50 @@ def h5_get_n_bins(train_files):
     return n_bins
 
 
-def use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=False):
+def use_node_local_ssd_for_input(train_files, val_files):
     """
     Copies the test and train files to the node-local ssd scratch folder and returns the new filepaths of the train and test data.
     Speeds up I/O and reduces RRZE network load.
-    :param List train_files: list that contains all train files in tuples (filepath, f_size).
-    :param List test_files: list that contains all test files in tuples (filepath, f_size).
-    :param bool multiple_inputs: specifies if the -m option in the parser has been chosen. This means that the list inside the train/test_files tuple has more than one element!
-    :return: list train_files_ssd, test_files_ssd: new train/test list with updated SSD /scratch filepaths.
+
+    Parameters
+    ----------
+    train_files : dict
+        Dict containing the train file pathes.
+    val_files
+        Dict containing the val file pathes.
+
+    Returns
+    -------
+    train_files_ssd : dict
+        Train dict with updated SSD /scratch filepaths.
+    test_files_ssd : dict
+        Val dict with updated SSD /scratch filepaths.
+
     """
     local_scratch_path = os.environ['TMPDIR']
-    train_files_ssd, test_files_ssd = [], []
-    print('Copying the input train/test data to the node-local SSD scratch folder')
+    train_files_ssd, val_files_ssd = {}, {}
 
-    if multiple_inputs is True:
-        # in the case that we need multiple input data files for each batch, e.g. double input model with two different timecuts
-        f_paths_train_ssd_temp, f_paths_test_ssd_temp = [], []
+    for input_key in train_files:
+        old_pathes = train_files[input_key]
+        new_pathes = []
+        for f_path in old_pathes:
+            # copy to /scratch node-local SSD
+            f_path_ssd = local_scratch_path + '/' + os.path.basename(f_path)
+            print("Copying", f_path, "\nto", f_path_ssd)
+            shutil.copy2(f_path, local_scratch_path)
+            new_pathes.append(f_path_ssd)
+        train_files_ssd[input_key] = new_pathes
 
-        for file_tuple in train_files:
-            input_filepaths, f_size = file_tuple[0], file_tuple[1]
+    for input_key in val_files:
+        old_pathes = val_files[input_key]
+        new_pathes = []
+        for f_path in old_pathes:
+            # copy to /scratch node-local SSD
+            f_path_ssd = local_scratch_path + '/' + os.path.basename(f_path)
+            print("Copying", f_path, "\nto", f_path_ssd)
+            shutil.copy2(f_path, local_scratch_path)
+            new_pathes.append(f_path_ssd)
+        val_files_ssd[input_key] = new_pathes
 
-            for f_path in input_filepaths:
-                shutil.copy2(f_path, local_scratch_path)  # copy to /scratch node-local SSD
-                f_path_ssd = local_scratch_path + '/' + os.path.basename(f_path)
-                f_paths_train_ssd_temp.append(f_path_ssd)
-
-            train_files_ssd.append((f_paths_train_ssd_temp, f_size))  # f_size of all f_paths should be the same
-            f_paths_train_ssd_temp = []
-
-        for file_tuple in test_files:
-            input_filepaths, f_size = file_tuple[0], file_tuple[1]
-
-            for f_path in input_filepaths:
-                shutil.copy2(f_path, local_scratch_path)  # copy to /scratch node-local SSD
-                f_path_ssd = local_scratch_path + '/' + os.path.basename(f_path)
-                f_paths_test_ssd_temp.append(f_path_ssd)
-
-            test_files_ssd.append((f_paths_test_ssd_temp, f_size))  # f_size of all f_paths should be the same
-            f_paths_test_ssd_temp = []
-
-    else:
-        for file_tuple in train_files:
-            input_filepath, f_size = file_tuple[0][0], file_tuple[1]
-
-            shutil.copy2(input_filepath, local_scratch_path)  # copy to /scratch node-local SSD
-            input_filepath_ssd = local_scratch_path + '/' + os.path.basename(input_filepath)
-            train_files_ssd.append(([input_filepath_ssd], f_size))
-
-        for file_tuple in test_files:
-            input_filepath, f_size = file_tuple[0][0], file_tuple[1]
-
-            shutil.copy2(input_filepath, local_scratch_path)  # copy to /scratch node-local SSD
-            input_filepath_ssd = local_scratch_path + '/' + os.path.basename(input_filepath)
-            test_files_ssd.append(([input_filepath_ssd], f_size))
-
-    print('Finished copying the input train/test data to the node-local SSD scratch folder')
-    return train_files_ssd, test_files_ssd
+    print('Finished copying the input train/test data to the node-local SSD scratch folder.')
+    return train_files_ssd, val_files_ssd

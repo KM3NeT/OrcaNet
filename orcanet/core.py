@@ -11,7 +11,7 @@ import keras as ks
 
 from orcanet.run_nn import train_and_validate_model
 from orcanet.eval_nn import predict_and_investigate_model_performance, get_modelname
-from orcanet.utilities.input_output_utilities import read_out_list_file, read_out_config_file, read_out_model_file, use_node_local_ssd_for_input, h5_get_n_bins, write_full_logfile_startup
+from orcanet.utilities.input_output_utilities import read_out_list_file, read_out_config_file, read_out_model_file, use_node_local_ssd_for_input, h5_get_n_bins, write_full_logfile_startup, h5_get_number_of_rows
 from orcanet.utilities.nn_utilities import load_zero_center_data
 from orcanet.utilities.losses import get_all_loss_functions
 
@@ -87,19 +87,19 @@ class Configuration(object):
 
     Private attributes
     ------------------
-    _train_files : list or None
-        A list containing the paths to the different training files on which the model will be trained on.
-        Example for the output format:
-                [
-                 [['path/to/train_file_1_dimx.h5', 'path/to/train_file_1_dimy.h5'], number_of_events_train_files_1],
-                 [['path/to/train_file_2_dimx.h5', 'path/to/train_file_2_dimy.h5'], number_of_events_train_files_2],
-                 ...
-                ]
-    _val_files : list or None
+    _train_files : dict or None
+        A dict containing the paths to the different training files on which the model will be trained on.
+        Example for the format for two input sets with two files each:
+                {
+                 "input_A" : ['path/to/set_A_train_file_1.h5', 'path/to/set_A_train_file_2.h5']
+                 "input_B" : ['path/to/set_B_train_file_1.h5', 'path/to/set_B_train_file_2.h5']
+                }
+    _val_files : dict or None
         Like train_files but for the validation files.
-    _multiple_inputs : bool or None
-        Whether seperate sets of input files were given (e.g. for networks taking data
-        simulataneosly from different files).
+    _n_train_files : int or None
+        The number of train files.
+    _n_val_files : int or None
+        The number of validation files.
     _list_file : str or None
         Path to the list file that was used to set the training and validation files. Is None if no list file
         has been used yet.
@@ -163,7 +163,8 @@ class Configuration(object):
         # Private attributes:
         self._train_files = None
         self._val_files = None
-        self._multiple_inputs = None
+        self._n_train_files = None
+        self._n_val_files = None
         self._list_file = None
         self._modeldata = None
 
@@ -176,7 +177,7 @@ class Configuration(object):
     def set_from_list_file(self, list_file):
         """ Set filepaths to the ones given in a list file. """
         if self._list_file is None:
-            self._train_files, self._val_files, self._multiple_inputs = read_out_list_file(list_file)
+            self._train_files, self._val_files, self._n_train_files, self._n_val_files = read_out_list_file(list_file)
             # Save internally which path was used to load the info
             self._list_file = list_file
         else:
@@ -243,7 +244,7 @@ class Configuration(object):
         """
         if epoch[0] == 0 and epoch[1] == 0:
             next_epoch = (1, 1)
-        elif epoch[1] == len(self.get_train_files()):
+        elif epoch[1] == len(self._n_train_files):
             next_epoch = (epoch[0] + 1, 1)
         else:
             next_epoch = (epoch[0], epoch[1] + 1)
@@ -254,7 +255,7 @@ class Configuration(object):
         Copies the test and val files to the node-local ssd scratch folder and sets the new filepaths of the train and val data.
         Speeds up I/O and reduces RRZE network load.
         """
-        train_files_ssd, test_files_ssd = use_node_local_ssd_for_input(self.get_train_files(), self.get_val_files(), self.get_multiple_inputs())
+        train_files_ssd, test_files_ssd = use_node_local_ssd_for_input(self.get_train_files(), self.get_val_files())
         self._train_files = train_files_ssd
         self._val_files = test_files_ssd
 
@@ -286,14 +287,34 @@ class Configuration(object):
         return self._val_files
 
     def get_multiple_inputs(self):
-        # TODO Remove this attribute and make it a function instead
-        return self._multiple_inputs
+        """
+        Return True when seperate sets of input files were given (e.g. for networks taking data
+        simulataneosly from different files).
+        """
+        train_files = self.get_train_files()
+        return len(train_files) > 1
 
     def get_modeldata(self):
         return self._modeldata
 
     def get_list_file(self):
         return self._list_file
+
+    def get_train_file_sizes(self):
+        """
+        Get the number of samples in each input file.
+        # TODO only uses the no of samples of the first input! check if the others are the same % batchsize
+
+        Returns
+        -------
+        file_sizes : list
+            Its length is equal to the number of files in each input set.
+        """
+        train_files = self.get_train_files()
+        file_sizes = []
+        for file in train_files[list(train_files.keys())[0]]:
+            file_sizes.append(h5_get_number_of_rows(file))
+        return file_sizes
 
 
 def orca_train(cfg, initial_model=None):
