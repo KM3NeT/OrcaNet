@@ -91,8 +91,8 @@ class Configuration(object):
         A dict containing the paths to the different training files on which the model will be trained on.
         Example for the format for two input sets with two files each:
                 {
-                 "input_A" : ['path/to/set_A_train_file_1.h5', 'path/to/set_A_train_file_2.h5']
-                 "input_B" : ['path/to/set_B_train_file_1.h5', 'path/to/set_B_train_file_2.h5']
+                 "input_A" : ('path/to/set_A_train_file_1.h5', 'path/to/set_A_train_file_2.h5')
+                 "input_B" : ('path/to/set_B_train_file_1.h5', 'path/to/set_B_train_file_2.h5')
                 }
     _val_files : dict or None
         Like train_files but for the validation files.

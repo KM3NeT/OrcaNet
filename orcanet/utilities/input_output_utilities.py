@@ -61,8 +61,8 @@ def read_out_list_file(file):
         A dict containing the paths to the different training files given in the list_file.
         Example for the output format:
                 {
-                 "input_A" : ['path/to/set_A_train_file_1.h5', 'path/to/set_A_train_file_2.h5', ...]
-                 "input_B" : ['path/to/set_B_train_file_1.h5', 'path/to/set_B_train_file_2.h5', ...]
+                 "input_A" : ('path/to/set_A_train_file_1.h5', 'path/to/set_A_train_file_2.h5', ...)
+                 "input_B" : ('path/to/set_B_train_file_1.h5', 'path/to/set_B_train_file_2.h5', ...)
                  ...
                 }
     validation_files : dict
@@ -85,8 +85,8 @@ def read_out_list_file(file):
     # no of train/val fiels in each input set
     n_train, n_val = [], []
     for input_key in file_content:
-        train_files[input_key] = file_content[input_key]["train_files"]
-        validation_files[input_key] = file_content[input_key]["validation_files"]
+        train_files[input_key] = tuple(file_content[input_key]["train_files"])
+        validation_files[input_key] = tuple(file_content[input_key]["validation_files"])
         n_train.append(len(train_files[input_key]))
         n_val.append(len(validation_files[input_key]))
 

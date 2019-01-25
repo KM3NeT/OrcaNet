@@ -357,6 +357,7 @@ def get_labels(y_values, class_type):
 def load_zero_center_data(cfg):
     """
     Gets the xs_mean array(s) that can be used for zero-centering.
+    TODO Test!
 
     The arrays are either loaded from a previously saved .npz file or they are calculated on the fly by
     calculating the mean value per bin for the given training files. The name of the saved image is derived from the
