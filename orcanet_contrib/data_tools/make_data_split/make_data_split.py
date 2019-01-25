@@ -1,15 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-
-TODO
+Utility script that makes .list files for the concatenate_h5.py tool.
 
 Usage:
     make_data_split.py CONFIG
     make_data_split.py (-h | --help)
 
 Arguments:
-    CONFIG  A .toml file which sets up TODO
+    CONFIG  A .toml file which contains the configuration options.
 
 Options:
     -h --help  Show this screen.
@@ -22,30 +21,47 @@ import docopt
 import natsort as ns
 import h5py
 
+
 def parse_input():
+    """
+    Parses the config of the .toml file, specified by the user.
+
+    Returns
+    -------
+    cfg : dict
+        Dict that contains all configuration options from the input .toml file.
+
+    """
 
     args = docopt.docopt(__doc__)
     config_file = args['CONFIG']
 
     cfg = toml.load(config_file)
+    cfg['toml_filename'] = config_file
 
     return cfg
 
 
 def get_all_ip_group_keys(cfg):
     """
+    Gets the keys of all input groups in the config dict.
+
+    The input groups are defined as the dict elements, where the values have the type of a dict.
 
     Parameters
     ----------
-    cfg
+    cfg : dict
+        Dict that contains all configuration options and additional information.
 
     Returns
     -------
+    ip_group_keys : list
+        List of the input_group keys.
 
     """
     ip_group_keys = []
     for key in cfg:
-        if type(key) == dict:
+        if type(cfg[key]) == dict:
             ip_group_keys.append(key)
 
     return ip_group_keys
@@ -54,24 +70,57 @@ def get_all_ip_group_keys(cfg):
 def get_h5_filepaths(dirpath):
     """
     Returns the filepaths of all .h5 files that are located in a specific directory.
-    :param str dirpath: path of the directory where the .h5 files are located.
-    :return: list filepaths: list with the full filepaths of all .h5 files in the dirpath folder.
+
+    Parameters
+    ----------
+    dirpath: str
+        Path of the directory where the .h5 files are located.
+
+    Returns
+    -------
+    filepaths : list
+        List with the full filepaths of all .h5 files in the dirpath folder.
+
     """
     filepaths = []
     for f in os.listdir(dirpath):
-        if f.endswith(".h5"):
-            filepaths.append(f)
+        if f.endswith('.h5'):
+            filepaths.append(dirpath + '/' + f)
 
-    filepaths = ns.natsorted(filepaths)
+    filepaths = ns.natsorted(filepaths)  # TODO should not be necessary!
     return filepaths
 
 
 def get_number_of_evts_and_run_ids(list_of_files, dataset_key='y', run_id_col_name='run_id'):
+    """
+    Gets the number of events and the run_ids for all hdf5 files in the list_of_files.
+
+    The number of events is calculated based on the dataset, which is specified with the dataset_key parameter.
+
+    Parameters
+    ----------
+    list_of_files : list
+        List which contains filepaths to h5 files.
+    dataset_key : str
+        String which specifies, which dataset in a h5 file should be used for calculating the number of events.
+    run_id_col_name : str
+        String, which specifies the column name of the 'run_id' column.
+
+    Returns
+    -------
+    total_number_of_evts : int
+        The cumulative (total) number of events.
+    mean_number_of_evts_per_file : float
+        The mean number of evts per file.
+    run_ids : list
+        List containing the run_ids of the files in the list_of_files.
+
+    """
 
     total_number_of_evts = 0
-    run_id_list = []
+    run_ids = []
 
-    for fpath in list_of_files:
+    for i, fpath in enumerate(list_of_files):
         f = h5py.File(fpath, 'r')
 
         dset = f[dataset_key]
@@ -79,57 +128,135 @@ def get_number_of_evts_and_run_ids(list_of_files, dataset_key='y', run_id_col_na
         total_number_of_evts += n_evts
 
         run_id = f[dataset_key][0][run_id_col_name]
-        run_id_list.append(run_id)
+        run_ids.append(run_id)
 
         f.close()
 
     mean_number_of_evts_per_file = total_number_of_evts / len(list_of_files)
 
-    return total_number_of_evts, mean_number_of_evts_per_file, run_id_list
+    return total_number_of_evts, mean_number_of_evts_per_file, run_ids
 
 
 def split(a, n):
+    """
+    Splits a list into n equal sized (if possible! if not, approximately) chunks.
+
+    Parameters
+    ----------
+    a : list
+        A list that should be split.
+    n : int
+        Number of times the input list should be split.
+
+    Returns
+    -------
+    a_split : list
+        The input list a, which has been split into n chunks.
+
+    """
     # from https://stackoverflow.com/questions/2130016/splitting-a-list-into-n-parts-of-approximately-equal-length
     k, m = divmod(len(a), n)
-    return (a[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n))
+    a_split = list((a[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n)))
+    return a_split
 
 
-def get_run_ranges(cfg, ip_group_keys, mode='train'):
+def print_input_statistics(cfg, ip_group_keys):
+    """
+    Prints some useful information for each input_group.
 
-    # If the input groups do not have the needed number of events per class for the specified contribution, we
-    # need to move some leftover events to a leftover data split.
-    # In order to calculate this appropriately, we need to get the group, where the difference between the needed
-    # number of events for the (train) datasplit and the actually available number of events is the highest.
+    Parameters
+    ----------
+    cfg : dict
+        Dict that contains all configuration options and additional information.
+    ip_group_keys : list
+        List of the input_group keys.
 
-    group_key_max_diff, diff_max_to_avail = None, 0
+    """
+
+    print('----------------------------------------------------------------------')
+    print('Printing input statistics for your ' + cfg['toml_filename'] + ' input:')
+    print('----------------------------------------------------------------------')
+
+    print('Your input .toml file has the following data input groups: ' + str(ip_group_keys))
+    print('Total number of events: ' + str(cfg['n_evts_total']))
+
     for key in ip_group_keys:
-        n_evts_train_max = int(cfg['n_evts_total'] * cfg['fraction_train'] * cfg[key]['contribution_train'])
-        n_evts_train_avail = int(cfg[key]['n_events'] * cfg[key]['fraction_train'])
-        cfg[key]['n_evts_train_max'] = n_evts_train_max
+        print('--------------------------------------------------------------------')
+        print('Info for group ' + key + ':')
+        print('Directory: ' + cfg[key]['dir'])
+        print('Total number of files: ' + str(cfg[key]['n_files']))
+        print('Total number of events: ' + str(cfg[key]['n_evts']))
+        print('Mean number of events per file: ' + str(round(cfg[key]['n_evts_per_file_mean'], 3)))
+        print('--------------------------------------------------------------------')
 
-        diff_max_avail_key = n_evts_train_max - n_evts_train_avail
-        # TODO what happens if every group has a diff of 0, or if it is negative?
-        if group_key_max_diff is None or diff_max_avail_key > diff_max_to_avail:
-            group_key_max_diff = key
 
-    # train files should start from highest run_id
+def add_fpaths_for_data_split_to_cfg(cfg, key):
+    """
+    Adds all the filepaths for the output files into a list, and puts them into the cfg['output_dsplit'][key] location
+    for all dsplits (train, validate, rest).
 
-    # run_id_min_max = (min(cfg[group_key_max_diff]['run_id_list']), max(cfg[group_key_max_diff]['run_id_list']))
+    Parameters
+    ----------
+    cfg : dict
+        Dict that contains all configuration options and additional information.
+    key : str
+        The key of an input_group.
 
-    n_evts_train = cfg[group_key_max_diff]['n_evts'] * cfg['fraction_train']
-    n_files_train = int(n_evts_train / cfg[group_key_max_diff]['n_evts_per_file_mean'])
+    """
 
-    #run_id_end = run_id_min_max[1]
-    file_start_index = len(cfg[group_key_max_diff]['fpaths']) - n_files_train
-    file_start = cfg[group_key_max_diff]['fpaths'][file_start_index]
-    file_end = cfg[group_key_max_diff]['fpaths'][-1]
+    fpath_lists = {'train': [], 'validate': [], 'rest': []}
+    for i, fpath in enumerate(cfg[key]['fpaths']):
 
-    filelist_cut = cfg[group_key_max_diff]['fpaths'][file_start_index:-1]
-    file_splits = split(filelist_cut, cfg['n_train_files'])
+        run_id = cfg[key]['run_ids'][i]
 
+        for dsplit in ['train', 'validate', 'rest']:
+            if 'run_ids_' + dsplit in cfg[key]:
+                if cfg[key]['run_ids_' + dsplit][0] <= run_id <= cfg[key]['run_ids_' + dsplit][1]:
+                    fpath_lists[dsplit].append(fpath)
+
+    for dsplit in ['train', 'validate', 'rest']:
+        if len(fpath_lists[dsplit]) == 0:
+            continue
+
+        n_files_dsplit = cfg['n_files_' + dsplit]
+        fpath_lists[dsplit] = split(fpath_lists[dsplit], n_files_dsplit)
+        if 'output_' + dsplit not in cfg:
+            cfg['output_' + dsplit] = dict()
+        cfg['output_' + dsplit][key] = fpath_lists[dsplit]
+
+
+
+def make_dsplit_list_files(cfg):
+    """
+    Writes .list files of the datasplits to the disk, with the information in the cfg['output_dsplit'] dict.
+
+    Parameters
+    ----------
+    cfg : dict
+        Dict that contains all configuration options and additional information.
+
+    """
+
+    for dsplit in ['train', 'validate', 'rest']:
+
+        n_output_files = len(list(cfg['output_' + dsplit].keys())[0])
+        print(cfg['output_' + dsplit].keys())
+
+        for i in range(n_output_files):
+            fpath_output = cfg['output_file_folder'] + '/' + cfg['output_file_name'] + '_' + dsplit + '_' + str(i) + '.list'
+
+            with open(fpath_output, 'w') as f_out:
+                for group_key in cfg['output_' + dsplit]:
+                    print(len(cfg['output_' + dsplit][group_key]))
+                    for fpath in cfg['output_' + dsplit][group_key][i]:
+                        f_out.write(fpath + '\n')  # TODO strip last \n?
 
 
 def make_data_split():
+    """
+    Main function.
+    """
+
     cfg = parse_input()
     # TODO check if user input makes sense
 
@@ -137,20 +264,29 @@ def make_data_split():
 
     n_evts_total = 0
     for key in ip_group_keys:
+        print('Collecting information from group input ' + key)
         cfg[key]['fpaths'] = get_h5_filepaths(cfg[key]['dir'])
         cfg[key]['n_files'] = len(cfg[key]['fpaths'])
-        cfg[key]['n_evts'], cfg[key]['n_evts_per_file_mean'], cfg[key]['run_id_list'] = get_number_of_evts_and_run_ids(cfg[key]['fpaths'], dataset_key='y')
+        cfg[key]['n_evts'], cfg[key]['n_evts_per_file_mean'], cfg[key]['run_ids'] = get_number_of_evts_and_run_ids(cfg[key]['fpaths'], dataset_key='y')
 
         n_evts_total += cfg[key]['n_evts']
 
     cfg['n_evts_total'] = n_evts_total
+    print_input_statistics(cfg, ip_group_keys)
 
+    if cfg['print_only'] is True:
+        from sys import exit
+        exit()
 
+    for key in ip_group_keys:
+        add_fpaths_for_data_split_to_cfg(cfg, key)
+        print(list(cfg['output_train'].keys()))
 
-
+    make_dsplit_list_files(cfg)
 
 
 if __name__ == '__main__':
     make_data_split()
+
 
 
