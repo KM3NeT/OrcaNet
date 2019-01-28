@@ -107,10 +107,10 @@ html_theme = 'sphinx_rtd_theme'
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-# html_theme_options = {
-#     'logo_only': True,
-# }
-# html_logo = "_static/orcasong_wide_transparent_white.png"
+html_theme_options = {
+    'logo_only': True,
+}
+html_logo = "_static/orcanet_wide_transparent_white.png"
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
