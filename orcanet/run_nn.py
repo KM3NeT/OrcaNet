@@ -4,6 +4,7 @@
 Main code for training and validating NN's.
 """
 
+import os
 import matplotlib as mpl
 from inspect import signature
 import keras.backend as K
@@ -163,8 +164,10 @@ def train_and_validate_model(cfg, model, start_epoch):
         K.set_value(model.optimizer.lr, lr)
         print("Set learning rate to " + str(lr))
         # Train the model on one file and save it afterwards
+        model_filename = cfg.get_model_path(curr_epoch[0], curr_epoch[1])
+        assert not os.path.isfile(model_filename), "You tried to train your model in epoch {} file {}, but this model \
+            has already been trained and saved!".format(curr_epoch[0], curr_epoch[1])
         history_train = train_model(cfg, model, files_dict, f_size, xs_mean, curr_epoch)
-        model_filename = cfg.main_folder + 'saved_models/model_epoch_' + str(curr_epoch[0]) + '_file_' + str(curr_epoch[1]) + '.h5'
         model.save(model_filename)
         print("Saved model as " + model_filename)
         # Validate after every n-th file, starting with the first

@@ -51,7 +51,7 @@ def test_generators(batches, intermediate_log, functions, func_kwargs):
     cfg.zero_center_folder = zero_center_folder
     train_files = cfg.yield_train_files()
     # cfg.use_local_node()
-    print(batches, "batches from file", cfg.get_train_files())
+    print(batches, "batches from file", train_files)
     print("Batchsize:", cfg.batchsize)
     f = h5py.File(train_files.values()[0])
     print(f["x"].shape)

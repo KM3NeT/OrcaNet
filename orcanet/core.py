@@ -207,6 +207,8 @@ class Configuration(object):
         """
         Check all saved models in the ./saved_models folder and return the highest epoch / file_no pair.
 
+        Will only consider files that end with .h5 as models.
+
         Returns
         -------
         latest_epoch : tuple
@@ -214,7 +216,11 @@ class Configuration(object):
 
         """
         if os.path.exists(self.main_folder + "saved_models"):
-            files = os.listdir(self.main_folder + "saved_models")
+            files = []
+            for file in os.listdir(self.main_folder + "saved_models"):
+                if file.endswith('.h5'):
+                    files.append(file)
+
             if len(files) == 0:
                 latest_epoch = (0, 0)
             else:
@@ -249,6 +255,26 @@ class Configuration(object):
         else:
             next_epoch = (epoch[0], epoch[1] + 1)
         return next_epoch
+
+    def get_model_path(self, epoch, fileno):
+        """
+        Get the path to a model (which might not exist yet).
+
+        Parameters
+        ----------
+        epoch : int
+            The epoch.
+        fileno : int
+            The file number.
+
+        Returns
+        -------
+        model_filename : str
+            Path to a model.
+
+        """
+        model_filename = self.main_folder + 'saved_models/model_epoch_' + str(epoch) + '_file_' + str(fileno) + '.h5'
+        return model_filename
 
     def use_local_node(self):
         """
@@ -426,7 +452,7 @@ def orca_train(cfg, initial_model=None):
         # Load an existing model
         if initial_model is not None:
             warnings.warn("You provided a model even though this is not the start of the training. Provided model is ignored!")
-        path_of_model = cfg.main_folder + 'saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5'
+        path_of_model = cfg.get_model_path(epoch[0], epoch[1])
         print("Loading saved model: "+path_of_model)
         model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
     model.summary()
@@ -479,7 +505,7 @@ def orca_eval(cfg):
     if cfg.use_scratch_ssd:
         cfg.use_local_node()
 
-    path_of_model = folder_name + 'saved_models/model_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.h5'
+    path_of_model = cfg.get_model_path(epoch[0], epoch[1])
     model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
     modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident)
     arr_filename = folder_name + 'predictions/pred_model_epoch_{}_file_{}_on_{}_val_files.npy'.format(str(epoch[0]), str(epoch[1]), list_name)
