@@ -87,7 +87,7 @@ def get_h5_filepaths(dirpath):
         if f.endswith('.h5'):
             filepaths.append(dirpath + '/' + f)
 
-    filepaths = ns.natsorted(filepaths)  # TODO should not be necessary!
+    filepaths = ns.natsorted(filepaths)  # TODO should not be necessary actually!
     return filepaths
 
 
@@ -225,7 +225,6 @@ def add_fpaths_for_data_split_to_cfg(cfg, key):
         cfg['output_' + dsplit][key] = fpath_lists[dsplit]
 
 
-
 def make_dsplit_list_files(cfg):
     """
     Writes .list files of the datasplits to the disk, with the information in the cfg['output_dsplit'] dict.
@@ -253,11 +252,10 @@ def make_dsplit_list_files(cfg):
                 cfg['output_lists'] = list()
             cfg['output_lists'].append(fpath_output)
 
-
             with open(fpath_output, 'w') as f_out:
                 for group_key in cfg['output_' + dsplit]:
                     for fpath in cfg['output_' + dsplit][group_key][i]:
-                        f_out.write(fpath + '\n')  # TODO strip last \n?
+                        f_out.write(fpath + '\n')
 
 
 def submit_concatenate_list_files(cfg):
@@ -282,14 +280,14 @@ def submit_concatenate_list_files(cfg):
     """
     dirpath = cfg['output_file_folder']
 
-    if not os.path.exists(dirpath + '/logs'): # check if /logs/cout folder exists, if not create it.
+    if not os.path.exists(dirpath + '/logs'):  # check if /logs/cout folder exists, if not create it.
         os.makedirs(dirpath + '/logs')
-    if not os.path.exists(dirpath + '/job_scripts'): # check if /logs/cout folder exists, if not create it.
+    if not os.path.exists(dirpath + '/job_scripts'):  # check if /logs/cout folder exists, if not create it.
         os.makedirs(dirpath + '/job_scripts')
 
     # make qsub .sh file
     for listfile_fpath in cfg['output_lists']:
-        listfile_fname =os.path.basename(listfile_fpath)
+        listfile_fname = os.path.basename(listfile_fpath)
         listfile_fname_wout_ext = os.path.splitext(listfile_fname)[0]
         conc_outputfile_fpath = cfg['output_file_folder'] + listfile_fname_wout_ext
 
@@ -303,7 +301,7 @@ def submit_concatenate_list_files(cfg):
             f.write('\n')
             f.write('CodeFolder="' + cfg['data_tools_folder'] + '"\n')
             f.write('cd ${CodeFolder}\n')
-            f.write('source activate ' + cfg['venv_path'] +'\n')
+            f.write('source activate ' + cfg['venv_path'] + '\n')
             f.write('\n')
             f.write('# Concatenate the files in the list\n')
 
@@ -326,7 +324,7 @@ def make_data_split():
 
     n_evts_total = 0
     for key in ip_group_keys:
-        print('Collecting information from group input ' + key)
+        print('Collecting information from input group ' + key)
         cfg[key]['fpaths'] = get_h5_filepaths(cfg[key]['dir'])
         cfg[key]['n_files'] = len(cfg[key]['fpaths'])
         cfg[key]['n_evts'], cfg[key]['n_evts_per_file_mean'], cfg[key]['run_ids'] = get_number_of_evts_and_run_ids(cfg[key]['fpaths'], dataset_key='y')
@@ -351,6 +349,3 @@ def make_data_split():
 
 if __name__ == '__main__':
     make_data_split()
-
-
-
