@@ -1,0 +1,13 @@
+# These options define the various properties of a model.
+#
+# They overwrite the default values which are listed in the definition of the Configuration class.
+#
+[config]
+class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
+
+learning_rate = "triple_decay"
+zero_center_folder = "/home/woody/capn/mppi033h/orcanet_test/zero_center_folder/"
+train_logger_display=250
+train_logger_flush=-1
+verbose_train = 1
+#n_events = 32000
