@@ -1,0 +1,136 @@
+# Example configuration file for make_data_split.py
+
+# --- Documentation for every config parameter that is available --- #
+#
+#    Main Parameters
+#    ----------
+#    n_files_train : int
+#       Into how many files the training dataset should be split.
+#       If you don't want to have this dataset, comment out the line or delete it!
+#    n_files_validate : int
+#       Into how many files the validation dataset should be split.
+#       If you don't want to have this dataset, comment out the line or delete it!
+#    n_files_rest : int
+#       Into how many files the "rest" dataset should be split.
+#       If you don't want to have this dataset, comment out the line or delete it!
+#    output_file_folder : str
+#       Path to the folder, where all the output .list files (and the bash job scripts) should be stored.
+#    output_file_name : str
+#       String, that specifies the prefix of the filename of the output .list files.
+#       E.g. if = "xyzc_tight_0":
+#       xyzc_tight_0_train_0.list, xyzc_tight_0_validate_0.list, ...
+#    print_only : bool
+#       If only informationa about the input_groups should be printed, and no .list files should be made.
+#
+#    Job submission Parameters
+#    -------------------------
+#    make_qsub_bash_files : bool
+#       If bash files should be made, that can be submitted to a cluster, in order to actually concatenate
+#       the files in the .list files.
+#    submit_jobs : bool
+#       Additionally to make_qsub_bash_files, submit the bash job scripts to the cluster after they have been made.
+#       CAREFUL: May only work for Erlangen-CC.
+#    venv_path : str
+#       Path to a virtualenv, e.g. "/home/hpc/capn/mppi033h/.virtualenv/python_3_env/"
+#    data_tools_folder : str
+#       Dirpath, where the concatenate.py tool is located.
+#       E.g. "/home/woody/capn/mppi033h/Code/OrcaNet/orcanet_contrib/data_tools"
+#    chunksize : int
+#       Chunksize parameter, that is used when calling concatenate.py
+#    complib : str
+#       Complib parameter, that is used when calling concatenate.py
+#    complevel : int
+#       Complevel parameter, that is used when calling concatenate.py
+#
+#    Input Group Parameters
+#    ----------------------
+#    dir : str
+#       Path of the directory, where the files for this input group are located.
+#    run_ids_train/run_ids_validate/run_ids_rest : array
+#       Array, which specifies the range of the run_ids, that should be used for the training/validation.rest
+#       dataset of this input group.
+#       E.g. if [1,5], the script will put files from this input group with run_ids from 1 to 5 (including 1 and 5)
+#       to the training/validation/rest dataset.
+#       If you don't want to use a specific dataset for this input group, comment out the line or delete it!
+#
+# --- Documentation for every config parameter that is available --- #
+
+# --- Main options ---#
+
+n_files_train = 5
+n_files_validate = 3
+n_files_rest = 1
+output_file_folder = "/home/woody/capn/mppi033h/make_dsplit_test"
+output_file_name = "xyzc_tight_0"
+print_only = false # only print information of your input_groups, don't make any .list files
+
+# --- Main options ---#
+
+
+# --- Options, for submitting jobs to concatenate the .list files. --- #
+
+make_qsub_bash_files = true
+submit_jobs = false
+venv_path = "/home/hpc/capn/mppi033h/.virtualenv/python_3_env"
+data_tools_folder = "/home/woody/capn/mppi033h/Code/OrcaNet/orcanet_contrib/data_tools"
+chunksize = 32
+complib = "gzip"
+complevel = 1
+
+# --- Options, for submitting jobs to concatenate the .list files. --- #
+
+# --- Input groups : these are the datafiles, that should be concatenated somehow --- #
+[mupage] # 1 to 20000
+dir = "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/mupage/xyzc"
+run_ids_train = [1001, 5000]
+run_ids_validate = [1, 1000]
+run_ids_rest = [5001, 20000]
+
+
+[random_noise] # 1 to 1500
+dir = "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/random_noise/xyzc"
+run_ids_train = [101, 500]
+run_ids_validate = [1, 100]
+
+
+[muon_cc_3_100] # 1 to 2400
+dir = "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/muon-CC/3-100GeV/xyzc"
+run_ids_train = [601, 2400]
+run_ids_validate = [1, 600]
+
+
+[muon_cc_1_5] # 1 to 600
+dir = "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/muon-CC/1-5GeV/xyzc"
+run_ids_train = [151, 600]
+run_ids_validate = [1, 150]
+
+
+[elec_cc_3_100] # 1 to 2400
+dir = "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/elec-CC/3-100GeV/xyzc"
+run_ids_train = [301, 1200]
+run_ids_validate = [1, 300]
+#run_id_rest = []
+
+[elec_cc_1_5] # 1 to 600
+dir = "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/elec-CC/1-5GeV/xyzc"
+run_ids_train = [301, 1200]
+run_ids_validate = [1, 300]
+
+
+[elec_nc_3_100] # 1 to 2400
+dir = "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/elec-NC/3-100GeV/xyzc"
+run_ids_train = [301, 1200]
+run_ids_validate = [1, 300]
+
+
+[elec_nc_1_5] # 1 to 600
+dir = "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/elec-NC/1-5GeV/xyzc"
+run_ids_train = [301, 1200]
+run_ids_validate = [1, 300]
+
+
+[tau_cc_3_100] # 1 to 1800
+dir = "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/tau-CC/3-100GeV/xyzc"
+run_ids_validate = [1, 1800]
+
+# --- Input groups : these are the datafiles, that should be concatenated somehow --- #
