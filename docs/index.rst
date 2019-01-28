@@ -3,6 +3,15 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
+.. |vspace| raw:: latex
+
+   \vspace{1cm}
+
+.. image:: _static/orcanet_wide_transparent_black.png
+   :height: 142px
+
+|vspace|
+
 Welcome to OrcaNet's documentation!
 ===================================
 

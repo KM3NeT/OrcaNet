@@ -1,0 +1,16 @@
+# These options define the various properties of a model.
+#
+# They overwrite the default values which are listed in the definition of the Configuration class.
+#
+[config]
+
+class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
+
+swap_4d_channels = 'xyz-t_and_xyz-c_single_input'
+str_ident = 'lp_tight-1_60b_errors_mse_w_vtx'
+
+zero_center_folder = "/home/woody/capn/mppi013h/Code/work/zero_center_folder/"
+train_logger_display=250
+train_logger_flush=-1
+verbose_train = 1
+#n_events = 32000
