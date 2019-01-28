@@ -49,12 +49,11 @@ def test_generators(batches, intermediate_log, functions, func_kwargs):
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
     cfg = Configuration("./test/", list_file)
     cfg.zero_center_folder = zero_center_folder
-    train_files = cfg.get_train_files()
-    file = train_files[0][0]
+    train_files = cfg.yield_train_files()
     # cfg.use_local_node()
     print(batches, "batches from file", cfg.get_train_files())
     print("Batchsize:", cfg.batchsize)
-    f = h5py.File(file[0])
+    f = h5py.File(train_files.values()[0])
     print(f["x"].shape)
     xs_mean = np.ones(f["x"].shape[1:])  # load_zero_center_data(cfg)
     f.close()
@@ -76,7 +75,7 @@ def test_generators(batches, intermediate_log, functions, func_kwargs):
     print("\n")
     for f_no, func in enumerate(functions):
         print("------------- Function", f_no, " -------------")
-        generator = func(cfg, file, zero_center_image=xs_mean, **func_kwargs[f_no])
+        generator = func(cfg, train_files, zero_center_image=xs_mean, **func_kwargs[f_no])
         print("Shape of batches:", next(generator)[0][0].shape, "\n")
         average_read_time, average_model_time = [], []
         for i in range(batches):
