@@ -237,6 +237,8 @@ def validate_model(cfg, model, xs_mean):
         val_generator = generate_batches_from_hdf5_file(cfg, f, f_size=f_size, zero_center_image=xs_mean)
         history = model.evaluate_generator(val_generator, steps=int(f_size / cfg.batchsize), max_queue_size=10, verbose=cfg.verbose_val)
         # This history object is just a list, not a dict like with fit_generator!
+        if type(history) != list:
+            history = [history]
         print('Validation sample results: ' + str(history) + ' (' + str(model.metrics_names) + ')')
         histories.append(history)
     history_val = [sum(col) / float(len(col)) for col in zip(*histories)] if len(histories) > 1 else histories[0]  # average over all val files if necessary
