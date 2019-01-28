@@ -95,8 +95,11 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
             y_values = list(files.values())[0][mc_key][sample_n:sample_n + batchsize]
 
             # Modify the samples and the labels batchwise
-            if swap_col is not None:
-                xs = get_input_images(xs, swap_col, str_ident)
+            if cfg.sample_modifier is not None:
+                xs = cfg.sample_modifier(xs)
+
+            # if swap_col is not None:
+            #     xs = get_input_images(xs, swap_col, str_ident)
             ys = get_labels(y_values, class_type)
 
             if not yield_mc_info:
@@ -161,19 +164,16 @@ def get_dimensions_encoding(n_bins, batchsize):
     return dimensions
 
 
-def get_input_images(xs, swap_col, str_ident):
+def sample_modifier_orca(xs_list, swap_col, str_ident):
     """
     Permute columns, or add permuted columns to xs.
 
     Parameters
     ----------
-    xs : dict
-        Dict that contains the input image(s). The keys are integers i and they range from [0 ... (n_input_images-1)].
-        Each key then contains a batchsize array of this input i.
-        The ordering of the i inputs in the dict is defined by the input file .list file!
-        E.g., if you have 2 inputs (XYZ-T: 11,13,18,60 ; and XYZ-C: 11,13,18,31), the dict looks as follows:
-        xs[0] = ndarray(batchsize, 11, 13, 18, 60)
-        xs[1] = ndarray(batchsize, 11, 13, 18, 31)
+    xs_list : dict
+        Dict that contains the input image(s).
+        The keys are the names of the inputs in the toml list file.
+        The values are a single batch of data from each corresponding file.
     swap_col : None/str
         TODO
     str_ident : str
@@ -181,36 +181,39 @@ def get_input_images(xs, swap_col, str_ident):
 
     Returns
     -------
-    xs_dict : list
+    xs_layer : dict
         Dict that contains the input images for a Keras NN.
+        The keys are the names of the input layers of the network.
+        The values are a single batch of data for each input layer.
 
     """
+    keys = list(xs_list.keys())
     # list of inputs for the Keras NN
-    xs_dict = {}
+    xs_layer = {}
     swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'xyt-z': (0, 1, 2, 4, 3), 't-xyz': (0, 4, 1, 2, 3),
                              'tyz-x': (0, 4, 2, 3, 1)}
 
     # single image input
-    if swap_col == 'yzt-x' or swap_col == 'xyt-z':
-        xs_dict[0] = np.transpose(xs, swap_4d_channels_dict[swap_col])
+    if swap_col in swap_4d_channels_dict:
+        xs_layer[keys[0]] = np.transpose(xs_list, swap_4d_channels_dict[swap_col])
 
     elif swap_col == 'xyz-t_and_yzt-x':
-        xs_dict[0] = xs[0]  # xyzt
-        xs_dict[1] = np.transpose(xs[0], swap_4d_channels_dict['yzt-x'])
+        xs_layer["xyz-t"] = xs_list["xyz-t"]  # xyzt
+        xs_layer["yzt-x"] = np.transpose(xs_list["xyz-t"], swap_4d_channels_dict['yzt-x'])
 
     elif 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2' in swap_col + str_ident:
-        xs_dict[0] = xs[0]  # xyz-t tight-1
-        xs_dict[1] = np.transpose(xs[0], swap_4d_channels_dict['yzt-x'])  # yzt-x tight-1
-        xs_dict[2] = xs[1]  # xyz-t tight-2
-        xs_dict[3] = np.transpose(xs[1], swap_4d_channels_dict['yzt-x'])  # yzt-x tight-2
+        xs_layer["xyz-t"] = xs_list[0]  # xyz-t tight-1
+        xs_layer[1] = np.transpose(xs_list[0], swap_4d_channels_dict['yzt-x'])  # yzt-x tight-1
+        xs_layer[2] = xs_list[1]  # xyz-t tight-2
+        xs_layer[3] = np.transpose(xs_list[1], swap_4d_channels_dict['yzt-x'])  # yzt-x tight-2
 
     elif swap_col == 'xyz-t_and_xyz-c_single_input':
-        xs_dict[0] = np.concatenate([xs[0], xs[1]], axis=-1)
+        xs_layer[0] = np.concatenate([xs_list[0], xs_list[1]], axis=-1)
 
     else:
         raise ValueError('The argument "swap_col"=' + str(swap_col) + ' is not valid.')
 
-    return xs_dict
+    return xs_layer
 
 
 def get_labels(y_values, class_type):

@@ -5,15 +5,17 @@ Core scripts for the OrcaNet package.
 """
 
 import os
+import sys
 import warnings
 from collections import namedtuple
 import keras as ks
 import h5py
+import numpy as np
 
 from orcanet.run_nn import train_and_validate_model
 from orcanet.eval_nn import predict_and_investigate_model_performance, get_modelname
 from orcanet.utilities.input_output_utilities import read_out_list_file, read_out_config_file, read_out_model_file, use_node_local_ssd_for_input, write_full_logfile_startup, h5_get_number_of_rows
-from orcanet.utilities.nn_utilities import load_zero_center_data
+from orcanet.utilities.nn_utilities import load_zero_center_data, get_inputs
 from orcanet.utilities.losses import get_all_loss_functions
 
 
@@ -63,6 +65,8 @@ class Configuration(object):
         For testing purposes. If not the whole .h5 file should be used for training, define the number of events.
     n_gpu : tuple(int, str)
         Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov') [1].
+    sample_modifier : function or None
+        Operation to be performed on batches read from the input files before they are fed into the model. TODO online doc on how to do this
     str_ident : str
         Optional string identifier that gets appended to the modelname. Useful when training models which would have
         the same modelname. Also used for defining models and projections!
@@ -96,18 +100,14 @@ class Configuration(object):
         A dict containing the paths to the different training files on which the model will be trained on.
         Example for the format for two input sets with two files each:
                 {
-                 "input_A" : ('path/to/set_A_train_file_1.h5', 'path/to/set_A_train_file_2.h5')
-                 "input_B" : ('path/to/set_B_train_file_1.h5', 'path/to/set_B_train_file_2.h5')
+                 "input_A" : ('path/to/set_A_train_file_1.h5', 'path/to/set_A_train_file_2.h5'),
+                 "input_B" : ('path/to/set_B_train_file_1.h5', 'path/to/set_B_train_file_2.h5'),
                 }
     _val_files : dict or None
         Like train_files but for the validation files.
-    _n_train_files : int or None
-        The number of train files.
-    _n_val_files : int or None
-        The number of validation files.
     _list_file : str or None
         Path to the list file that was used to set the training and validation files. Is None if no list file
-        has been used yet.
+        has been used.
     _modeldata : namedtuple or None
         Optional info only required for building a predefined model with OrcaNet. [default: None]
         It is not needed for executing orcatrain. It is set via self.load_from_model_file.
@@ -149,6 +149,7 @@ class Configuration(object):
         self.learning_rate = 0.001
         self.n_events = None
         self.n_gpu = (1, 'avolkov')
+        self.sample_modifier = None
         self.str_ident = ''
         self.swap_4d_channels = None
         self.train_logger_display = 100
@@ -327,7 +328,7 @@ class Configuration(object):
         Returns
         -------
         n_bins : dict
-            List input names as keys, list of the bins as values.
+            Toml-list input names as keys, list of the bins as values.
 
         """
         train_files = self.get_train_files()
@@ -447,6 +448,75 @@ class Configuration(object):
             files_dict = {key: val_files[key][file_no] for key in val_files}
             yield files_dict
 
+    def check_connection(self, model):
+        """
+        Check if the names and shapes of the given input files work with the given model inputs.
+
+        Parameters
+        ----------
+        model : ks.model
+            A keras model.
+
+        Raises
+        ------
+        AssertionError
+            If they dont work together.
+
+        """
+        print("\nConnection check\n----------------")
+        layer_inputs = get_inputs(model)
+        # keys: name of layers, values: shape of input
+        layer_inp_shapes = {key: layer_inputs[key].input_shape[1:] for key in layer_inputs}
+        list_inp_shapes = self.get_n_bins()
+
+        print("The inputs in your toml list file have the following names and shapes:")
+        for list_key in list_inp_shapes:
+            print("\t{}\t{}".format(list_key, list_inp_shapes[list_key]))
+
+        sample_mod_failed = False
+        if self.sample_modifier is not None:
+            try:
+                # a dict of np ones with the same shape as real data
+                dummy_inp = {}
+                for list_key in list_inp_shapes:
+                    dummy_inp[list_key] = np.ones((self.batchsize,) + list_inp_shapes[list_key])
+                modified = self.sample_modifier(dummy_inp)
+                # a dict with the shapes after the modifier has been applied
+                modified_shapes = {modi_key: modified[modi_key].shape[1:] for modi_key in modified}
+                print("After applying your sample modifier, they have the following names and shapes:")
+                for list_key in modified_shapes:
+                    print("\t{}\t{}".format(list_key, modified_shapes[list_key]))
+                list_inp_shapes = modified_shapes
+            except:
+                print("Error encountered during test of sample modifier:", str(sys.exc_info()), "\n Lets continue and hope for the best...")
+                sample_mod_failed = True
+
+        print("Your model requires the following input names and shapes:")
+        for layer_key in layer_inp_shapes:
+            print("\t{}\t{}".format(layer_key, layer_inp_shapes[layer_key]))
+
+        err_inp_names = []
+        err_inp_shapes = []
+        for layer_key in layer_inp_shapes:
+            if layer_key not in list_inp_shapes.keys():
+                err_inp_names.append(layer_key)
+            elif list_inp_shapes[layer_key] != layer_inp_shapes[layer_key]:
+                err_inp_shapes.append(layer_key)
+
+        if sample_mod_failed:
+            pass
+        elif len(err_inp_names) == 0 and len(err_inp_shapes) == 0:
+            print("Check passed.\n")
+        else:
+            names_err = "No input in the list file provided for layer(s): " + ", ".join(str(e) for e in err_inp_names)
+            shapes_err = "Shapes do not match for the following layer(s): " + ", ".join(str(e) for e in err_inp_shapes)
+            err_msg = ""
+            if len(err_inp_names) != 0:
+                err_msg = err_msg + names_err + "\n"
+            if len(err_inp_shapes) != 0:
+                err_msg += shapes_err
+            raise AssertionError(err_msg)
+
 
 def orca_train(cfg, initial_model=None):
     """
@@ -484,7 +554,8 @@ def orca_train(cfg, initial_model=None):
         path_of_model = cfg.get_model_path(epoch[0], epoch[1])
         print("Loading saved model: "+path_of_model)
         model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
-    model.summary()
+    cfg.check_connection(model)
+    # model.summary()
     if cfg.use_scratch_ssd:
         cfg.use_local_node()
 

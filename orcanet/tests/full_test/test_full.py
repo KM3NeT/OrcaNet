@@ -82,7 +82,13 @@ class DatasetTest(TestCase):
         def test_learning_rate(epoch, fileno, cfg):
             lr = (1 + epoch)*(1 + fileno) * 0.001
             return lr
+
+        def test_modifier(xs):
+            xs = {key: xs[key] * 2 for key in xs}
+            return xs
+
         cfg.learning_rate = test_learning_rate
+        cfg.sample_modifier = test_modifier
         orca_train(cfg)
         # orca_eval(cfg)
 
