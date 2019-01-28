@@ -1,53 +1,60 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Utility code like parsing the command line input or
-technical stuff like copying the files to the node-local SSD."""
+"""
+Utility code like parsing the command line input or
+technical stuff like copying the files to the node-local SSD.
+
+Reading toml files: There are three different keywords:
+    "input" :   The input to networks.
+    "config" :  The Configuration.
+    "model" :   Options for auto-generated OrcaNet models.
+
+"""
 
 import os
 import shutil
 import h5py
 import toml
-from time import gmtime, strftime
 import numpy as np
+from datetime import datetime
 
-def read_out_config_file(config_file):
+
+def read_out_config_file(file):
     """
-    Extract the variables of a model from the .toml file and convert them to a dict. It is handed to the execute_nn
-    function in run_nn.py.
+    Extract the variables of a model from the .toml file and convert them to a dict.
+
+    Toml can not handle arrays with mixed types of variables, so some conversion are done.
 
     Parameters
     ----------
-    config_file : str
+    file : str
         Path and name of the .toml file that defines the properties of the model.
+
     Returns
     -------
     keyword_arguments : dict
-        Arguments for the execute_nn function.
+        Values for the OrcaNet scripts, as listed in the Configuration class.
 
     """
-    config = toml.load(config_file)
-    keyword_arguments = config["keyword_arguments"]
-
-    if "class_type" in keyword_arguments:
-        if keyword_arguments["class_type"][0]=="None":
-            keyword_arguments["class_type"][0] = None
-    if "n_gpu" in keyword_arguments:
-        keyword_arguments["n_gpu"][0] = int(keyword_arguments["n_gpu"][0])
-    keyword_arguments["loss_opt"] = (config["losses"], None)
-
-    return keyword_arguments
+    file_content = toml.load(file)["config"]
+    if "class_type" in file_content:
+        if file_content["class_type"][0] == "None":
+            file_content["class_type"][0] = None
+    if "n_gpu" in file_content:
+        file_content["n_gpu"][0] = int(file_content["n_gpu"][0])
+    return file_content
 
 
 def list_get_number_of_files(file_content, keyword):
     """
-    Get the number of training or evaluation files from the content of a toml list.
+    Get the number of training or validation files from the content of a toml list.
 
     Parameters
     ----------
     file_content : dict
         From a list file by toml.load().
     keyword : str
-        Keyword in the file content dictionary to look up, e.g. "train_files" or "evaluation_files".
+        Keyword in the file content dictionary to look up, e.g. "train_files" or "validation_files".
 
     Returns
     -------
@@ -61,8 +68,8 @@ def list_get_number_of_files(file_content, keyword):
 
     """
     number_of_files = 0
-    for dataset_no in range(len(file_content["input"])):
-        current_number_of_files = len(file_content["input"][dataset_no][keyword])
+    for dataset_no in range(len(file_content)):
+        current_number_of_files = len(file_content[dataset_no][keyword])
         if dataset_no == 0:
             number_of_files = current_number_of_files
         elif current_number_of_files != number_of_files:
@@ -70,27 +77,27 @@ def list_get_number_of_files(file_content, keyword):
     return number_of_files
 
 
-def list_restructure(number_of_files, keyword, file_content_input):
+def list_restructure(number_of_files, keyword, file_content):
     """ Arrange the given files to the desired format. """
     files = []
     for file_no in range(number_of_files):
         file_set = []
-        for input_data in file_content_input:
+        for input_data in file_content:
             file_set.append(input_data[keyword][file_no])
         files.append([file_set, h5_get_number_of_rows(file_set[0])])
-        #TODO Maybe files have different number of events? Should give an error
+        # TODO Maybe files have different number of events? Should give an error
     return files
 
 
-def read_out_list_file(list_file):
+def read_out_list_file(file):
     """
     Reads out a list file in .toml format containing the pathes to training
-    and evaluation files and bring it into the proper format.
+    and validation files and bring it into the proper format.
 
     Parameters
     ----------
-    list_file : str
-        Path to a .list file containing the paths to training and test files to be used during training.
+    file : str
+        Path to a .list file containing the paths to training and validation files to be used during training.
 
     Returns
     -------
@@ -102,126 +109,163 @@ def read_out_list_file(list_file):
                  [['path/to/train_file_2_dimx.h5', 'path/to/train_file_2_dimy.h5'], number_of_events_train_files_2],
                  ...
                 ]
-    test_files : list
-        Like the above but for test files.
+    validation_files : list
+        Like the above but for validation files.
     multiple_inputs : bool
         Whether seperate sets of input files were given (e.g. for networks taking data
         simulataneosly from different files).
 
     """
-    file_content = toml.load(list_file)
+    file_content = toml.load(file)["input"]
     number_of_train_files = list_get_number_of_files(file_content, "train_files")
-    number_of_eval_files = list_get_number_of_files(file_content, "evaluation_files")
-    train_files = list_restructure(number_of_train_files, "train_files", file_content["input"])
-    evaluation_files = list_restructure(number_of_eval_files, "evaluation_files", file_content["input"])
-    multiple_inputs = len(file_content["input"]) > 1
+    number_of_val_files = list_get_number_of_files(file_content, "validation_files")
+    train_files = list_restructure(number_of_train_files, "train_files", file_content)
+    validation_files = list_restructure(number_of_val_files, "validation_files", file_content)
+    multiple_inputs = len(file_content) > 1
 
-    return train_files, evaluation_files, multiple_inputs
+    return train_files, validation_files, multiple_inputs
 
 
-def write_full_logfile_startup(folder_name, list_filename, keyword_arguments):
+def read_out_model_file(file):
+    """
+    Read out parameters for creating models with OrcaNet from a toml file.
+
+    Parameters
+    ----------
+    file : str
+        Path to the toml file.
+
+    Returns
+    -------
+    nn_arch : str
+        Name of the architecture to be loaded.
+    loss_opt : tuple
+        The losses and weights of the model.
+    file_content : dict
+        Keyword arguments for the model generation.
+
+    """
+    file_content = toml.load(file)["model"]
+    nn_arch = file_content.pop("nn_arch")
+    losses = file_content.pop("losses")
+    loss_opt = (losses, None)
+    return nn_arch, loss_opt, file_content
+
+
+def write_full_logfile_startup(cfg):
     """
     Whenever the orca_train function is run, this logs all the input parameters in the full log file.
 
+    Parameters
+    ----------
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
+
     """
-    logfile = folder_name + '/full_log.txt'
-    train_files, test_files, multiple_inputs = read_out_list_file(list_filename)
+    logfile = cfg.main_folder + 'full_log.txt'
     with open(logfile, 'a+') as f_out:
         f_out.write('--------------------------------------------------------------------------------------------------------\n')
-        f_out.write('--------------------------------------------------------------------------------------------------------\n\n\n')
-        f_out.write("New execution of the orca_train function started with the following options:\n")
-        f_out.write("List file path:\t"+list_filename+"\n")
+        f_out.write('----------------------------------'+str(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))+'---------------------------------------------------\n\n')
+        f_out.write("New execution of the orca_train function started with the following options:\n\n")
+        f_out.write("List file path:\t"+cfg.get_list_file()+"\n")
         f_out.write("Given trainfiles in the .list file:\n")
-        for train_file in train_files:
+        for train_file in cfg.get_train_files():
             f_out.write("   " + str(train_file)+"\n")
-        f_out.write("\nGiven testfiles in the .list file:\n")
-        for test_file in test_files:
-            f_out.write("   " + str(test_file) + "\n")
-        f_out.write("\nGiven options in the .toml config:\n")
-        for keyword_argument in keyword_arguments.keys():
-            f_out.write("   {}:\t{}\n".format(keyword_argument, keyword_arguments[keyword_argument]))
+        f_out.write("Given validation files in the .list file:\n")
+        for val_file in cfg.get_val_files():
+            f_out.write("   " + str(val_file) + "\n")
+        f_out.write("\nConfiguration used:\n")
+        for key in vars(cfg):
+            if not key.startswith("_"):
+                f_out.write("   {}:\t{}\n".format(key, getattr(cfg, key)))
+        f_out.write("\nPrivate attributes:\n")
+        for key in vars(cfg):
+            if key.startswith("_"):
+                f_out.write("   {}:\t{}\n".format(key, getattr(cfg, key)))
         f_out.write("\n")
 
 
-def write_full_logfile(model, history_train, history_test, lr, lr_decay, epoch, train_file,
-                            test_files, batchsize, n_bins, class_type, swap_4d_channels, str_ident, folder_name):
+def write_full_logfile(cfg, model, history_train, history_val, lr, epoch, train_file):
     """
-    Function for saving various information during training and testing to a .txt file.
+    Function for saving various information during training and validation to a .txt file.
+
+    Parameters
+    ----------
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
 
     """
-    logfile=folder_name + '/full_log.txt'
+    logfile = cfg.main_folder + 'full_log.txt'
     with open(logfile, 'a+') as f_out:
         f_out.write('---------------Epoch {} File {}-------------------------------------------------------------------------\n'.format(epoch[0], epoch[1]))
         f_out.write('\n')
-        f_out.write('Current time: ' + strftime("%Y-%m-%d %H:%M:%S", gmtime()) + '\n')
+        f_out.write('Current time: ' + str(datetime.now().strftime('%Y-%m-%d %H:%M:%S')) + '\n')
         f_out.write('Decayed learning rate to ' + str(lr) + ' before epoch ' + str(epoch[0]) +
-                    ' and file ' + str(epoch[1]) + ' (minus ' + str(lr_decay) + ')\n')
+                    ' and file ' + str(epoch[1]) + ')\n')
         f_out.write('Trained in epoch ' + str(epoch) + ' on file ' + str(epoch[1]) + ', ' + str(train_file) + '\n')
-        if history_test is not None:
-            f_out.write('Tested in epoch ' + str(epoch) + ', file ' + str(epoch[1]) + ' on test_files ' + str(test_files) + '\n')
-        f_out.write('History for training / testing: \n')
+        if history_val is not None:
+            f_out.write('Validated in epoch ' + str(epoch) + ', file ' + str(epoch[1]) + ' on val_files ' + str(cfg.get_val_files()) + '\n')
+        f_out.write('History for training / validating: \n')
         f_out.write('Train: ' + str(history_train.history) + '\n')
-        if history_test is not None:
-            f_out.write('Test: ' + str(history_test) + ' (' + str(model.metrics_names) + ')' + '\n')
+        if history_val is not None:
+            f_out.write('Validation: ' + str(history_val) + ' (' + str(model.metrics_names) + ')' + '\n')
         f_out.write('\n')
-        #f_out.write('Additional Info:\n')
-        #f_out.write('Batchsize=' + str(batchsize) + ', n_bins=' + str(n_bins) +
+        # f_out.write('Additional Info:\n')
+        # f_out.write('Batchsize=' + str(batchsize) + ', n_bins=' + str(n_bins) +
         #            ', class_type=' + str(class_type) + '\n' +
         #            'swap_4d_channels=' + str(swap_4d_channels) + ', str_ident=' + str_ident + '\n')
-        #f_out.write('\n')
+        # f_out.write('\n')
 
 
-def write_summary_logfile(train_files, batchsize, epoch, folder_name, model, history_train, history_test, lr):
+def write_summary_logfile(cfg, epoch, model, history_train, history_val, lr):
     """
     Write to the summary.txt file in every trained model folder.
 
     Parameters
     ----------
-    train_files : list(([train_filepaths], train_filesize))
-        List of tuples with the filepaths and the filesizes of the train_files.
-    batchsize : int
-        Batchsize that is used in the evaluate_generator method.
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
     epoch : tuple(int, int)
         The number of the current epoch and the current filenumber.
-    folder_name : str
-        Name of the folder in the cnns directory in which everything will be saved.
     model : ks.model.Model
         Keras model instance of a neural network.
     history_train : Keras history object
         History object containing the history of the training, averaged over files.
-    history_test : List
-        List of test losses for all the metrics, averaged over all test files.
+    history_val : List
+        List of validation losses for all the metrics, averaged over all validation files.
     lr : float
         The current learning rate of the model.
 
     """
-    # Save test log
-    steps_per_total_epoch, steps_cum = 0, [0] # get this for the epoch_number_float in the logfile
-    for f, f_size in train_files:
-        steps_per_file = int(f_size / batchsize)
+    # Save val log
+    steps_per_total_epoch, steps_cum = 0, [0]  # get this for the epoch_number_float in the logfile
+    for f, f_size in cfg.get_train_files():
+        steps_per_file = int(f_size / cfg.batchsize)
         steps_per_total_epoch += steps_per_file
         steps_cum.append(steps_cum[-1] + steps_per_file)
 
     epoch_number_float = epoch[0] - (steps_per_total_epoch - steps_cum[epoch[1]]) / float(steps_per_total_epoch)
-    logfile_fname = folder_name + '/summary.txt'
+    logfile_fname = cfg.main_folder + 'summary.txt'
     with open(logfile_fname, 'a+') as logfile:
         # Write the headline
         if os.stat(logfile_fname).st_size == 0:
             logfile.write('Epoch\tLR\t')
             for i, metric in enumerate(model.metrics_names):
-                logfile.write("train_" + str(metric) + "\ttest_" + str(metric))
-                if i + 1 < len(model.metrics_names): logfile.write("\t")
+                logfile.write("train_" + str(metric) + "\tval_" + str(metric))
+                if i + 1 < len(model.metrics_names):
+                    logfile.write("\t")
             logfile.write('\n')
-        # Write the content: Epoch, LR, train_1, test_1, ...
+        # Write the content: Epoch, LR, train_1, val_1, ...
         logfile.write("{:.4g}\t".format(float(epoch_number_float)))
         logfile.write("{:.4g}\t".format(float(lr)))
         for i, metric_name in enumerate(model.metrics_names):
             logfile.write("{:.4g}\t".format(float(history_train.history[metric_name][0])))
-            if history_test is None:
+            if history_val is None:
                 logfile.write("nan")
             else:
-                logfile.write("{:.4g}".format(float(history_test[i])))
-            if i + 1 < len(model.metrics_names): logfile.write("\t")
+                logfile.write("{:.4g}".format(float(history_val[i])))
+            if i + 1 < len(model.metrics_names):
+                logfile.write("\t")
         logfile.write('\n')
 
 
@@ -257,35 +301,9 @@ def read_logfiles(summary_logfile):
     train_file_data.sort()
     full_train_data = train_file_data[0][1]
     for [epoch, file_no], file_data in train_file_data[1:]:
-        #file_data["Batch_float"]+=(epoch-1)
+        # file_data["Batch_float"]+=(epoch-1)
         full_train_data = np.append(full_train_data, file_data)
     return summary_data, full_train_data
-
-
-def look_for_latest_epoch(folder_name):
-    """
-    Check all saved models in the ./saved_models folder and return the highest epoch / file_no pair.
-
-    Parameters
-    ----------
-    folder_name : str
-        Name of the main folder.
-    Returns
-    -------
-    List
-        The highest epoch, file_no pair. [0,1] if the folder is empty.
-
-    """
-    files = os.listdir(folder_name + "/saved_models")
-    if len(files) == 0:
-        latest_epoch = [0 , 1]
-    else:
-        epochs = []
-        for file in files:
-            epoch, file_no = file.split("model_epoch_")[-1].split(".h5")[0].split("_file_")
-            epochs.append([int(epoch), int(file_no)])
-        latest_epoch = max(epochs)
-    return latest_epoch
 
 
 def h5_get_number_of_rows(h5_filepath):
@@ -295,7 +313,10 @@ def h5_get_number_of_rows(h5_filepath):
     :return: int number_of_rows: number of rows of the .h5 file in the first dataset.
     """
     f = h5py.File(h5_filepath, 'r')
-    number_of_rows = f[list(f.keys())[0]].shape[0]
+    # remove any keys to pytables folders that may be in the file
+    f_keys_stripped = [x for x in list(f.keys()) if '_i_' not in x]
+
+    number_of_rows = f[f_keys_stripped[0]].shape[0]
     f.close()
     return number_of_rows
 
@@ -303,6 +324,7 @@ def h5_get_number_of_rows(h5_filepath):
 def h5_get_n_bins(train_files):
     """
     Get the number of bins from the training files. Only the first files are looked up, the others should be identical.
+    CAREFUL: The name of the neural network 'images' dataset in the files MUST be 'x'.
 
     Parameters
     ----------
@@ -319,10 +341,10 @@ def h5_get_n_bins(train_files):
     n_bins : list
 
     """
-    n_bins=[]
+    n_bins = []
     for dim_file in train_files[0][0]:
         f = h5py.File(dim_file, "r")
-        n_bins.append(f[list(f.keys())[0]].shape[1:])
+        n_bins.append(f['x'].shape[1:])
     return n_bins
 
 
@@ -351,7 +373,7 @@ def use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=False)
                 f_path_ssd = local_scratch_path + '/' + os.path.basename(f_path)
                 f_paths_train_ssd_temp.append(f_path_ssd)
 
-            train_files_ssd.append((f_paths_train_ssd_temp, f_size)) # f_size of all f_paths should be the same
+            train_files_ssd.append((f_paths_train_ssd_temp, f_size))  # f_size of all f_paths should be the same
             f_paths_train_ssd_temp = []
 
         for file_tuple in test_files:
@@ -362,21 +384,21 @@ def use_node_local_ssd_for_input(train_files, test_files, multiple_inputs=False)
                 f_path_ssd = local_scratch_path + '/' + os.path.basename(f_path)
                 f_paths_test_ssd_temp.append(f_path_ssd)
 
-            test_files_ssd.append((f_paths_test_ssd_temp, f_size)) # f_size of all f_paths should be the same
+            test_files_ssd.append((f_paths_test_ssd_temp, f_size))  # f_size of all f_paths should be the same
             f_paths_test_ssd_temp = []
 
     else:
         for file_tuple in train_files:
             input_filepath, f_size = file_tuple[0][0], file_tuple[1]
 
-            shutil.copy2(input_filepath, local_scratch_path) # copy to /scratch node-local SSD
+            shutil.copy2(input_filepath, local_scratch_path)  # copy to /scratch node-local SSD
             input_filepath_ssd = local_scratch_path + '/' + os.path.basename(input_filepath)
             train_files_ssd.append(([input_filepath_ssd], f_size))
 
         for file_tuple in test_files:
             input_filepath, f_size = file_tuple[0][0], file_tuple[1]
 
-            shutil.copy2(input_filepath, local_scratch_path) # copy to /scratch node-local SSD
+            shutil.copy2(input_filepath, local_scratch_path)  # copy to /scratch node-local SSD
             input_filepath_ssd = local_scratch_path + '/' + os.path.basename(input_filepath)
             test_files_ssd.append(([input_filepath_ssd], f_size))
 
