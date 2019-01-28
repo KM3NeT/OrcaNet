@@ -180,7 +180,8 @@ def train_and_validate_model(cfg, model, start_epoch):
         write_full_logfile(cfg, model, history_train, history_val, K.get_value(model.optimizer.lr), curr_epoch, files_dict)
         # Make plots
         update_summary_plot(cfg.main_folder)
-        plot_weights_and_activations(cfg, model, xs_mean, curr_epoch)
+        # TODO reimplement, this function throws errors all the time!
+        # plot_weights_and_activations(cfg, model, xs_mean, curr_epoch)
 
 
 def train_model(cfg, model, files_dict, f_size, xs_mean, curr_epoch):

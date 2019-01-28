@@ -67,10 +67,6 @@ def read_out_list_file(file):
                 }
     validation_files : dict
         Like the above but for validation files.
-    n_train : int
-        The number of train files.
-    n_val : int
-        The number of validation files.
 
     Raises
     -------
@@ -95,7 +91,8 @@ def read_out_list_file(file):
     if not n_val.count(n_val[0]) == len(n_val):
         raise AssertionError("The specified validation inputs do not all have the same number of files")
     # TODO Maybe files have different number of events? Should give an error
-    return train_files, validation_files, n_train, n_val
+    # TODO maybe x and y groups have different number of events? --> Error
+    return train_files, validation_files
 
 
 def read_out_model_file(file):

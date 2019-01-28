@@ -170,8 +170,6 @@ class Configuration(object):
         # Private attributes:
         self._train_files = None
         self._val_files = None
-        self._n_train_files = None
-        self._n_val_files = None
         self._list_file = None
         self._modeldata = None
 
@@ -184,7 +182,7 @@ class Configuration(object):
     def set_from_list_file(self, list_file):
         """ Set filepaths to the ones given in a list file. """
         if self._list_file is None:
-            self._train_files, self._val_files, self._n_train_files, self._n_val_files = read_out_list_file(list_file)
+            self._train_files, self._val_files = read_out_list_file(list_file)
             # Save internally which path was used to load the info
             self._list_file = list_file
         else:
@@ -257,7 +255,7 @@ class Configuration(object):
         """
         if epoch[0] == 0 and epoch[1] == 0:
             next_epoch = (1, 1)
-        elif epoch[1] == len(self._n_train_files):
+        elif epoch[1] == self.get_no_of_train_files():
             next_epoch = (epoch[0] + 1, 1)
         else:
             next_epoch = (epoch[0], epoch[1] + 1)
@@ -306,6 +304,20 @@ class Configuration(object):
                 print("Creating directory: " + directory)
                 os.makedirs(directory)
 
+    def get_default_values(self):
+        """ Return default values of common settings. """
+        return self._default_values
+
+    def get_train_files(self):
+        if self._train_files is None:
+            raise AssertionError("No train files were specified!")
+        return self._train_files
+
+    def get_val_files(self):
+        if self._val_files is None:
+            raise AssertionError("No validation files were specified!")
+        return self._val_files
+
     def get_n_bins(self):
         """
         Get the number of bins from the training files.
@@ -324,16 +336,6 @@ class Configuration(object):
             f = h5py.File(train_files[input_key][0], "r")
             n_bins[input_key] = f[self.key_samples].shape[1:]
         return n_bins
-
-    def get_default_values(self):
-        """ Return default values of common settings. """
-        return self._default_values
-
-    def get_train_files(self):
-        return self._train_files
-
-    def get_val_files(self):
-        return self._val_files
 
     def get_multiple_inputs(self):
         """
