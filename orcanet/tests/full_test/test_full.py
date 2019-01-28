@@ -32,10 +32,10 @@ class DatasetTest(TestCase):
         self.shape = (3, 3, 3, 3)
 
         train_inp = (self.temp_dir + "train1.h5", self.temp_dir + "train2.h5")
-        self.train_pathes = {"input_A": train_inp}
+        self.train_pathes = {"input_1": train_inp}
 
         val_inp = (self.temp_dir + "val1.h5", self.temp_dir + "val2.h5")
-        self.val_pathes = {"input_A": val_inp}
+        self.val_pathes = {"input_1": val_inp}
 
         for path1, path2 in (train_inp, val_inp):
             make_dummy_data(path1, path2, self.shape)
@@ -61,11 +61,11 @@ class DatasetTest(TestCase):
         cfg = self.cfg
         xs_mean = load_zero_center_data(cfg)
         target_xs_mean = np.ones(self.shape)/4
-        self.assertTrue(np.allclose(xs_mean["input_A"], target_xs_mean))
+        self.assertTrue(np.allclose(xs_mean["input_1"], target_xs_mean))
 
-        file = cfg.zero_center_folder + cfg._list_file + '_input_' + "input_A" + '.npz'
+        file = cfg.zero_center_folder + cfg._list_file + '_input_' + "input_1" + '.npz'
         zero_center_used_ip_files = np.load(file)['zero_center_used_ip_files']
-        self.assertTrue(np.array_equal(zero_center_used_ip_files, cfg._train_files["input_A"]))
+        self.assertTrue(np.array_equal(zero_center_used_ip_files, cfg._train_files["input_1"]))
 
     def test_multi_input_model(self):
         """
@@ -104,14 +104,14 @@ def make_dummy_data(filepath1, filepath2, shape):
     xs1 = np.concatenate([np.ones((75,) + shape), np.zeros((75,) + shape)])
     xs2 = np.concatenate([np.ones((25,) + shape), np.zeros((225,) + shape)])
 
-    y = np.ones((150, 16))
     dtypes = [('event_id', '<f8'), ('particle_type', '<f8'), ('energy', '<f8'), ('is_cc', '<f8'), ('bjorkeny', '<f8'),
               ('dir_x', '<f8'), ('dir_y', '<f8'), ('dir_z', '<f8'), ('time_interaction', '<f8'), ('run_id', '<f8'),
               ('vertex_pos_x', '<f8'), ('vertex_pos_y', '<f8'), ('vertex_pos_z', '<f8'), ('time_residual_vertex', '<f8'),
               ('prod_ident', '<f8'), ('group_id', '<i8')]
-    ys = y.ravel().view(dtype=dtypes)
+    ys1 = np.ones((150, 16)).ravel().view(dtype=dtypes)
+    ys2 = np.ones((250, 16)).ravel().view(dtype=dtypes)
 
-    for xs, filepath in ((xs1, filepath1), (xs2, filepath2)):
+    for xs, ys, filepath in ((xs1, ys1, filepath1), (xs2, ys2, filepath2)):
         h5f = h5py.File(filepath, 'w')
         h5f.create_dataset('x', data=xs, dtype='uint8')
         h5f.create_dataset('y', data=ys, dtype=dtypes)

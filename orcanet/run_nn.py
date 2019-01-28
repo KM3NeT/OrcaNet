@@ -94,7 +94,7 @@ def triple_decay(n_epoch, n_file, cfg):
         Calculated learning rate for this epoch.
 
     """
-    n_lr_decays = (n_epoch - 1) * len(cfg.get_no_of_train_files()) + (n_file - 1)
+    n_lr_decays = (n_epoch - 1) * cfg.get_no_of_train_files() + (n_file - 1)
     lr_temp = 0.005  # * n_gpu TODO think about multi gpu lr
 
     for i in range(n_lr_decays):

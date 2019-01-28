@@ -21,8 +21,8 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident =
 
     Parameters
     ----------
-    n_bins : list(tuple(int))
-        Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
+    n_bins : dict(tuple(int))
+        Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples for different inputs.
     batchsize : int
         Batchsize that is used for the training / inferencing of the cnn.
     swap_4d_channels : None/str
@@ -42,6 +42,8 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident =
         Item: Specifies the strides.
 
     """
+    # TODO Change this to actually use the dict keywords!
+    n_bins = list(n_bins.values())
     if n_bins[0].count(1) == 1: # 3d case
         dim = 3
         input_dim = get_dimensions_encoding(n_bins[0], batchsize)  # includes batchsize
@@ -140,8 +142,8 @@ def create_vgg_like_model(n_bins, class_type, n_filters=None, dropout=0, k_size=
 
     Parameters
     ----------
-    n_bins : list(tuple(int))
-        Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples.
+    n_bins : dict(tuple(int))
+        Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples for different inputs.
     class_type : tuple(int, str)
         Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
     n_filters : tuple

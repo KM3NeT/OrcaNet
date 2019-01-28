@@ -20,6 +20,7 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
     This will go through one file, or multiple files in parallel, and yield one batch of data, which can then
     be used as an input to a model. Since multiple filepaths can be given to read out in parallel,
     this can also be used for models with multiple inputs.
+    # TODO Is reading n batches at once and yielding them one at a time faster then what we have currently?
 
     Parameters
     ----------
@@ -54,8 +55,8 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
     str_ident = cfg.str_ident
     swap_col = cfg.swap_4d_channels
     # name of the datagroups in the file
-    samples_key = "x"
-    mc_key = "y"
+    samples_key = cfg.key_samples
+    mc_key = cfg.key_labels
 
     # If the batchsize is larger than the f_size, make batchsize smaller or nothing would be yielded
     if f_size is not None:
@@ -91,7 +92,7 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
                 if zero_center_image is not None:
                     xs[input_key] = np.subtract(xs[input_key], zero_center_image[input_key])
             # Get labels for the nn. Since the labels are hopefully the same for all the files, use the ones from the first
-            y_values = files[0][mc_key][sample_n:sample_n + batchsize]
+            y_values = list(files.values())[0][mc_key][sample_n:sample_n + batchsize]
 
             # Modify the samples and the labels batchwise
             if swap_col is not None:
@@ -302,52 +303,28 @@ def get_labels(y_values, class_type):
     return ys
 
 
-# def encode_targets(y_val, class_type):
-#     """
-#     Encodes the labels (classes) of the images.
-#     :param ndarray(ndim=1) y_val: Array that contains ALL event class information for one event.
-#            ---------------------------------------------------------------------------------------------------------------------------------------
-#            Current content: [event_id -> 0, particle_type -> 1, energy -> 2, isCC -> 3, bjorkeny -> 4, dir_x/y/z -> 5/6/7, time -> 8, run_id -> 9]
-#            ---------------------------------------------------------------------------------------------------------------------------------------
-#     :param (int, str) class_type: Tuple with the umber of output classes and a string identifier to specify the exact output classes.
-#                                   I.e. (2, 'muon-CC_to_elec-CC')
-#     :return: ndarray(ndim=1) train_y: Array that contains the encoded class label information of the input event.
-#     """
-#     def get_class_up_down_categorical(dir_z, n_neurons):
-#         """
-#         Converts the zenith information (dir_z) to a binary up/down value.
-#         :param float32 dir_z: z-direction of the event_track (which contains dir_z).
-#         :param int n_neurons: defines the number of neurons in the last cnn layer that should be used with the categorical array.
-#         :return ndarray(ndim=1) y_cat_up_down: categorical y ('label') array which can be fed to a NN.
-#                                                E.g. [0],[1] for n=1 or [0,1], [1,0] for n=2
-#         """
-#         # analyze the track info to determine the class number
-#         up_down_class_value = int(np.sign(dir_z)) # returns -1 if dir_z < 0, 0 if dir_z==0, 1 if dir_z > 0
-#
-#         if up_down_class_value == 0:
-#             print('Warning: Found an event with dir_z==0. Setting the up-down class randomly.')
-#             # maybe [0.5, 0.5], but does it make sense with cat_crossentropy?
-#             up_down_class_value = np.random.randint(2)
-#
-#         if up_down_class_value == -1: up_down_class_value = 0 # Bring -1,1 values to 0,1
-#
-#         y_cat_up_down = np.zeros(n_neurons, dtype='float32')
-#
-#         if n_neurons == 1:
-#             y_cat_up_down[0] = up_down_class_value # 1 or 0 for up/down
-#         else:
-#             y_cat_up_down[up_down_class_value] = 1 # [0,1] or [1,0] for up/down
-#
-#         return y_cat_up_down
-#
-#
-#     if class_type[1] == 'up_down':
-#         train_y = get_class_up_down_categorical(y_val[7], class_type[0])
-#
-#     else:
-#         raise ValueError("Class type " + str(class_type) + " not supported!")
-#
-#     return train_y
+def get_inputs(model):
+    """
+    Get the names and the layers of the inputs of the model.
+
+    Parameters
+    ----------
+    model : ks.model
+        A keras model.
+
+    Returns
+    -------
+    layers :dict
+        The input layers and names.
+
+    """
+    from keras.layers import InputLayer
+    layers = {}
+    for layer in model.layers:
+        if isinstance(layer, InputLayer):
+            layers[layer.name] = layer
+    return layers
+
 
 # ------------- Functions used for supplying images to the GPU -------------#
 
@@ -399,7 +376,7 @@ def load_zero_center_data(cfg):
         else:
             print('Calculating the xs_mean_array for list input ' + str(input_key) + ' in order to zero_center the data!')
             # if the train dataset is split over multiple files, we need to average over the single xs_mean_for_ip arrays.
-            xs_mean_for_ip_i = get_mean_image(all_train_files_for_ip_i, cfg.n_gpu[0])
+            xs_mean_for_ip_i = get_mean_image(all_train_files_for_ip_i, cfg.key_samples, cfg.n_gpu[0])
 
             filename = zero_center_folder + train_files_list_name + '_input_' + str(input_key) + '.npz'
             np.savez(filename, xs_mean=xs_mean_for_ip_i, zero_center_used_ip_files=all_train_files_for_ip_i)
@@ -467,12 +444,12 @@ def get_precalculated_xs_mean_if_exists(zero_center_files, all_train_files_for_i
     return xs_mean_for_ip_i
 
 
-def get_mean_image(filepaths, n_gpu):
+def get_mean_image(filepaths, key_samples, n_gpu):
     """
     Returns the mean_image of a xs dataset.
     Calculating still works if xs is larger than the available memory and also if the file is compressed!
-    :param list filepath: Filepaths of the data upon which the mean_image should be calculated.
-    :param filepath: Filepath of the input data, used as a str for saving the xs_mean_image.
+    :param list filepaths: Filepaths of the data upon which the mean_image should be calculated.
+    :param str key_samples: The name of the datagroup in your h5 input files which contains the samples to the network.
     :param int n_gpu: Number of used gpu's that is related to how much RAM is available (16G per GPU).
     :return: ndarray xs_mean: mean_image of the x dataset. Can be used for zero-centering later on.
     """
@@ -486,7 +463,7 @@ def get_mean_image(filepaths, n_gpu):
 
         filesize = get_array_memsize(file['x'])
         steps = int(np.ceil(filesize/total_memory))
-        n_rows = file['x'].shape[0]
+        n_rows = file[key_samples].shape[0]
         stepsize = int(n_rows / float(steps))
 
         # create xs_mean_arr that stores intermediate mean_temp results
@@ -498,9 +475,9 @@ def get_mean_image(filepaths, n_gpu):
 
             # for the last step, calculate mean till the end of the file
             if i == steps-1 or steps == 1:
-                xs_mean_temp = np.mean(file['x'][i * stepsize: n_rows], axis=0, dtype=np.float64)
+                xs_mean_temp = np.mean(file[key_samples][i * stepsize: n_rows], axis=0, dtype=np.float64)
             else:
-                xs_mean_temp = np.mean(file['x'][i*stepsize: (i+1) * stepsize], axis=0, dtype=np.float64)
+                xs_mean_temp = np.mean(file[key_samples][i*stepsize: (i+1) * stepsize], axis=0, dtype=np.float64)
 
             xs_mean_arr[i] = xs_mean_temp
 

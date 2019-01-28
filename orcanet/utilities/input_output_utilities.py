@@ -294,33 +294,6 @@ def h5_get_number_of_rows(h5_filepath):
     return number_of_rows
 
 
-def h5_get_n_bins(train_files):
-    """
-    Get the number of bins from the training files. Only the first files are looked up, the others should be identical.
-    CAREFUL: The name of the neural network 'images' dataset in the files MUST be 'x'.
-
-    Parameters
-    ----------
-    train_files : List
-        A list containing the paths to the different training files given in the list_file.
-        Example format:
-                [
-                 [['path/to/train_file_1_dimx.h5', 'path/to/train_file_1_dimy.h5'], number_of_events_train_files_1],
-                 [['path/to/train_file_2_dimx.h5', 'path/to/train_file_2_dimy.h5'], number_of_events_train_files_1]
-                ]
-
-    Returns
-    -------
-    n_bins : list
-
-    """
-    n_bins = []
-    for dim_file in train_files[0][0]:
-        f = h5py.File(dim_file, "r")
-        n_bins.append(f['x'].shape[1:])
-    return n_bins
-
-
 def use_node_local_ssd_for_input(train_files, val_files):
     """
     Copies the test and train files to the node-local ssd scratch folder and returns the new filepaths of the train and test data.

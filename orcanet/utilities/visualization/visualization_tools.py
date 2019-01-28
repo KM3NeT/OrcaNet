@@ -252,9 +252,15 @@ def get_activations_and_weights(cfg, xs_mean, model, layer_name=None, learning_p
     :param str learning_phase: string identifier to specify the learning phase during the calculation of the activations.
                                'test', 'train': Dropout, Batchnorm etc. in test/train mode
     """
-    inp = model.input
-    if not isinstance(inp, list):
-        inp = [inp]  # only one input! let's wrap it in a list.
+    inp_layer = model.input
+    if not isinstance(inp_layer, list):
+        # only one input! let's wrap it in a list
+        inp_layer = [inp_layer, ]
+
+    inp = {}
+    for layer in inp_layer:
+        inp[layer.name] = layer
+
     outputs = [layer.output for layer in model.layers if
                layer.name == layer_name or layer_name is None]  # all layer outputs -> empty tf.tensors
     layer_names = [layer.name for layer in model.layers if
@@ -262,23 +268,14 @@ def get_activations_and_weights(cfg, xs_mean, model, layer_name=None, learning_p
     weights = [layer.get_weights() for layer in model.layers if
                layer.name == layer_name or layer_name is None]
     outputs = outputs[1:]  # remove the first input_layer from fetch
-    funcs = [K.function(inp + [K.learning_phase()], [out]) for out in outputs]  # evaluation functions
+    funcs = [K.function([inp, K.learning_phase()], [out]) for out in outputs]  # evaluation functions
 
-    f = cfg.yield_val_files()
+    f = next(cfg.yield_val_files())
     generator = generate_batches_from_hdf5_file(cfg, f, f_size=1, zero_center_image=xs_mean, yield_mc_info=True)
     model_inputs, ys, y_values = next(generator)  # y_values = mc_info for the event
     lp = 0. if learning_phase == 'test' else 1.
-    # print(len(model_inputs), type(model_inputs))    # Real: 1, ndarray   Dummy: 1 , list
-    # print(model_inputs[0].shape)    # Real: (11,13,18,131),     Dummy: (1,3,3,3,3)
-    if isinstance(model_inputs, list):
-        model_inputs = model_inputs[0]
 
-    if len(model_inputs) > 1:
-        list_inputs = []
-        list_inputs.extend(model_inputs)
-        list_inputs.append(lp)
-    else:
-        list_inputs = [model_inputs, lp]
+    list_inputs = [model_inputs.values(), lp]
 
     layer_outputs = [func(list_inputs)[0] for func in funcs]
     activations = []

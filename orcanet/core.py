@@ -8,10 +8,11 @@ import os
 import warnings
 from collections import namedtuple
 import keras as ks
+import h5py
 
 from orcanet.run_nn import train_and_validate_model
 from orcanet.eval_nn import predict_and_investigate_model_performance, get_modelname
-from orcanet.utilities.input_output_utilities import read_out_list_file, read_out_config_file, read_out_model_file, use_node_local_ssd_for_input, h5_get_n_bins, write_full_logfile_startup, h5_get_number_of_rows
+from orcanet.utilities.input_output_utilities import read_out_list_file, read_out_config_file, read_out_model_file, use_node_local_ssd_for_input, write_full_logfile_startup, h5_get_number_of_rows
 from orcanet.utilities.nn_utilities import load_zero_center_data
 from orcanet.utilities.losses import get_all_loss_functions
 
@@ -47,6 +48,10 @@ class Configuration(object):
         When using multiple files, define the file number with which the training is supposed to start, e.g.
         1 for load the model trained on the first file. If both epoch and fileno are -1, automatically set to the most
         recent file found in the main folder.
+    key_samples : str
+        The name of the datagroup in your h5 input files which contains the samples to the network.
+    key_labels : str
+        The name of the datagroup in your h5 input files which contains the labels to the network.
     learning_rate : float or tuple or function
         The learning rate for the training.
         If it is a float, the learning rate will be constantly this value.
@@ -139,6 +144,8 @@ class Configuration(object):
         self.filter_out_tf_garbage = True
         self.initial_epoch = -1
         self.initial_fileno = -1
+        self.key_samples = "x"
+        self.key_labels = "y"
         self.learning_rate = 0.001
         self.n_events = None
         self.n_gpu = (1, 'avolkov')
@@ -300,7 +307,23 @@ class Configuration(object):
                 os.makedirs(directory)
 
     def get_n_bins(self):
-        return h5_get_n_bins(self._train_files)
+        """
+        Get the number of bins from the training files.
+
+        Only the first files are looked up, the others should be identical.
+
+        Returns
+        -------
+        n_bins : dict
+            List input names as keys, list of the bins as values.
+
+        """
+        train_files = self.get_train_files()
+        n_bins = {}
+        for input_key in train_files:
+            f = h5py.File(train_files[input_key][0], "r")
+            n_bins[input_key] = f[self.key_samples].shape[1:]
+        return n_bins
 
     def get_default_values(self):
         """ Return default values of common settings. """
@@ -364,6 +387,8 @@ class Configuration(object):
         """
         Return the number of train files.
 
+        Only looks up the no of files of one (random) list input, as equal length is checked during read in.
+
         Returns
         -------
         no_of_files : int
@@ -371,12 +396,14 @@ class Configuration(object):
 
         """
         train_files = self.get_train_files()
-        no_of_files = len(train_files.values()[0])
+        no_of_files = len(list(train_files.values())[0])
         return no_of_files
 
     def get_no_of_val_files(self):
         """
         Return the number of val files.
+
+        Only looks up the no of files of one (random) list input, as equal length is checked during read in.
 
         Returns
         -------
@@ -385,7 +412,7 @@ class Configuration(object):
 
         """
         val_files = self.get_val_files()
-        no_of_files = len(val_files.values()[0])
+        no_of_files = len(list(val_files.values())[0])
         return no_of_files
 
     def yield_train_files(self):
@@ -400,7 +427,7 @@ class Configuration(object):
         """
         train_files = self.get_train_files()
         for file_no in range(self.get_no_of_train_files()):
-            files_dict = {key: train_files[file_no] for key in train_files}
+            files_dict = {key: train_files[key][file_no] for key in train_files}
             yield files_dict
 
     def yield_val_files(self):
@@ -415,7 +442,7 @@ class Configuration(object):
         """
         val_files = self.get_val_files()
         for file_no in range(self.get_no_of_val_files()):
-            files_dict = {key: val_files[file_no] for key in val_files}
+            files_dict = {key: val_files[key][file_no] for key in val_files}
             yield files_dict
 
 
