@@ -218,7 +218,7 @@ def shuffle_h5(filepath_input, tool=False, seed=42, delete=True, chunksize=None,
         pipe = kp.Pipeline(timeit=True)  # add timeit=True argument for profiling
         pipe.attach(km.common.StatusBar, every=200)
         pipe.attach(km.common.MemoryObserver, every=200)
-        pipe.attach(kp.io.hdf5.HDF5Pump, filename=filepath_input, shuffle=True)
+        pipe.attach(kp.io.hdf5.HDF5Pump, filename=filepath_input, shuffle=True, reset_index=True)
         pipe.attach(kp.io.hdf5.HDF5Sink, filename=filepath_output, complib=complib, complevel=complevel, chunksize=chunksize, flush_frequency=1000)
         pipe.drain()
         if delete:
