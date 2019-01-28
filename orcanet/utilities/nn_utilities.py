@@ -13,7 +13,7 @@ from functools import reduce
 # ------------- Functions used for supplying images to the GPU -------------#
 
 
-def generate_batches_from_hdf5_file(cfg, filepaths, f_size=None, zero_center_image=None, yield_mc_info=False, shuffle=False):
+def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_image=None, yield_mc_info=False, shuffle=False):
     """
     Yields batches of input data from h5 files.
 
@@ -25,15 +25,14 @@ def generate_batches_from_hdf5_file(cfg, filepaths, f_size=None, zero_center_ima
     ----------
     cfg : object Configuration
         Configuration object containing all the configurable options in the OrcaNet scripts.
-    filepaths : list
-        List that contains the full filepath of the input h5 file, e.g. ['/path/to/file.h5', ]
-        (or multiple files to read out in parallel).
+    files_dict : dict
+        The name of every input as a key (can be multiple), the filepath of a h5py file to read samples from as values.
     f_size : int or None
         Specifies the filesize (#images) of the .h5 file if not the whole .h5 file
         should be used for yielding the xs/ys arrays. This is important if you run fit_generator(epochs>1) with
         a filesize (and hence # of steps) that is smaller than the .h5 file.
-    zero_center_image : ndarray
-        Mean image of the dataset used for zero-centering.
+    zero_center_image : dict
+        Mean image of the dataset used for zero-centering. Every input as a key, ndarray as values.
     yield_mc_info : bool
         Specifies if mc-infos (y_values) should be yielded as well.
         The mc-infos are used for evaluation after training and testing is finished.
@@ -54,7 +53,6 @@ def generate_batches_from_hdf5_file(cfg, filepaths, f_size=None, zero_center_ima
     class_type = cfg.class_type
     str_ident = cfg.str_ident
     swap_col = cfg.swap_4d_channels
-    n_files = len(filepaths)
     # name of the datagroups in the file
     samples_key = "x"
     mc_key = "y"
@@ -65,14 +63,16 @@ def generate_batches_from_hdf5_file(cfg, filepaths, f_size=None, zero_center_ima
             batchsize = f_size
 
     while 1:
+        # a dict with the names of list inputs as keys, and the opened h5 files as values.
         files = {}
         file_lengths = []
         # open the files and make sure they have the same length
-        for input_no in range(n_files):
-            files[input_no] = h5py.File(filepaths[input_no], 'r')
-            file_lengths.append(len(files[input_no][samples_key]))
+        for input_key in files_dict:
+            files[input_key] = h5py.File(files_dict[input_key], 'r')
+            file_lengths.append(len(files[input_key][samples_key]))
         if not file_lengths.count(file_lengths[0]) == len(file_lengths):
             raise AssertionError("All data files must have the same length! Yours have:\n " + str(file_lengths))
+
         if f_size is None:
             f_size = file_lengths[0]
         # number of full batches available
@@ -84,18 +84,18 @@ def generate_batches_from_hdf5_file(cfg, filepaths, f_size=None, zero_center_ima
 
         for sample_n in sample_pos:
             # Read one batch of samples from the files and zero center
-            # Every input gets its own entry in the dict, with the key name currently being the index TODO change key to name of input layer
+            # A dict with every input name as key, and a batch of data as values
             xs = {}
-            for input_no in range(n_files):
-                xs[input_no] = files[input_no][samples_key][sample_n: sample_n + batchsize]
+            for input_key in files:
+                xs[input_key] = files[input_key][samples_key][sample_n: sample_n + batchsize]
                 if zero_center_image is not None:
-                    xs[input_no] = np.subtract(xs[input_no], zero_center_image[input_no])
+                    xs[input_key] = np.subtract(xs[input_key], zero_center_image[input_key])
             # Get labels for the nn. Since the labels are hopefully the same for all the files, use the ones from the first
             y_values = files[0][mc_key][sample_n:sample_n + batchsize]
 
             # Modify the samples and the labels batchwise
             if swap_col is not None:
-                xs = get_input_images(xs, n_files, swap_col, str_ident)
+                xs = get_input_images(xs, swap_col, str_ident)
             ys = get_labels(y_values, class_type)
 
             if not yield_mc_info:
@@ -103,8 +103,8 @@ def generate_batches_from_hdf5_file(cfg, filepaths, f_size=None, zero_center_ima
             else:
                 yield xs, ys, y_values
 
-        for i in range(n_files):
-            files[i].close()
+        # for i in range(n_files):
+        #     files[i].close()
 
 
 def get_dimensions_encoding(n_bins, batchsize):
@@ -160,7 +160,7 @@ def get_dimensions_encoding(n_bins, batchsize):
     return dimensions
 
 
-def get_input_images(xs, n_files, swap_col, str_ident):
+def get_input_images(xs, swap_col, str_ident):
     """
     Permute columns, or add permuted columns to xs.
 
@@ -638,7 +638,7 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
             self.cum_metrics[metric] = 0
 
         self.steps_per_total_epoch, self.steps_cum = 0, [0]
-        for f, f_size in cfg.get_train_files():
+        for f_size in cfg.get_train_file_sizes():
             steps_per_file = int(f_size / cfg.batchsize)
             self.steps_per_total_epoch += steps_per_file
             self.steps_cum.append(self.steps_cum[-1] + steps_per_file)

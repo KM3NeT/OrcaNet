@@ -244,7 +244,9 @@ def sort_metric_names_and_errors(metric_names):
 def get_activations_and_weights(cfg, xs_mean, model, layer_name=None, learning_phase='test'):
     """
     Get the weights of a model and also the activations of the model for a single event in the validation set.
-    :param ndarray xs_mean: mean_image of the x (train-) dataset used for zero-centering the data.
+
+    xs_mean : dict
+        Mean image of the dataset used for zero-centering. Every input as a key, ndarray as values.
     :param ks.model model: The model to make the data with.
     :param None/str layer_name: if only the activations of a single layer should be collected.
     :param str learning_phase: string identifier to specify the learning phase during the calculation of the activations.
@@ -262,7 +264,7 @@ def get_activations_and_weights(cfg, xs_mean, model, layer_name=None, learning_p
     outputs = outputs[1:]  # remove the first input_layer from fetch
     funcs = [K.function(inp + [K.learning_phase()], [out]) for out in outputs]  # evaluation functions
 
-    f = cfg.get_val_files()[0][0]
+    f = cfg.yield_val_files()
     generator = generate_batches_from_hdf5_file(cfg, f, f_size=1, zero_center_image=xs_mean, yield_mc_info=True)
     model_inputs, ys, y_values = next(generator)  # y_values = mc_info for the event
     lp = 0. if learning_phase == 'test' else 1.
@@ -296,8 +298,8 @@ def plot_weights_and_activations(cfg, model, xs_mean, epoch):
         Configuration object containing all the configurable options in the OrcaNet scripts.
     model : ks.models.Model
         The model to do the predictions with.
-    xs_mean : ndarray
-        Zero center image.
+    xs_mean : dict
+        Mean image of the dataset used for zero-centering. Every input as a key, ndarray as values.
     epoch : tuple
         Current epoch and fileno.
 

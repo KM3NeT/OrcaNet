@@ -309,12 +309,88 @@ class Configuration(object):
         -------
         file_sizes : list
             Its length is equal to the number of files in each input set.
+
         """
         train_files = self.get_train_files()
         file_sizes = []
         for file in train_files[list(train_files.keys())[0]]:
             file_sizes.append(h5_get_number_of_rows(file))
         return file_sizes
+
+    def get_val_file_sizes(self):
+        """
+        Get the number of samples in each input file.
+        # TODO only uses the no of samples of the first input! check if the others are the same % batchsize
+
+        Returns
+        -------
+        file_sizes : list
+            Its length is equal to the number of files in each input set.
+
+        """
+        val_files = self.get_val_files()
+        file_sizes = []
+        for file in val_files[list(val_files.keys())[0]]:
+            file_sizes.append(h5_get_number_of_rows(file))
+        return file_sizes
+
+    def get_no_of_train_files(self):
+        """
+        Return the number of train files.
+
+        Returns
+        -------
+        no_of_files : int
+            The number of files.
+
+        """
+        train_files = self.get_train_files()
+        no_of_files = len(train_files.values()[0])
+        return no_of_files
+
+    def get_no_of_val_files(self):
+        """
+        Return the number of val files.
+
+        Returns
+        -------
+        no_of_files : int
+            The number of files.
+
+        """
+        val_files = self.get_val_files()
+        no_of_files = len(val_files.values()[0])
+        return no_of_files
+
+    def yield_train_files(self):
+        """
+        Yield a train file for every input.
+
+        Yields
+        ------
+        files_dict : dict
+            The name of every input as a key, the n-th filepath as values.
+
+        """
+        train_files = self.get_train_files()
+        for file_no in range(self.get_no_of_train_files()):
+            files_dict = {key: train_files[file_no] for key in train_files}
+            yield files_dict
+
+    def yield_val_files(self):
+        """
+        Yield a validation file for every input.
+
+        Yields
+        ------
+        files_dict : dict
+            The name of every input as a key, the n-th filepath as values.
+
+        """
+        val_files = self.get_val_files()
+        for file_no in range(self.get_no_of_val_files()):
+            files_dict = {key: val_files[file_no] for key in val_files}
+            yield files_dict
 
 
 def orca_train(cfg, initial_model=None):

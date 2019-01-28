@@ -49,7 +49,7 @@ def get_learning_rate(cfg, epoch):
     elif isinstance(user_lr, tuple) or isinstance(user_lr, list):
         if len(user_lr) == 2:
             # Exponentially decaying LR
-            lr = user_lr[0] * (1 - user_lr[1])**(epoch[1] + epoch[0]*len(cfg.get_train_files()))
+            lr = user_lr[0] * (1 - user_lr[1])**(epoch[1] + epoch[0]*len(cfg.get_no_of_train_files()))
         else:
             raise AssertionError(error_msg)
 
@@ -93,8 +93,7 @@ def triple_decay(n_epoch, n_file, cfg):
         Calculated learning rate for this epoch.
 
     """
-
-    n_lr_decays = (n_epoch - 1) * len(cfg.get_train_files()) + (n_file - 1)
+    n_lr_decays = (n_epoch - 1) * len(cfg.get_no_of_train_files()) + (n_file - 1)
     lr_temp = 0.005  # * n_gpu TODO think about multi gpu lr
 
     for i in range(n_lr_decays):
@@ -150,10 +149,13 @@ def train_and_validate_model(cfg, model, start_epoch):
         xs_mean = load_zero_center_data(cfg)
     else:
         xs_mean = None
+    f_sizes = cfg.get_train_file_sizes()
 
-    for file_no, (files, f_size) in enumerate(cfg.get_train_files(), 1):
+    for file_no, files_dict in enumerate(cfg.yield_train_files()):
+        # no of samples in current file
+        f_size = f_sizes[file_no]
         # Only the file number changes during training, as this function trains only for one epoch
-        curr_epoch = (start_epoch[0], file_no)
+        curr_epoch = (start_epoch[0], file_no + 1)
         # skip to the file with the target file number given in the start_epoch tuple.
         if curr_epoch[1] < start_epoch[1]:
             continue
@@ -161,7 +163,7 @@ def train_and_validate_model(cfg, model, start_epoch):
         K.set_value(model.optimizer.lr, lr)
         print("Set learning rate to " + str(lr))
         # Train the model on one file and save it afterwards
-        history_train = train_model(cfg, model, files, f_size, xs_mean, curr_epoch)
+        history_train = train_model(cfg, model, files_dict, f_size, xs_mean, curr_epoch)
         model_filename = cfg.main_folder + 'saved_models/model_epoch_' + str(curr_epoch[0]) + '_file_' + str(curr_epoch[1]) + '.h5'
         model.save(model_filename)
         print("Saved model as " + model_filename)
@@ -172,13 +174,13 @@ def train_and_validate_model(cfg, model, start_epoch):
             history_val = None
         # Write logfiles
         write_summary_logfile(cfg, curr_epoch, model, history_train, history_val, K.get_value(model.optimizer.lr))
-        write_full_logfile(cfg, model, history_train, history_val, K.get_value(model.optimizer.lr), curr_epoch, files)
+        write_full_logfile(cfg, model, history_train, history_val, K.get_value(model.optimizer.lr), curr_epoch, files_dict)
         # Make plots
         update_summary_plot(cfg.main_folder)
         plot_weights_and_activations(cfg, model, xs_mean, curr_epoch)
 
 
-def train_model(cfg, model, files, f_size, xs_mean, curr_epoch):
+def train_model(cfg, model, files_dict, f_size, xs_mean, curr_epoch):
     """
     Trains a model on one file based on the Keras fit_generator method.
 
@@ -190,22 +192,22 @@ def train_model(cfg, model, files, f_size, xs_mean, curr_epoch):
         Configuration object containing all the configurable options in the OrcaNet scripts.
     model : ks.model.Model
         Keras model instance of a neural network.
-    files : list
-        Full filepath of the file (or files for multiple inputs) that should be used for training.
+    files_dict : dict
+        The name of every input as a key, the path to the n-th training file as values.
     f_size : int
-        Number of images contained in f.
-    xs_mean : ndarray
-        Mean_image of the x (train-) dataset used for zero-centering the train-/val-data.
+        Number of images contained in f
+    xs_mean : dict
+        Mean image of the dataset used for zero-centering. Every input as a key, ndarray as values.
     curr_epoch : tuple(int, int)
         The number of the current epoch and the current filenumber.
 
     """
-    print('Training in epoch ' + str(curr_epoch[0]) + ' on file ' + str(curr_epoch[1]) + ' ,', files)
+    print('Training in epoch ' + str(curr_epoch[0]) + ' on file ' + str(curr_epoch[1]) + ' ,', str(files_dict))
     if cfg.n_events is not None:
         # TODO Can throw an error if n_events is larger than the file
         f_size = cfg.n_events  # for testing purposes
     callbacks = [BatchLevelPerformanceLogger(cfg, model, curr_epoch), ]
-    training_generator = generate_batches_from_hdf5_file(cfg, files, f_size=f_size, zero_center_image=xs_mean)
+    training_generator = generate_batches_from_hdf5_file(cfg, files_dict, f_size=f_size, zero_center_image=xs_mean)
     history = model.fit_generator(training_generator, steps_per_epoch=int(f_size / cfg.batchsize), epochs=1,
                                   verbose=cfg.verbose_train, max_queue_size=10, callbacks=callbacks)
     return history
@@ -223,18 +225,19 @@ def validate_model(cfg, model, xs_mean):
         Configuration object containing all the configurable options in the OrcaNet scripts.
     model : ks.model.Model
         Keras model instance of a neural network.
-    xs_mean : ndarray
-        Mean_image of the x (train-) dataset used for zero-centering the train-/val-data.
+    xs_mean : dict
+        Mean image of the dataset used for zero-centering. Every input as a key, ndarray as values.
 
     """
     # One history for each val file
     histories = []
-    for i, (f, f_size) in enumerate(cfg.get_val_files()):
-        print('Validating on file ', i, ',', str(f))
-
+    f_sizes = cfg.get_val_file_sizes()
+    for i, files_dict in enumerate(cfg.yield_val_files()):
+        print('Validating on file ', i+1, ',', str(files_dict))
+        f_size = f_sizes[i]
         if cfg.n_events is not None:
             f_size = cfg.n_events  # for testing purposes
-        val_generator = generate_batches_from_hdf5_file(cfg, f, f_size=f_size, zero_center_image=xs_mean)
+        val_generator = generate_batches_from_hdf5_file(cfg, files_dict, f_size=f_size, zero_center_image=xs_mean)
         history = model.evaluate_generator(val_generator, steps=int(f_size / cfg.batchsize), max_queue_size=10, verbose=cfg.verbose_val)
         # This history object is just a list, not a dict like with fit_generator!
         print('Validation sample results: ' + str(history) + ' (' + str(model.metrics_names) + ')')

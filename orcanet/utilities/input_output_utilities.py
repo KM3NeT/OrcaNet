@@ -155,7 +155,7 @@ def write_full_logfile_startup(cfg):
         f_out.write("\n")
 
 
-def write_full_logfile(cfg, model, history_train, history_val, lr, epoch, train_file):
+def write_full_logfile(cfg, model, history_train, history_val, lr, epoch, files_dict):
     """
     Function for saving various information during training and validation to a .txt file.
 
@@ -163,6 +163,8 @@ def write_full_logfile(cfg, model, history_train, history_val, lr, epoch, train_
     ----------
     cfg : object Configuration
         Configuration object containing all the configurable options in the OrcaNet scripts.
+    files_dict : dict
+        The name of every input as a key, the path to the n-th training file as values.
 
     """
     logfile = cfg.main_folder + 'full_log.txt'
@@ -172,7 +174,7 @@ def write_full_logfile(cfg, model, history_train, history_val, lr, epoch, train_
         f_out.write('Current time: ' + str(datetime.now().strftime('%Y-%m-%d %H:%M:%S')) + '\n')
         f_out.write('Decayed learning rate to ' + str(lr) + ' before epoch ' + str(epoch[0]) +
                     ' and file ' + str(epoch[1]) + ')\n')
-        f_out.write('Trained in epoch ' + str(epoch) + ' on file ' + str(epoch[1]) + ', ' + str(train_file) + '\n')
+        f_out.write('Trained in epoch ' + str(epoch) + ' on file ' + str(epoch[1]) + ', ' + str(files_dict) + '\n')
         if history_val is not None:
             f_out.write('Validated in epoch ' + str(epoch) + ', file ' + str(epoch[1]) + ' on val_files ' + str(cfg.get_val_files()) + '\n')
         f_out.write('History for training / validating: \n')
