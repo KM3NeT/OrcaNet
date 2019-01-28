@@ -510,8 +510,8 @@ def get_mean_image(filepaths, n_gpu):
         # the number of samples in this file
         file_sizes.append(n_rows)
     # calculate weighted average depending on no of samples in the files
-    file_sizes = [size / max(file_sizes) for size in file_sizes]
-    xs_mean = np.average(xs_means, weights=file_sizes)
+    file_sizes = [size / np.sum(file_sizes) for size in file_sizes]
+    xs_mean = np.average(xs_means, weights=file_sizes, axis=0)
     return xs_mean
 
 

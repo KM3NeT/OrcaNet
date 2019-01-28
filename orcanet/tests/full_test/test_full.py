@@ -11,46 +11,70 @@ from unittest import TestCase
 
 from orcanet.core import Configuration, orca_train
 from orcanet.model_archs.model_setup import build_nn_model
+from orcanet.utilities.nn_utilities import load_zero_center_data
 
 
 class DatasetTest(TestCase):
     """ Tests which require a dataset. """
     def setUp(self):
         """
-        Make a .temp directory in the current working directory, generate dummy data in it and also a list .toml file which points to these datasets.
+        Make a .temp directory in the current working directory, generate dummy data in it and set up the
+        cfg object.
+
         """
         self.temp_dir = os.path.join(os.getcwd(), ".temp/")
-        self.list_file_path = self.temp_dir + "list.toml"
-
         # Make sure temp dir does either not exist or is empty
-        assert not os.path.exists(self.temp_dir) or len(os.listdir('/home/varun/temp')) == 0
-        os.makedirs(self.temp_dir)
+        if os.path.exists(self.temp_dir):
+            assert len(os.listdir(self.temp_dir)) == 0
+        else:
+            os.makedirs(self.temp_dir)
 
-        shape = (3, 3, 3, 3)
-        train_filepath = self.temp_dir + "train.h5"
-        val_filepath = self.temp_dir + "val.h5"
-        make_dummy_data(train_filepath, shape)
-        make_dummy_data(val_filepath, shape)
-        with open(self.list_file_path, "w") as list_file:
-            list_content = '[[input]]\ntrain_files = ["{}",]\nvalidation_files = ["{}",]'.format(train_filepath, val_filepath)
-            list_file.write(list_content)
+        self.shape = (3, 3, 3, 3)
+
+        train_inp = (self.temp_dir + "train1.h5", self.temp_dir + "train2.h5")
+        self.train_pathes = {"input_A": train_inp}
+
+        val_inp = (self.temp_dir + "val1.h5", self.temp_dir + "val2.h5")
+        self.val_pathes = {"input_A": val_inp}
+
+        for path1, path2 in (train_inp, val_inp):
+            make_dummy_data(path1, path2, self.shape)
+
+        # Set up the configuration object
+        config_file = os.path.join(os.path.dirname(__file__), "config_test.toml")
+
+        main_folder = self.temp_dir + "model/"
+        cfg = Configuration(main_folder, config_file=config_file)
+
+        cfg._train_files = self.train_pathes
+        cfg._val_files = self.val_pathes
+        cfg._list_file = "test.toml"
+        cfg.zero_center_folder = self.temp_dir
+        self.cfg = cfg
 
     def tearDown(self):
         """ Remove the .temp directory. """
         shutil.rmtree(self.temp_dir)
+
+    def test_zero_center(self):
+        """ Calculate the zero center image and check if it works properly. """
+        cfg = self.cfg
+        xs_mean = load_zero_center_data(cfg)
+        target_xs_mean = np.ones(self.shape)/4
+        self.assertTrue(np.allclose(xs_mean["input_A"], target_xs_mean))
+
+        file = cfg.zero_center_folder + cfg._list_file + '_input_' + "input_A" + '.npz'
+        zero_center_used_ip_files = np.load(file)['zero_center_used_ip_files']
+        self.assertTrue(np.array_equal(zero_center_used_ip_files, cfg._train_files["input_A"]))
 
     def test_multi_input_model(self):
         """
         Make a model and train it with the test toml files provided to check if it throws an error.
         Also resumes training after the first epoch with a custom lr to check if that works.
         """
-        list_file = self.list_file_path
-        config_file = os.path.join(os.path.dirname(__file__), "config_test.toml")
+        cfg = self.cfg
         model_file = os.path.join(os.path.dirname(__file__), "model_test.toml")
 
-        main_folder = self.temp_dir + "model/"
-        cfg = Configuration(main_folder, list_file, config_file)
-        cfg.zero_center_folder = self.temp_dir
         cfg.set_from_model_file(model_file)
         initial_model = build_nn_model(cfg)
         orca_train(cfg, initial_model)
@@ -63,20 +87,35 @@ class DatasetTest(TestCase):
         # orca_eval(cfg)
 
 
-def make_dummy_data(filepath, shape):
-    xs = np.concatenate([np.ones((100,) + shape), np.zeros((100,) + shape)])
+def make_dummy_data(filepath1, filepath2, shape):
+    """
+    Make a total of 100 ones vs 300 zeroes of dummy data over two files.
 
-    y = np.ones((200, 16))
+    Parameters
+    ----------
+    filepath1 : str
+        Path to file 1.
+    filepath2 : str
+        Path to file 2.
+    shape : tuple
+        Shape of the data, not including sample dimension.
+
+    """
+    xs1 = np.concatenate([np.ones((75,) + shape), np.zeros((75,) + shape)])
+    xs2 = np.concatenate([np.ones((25,) + shape), np.zeros((225,) + shape)])
+
+    y = np.ones((150, 16))
     dtypes = [('event_id', '<f8'), ('particle_type', '<f8'), ('energy', '<f8'), ('is_cc', '<f8'), ('bjorkeny', '<f8'),
-           ('dir_x', '<f8'), ('dir_y', '<f8'), ('dir_z', '<f8'), ('time_interaction', '<f8'), ('run_id', '<f8'),
-           ('vertex_pos_x', '<f8'), ('vertex_pos_y', '<f8'), ('vertex_pos_z', '<f8'), ('time_residual_vertex', '<f8'),
-           ('prod_ident', '<f8'), ('group_id', '<i8')]
+              ('dir_x', '<f8'), ('dir_y', '<f8'), ('dir_z', '<f8'), ('time_interaction', '<f8'), ('run_id', '<f8'),
+              ('vertex_pos_x', '<f8'), ('vertex_pos_y', '<f8'), ('vertex_pos_z', '<f8'), ('time_residual_vertex', '<f8'),
+              ('prod_ident', '<f8'), ('group_id', '<i8')]
     ys = y.ravel().view(dtype=dtypes)
 
-    h5f = h5py.File(filepath, 'w')
-    h5f.create_dataset('x', data=xs, dtype='uint8')
-    h5f.create_dataset('y', data=ys, dtype=dtypes)
-    h5f.close()
+    for xs, filepath in ((xs1, filepath1), (xs2, filepath2)):
+        h5f = h5py.File(filepath, 'w')
+        h5f.create_dataset('x', data=xs, dtype='uint8')
+        h5f.create_dataset('y', data=ys, dtype=dtypes)
+        h5f.close()
 
 
 def make_dummy_model(shape):
