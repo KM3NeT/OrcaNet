@@ -331,7 +331,9 @@ def evaluate_model(model, test_files, batchsize, n_bins, class_type, xs_mean, sw
         history = model.evaluate_generator(
             generate_batches_from_hdf5_file(f, batchsize, n_bins, class_type, str_ident, swap_col=swap_4d_channels, f_size=f_size, zero_center_image=xs_mean),
             steps=int(f_size / batchsize), max_queue_size=10, verbose=1)
-        #This history object is just a list, not a dict like with fit_generator!
+        # This history object is just a list, not a dict like with fit_generator!
+        if type(history) != list:
+            history = [history]
         print('Test sample results: ' + str(history) + ' (' + str(model.metrics_names) + ')')
         histories.append(history)
     history_test = [sum(col) / float(len(col)) for col in zip(*histories)] if len(histories) > 1 else histories[0] # average over all test files if necessary
