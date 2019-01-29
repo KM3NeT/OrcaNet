@@ -15,7 +15,7 @@ import numpy as np
 from orcanet.run_nn import train_and_validate_model
 from orcanet.eval_nn import predict_and_investigate_model_performance, get_modelname
 from orcanet.utilities.input_output_utilities import read_out_list_file, read_out_config_file, read_out_model_file, use_node_local_ssd_for_input, write_full_logfile_startup, h5_get_number_of_rows
-from orcanet.utilities.nn_utilities import load_zero_center_data, get_inputs
+from orcanet.utilities.nn_utilities import load_zero_center_data, get_inputs, generate_batches_from_hdf5_file
 from orcanet.utilities.losses import get_all_loss_functions
 
 
@@ -56,6 +56,7 @@ class Configuration(object):
         The name of the datagroup in your h5 input files which contains the labels to the network.
     label_modifier : function or None
         Operation to be performed on batches of labels read from the input files before they are fed into the model.
+        If None is given, all labels will be passed to the model as a dict, with the keys being the dtype names.
         TODO online doc on how to do this
     learning_rate : float or tuple or function
         The learning rate for the training.
@@ -64,6 +65,9 @@ class Configuration(object):
         float gives the decrease of the learning rate per file (e.g. 0.1 for 10% decrease per file).
         You can also give an arbitrary function, which takes as an input the epoch, the file number and the
         Configuration object (in this order), and returns the learning rate.
+    max_queue_size : int
+        max_queue_size option of the keras training and evaluation generator methods. How many batches get preloaded
+        from the generator.
     n_events : None or int
         For testing purposes. If not the whole .h5 file should be used for training, define the number of events.
     n_gpu : tuple(int, str)
@@ -152,6 +156,7 @@ class Configuration(object):
         self.key_labels = "y"
         self.label_modifier = None
         self.learning_rate = 0.001
+        self.max_queue_size = 10
         self.n_events = None
         self.n_gpu = (1, 'avolkov')
         self.sample_modifier = None
@@ -310,18 +315,12 @@ class Configuration(object):
                 print("Creating directory: " + directory)
                 os.makedirs(directory)
 
-    def get_default_values(self):
-        """ Return default values of common settings. """
-        return self._default_values
-
     def get_train_files(self):
-        if self._train_files is None:
-            raise AssertionError("No train files were specified!")
+        assert self._train_files is not None, "No train files have been specified!"
         return self._train_files
 
     def get_val_files(self):
-        if self._val_files is None:
-            raise AssertionError("No validation files were specified!")
+        assert self._val_files is not None, "No validation files have been specified!"
         return self._val_files
 
     def get_n_bins(self):
@@ -347,6 +346,7 @@ class Configuration(object):
         """
         Return True when seperate sets of input files were given (e.g. for networks taking data
         simulataneosly from different files).
+
         """
         train_files = self.get_train_files()
         return len(train_files) > 1
@@ -430,7 +430,8 @@ class Configuration(object):
         Yields
         ------
         files_dict : dict
-            The name of every input as a key, the n-th filepath as values.
+            The name of every toml list input as a key, one of the filepaths as values.
+            They will be yielded in the same order as they are given in the toml file.
 
         """
         train_files = self.get_train_files()
@@ -445,7 +446,8 @@ class Configuration(object):
         Yields
         ------
         files_dict : dict
-            The name of every input as a key, the n-th filepath as values.
+            The name of every toml list input as a key, one of the filepaths as values.
+            They will be yielded in the same order as they are given in the toml file.
 
         """
         val_files = self.get_val_files()
@@ -481,12 +483,7 @@ class Configuration(object):
         sample_mod_failed = False
         if self.sample_modifier is not None:
             try:
-                # a dict of np ones with the same shape as real data
-                dummy_inp = {}
-                for list_key in list_inp_shapes:
-                    dummy_inp[list_key] = np.ones((self.batchsize,) + list_inp_shapes[list_key])
-                modified = self.sample_modifier(dummy_inp)
-                # a dict with the shapes after the modifier has been applied
+                modified = next(self.get_generator())[0]
                 modified_shapes = {modi_key: modified[modi_key].shape[1:] for modi_key in modified}
                 print("After applying your sample modifier, they have the following names and shapes:")
                 for list_key in modified_shapes:
@@ -521,6 +518,20 @@ class Configuration(object):
             if len(err_inp_shapes) != 0:
                 err_msg += shapes_err
             raise AssertionError(err_msg)
+
+    def get_generator(self):
+        """
+        For testing purposes: Return a generator reading from the first training file.
+
+        Returns
+        -------
+        generator : generator object
+            Yields tuples with a batch of samples and labels each.
+
+        """
+        files_dict = next(self.yield_train_files())
+        generator = generate_batches_from_hdf5_file(self, files_dict)
+        return generator
 
 
 def orca_train(cfg, initial_model=None):

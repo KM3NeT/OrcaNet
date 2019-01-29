@@ -28,6 +28,11 @@ def get_dict():
     return x
 
 
+def transf_arr(x):
+    xd = {name: x[name] for name in x.dtype.names}
+    return xd
+
+
 x = get_structured_array()
 xd = get_dict()
 model = build_test_model()

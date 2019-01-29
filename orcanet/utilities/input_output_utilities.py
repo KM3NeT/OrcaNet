@@ -37,9 +37,6 @@ def read_out_config_file(file):
 
     """
     file_content = toml.load(file)["config"]
-    if "class_type" in file_content:
-        if file_content["class_type"][0] == "None":
-            file_content["class_type"][0] = None
     if "n_gpu" in file_content:
         file_content["n_gpu"][0] = int(file_content["n_gpu"][0])
     return file_content
@@ -76,7 +73,7 @@ def read_out_list_file(file):
     """
     # a dict with inputnames as keys and dicts with the lists of train/val files as values
     file_content = toml.load(file)
-
+    # TODO raise if the list does not have the proper format
     train_files, validation_files = {}, {}
     # no of train/val fiels in each input set
     n_train, n_val = [], []

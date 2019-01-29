@@ -9,7 +9,7 @@ from keras.layers import Input, Dense, Dropout, Activation, Flatten, Convolution
 from keras import backend as K
 from keras.regularizers import l2
 
-from orcanet.model_archs.model_setup import get_dimensions_encoding
+from orcanet.model_archs.file_dump import get_dimensions_encoding
 
 # ------------- VGG-like model -------------#
 
@@ -316,7 +316,7 @@ def add_dense_layers_to_cnn(conv_output_flat, class_type, dropout=0, activation=
                 outputs.append(output_label_merged)
 
         else:
-            raise ValueError(class_type, "is not known!")
+            raise ValueError(class_type, "is not a known class_type!")
 
     return outputs
 

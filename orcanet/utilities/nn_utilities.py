@@ -16,14 +16,15 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
     This will go through one file, or multiple files in parallel, and yield one batch of data, which can then
     be used as an input to a model. Since multiple filepaths can be given to read out in parallel,
     this can also be used for models with multiple inputs.
-    # TODO Is reading n batches at once and yielding them one at a time faster then what we have currently?
 
     Parameters
     ----------
     cfg : object Configuration
         Configuration object containing all the configurable options in the OrcaNet scripts.
-    files_dict : dict
-        The name of every input as a key (can be multiple), the filepath of a h5py file to read samples from as values.
+    files_dict : dict or None
+        Pathes of the files to train on.
+        The name of every input (given in the toml list file, can be multiple) as keys, the filepath
+        of a single h5py file to read samples from as values.
     f_size : int or None
         Specifies the filesize (#images) of the .h5 file if not the whole .h5 file
         should be used for yielding the xs/ys arrays. This is important if you run fit_generator(epochs>1) with
@@ -40,8 +41,12 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
     ------
     xs : dict
         Data for the model train on.
+            Keys : str  The name(s) of the input layer(s) of the model.
+            Values : ndarray    A batch of samples for the corresponding input.
     ys : dict
         Labels for the model to train on.
+            Keys : str  The name(s) of the output layer(s) of the model.
+            Values : ndarray    A batch of labels for the corresponding output.
     mc_info : ndarray, optional
         Mc info from the file. Only yielded if yield_mc_info is True.
 
@@ -50,58 +55,58 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
     # name of the datagroups in the file
     samples_key = cfg.key_samples
     mc_key = cfg.key_labels
-
     # If the batchsize is larger than the f_size, make batchsize smaller or nothing would be yielded
     if f_size is not None:
         if f_size < batchsize:
             batchsize = f_size
 
-    while 1:
-        # a dict with the names of list inputs as keys, and the opened h5 files as values.
-        files = {}
-        file_lengths = []
-        # open the files and make sure they have the same length
-        for input_key in files_dict:
-            files[input_key] = h5py.File(files_dict[input_key], 'r')
-            file_lengths.append(len(files[input_key][samples_key]))
-        if not file_lengths.count(file_lengths[0]) == len(file_lengths):
-            raise AssertionError("All data files must have the same length! Yours have:\n " + str(file_lengths))
+    # a dict with the names of list inputs as keys, and the opened h5 files as values.
+    files = {}
+    file_lengths = []
+    # open the files and make sure they have the same length
+    for input_key in files_dict:
+        files[input_key] = h5py.File(files_dict[input_key], 'r')
+        file_lengths.append(len(files[input_key][samples_key]))
+    if not file_lengths.count(file_lengths[0]) == len(file_lengths):
+        raise AssertionError("All data files must have the same length! Yours have:\n " + str(file_lengths))
 
-        if f_size is None:
-            f_size = file_lengths[0]
-        # number of full batches available
-        total_no_of_batches = int(f_size/batchsize)
-        # positions of the samples in the file
-        sample_pos = np.arange(total_no_of_batches) * batchsize
-        if shuffle:
-            np.random.shuffle(sample_pos)
+    if f_size is None:
+        f_size = file_lengths[0]
+    # number of full batches available
+    total_no_of_batches = int(f_size/batchsize)
+    # positions of the samples in the file
+    sample_pos = np.arange(total_no_of_batches) * batchsize
+    if shuffle:
+        np.random.shuffle(sample_pos)
+    # append some samples due to preloading by the fit_generator method
+    sample_pos = np.append(sample_pos, sample_pos[:cfg.max_queue_size])
 
-        for sample_n in sample_pos:
-            # A dict with every input name as key, and a batch of data as values
-            xs = {}
-            # Read one batch of samples from the files and zero center
-            for input_key in files:
-                xs[input_key] = files[input_key][samples_key][sample_n: sample_n + batchsize]
-                if zero_center_image is not None:
-                    xs[input_key] = np.subtract(xs[input_key], zero_center_image[input_key])
-            # Get labels for the nn. Since the labels are hopefully the same for all the files, use the ones from the first
-            y_values = list(files.values())[0][mc_key][sample_n:sample_n + batchsize]
+    for sample_n in sample_pos:
+        # A dict with every input name as key, and a batch of data as values
+        xs = {}
+        # Read one batch of samples from the files and zero center
+        for input_key in files:
+            xs[input_key] = files[input_key][samples_key][sample_n: sample_n + batchsize]
+            if zero_center_image is not None:
+                xs[input_key] = np.subtract(xs[input_key], zero_center_image[input_key])
+        # Get labels for the nn. Since the labels are hopefully the same for all the files, use the ones from the first
+        y_values = list(files.values())[0][mc_key][sample_n:sample_n + batchsize]
 
-            # Modify the samples and labels before feeding them into the network
-            if cfg.sample_modifier is not None:
-                xs = cfg.sample_modifier(xs)
-            if cfg.label_modifier is not None:
-                ys = cfg.label_modifier(y_values)
-            else:
-                ys = y_values
+        # Modify the samples and labels before feeding them into the network
+        if cfg.sample_modifier is not None:
+            xs = cfg.sample_modifier(xs)
+        if cfg.label_modifier is not None:
+            ys = cfg.label_modifier(y_values)
+        else:
+            ys = {name: y_values[name] for name in y_values.dtype.names}
 
-            if not yield_mc_info:
-                yield xs, ys
-            else:
-                yield xs, ys, y_values
+        if not yield_mc_info:
+            yield xs, ys
+        else:
+            yield xs, ys, y_values
 
-        # for i in range(n_files):
-        #     files[i].close()
+    for file in files.values():
+        file.close()
 
 
 def get_inputs(model):

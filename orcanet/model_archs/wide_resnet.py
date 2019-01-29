@@ -11,7 +11,7 @@ from keras.layers.convolutional import Convolution2D, Convolution3D, MaxPooling2
 from keras.layers.normalization import BatchNormalization
 from keras import backend as K
 
-from orcanet.model_archs.model_setup import get_dimensions_encoding
+from orcanet.model_archs.file_dump import get_dimensions_encoding
 
 
 def decode_input_dimensions(n_bins, batchsize, swap_4d_channels):

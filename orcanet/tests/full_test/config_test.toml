@@ -5,7 +5,7 @@
 [config]
 # swap_4d_channels = 'xyz-t_and_xyz-c_single_input'
 str_ident = 'lp_tight-1_60b_errors_mse_w_vtx'
-class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
+class_type = 'energy_dir_bjorken-y_vtx_errors'
 
 learning_rate = "triple_decay"
 batchsize = 5
