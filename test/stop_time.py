@@ -25,6 +25,110 @@ from orcanet.core import Configuration
 from orcanet.model_archs.model_setup import build_nn_model
 
 
+def generate_batches_from_hdf5_file_tweak(cfg, files_dict, f_size=None, zero_center_image=None, yield_mc_info=False, shuffle=False, batches_at_once=10):
+    """
+    Yields batches of input data from h5 files.
+
+    This will go through one file, or multiple files in parallel, and yield one batch of data, which can then
+    be used as an input to a model. Since multiple filepaths can be given to read out in parallel,
+    this can also be used for models with multiple inputs.
+    # TODO Is reading n batches at once and yielding them one at a time faster then what we have currently?
+
+    Parameters
+    ----------
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
+    files_dict : dict
+        The name of every input as a key (can be multiple), the filepath of a h5py file to read samples from as values.
+    f_size : int or None
+        Specifies the filesize (#images) of the .h5 file if not the whole .h5 file
+        should be used for yielding the xs/ys arrays. This is important if you run fit_generator(epochs>1) with
+        a filesize (and hence # of steps) that is smaller than the .h5 file.
+    zero_center_image : dict
+        Mean image of the dataset used for zero-centering. Every input as a key, ndarray as values.
+    yield_mc_info : bool
+        Specifies if mc-infos (y_values) should be yielded as well.
+        The mc-infos are used for evaluation after training and testing is finished.
+    shuffle : bool
+        Randomize the order in which batches are read from the file. Significantly reduces read out speed.
+
+    Yields
+    ------
+    xs : dict
+        Data for the model train on.
+    ys : dict
+        Labels for the model to train on.
+    mc_info : ndarray, optional
+        Mc info from the file. Only yielded if yield_mc_info is True.
+
+    """
+    batchsize = cfg.batchsize
+    class_type = cfg.class_type
+    str_ident = cfg.str_ident
+    swap_col = cfg.swap_4d_channels
+    # name of the datagroups in the file
+    samples_key = cfg.key_samples
+    mc_key = cfg.key_labels
+
+    # If the batchsize is larger than the f_size, make batchsize smaller or nothing would be yielded
+    if f_size is not None:
+        if f_size < batchsize:
+            batchsize = f_size
+
+    while 1:
+        # a dict with the names of list inputs as keys, and the opened h5 files as values.
+        files = {}
+        file_lengths = []
+        # open the files and make sure they have the same length
+        for input_key in files_dict:
+            files[input_key] = h5py.File(files_dict[input_key], 'r')
+            file_lengths.append(len(files[input_key][samples_key]))
+        if not file_lengths.count(file_lengths[0]) == len(file_lengths):
+            raise AssertionError("All data files must have the same length! Yours have:\n " + str(file_lengths))
+
+        if f_size is None:
+            f_size = file_lengths[0]
+        # number of full batches available
+        total_no_of_batches = int(f_size/batchsize)
+        # positions of the samples in the file
+        sample_pos = np.arange(total_no_of_batches, step=batches_at_once) * batchsize
+        if shuffle:
+            np.random.shuffle(sample_pos)
+
+        for sample_n in sample_pos:
+            # Read one batch of samples from the files and zero center
+            # A dict with every input name as key, and a batch of data as values
+            xs = {}
+            for input_key in files:
+                xs[input_key] = files[input_key][samples_key][sample_n: sample_n + batches_at_once*batchsize]
+                if zero_center_image is not None:
+                    xs[input_key] = np.subtract(xs[input_key], zero_center_image[input_key])
+            # Get labels for the nn. Since the labels are hopefully the same for all the files, use the ones from the first
+            y_values = list(files.values())[0][mc_key][sample_n:sample_n + batches_at_once*batchsize]
+
+            for bsample_no in np.arange(batches_at_once)*batchsize:
+                bxs = {}
+                for input_key in xs:
+                    bxs[input_key] = xs[input_key][bsample_no: bsample_no + batchsize]
+                by_values = y_values[bsample_no: bsample_no + batchsize]
+
+                # Modify the samples and the labels batchwise
+                if cfg.sample_modifier is not None:
+                    bxs = cfg.sample_modifier(bxs)
+
+                # if swap_col is not None:
+                #     xs = get_input_images(xs, swap_col, str_ident)
+                bys = by_values  # get_labels(by_values, class_type)
+
+                if not yield_mc_info:
+                    yield bxs, bys
+                else:
+                    yield bxs, bys, by_values
+
+        # for i in range(n_files):
+        #     files[i].close()
+
+
 def test_generators(batches, intermediate_log, functions, func_kwargs):
     """
     Test the time of generators.
@@ -49,13 +153,13 @@ def test_generators(batches, intermediate_log, functions, func_kwargs):
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
     cfg = Configuration("./test/", list_file)
     cfg.zero_center_folder = zero_center_folder
-    train_files = cfg.yield_train_files()
+    train_files = next(cfg.yield_train_files())
     # cfg.use_local_node()
     print(batches, "batches from file", train_files)
     print("Batchsize:", cfg.batchsize)
-    f = h5py.File(train_files.values()[0])
+    f = h5py.File(list(train_files.values())[0])
     print(f["x"].shape)
-    xs_mean = np.ones(f["x"].shape[1:])  # load_zero_center_data(cfg)
+    xs_mean = None  # np.ones(f["x"].shape[1:])  # load_zero_center_data(cfg)
     f.close()
 
     cfg.set_from_model_file(modelfile)
@@ -76,11 +180,11 @@ def test_generators(batches, intermediate_log, functions, func_kwargs):
     for f_no, func in enumerate(functions):
         print("------------- Function", f_no, " -------------")
         generator = func(cfg, train_files, zero_center_image=xs_mean, **func_kwargs[f_no])
-        print("Shape of batches:", next(generator)[0][0].shape, "\n")
+        print("Shape of batches:", list(next(generator)[0].values())[0].shape, "\n")
         average_read_time, average_model_time = [], []
         for i in range(batches):
             read_start = time.time()
-            x = next(generator)[0][0]
+            x = list(next(generator)[0].values())[0]
             average_read_time.append(time.time() - read_start)
 
             model_start = time.time()
@@ -97,9 +201,9 @@ def test_generators(batches, intermediate_log, functions, func_kwargs):
 
 
 if __name__ == "__main__":
-    batches = 5000
-    intermediate_log = 200
-    functions = (generate_batches_from_hdf5_file, generate_batches_from_hdf5_file)
-    func_kwargs = [{}, {"shuffle": True}]
+    batches = 500
+    intermediate_log = 100
+    functions = (generate_batches_from_hdf5_file_tweak, generate_batches_from_hdf5_file_tweak)
+    func_kwargs = [{"batches_at_once": 10, "shuffle": True}, {"batches_at_once": 10, }]
 
     test_generators(batches, intermediate_log, functions, func_kwargs)

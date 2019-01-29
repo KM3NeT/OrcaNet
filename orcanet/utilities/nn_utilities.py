@@ -100,7 +100,7 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
 
             # if swap_col is not None:
             #     xs = get_input_images(xs, swap_col, str_ident)
-            ys = get_labels(y_values, class_type)
+            ys = y_values  # get_labels(y_values, class_type)
 
             if not yield_mc_info:
                 yield xs, ys
@@ -164,56 +164,78 @@ def get_dimensions_encoding(n_bins, batchsize):
     return dimensions
 
 
-def sample_modifier_orca(xs_list, swap_col, str_ident):
+def sample_modifiers_orca(swap_col, str_ident):
     """
-    Permute columns, or add permuted columns to xs.
+    Returns one of the sample modifiers used for Orca networks.
+
+    They will permute columns, and/or add permuted columns to xs.
+
+    The input to the functions is:
+        xs_list : dict
+            Dict that contains the input samples from the file(s).
+            The keys are the names of the inputs in the toml list file.
+            The values are a single batch of data from each corresponding file.
+
+    The output is:
+        xs_layer : dict
+            Dict that contains the input samples for a Keras NN.
+            The keys are the names of the input layers of the network.
+            The values are a single batch of data for each input layer.
 
     Parameters
     ----------
-    xs_list : dict
-        Dict that contains the input image(s).
-        The keys are the names of the inputs in the toml list file.
-        The values are a single batch of data from each corresponding file.
     swap_col : None/str
-        TODO
+        Define which channels to swap.
     str_ident : str
-        TODO
+        Additional operations.
 
     Returns
     -------
-    xs_layer : dict
-        Dict that contains the input images for a Keras NN.
-        The keys are the names of the input layers of the network.
-        The values are a single batch of data for each input layer.
+    sample_modifier : function
+        The sample modifier function.
 
     """
-    keys = list(xs_list.keys())
-    # list of inputs for the Keras NN
-    xs_layer = {}
     swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'xyt-z': (0, 1, 2, 4, 3), 't-xyz': (0, 4, 1, 2, 3),
                              'tyz-x': (0, 4, 2, 3, 1)}
 
-    # single image input
     if swap_col in swap_4d_channels_dict:
-        xs_layer[keys[0]] = np.transpose(xs_list, swap_4d_channels_dict[swap_col])
+        def swap_columns(xs_list):
+            # Transpose dimensions
+            xs_layer = {}
+            keys = list(xs_list.keys())
+            xs_layer[keys[0]] = np.transpose(xs_list, swap_4d_channels_dict[swap_col])
+            return xs_layer
+        sample_modifier = swap_columns
 
     elif swap_col == 'xyz-t_and_yzt-x':
-        xs_layer["xyz-t"] = xs_list["xyz-t"]  # xyzt
-        xs_layer["yzt-x"] = np.transpose(xs_list["xyz-t"], swap_4d_channels_dict['yzt-x'])
+        def sample_modifier(xs_list):
+            # Use xyz-t, and also transpose it to yzt-x and use that, too.
+            xs_layer = {}
+            xs_layer["xyz-t"] = xs_list["xyz-t"]
+            xs_layer["yzt-x"] = np.transpose(xs_list["xyz-t"], swap_4d_channels_dict['yzt-x'])
+            return xs_layer
 
     elif 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2' in swap_col + str_ident:
-        xs_layer["xyz-t"] = xs_list[0]  # xyz-t tight-1
-        xs_layer[1] = np.transpose(xs_list[0], swap_4d_channels_dict['yzt-x'])  # yzt-x tight-1
-        xs_layer[2] = xs_list[1]  # xyz-t tight-2
-        xs_layer[3] = np.transpose(xs_list[1], swap_4d_channels_dict['yzt-x'])  # yzt-x tight-2
+        def sample_modifier(xs_list):
+            # Use xyz-t in two different time cuts, and also transpose them to yzt-x and use these, too.
+            xs_layer = {}
+            xs_layer["xyz-t_tight-1"] = xs_list["xyz-t_tight-1"]
+            xs_layer["xyz-t_tight-2"] = xs_list["xyz-t_tight-2"]
+            xs_layer["yzt-x_tight-1"] = np.transpose(xs_list["xyz-t_tight-1"], swap_4d_channels_dict['yzt-x'])
+            xs_layer["yzt-x_tight-2"] = np.transpose(xs_list["xyz-t_tight-2"], swap_4d_channels_dict['yzt-x'])
+            return xs_layer
 
     elif swap_col == 'xyz-t_and_xyz-c_single_input':
-        xs_layer[0] = np.concatenate([xs_list[0], xs_list[1]], axis=-1)
+        def sample_modifier(xs_list):
+            # Concatenate xyz-t and xyz-c to a single input
+            xs_layer = {}
+            xs_layer['xyz-t_and_xyz-c_single_input'] = np.concatenate([xs_list["xyz-t"], xs_list["xyz-c"]], axis=-1)
+            return xs_layer
 
     else:
         raise ValueError('The argument "swap_col"=' + str(swap_col) + ' is not valid.')
 
-    return xs_layer
+    return sample_modifier
 
 
 def get_labels(y_values, class_type):
