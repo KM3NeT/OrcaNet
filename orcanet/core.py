@@ -455,7 +455,7 @@ class Configuration(object):
             files_dict = {key: val_files[key][file_no] for key in val_files}
             yield files_dict
 
-    def check_connection(self, model):
+    def check_input_connection(self, model):
         """
         Check if the names and shapes of the given input files work with the given model inputs.
 
@@ -470,7 +470,7 @@ class Configuration(object):
             If they dont work together.
 
         """
-        print("\nConnection check\n----------------")
+        print("\nInput check\n-----------")
         layer_inputs = get_inputs(model)
         # keys: name of layers, values: shape of input
         layer_inp_shapes = {key: layer_inputs[key].input_shape[1:] for key in layer_inputs}
@@ -518,6 +518,42 @@ class Configuration(object):
             if len(err_inp_shapes) != 0:
                 err_msg += shapes_err
             raise AssertionError(err_msg)
+
+    def compare_outputs(self, model):
+        # model_shapes = [ls[1:] for ls in model.output_shape]
+        print("\nOutput check\n------------")
+        y = next(self.get_generator())[1]
+        list_shapes = dict()
+        for key in y:
+            shape = y[key].shape[1:]
+            if len(shape) == 0:
+                list_shapes[key] = 1
+            else:
+                list_shapes[key] = shape
+
+        print("After the label modifier, the outputs from your toml list file have the following names and shapes:")
+        for list_key in list_shapes:
+            print("\t{}\t{}".format(list_key, list_shapes[list_key]))
+
+        model_shapes = {}
+        # These are tf layers...
+        # for olayer in model.output:
+        #     shape = olayer.shape[1:]
+        #     if len(shape) == 1:
+        #         shape = shape[0]
+        #     model_shapes[olayer.name] = shape
+
+        # This is probably not a good idea? But you cant access the keras output layers otherwise...
+        for olayer in model._output_layers:
+            shape = olayer.output_shape[1:]
+            if len(shape) == 1:
+                shape = shape[0]
+            model_shapes[olayer.name] = shape
+
+        print("Your model has the following output layer names and shapes:")
+        for key in model_shapes:
+            print("\t{}\t{}".format(key, str(model_shapes[key])))
+        print("Check passed.\n")  # TODO implement check
 
     def get_generator(self):
         """
@@ -570,7 +606,8 @@ def orca_train(cfg, initial_model=None):
         path_of_model = cfg.get_model_path(epoch[0], epoch[1])
         print("Loading saved model: "+path_of_model)
         model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
-    cfg.check_connection(model)
+    cfg.check_input_connection(model)
+    cfg.compare_outputs(model)
     # model.summary()
     if cfg.use_scratch_ssd:
         cfg.use_local_node()
