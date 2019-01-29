@@ -179,11 +179,6 @@ def write_full_logfile(cfg, model, history_train, history_val, lr, epoch, files_
         if history_val is not None:
             f_out.write('Validation: ' + str(history_val) + ' (' + str(model.metrics_names) + ')' + '\n')
         f_out.write('\n')
-        # f_out.write('Additional Info:\n')
-        # f_out.write('Batchsize=' + str(batchsize) + ', n_bins=' + str(n_bins) +
-        #            ', class_type=' + str(class_type) + '\n' +
-        #            'swap_4d_channels=' + str(swap_4d_channels) + ', str_ident=' + str_ident + '\n')
-        # f_out.write('\n')
 
 
 def write_summary_logfile(cfg, epoch, model, history_train, history_val, lr):

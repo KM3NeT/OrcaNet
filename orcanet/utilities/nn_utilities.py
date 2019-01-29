@@ -1,16 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Utility functions used for training a CNN."""
+"""Utility functions used for training a NN."""
 
-import warnings
-import re
 import numpy as np
 import h5py
 import os
 import keras as ks
 from functools import reduce
-
-# ------------- Functions used for supplying images to the GPU -------------#
 
 
 def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_image=None, yield_mc_info=False, shuffle=False):
@@ -108,59 +104,6 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
         #     files[i].close()
 
 
-def get_dimensions_encoding(n_bins, batchsize):
-    """
-    Returns a dimensions tuple for 2,3 and 4 dimensional data.
-    :param int batchsize: Batchsize that is used in generate_batches_from_hdf5_file().
-    :param tuple n_bins: Declares the number of bins for each dimension (x,y,z).
-                        If a dimension is equal to 1, it means that the dimension should be left out.
-    :return: tuple dimensions: 2D, 3D or 4D dimensions tuple (integers).
-    """
-    n_bins_x, n_bins_y, n_bins_z, n_bins_t = n_bins[0], n_bins[1], n_bins[2], n_bins[3]
-    if n_bins_x == 1:
-        if n_bins_y == 1:
-            print('Using 2D projected data without dimensions x and y')
-            dimensions = (batchsize, n_bins_z, n_bins_t, 1)
-        elif n_bins_z == 1:
-            print('Using 2D projected data without dimensions x and z')
-            dimensions = (batchsize, n_bins_y, n_bins_t, 1)
-        elif n_bins_t == 1:
-            print('Using 2D projected data without dimensions x and t')
-            dimensions = (batchsize, n_bins_y, n_bins_z, 1)
-        else:
-            print('Using 3D projected data without dimension x')
-            dimensions = (batchsize, n_bins_y, n_bins_z, n_bins_t, 1)
-
-    elif n_bins_y == 1:
-        if n_bins_z == 1:
-            print('Using 2D projected data without dimensions y and z')
-            dimensions = (batchsize, n_bins_x, n_bins_t, 1)
-        elif n_bins_t == 1:
-            print('Using 2D projected data without dimensions y and t')
-            dimensions = (batchsize, n_bins_x, n_bins_z, 1)
-        else:
-            print('Using 3D projected data without dimension y')
-            dimensions = (batchsize, n_bins_x, n_bins_z, n_bins_t, 1)
-
-    elif n_bins_z == 1:
-        if n_bins_t == 1:
-            print('Using 2D projected data without dimensions z and t')
-            dimensions = (batchsize, n_bins_x, n_bins_y, 1)
-        else:
-            print('Using 3D projected data without dimension z')
-            dimensions = (batchsize, n_bins_x, n_bins_y, n_bins_t, 1)
-
-    elif n_bins_t == 1:
-        print('Using 3D projected data without dimension t')
-        dimensions = (batchsize, n_bins_x, n_bins_y, n_bins_z, 1)
-
-    else:
-        # print 'Using full 4D data'
-        dimensions = (batchsize, n_bins_x, n_bins_y, n_bins_z, n_bins_t)
-
-    return dimensions
-
-
 def get_inputs(model):
     """
     Get the names and the layers of the inputs of the model.
@@ -183,11 +126,8 @@ def get_inputs(model):
             layers[layer.name] = layer
     return layers
 
+# ------------- Zero center functions -------------#
 
-# ------------- Functions used for supplying images to the GPU -------------#
-
-
-# ------------- Functions for preprocessing -------------#
 
 def load_zero_center_data(cfg):
     """
@@ -362,53 +302,6 @@ def get_array_memsize(array):
     memsize = (n_numbers * precision) / float(8)  # in bytes
 
     return memsize
-
-
-# ------------- Functions for preprocessing -------------#
-
-
-# ------------- Various other functions -------------#
-
-def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident=''):
-    """
-    Derives the name of a model based on its number of bins and the class_type tuple.
-    The final modelname is defined as 'model_Nd_proj_class_type[1]'.
-    E.g. 'model_3d_xyz_muon-CC_to_elec-CC'.
-    :param list(tuple) n_bins: Number of bins for each dimension (x,y,z,t) of the training images. Can contain multiple n_bins tuples.
-    :param str class_type: Tuple that declares the number of output classes and a string identifier to specify the exact output classes.
-                                  I.e. (2, 'muon-CC_to_elec-CC')
-    :param str nn_arch: String that declares which neural network model architecture is used.
-    :param None/str swap_4d_channels: For 4D data input (3.5D models). Specifies the projection type.
-    :param str str_ident: Optional str identifier that gets appended to the modelname.
-    :return: str modelname: Derived modelname.
-    """
-    modelname = 'model_' + nn_arch + '_'
-
-    projection = ''
-    for i, bins in enumerate(n_bins):
-
-        dim = 4- bins.count(1)
-        if i > 0: projection += '_and_'
-        projection += str(dim) + 'd_'
-
-        if bins.count(1) == 0 and i == 0: # for 4D input # TODO FIX BUG XYZT AFTER NAME
-            if swap_4d_channels is not None:
-                projection += swap_4d_channels
-            else:
-                projection += 'xyz-c' if bins[3] == 31 else 'xyz-t'
-
-        else: # 2D/3D input
-            if bins[0] > 1: projection += 'x'
-            if bins[1] > 1: projection += 'y'
-            if bins[2] > 1: projection += 'z'
-            if bins[3] > 1: projection += 't'
-
-    str_ident = '_' + str_ident if str_ident is not '' else str_ident
-    modelname += projection + '_' + class_type + str_ident
-
-    return modelname
-
-# ------------- Various other functions -------------#
 
 
 # ------------- Classes -------------#
