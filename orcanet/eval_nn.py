@@ -43,7 +43,7 @@ def predict_and_investigate_model_performance(cfg, model, test_files, n_bins, ba
         Number of bins for each dimension (x,y,z,t) in both the train- and test_files. Can contain multiple n_bins tuples.
     batchsize : int
         Batchsize that is used for predicting.
-    class_type : tuple(int, str)
+    class_type : str
         Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
     swap_4d_channels : None/str
         For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
@@ -76,7 +76,7 @@ def predict_and_investigate_model_performance(cfg, model, test_files, n_bins, ba
     # arr_nn_pred = np.load('results/plots/saved_predictions/arr_nn_pred_' + modelname + '_final_stateful_false.npy')
     # arr_nn_pred = np.load('results/plots/saved_predictions//arr_nn_pred_model_VGG_4d_xyz-t_and_yzt-x_and_4d_xyzt_track-shower_multi_input_single_train_tight-1_tight-2_lr_0.003_tr_st_test_st_final_stateful_false_1-100GeV_precut.npy')
 
-    if class_type[1] == 'track-shower':  # categorical
+    if class_type == 'track-shower':  # categorical
         precuts = (False, '3-100_GeV_prod')
 
         make_energy_to_accuracy_plot_multiple_classes(arr_nn_pred, title='Classified as track', filename=folder_name + 'plots/ts_' + modelname,
@@ -92,7 +92,7 @@ def predict_and_investigate_model_performance(cfg, model, test_files, n_bins, ba
         arr_nn_pred_shallow = np.load('/home/woody/capn/mppi033h/Data/various/arr_nn_pred.npy')
         # precuts = (True, 'regr_3-100_GeV_prod_and_1-3_GeV_prod')
         precuts = (False, '3-100_GeV_prod')
-        if 'energy' in class_type[1]:
+        if 'energy' in class_type:
             print('Generating plots for energy performance investigations')
 
             # DL
@@ -105,7 +105,7 @@ def predict_and_investigate_model_performance(cfg, model, test_files, n_bins, ba
             # shallow reco
             make_2d_energy_resolution_plot(arr_nn_pred_shallow, 'shallow_reco', folder_name, precuts=precuts)
 
-        if 'dir' in class_type[1]:
+        if 'dir' in class_type:
             print('Generating plots for directional performance investigations')
 
             # DL
@@ -115,7 +115,7 @@ def predict_and_investigate_model_performance(cfg, model, test_files, n_bins, ba
             # shallow reco
             make_2d_dir_correlation_plot(arr_nn_pred_shallow, 'shallow_reco', folder_name, precuts=precuts)
 
-        if 'bjorken-y' in class_type[1]:
+        if 'bjorken-y' in class_type:
             print('Generating plots for bjorken-y performance investigations')
 
             # DL
@@ -125,7 +125,7 @@ def predict_and_investigate_model_performance(cfg, model, test_files, n_bins, ba
             # shallow reco
             make_2d_bjorken_y_resolution_plot(arr_nn_pred_shallow, 'shallow_reco', folder_name, precuts=precuts)
 
-        if 'errors' in class_type[1]:
+        if 'errors' in class_type:
             print('Generating plots for error performance investigations')
 
             make_1d_reco_err_div_by_std_plot(arr_nn_pred, modelname, folder_name, precuts=precuts)  # TODO take precuts from above?
@@ -139,7 +139,7 @@ def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident=''):
     The final modelname is defined as 'model_Nd_proj_class_type[1]'.
     E.g. 'model_3d_xyz_muon-CC_to_elec-CC'.
     :param list(tuple) n_bins: Number of bins for each dimension (x,y,z,t) of the training images. Can contain multiple n_bins tuples.
-    :param (int, str) class_type: Tuple that declares the number of output classes and a string identifier to specify the exact output classes.
+    :param str class_type: Tuple that declares the number of output classes and a string identifier to specify the exact output classes.
                                   I.e. (2, 'muon-CC_to_elec-CC')
     :param str nn_arch: String that declares which neural network model architecture is used.
     :param None/str swap_4d_channels: For 4D data input (3.5D models). Specifies the projection type.
@@ -169,7 +169,7 @@ def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident=''):
             if bins[3] > 1: projection += 't'
 
     str_ident = '_' + str_ident if str_ident is not '' else str_ident
-    modelname += projection + '_' + class_type[1] + str_ident
+    modelname += projection + '_' + class_type + str_ident
 
     return modelname
 

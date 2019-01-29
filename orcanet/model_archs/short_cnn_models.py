@@ -144,7 +144,7 @@ def create_vgg_like_model(n_bins, class_type, n_filters=None, dropout=0, k_size=
     ----------
     n_bins : dict(tuple(int))
         Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples for different inputs.
-    class_type : tuple(int, str)
+    class_type : str
         Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
     n_filters : tuple
         Number of filters for each conv. layer. len(n_filters)=n_conv_layer.
@@ -244,7 +244,7 @@ def add_dense_layers_to_cnn(conv_output_flat, class_type, dropout=0, activation=
     ----------
     conv_output_flat : ? # TODO
         The Keras layer instance after the Flatten() layer.
-    class_type : tuple(int, str)
+    class_type : str
         Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
     dropout : float
         Adds a dropout layer if the value is greater than 0.
@@ -259,7 +259,6 @@ def add_dense_layers_to_cnn(conv_output_flat, class_type, dropout=0, activation=
         List of outputs for the cnn.
 
     """
-    nb_classes = class_type[0]
 
     x = Dense(128, kernel_initializer='he_normal', kernel_regularizer=kernel_reg, activation=activation)(conv_output_flat)
     if dropout > 0.0: x = Dropout(dropout)(x)
@@ -267,13 +266,13 @@ def add_dense_layers_to_cnn(conv_output_flat, class_type, dropout=0, activation=
 
     outputs = []
 
-    if class_type[1] == 'track-shower':  # categorical problem
-        x = Dense(nb_classes, activation='softmax', kernel_initializer='he_normal', name='ts_output')(x)
+    if class_type == 'track-shower':  # categorical problem
+        x = Dense(2, activation='softmax', kernel_initializer='he_normal', name='ts_output')(x)
         outputs.append(x)
 
     else:  # regression case, one output for each regression label
 
-        if class_type[1] == 'energy_dir_bjorken-y_errors':
+        if class_type == 'energy_dir_bjorken-y_errors':
             label_names = ('e', 'dir_x', 'dir_y', 'dir_z', 'by')
             for name in label_names:
                 output_label = Dense(1, name=name)(x)
@@ -296,7 +295,7 @@ def add_dense_layers_to_cnn(conv_output_flat, class_type, dropout=0, activation=
                 output_label_merged = Concatenate(name=name + '_err')([outputs[i], output_label_error])
                 outputs.append(output_label_merged)
 
-        elif class_type[1] == 'energy_dir_bjorken-y_vtx_errors':
+        elif class_type == 'energy_dir_bjorken-y_vtx_errors':
             label_names = ('e', 'dx', 'dy', 'dz', 'by', 'vx', 'vy', 'vz', 'vt')
             for name in label_names:
                 output_label = Dense(1, name=name)(x)
@@ -317,12 +316,7 @@ def add_dense_layers_to_cnn(conv_output_flat, class_type, dropout=0, activation=
                 outputs.append(output_label_merged)
 
         else:
-            label_names = ['neuron_' + str(i) for i in range(class_type[0])]
-            if class_type[1] == 'energy_and_direction_and_bjorken-y':
-                label_names = ('energy', 'dir_x', 'dir_y', 'dir_z', 'bjorken-y')
-            elif class_type[1] == 'energy':
-                label_names = ('energy',)
-            outputs = [Dense(1, name=name)(x) for name in label_names]
+            raise ValueError(class_type, "is not known!")
 
     return outputs
 
@@ -396,7 +390,7 @@ def create_vgg_like_model_double_input(n_bins, batchsize, nb_classes=2, n_filter
     return model
 
 
-def create_vgg_like_model_multi_input_from_single_nns(n_bins, str_ident, nb_classes=2, dropout=(0, 0.2), swap_4d_channels=None, activation='relu'):
+def create_vgg_like_model_multi_input_from_single_nns(n_bins, str_ident, dropout=(0, 0.2), swap_4d_channels=None, activation='relu'):
     """
     Returns a double input, VGG-like model (stacked conv. layers) with MaxPooling and Dropout if wished.
 
@@ -426,6 +420,7 @@ def create_vgg_like_model_multi_input_from_single_nns(n_bins, str_ident, nb_clas
     # TODO Batchsize has to be given to decode_input_dimensions_vgg, but is not used for constructing the model.
     # For now: Just use some random value.
     batchsize=64
+    nb_classes = 2
 
     dim, input_dim, max_pool_sizes = decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident=str_ident)
     trained_model_paths = {}

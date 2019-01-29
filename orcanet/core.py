@@ -34,7 +34,7 @@ class Configuration(object):
         Has a '/' at the end.
     batchsize : int
         Batchsize that should be used for the training / inferencing of the cnn.
-    class_type : tuple(int, str)
+    class_type : str
         Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
         I.e. (2, 'track-shower')
     filter_out_tf_garbage : bool
@@ -54,6 +54,9 @@ class Configuration(object):
         The name of the datagroup in your h5 input files which contains the samples to the network.
     key_labels : str
         The name of the datagroup in your h5 input files which contains the labels to the network.
+    label_modifier : function or None
+        Operation to be performed on batches of labels read from the input files before they are fed into the model.
+        TODO online doc on how to do this
     learning_rate : float or tuple or function
         The learning rate for the training.
         If it is a float, the learning rate will be constantly this value.
@@ -66,7 +69,8 @@ class Configuration(object):
     n_gpu : tuple(int, str)
         Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov') [1].
     sample_modifier : function or None
-        Operation to be performed on batches read from the input files before they are fed into the model. TODO online doc on how to do this
+        Operation to be performed on batches of samples read from the input files before they are fed into the model.
+        TODO online doc on how to do this
     str_ident : str
         Optional string identifier that gets appended to the modelname. Useful when training models which would have
         the same modelname. Also used for defining models and projections!
@@ -139,13 +143,14 @@ class Configuration(object):
         """
         # Configuration:
         self.batchsize = 64
-        self.class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
+        self.class_type = 'energy_dir_bjorken-y_vtx_errors'
         self.epochs_to_train = -1
         self.filter_out_tf_garbage = True
         self.initial_epoch = -1
         self.initial_fileno = -1
         self.key_samples = "x"
         self.key_labels = "y"
+        self.label_modifier = None
         self.learning_rate = 0.001
         self.n_events = None
         self.n_gpu = (1, 'avolkov')

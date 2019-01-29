@@ -144,12 +144,12 @@ def build_nn_model(cfg):
     swap_4d_channels = cfg.swap_4d_channels
 
     if nn_arch == 'WRN':
-        model = create_wide_residual_network(n_bins[0], nb_classes=class_type[0], n=1, k=1, dropout=0.2, k_size=3, swap_4d_channels=swap_4d_channels)
+        model = create_wide_residual_network(n_bins[0], n=1, k=1, dropout=0.2, k_size=3, swap_4d_channels=swap_4d_channels)
 
     elif nn_arch == 'VGG':
         if 'multi_input_single_train' in str_ident:
             dropout = (0, 0.1)
-            model = create_vgg_like_model_multi_input_from_single_nns(n_bins, str_ident, nb_classes=class_type[0],
+            model = create_vgg_like_model_multi_input_from_single_nns(n_bins, str_ident,
                                                                       dropout=dropout, swap_4d_channels=swap_4d_channels)
         else:
             dropout = args["dropout"]

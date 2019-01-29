@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def sample_modifiers_orca(swap_col, str_ident):
+def orca_sample_modifiers(swap_col, str_ident):
     """
     Returns one of the sample modifiers used for Orca networks.
 
@@ -73,3 +73,96 @@ def sample_modifiers_orca(swap_col, str_ident):
         raise ValueError('The argument "swap_col"=' + str(swap_col) + ' is not valid.')
 
     return sample_modifier
+
+
+def orca_label_modifiers(class_type):
+    """
+    TODO add docs
+
+    CAREFUL: y_values is a structured numpy array! if you use advanced numpy indexing, this may lead to errors.
+    Let's suppose you want to assign a particular value to one or multiple elements of the y_values array.
+
+    E.g.
+    y_values[1]['bjorkeny'] = 5
+    This works, since it is basic indexing.
+
+    Likewise,
+    y_values[1:3]['bjorkeny'] = 5
+    works as well, because basic indexing gives you a view (!).
+
+    Advanced indexing though, gives you a copy.
+    So this
+    y_values[[1,2,4]]['bjorkeny'] = 5
+    will NOT work! Same with boolean indexing, like
+
+    bool_idx = np.array([True,False,False,True,False]) # if len(y_values) = 5
+    y_values[bool_idx]['bjorkeny'] = 10
+    This will NOT work as well!!
+
+    Instead, use
+    np.place(y_values['bjorkeny'], bool_idx, 10)
+    This works.
+
+    Parameters
+    ----------
+    class_type : str
+
+    Returns
+    -------
+    label_modifier : function
+        The label modifier function.
+
+    """
+
+    if class_type == 'energy_dir_bjorken-y_vtx_errors':
+        def label_modifier(y_values):
+            ys = dict()
+            particle_type, is_cc = y_values['particle_type'], y_values['is_cc']
+            elec_nc_bool_idx = np.logical_and(np.abs(particle_type) == 12, is_cc == 0)
+
+            # correct energy to visible energy
+            visible_energy = y_values[elec_nc_bool_idx]['energy'] * y_values[elec_nc_bool_idx]['bjorkeny']
+            # fix energy to visible energy
+            np.place(y_values['energy'], elec_nc_bool_idx, visible_energy)  # TODO fix numpy warning
+            # set bjorkeny label of nc events to 1
+            np.place(y_values['bjorkeny'], elec_nc_bool_idx, 1)
+
+            ys['dx'], ys['dx_err'] = y_values['dir_x'], y_values['dir_x']
+            ys['dy'], ys['dy_err'] = y_values['dir_y'], y_values['dir_y']
+            ys['dz'], ys['dz_err'] = y_values['dir_z'], y_values['dir_z']
+            ys['e'], ys['e_err'] = y_values['energy'], y_values['energy']
+            ys['by'], ys['by_err'] = y_values['bjorkeny'], y_values['bjorkeny']
+
+            ys['vx'], ys['vx_err'] = y_values['vertex_pos_x'], y_values['vertex_pos_x']
+            ys['vy'], ys['vy_err'] = y_values['vertex_pos_y'], y_values['vertex_pos_y']
+            ys['vz'], ys['vz_err'] = y_values['vertex_pos_z'], y_values['vertex_pos_z']
+            ys['vt'], ys['vt_err'] = y_values['time_residual_vertex'], y_values['time_residual_vertex']
+
+            for key_label in ys:
+                ys[key_label] = ys[key_label].astype(np.float32)
+            return ys
+
+    elif class_type == 'track-shower':
+        def label_modifier(y_values):
+            # for every sample, [0,1] for shower, or [1,0] for track
+
+            # {(12, 0): 0, (12, 1): 1, (14, 1): 2, (16, 1): 3}
+            # 0: elec_NC, 1: elec_CC, 2: muon_CC, 3: tau_CC
+            # label is always shower, except if muon-CC
+            ys = dict()
+            particle_type, is_cc = y_values['particle_type'], y_values['is_cc']
+            is_muon_cc = np.logical_and(np.abs(particle_type) == 14, is_cc == 1)
+            is_not_muon_cc = np.invert(is_muon_cc)
+
+            batchsize = y_values.shape[0]
+            categorical_ts = np.zeros((batchsize, 2), dtype='bool')  # categorical [shower, track] -> [1,0] = shower, [0,1] = track
+            categorical_ts[is_not_muon_cc][:, 0] = 1
+            categorical_ts[is_muon_cc][:, 1] = 1
+
+            ys['ts_output'] = categorical_ts.astype(np.float32)
+            return ys
+
+    else:
+        raise ValueError('The label ' + str(class_type) + ' in class_type is not available.')
+
+    return label_modifier

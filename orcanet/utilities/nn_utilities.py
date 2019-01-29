@@ -51,9 +51,6 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
 
     """
     batchsize = cfg.batchsize
-    class_type = cfg.class_type
-    str_ident = cfg.str_ident
-    swap_col = cfg.swap_4d_channels
     # name of the datagroups in the file
     samples_key = cfg.key_samples
     mc_key = cfg.key_labels
@@ -84,9 +81,9 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
             np.random.shuffle(sample_pos)
 
         for sample_n in sample_pos:
-            # Read one batch of samples from the files and zero center
             # A dict with every input name as key, and a batch of data as values
             xs = {}
+            # Read one batch of samples from the files and zero center
             for input_key in files:
                 xs[input_key] = files[input_key][samples_key][sample_n: sample_n + batchsize]
                 if zero_center_image is not None:
@@ -94,13 +91,13 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
             # Get labels for the nn. Since the labels are hopefully the same for all the files, use the ones from the first
             y_values = list(files.values())[0][mc_key][sample_n:sample_n + batchsize]
 
-            # Modify the samples and the labels batchwise
+            # Modify the samples and labels before feeding them into the network
             if cfg.sample_modifier is not None:
                 xs = cfg.sample_modifier(xs)
-
-            # if swap_col is not None:
-            #     xs = get_input_images(xs, swap_col, str_ident)
-            ys = y_values  # get_labels(y_values, class_type)
+            if cfg.label_modifier is not None:
+                ys = cfg.label_modifier(y_values)
+            else:
+                ys = y_values
 
             if not yield_mc_info:
                 yield xs, ys
@@ -162,96 +159,6 @@ def get_dimensions_encoding(n_bins, batchsize):
         dimensions = (batchsize, n_bins_x, n_bins_y, n_bins_z, n_bins_t)
 
     return dimensions
-
-
-def get_labels(y_values, class_type):
-    """
-    TODO add docs
-
-    CAREFUL: y_values is a structured numpy array! if you use advanced numpy indexing, this may lead to errors.
-    Let's suppose you want to assign a particular value to one or multiple elements of the y_values array.
-
-    E.g.
-    y_values[1]['bjorkeny'] = 5
-    This works, since it is basic indexing.
-
-    Likewise,
-    y_values[1:3]['bjorkeny'] = 5
-    works as well, because basic indexing gives you a view (!).
-
-    Advanced indexing though, gives you a copy.
-    So this
-    y_values[[1,2,4]]['bjorkeny'] = 5
-    will NOT work! Same with boolean indexing, like
-
-    bool_idx = np.array([True,False,False,True,False]) # if len(y_values) = 5
-    y_values[bool_idx]['bjorkeny'] = 10
-    This will NOT work as well!!
-
-    Instead, use
-    np.place(y_values['bjorkeny'], bool_idx, 10)
-    This works.
-
-    Parameters
-    ----------
-    y_values : ndarray
-        TODO
-    class_type : tuple(int, str) TODO is the int still needed anywhere?
-
-    Returns
-    -------
-    ys : dict
-        TODO
-
-    """
-    ys = dict()
-
-    if class_type[1] == 'energy_dir_bjorken-y_vtx_errors':
-        particle_type, is_cc = y_values['particle_type'], y_values['is_cc']
-        elec_nc_bool_idx = np.logical_and(np.abs(particle_type) == 12, is_cc == 0)
-
-        # correct energy to visible energy
-        visible_energy = y_values[elec_nc_bool_idx]['energy'] * y_values[elec_nc_bool_idx]['bjorkeny']
-        # fix energy to visible energy
-        np.place(y_values['energy'], elec_nc_bool_idx, visible_energy)  # TODO fix numpy warning
-        # set bjorkeny label of nc events to 1
-        np.place(y_values['bjorkeny'], elec_nc_bool_idx, 1)
-
-        ys['dx'], ys['dx_err'] = y_values['dir_x'], y_values['dir_x']
-        ys['dy'], ys['dy_err'] = y_values['dir_y'], y_values['dir_y']
-        ys['dz'], ys['dz_err'] = y_values['dir_z'], y_values['dir_z']
-        ys['e'], ys['e_err'] = y_values['energy'], y_values['energy']
-        ys['by'], ys['by_err'] = y_values['bjorkeny'], y_values['bjorkeny']
-
-        ys['vx'], ys['vx_err'] = y_values['vertex_pos_x'], y_values['vertex_pos_x']
-        ys['vy'], ys['vy_err'] = y_values['vertex_pos_y'], y_values['vertex_pos_y']
-        ys['vz'], ys['vz_err'] = y_values['vertex_pos_z'], y_values['vertex_pos_z']
-        ys['vt'], ys['vt_err'] = y_values['time_residual_vertex'], y_values['time_residual_vertex']
-
-        for key_label in ys:
-            ys[key_label] = ys[key_label].astype(np.float32)
-
-    elif class_type[1] == 'track-shower':
-        # for every sample, [0,1] for shower, or [1,0] for track
-
-        # {(12, 0): 0, (12, 1): 1, (14, 1): 2, (16, 1): 3}
-        # 0: elec_NC, 1: elec_CC, 2: muon_CC, 3: tau_CC
-        # label is always shower, except if muon-CC
-        particle_type, is_cc = y_values['particle_type'], y_values['is_cc']
-        is_muon_cc = np.logical_and(np.abs(particle_type) == 14, is_cc == 1)
-        is_not_muon_cc = np.invert(is_muon_cc)
-
-        batchsize = y_values.shape[0]
-        categorical_ts = np.zeros((batchsize, 2), dtype='bool')  # categorical [shower, track] -> [1,0] = shower, [0,1] = track
-        categorical_ts[is_not_muon_cc][:, 0] = 1
-        categorical_ts[is_muon_cc][:, 1] = 1
-
-        ys['ts_output'] = categorical_ts.astype(np.float32)
-
-    else:
-        raise ValueError('The label ' + str(class_type[1]) + ' in class_type[1] is not available.')
-
-    return ys
 
 
 def get_inputs(model):
@@ -468,7 +375,7 @@ def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident=''):
     The final modelname is defined as 'model_Nd_proj_class_type[1]'.
     E.g. 'model_3d_xyz_muon-CC_to_elec-CC'.
     :param list(tuple) n_bins: Number of bins for each dimension (x,y,z,t) of the training images. Can contain multiple n_bins tuples.
-    :param (int, str) class_type: Tuple that declares the number of output classes and a string identifier to specify the exact output classes.
+    :param str class_type: Tuple that declares the number of output classes and a string identifier to specify the exact output classes.
                                   I.e. (2, 'muon-CC_to_elec-CC')
     :param str nn_arch: String that declares which neural network model architecture is used.
     :param None/str swap_4d_channels: For 4D data input (3.5D models). Specifies the projection type.
@@ -497,7 +404,7 @@ def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident=''):
             if bins[3] > 1: projection += 't'
 
     str_ident = '_' + str_ident if str_ident is not '' else str_ident
-    modelname += projection + '_' + class_type[1] + str_ident
+    modelname += projection + '_' + class_type + str_ident
 
     return modelname
 
