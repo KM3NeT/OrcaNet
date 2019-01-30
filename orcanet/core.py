@@ -455,9 +455,11 @@ class Configuration(object):
             files_dict = {key: val_files[key][file_no] for key in val_files}
             yield files_dict
 
-    def check_input_connection(self, model):
+    def check_connections(self, model):
         """
-        Check if the names and shapes of the given input files work with the given model inputs.
+        Check if the names and shapes of the samples and labels in the given input files work with the model.
+
+        Also takes into account the possibly present sample or label modifiers.
 
         Parameters
         ----------
@@ -470,6 +472,19 @@ class Configuration(object):
             If they dont work together.
 
         """
+        def check_for_error(list_ns, layer_ns):
+            """ Get the names of the layers which dont have a fitting counterpart from the toml list. """
+            # Both inputs are dicts with  name: shape  of input/output layers/data
+            err_names, err_shapes = [], []
+            for layer_name in layer_ns:
+                if layer_name not in list_ns.keys():
+                    # no matching name
+                    err_names.append(layer_name)
+                elif list_ns[layer_name] != layer_ns[layer_name]:
+                    # no matching shape
+                    err_shapes.append(layer_name)
+            return err_names, err_shapes
+
         print("\nInput check\n-----------")
         layer_inputs = get_inputs(model)
         # keys: name of layers, values: shape of input
@@ -480,80 +495,81 @@ class Configuration(object):
         for list_key in list_inp_shapes:
             print("\t{}\t{}".format(list_key, list_inp_shapes[list_key]))
 
-        sample_mod_failed = False
         if self.sample_modifier is not None:
-            try:
-                modified = next(self.get_generator())[0]
-                modified_shapes = {modi_key: modified[modi_key].shape[1:] for modi_key in modified}
-                print("After applying your sample modifier, they have the following names and shapes:")
-                for list_key in modified_shapes:
-                    print("\t{}\t{}".format(list_key, modified_shapes[list_key]))
-                list_inp_shapes = modified_shapes
-            except:
-                print("Error encountered during test of sample modifier:", str(sys.exc_info()), "\n Lets continue and hope for the best...")
-                sample_mod_failed = True
+            modified = next(self.get_generator())[0]
+            modified_shapes = {modi_key: modified[modi_key].shape[1:] for modi_key in modified}
+            print("After applying your sample modifier, they have the following names and shapes:")
+            for list_key in modified_shapes:
+                print("\t{}\t{}".format(list_key, modified_shapes[list_key]))
+            list_inp_shapes = modified_shapes
 
         print("Your model requires the following input names and shapes:")
         for layer_key in layer_inp_shapes:
             print("\t{}\t{}".format(layer_key, layer_inp_shapes[layer_key]))
 
-        err_inp_names = []
-        err_inp_shapes = []
-        for layer_key in layer_inp_shapes:
-            if layer_key not in list_inp_shapes.keys():
-                err_inp_names.append(layer_key)
-            elif list_inp_shapes[layer_key] != layer_inp_shapes[layer_key]:
-                err_inp_shapes.append(layer_key)
+        err_inp_names, err_inp_shapes = check_for_error(list_inp_shapes, layer_inp_shapes)
 
-        if sample_mod_failed:
-            pass
-        elif len(err_inp_names) == 0 and len(err_inp_shapes) == 0:
+        err_msg = ""
+        if len(err_inp_names) == 0 and len(err_inp_shapes) == 0:
             print("Check passed.\n")
         else:
-            names_err = "No input in the list file provided for layer(s): " + ", ".join(str(e) for e in err_inp_names)
-            shapes_err = "Shapes do not match for the following layer(s): " + ", ".join(str(e) for e in err_inp_shapes)
-            err_msg = ""
             if len(err_inp_names) != 0:
-                err_msg = err_msg + names_err + "\n"
+                err_msg += "No matching input name from the list file for input layer(s): " \
+                           + (", ".join(str(e) for e in err_inp_names) + "\n")
             if len(err_inp_shapes) != 0:
-                err_msg += shapes_err
-            raise AssertionError(err_msg)
+                err_msg += "Shapes of layers and labels do not match for the following input layer(s): " \
+                           + (", ".join(str(e) for e in err_inp_shapes) + "\n")
+            print("Error:", err_msg)
 
-    def compare_outputs(self, model):
-        # model_shapes = [ls[1:] for ls in model.output_shape]
+        # ----------------------------------
         print("\nOutput check\n------------")
         y = next(self.get_generator())[1]
-        list_shapes = dict()
+        list_out_shapes = dict()
         for key in y:
             shape = y[key].shape[1:]
             if len(shape) == 0:
-                list_shapes[key] = 1
+                list_out_shapes[key] = 1
             else:
-                list_shapes[key] = shape
+                list_out_shapes[key] = shape
 
         print("After the label modifier, the outputs from your toml list file have the following names and shapes:")
-        for list_key in list_shapes:
-            print("\t{}\t{}".format(list_key, list_shapes[list_key]))
+        for list_key in list_out_shapes:
+            print("\t{}\t{}".format(list_key, list_out_shapes[list_key]))
 
-        model_shapes = {}
-        # These are tf layers...
+        layer_out_shapes = {}
+        # model.output are tf layers...
         # for olayer in model.output:
         #     shape = olayer.shape[1:]
         #     if len(shape) == 1:
         #         shape = shape[0]
         #     model_shapes[olayer.name] = shape
 
-        # This is probably not a good idea? But you cant access the keras output layers otherwise...
+        # This is probably not a good idea? But you cant access all keras output layers otherwise...
         for olayer in model._output_layers:
             shape = olayer.output_shape[1:]
             if len(shape) == 1:
                 shape = shape[0]
-            model_shapes[olayer.name] = shape
+            layer_out_shapes[olayer.name] = shape
 
         print("Your model has the following output layer names and shapes:")
-        for key in model_shapes:
-            print("\t{}\t{}".format(key, str(model_shapes[key])))
-        print("Check passed.\n")  # TODO implement check
+        for key in layer_out_shapes:
+            print("\t{}\t{}".format(key, str(layer_out_shapes[key])))
+
+        err_out_names, err_out_shapes = check_for_error(list_out_shapes, layer_out_shapes)
+
+        if len(err_out_names) == 0 and len(err_out_shapes) == 0:
+            print("Check passed.\n")
+        else:
+            if len(err_out_names) != 0:
+                err_msg += "No matching output name from the list file for output layer(s): " \
+                           + (", ".join(str(e) for e in err_out_names) + "\n")
+            if len(err_out_shapes) != 0:
+                err_msg += "Shapes of layers and labels do not match for the following output layer(s): " \
+                           + (", ".join(str(e) for e in err_out_shapes) + "\n")
+            print("Error:", err_msg)
+
+        if err_msg != "":
+            raise AssertionError(err_msg)
 
     def get_generator(self):
         """
@@ -606,8 +622,7 @@ def orca_train(cfg, initial_model=None):
         path_of_model = cfg.get_model_path(epoch[0], epoch[1])
         print("Loading saved model: "+path_of_model)
         model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
-    cfg.check_input_connection(model)
-    cfg.compare_outputs(model)
+    cfg.check_connections(model)
     # model.summary()
     if cfg.use_scratch_ssd:
         cfg.use_local_node()
