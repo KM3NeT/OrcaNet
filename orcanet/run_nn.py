@@ -12,7 +12,7 @@ mpl.use('Agg')
 from orcanet.utilities.input_output_utilities import write_summary_logfile, write_full_logfile, read_logfiles
 from orcanet.utilities.nn_utilities import load_zero_center_data, BatchLevelPerformanceLogger, generate_batches_from_hdf5_file
 from orcanet.utilities.visualization.visualization_tools import plot_all_metrics_to_pdf, plot_weights_and_activations
-
+from orcanet_contrib.contrib import orca_learning_rates
 
 # for debugging
 # from tensorflow.python import debug as tf_debug
@@ -52,11 +52,12 @@ def get_learning_rate(cfg, epoch):
             # Exponentially decaying LR
             lr = user_lr[0] * (1 - user_lr[1])**(epoch[1] + epoch[0]*len(cfg.get_no_of_train_files()))
         else:
-            raise AssertionError(error_msg)
+            raise AssertionError(error_msg, "(Your tuple has length "+str(len(user_lr))+")")
 
     elif isinstance(user_lr, str):
         if user_lr == "triple_decay":
-            lr = triple_decay(epoch[0], epoch[1], cfg)
+            lr_schedule = orca_learning_rates("triple_decay")
+            lr = lr_schedule(epoch[0], epoch[1], cfg)
         else:
             raise NameError(user_lr, "is an unknown learning rate string!")
 
@@ -67,46 +68,8 @@ def get_learning_rate(cfg, epoch):
         lr = user_lr(epoch[0], epoch[1], cfg)
 
     else:
-        raise AssertionError(error_msg)
+        raise AssertionError(error_msg, "(You gave a " + str(type(user_lr)) + ")")
     return lr
-
-
-def triple_decay(n_epoch, n_file, cfg):
-    """
-    Function that calculates the current learning rate based on the number of already trained epochs.
-
-    Learning rate schedule is as follows: lr_decay = 7% for lr > 0.0003
-                                          lr_decay = 4% for 0.0003 >= lr > 0.0001
-                                          lr_decay = 2% for 0.0001 >= lr
-
-    Parameters
-    ----------
-    n_epoch : int
-        The number of the current epoch which is used to calculate the new learning rate.
-    n_file : int
-        The number of the current filenumber which is used to calculate the new learning rate.
-    cfg : object Configuration
-        Configuration object containing all the configurable options in the OrcaNet scripts.
-
-    Returns
-    -------
-    lr_temp : float
-        Calculated learning rate for this epoch.
-
-    """
-    n_lr_decays = (n_epoch - 1) * cfg.get_no_of_train_files() + (n_file - 1)
-    lr_temp = 0.005  # * n_gpu TODO think about multi gpu lr
-
-    for i in range(n_lr_decays):
-        if lr_temp > 0.0003:
-            lr_decay = 0.07  # standard for regression: 0.07, standard for PID: 0.02
-        elif 0.0003 >= lr_temp > 0.0001:
-            lr_decay = 0.04  # standard for regression: 0.04, standard for PID: 0.01
-        else:
-            lr_decay = 0.02  # standard for regression: 0.02, standard for PID: 0.005
-        lr_temp = lr_temp * (1 - float(lr_decay))
-
-    return lr_temp
 
 
 def update_summary_plot(main_folder):
