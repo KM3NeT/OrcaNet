@@ -110,20 +110,27 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
         file.close()
 
 
-def get_auto_label_modifier(names):
+def get_auto_label_modifier(model):
     """
-    Get a label modifier that reads out labels with the given names from a numpy structured array.
+    Get a label_modifier that reads out the labels from the files which are required by the model.
+
+    If the model has more than one output layer, it has to be compiled with a dict of losses, not a list.
 
     Parameters
     ----------
-    names : tuple
-        Strings with names appearing in the labels of the dataset.
+    model : ks.Model
+        A keras model.
 
     Returns
     -------
     label_modifier : function
 
     """
+    assert isinstance(model.loss, dict), "You did not compile your model with a dict of losses. " \
+                                         "Use a dict, so that it is clear which label from your data files " \
+                                         "belongs to which output layer."
+    names = tuple(model.loss.keys())
+
     def label_modifier(y_values):
         ys = {name: y_values[name] for name in names}
         return ys

@@ -629,7 +629,7 @@ def orca_train(cfg, initial_model=None):
         model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
 
     if cfg.label_modifier is None:
-        cfg._auto_label_modifier = get_auto_label_modifier(tuple(model.loss.keys()))
+        cfg._auto_label_modifier = get_auto_label_modifier(model)
     cfg.check_connections(model)
     # model.summary()
     if cfg.use_scratch_ssd:
