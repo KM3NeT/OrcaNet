@@ -34,7 +34,7 @@ def run_eval(main_folder, list_file, config_file, model_file):
     list_file : str
         Path to a list file which contains pathes to all the h5 files that should be used for training and validation.
     config_file : str
-        Path to a .toml file which overwrite some of the default settings for training and validating a model.
+        Path to a .toml file which overwrites some of the default settings for training and validating a model.
     model_file : str
         Path to a file with parameters to build a model of a predefined architecture with OrcaNet.
 

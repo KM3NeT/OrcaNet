@@ -53,7 +53,8 @@ class Configuration(object):
         The name of the datagroup in your h5 input files which contains the labels to the network.
     label_modifier : function or None
         Operation to be performed on batches of labels read from the input files before they are fed into the model.
-        If None is given, all labels will be passed to the model as a dict, with the keys being the dtype names.
+        If None is given, all labels with the same name as the output layers will be passed to the model as a dict,
+        with the keys being the dtype names.
         TODO online doc on how to do this
     learning_rate : float or tuple or function
         The learning rate for the training.

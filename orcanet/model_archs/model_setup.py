@@ -139,6 +139,7 @@ def build_nn_model(cfg):
 
     """
     modeldata = cfg.get_modeldata()
+    assert modeldata is not None, "You need to specify modeldata before building a model with OrcaNet!"
 
     nn_arch = modeldata.nn_arch
     loss_opt = modeldata.loss_opt
