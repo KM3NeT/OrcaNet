@@ -34,9 +34,6 @@ class Configuration(object):
         Has a '/' at the end.
     batchsize : int
         Batchsize that should be used for the training / inferencing of the cnn.
-    class_type : str
-        Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
-        I.e. (2, 'track-shower')
     filter_out_tf_garbage : bool
         If true, surpresses the tensorflow info logs which usually spam the terminal.
     epochs_to_train : int
@@ -75,12 +72,8 @@ class Configuration(object):
     sample_modifier : function or None
         Operation to be performed on batches of samples read from the input files before they are fed into the model.
         TODO online doc on how to do this
-    str_ident : str
-        Optional string identifier that gets appended to the modelname. Useful when training models which would have
-        the same modelname. Also used for defining models and projections!
-    swap_4d_channels : None or str
-        For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
-        Currently available: None -> XYZ-T ; 'yzt-x' -> YZT-X, TODO add multi input options
+    shuffle_train : bool
+        If true, the order at which batches are read out from the files during training are randomized each time.
     train_logger_display : int
         How many batches should be averaged for one line in the training log files.
     train_logger_flush : int
@@ -127,6 +120,15 @@ class Configuration(object):
         modeldata.loss_opt : tuple(dict, dict/str/None,)
             Tuple that contains 1) the loss_functions and loss_weights as dicts (this is the losses table from the toml file)
             and 2) the metrics.
+        modeldata.class_type : str
+            Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
+            I.e. (2, 'track-shower')
+        modeldata.str_ident : str
+            Optional string identifier that gets appended to the modelname. Useful when training models which would have
+            the same modelname. Also used for defining models and projections!
+        modeldata.swap_4d_channels : None or str
+            For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
+            Currently available: None -> XYZ-T ; 'yzt-x' -> YZT-X, TODO add multi input options
         modeldata.args : dict
             Keyword arguments for the model generation.
 
@@ -142,9 +144,9 @@ class Configuration(object):
         main_folder : str
             Name of the folder of this model in which everything will be saved, e.g., the summary.txt log file is located in here.
         list_file : str or None
-            Path to a list file with pathes to all the h5 files that should be used for training and validation.
+            Path to a toml list file with pathes to all the h5 files that should be used for training and validation.
         config_file : str or None
-            Path to the config file with attributes that are used instead of the default ones.
+            Path to a toml config file with attributes that are used instead of the default ones.
 
         """
         # Configuration:
@@ -161,6 +163,7 @@ class Configuration(object):
         self.n_events = None
         self.n_gpu = (1, 'avolkov')
         self.sample_modifier = None
+        self.shuffle_train = False
         self.train_logger_display = 100
         self.train_logger_flush = -1
         self.use_scratch_ssd = False
@@ -168,11 +171,6 @@ class Configuration(object):
         self.verbose_train = 2
         self.verbose_val = 1
         self.zero_center_folder = None
-
-        # Move these
-        self.class_type = 'energy_dir_bjorken-y_vtx_errors'
-        self.str_ident = ''
-        self.swap_4d_channels = None
 
         self._default_values = dict(self.__dict__)
 
@@ -196,7 +194,15 @@ class Configuration(object):
             self.set_from_config_file(config_file)
 
     def set_from_list_file(self, list_file):
-        """ Set filepaths to the ones given in a list file. """
+        """
+        Set filepaths to the ones given in a list file.
+
+        Parameters
+        ----------
+        list_file : str or None
+            Path to a toml list file with pathes to all the h5 files that should be used for training and validation.
+
+        """
         if self._list_file is None:
             self._train_files, self._val_files = read_out_list_file(list_file)
             # Save internally which path was used to load the info
@@ -207,7 +213,15 @@ class Configuration(object):
             two different list files for one Configuration object!")
 
     def set_from_config_file(self, config_file):
-        """ Overwrite default attribute values with values from a config file. """
+        """
+        Overwrite default attribute values with values from a config file.
+
+        Parameters
+        ----------
+        config_file : str or None
+            Path to a toml config file with attributes that are used instead of the default ones.
+
+        """
         user_values = read_out_config_file(config_file)
         for key in user_values:
             if hasattr(self, key):
@@ -219,10 +233,7 @@ class Configuration(object):
 
     def set_from_model_file(self, model_file):
         """ Set attributes for generating models with OrcaNet. """
-        nn_arch, loss_opt, args = read_out_model_file(model_file)
-        ModelData = namedtuple("ModelData", "nn_arch loss_opt args")
-        data = ModelData(nn_arch, loss_opt, args)
-        self._modeldata = data
+        self._modeldata = read_out_model_file(model_file)
 
     def get_latest_epoch(self):
         """
@@ -658,12 +669,15 @@ def orca_eval(cfg):
     folder_name = cfg.main_folder
     test_files = cfg.get_val_files()
     n_bins = cfg.get_n_bins()
-    class_type = cfg.class_type
-    swap_4d_channels = cfg.swap_4d_channels
     batchsize = cfg.batchsize
-    str_ident = cfg.str_ident
     list_name = os.path.basename(cfg.get_list_file()).split(".")[0]
-    nn_arch = cfg.get_modeldata().nn_arch
+
+    model_data = cfg.get_modeldata()
+    nn_arch = model_data.nn_arch
+    str_ident = model_data.str_ident
+    class_type = model_data.class_type
+    swap_4d_channels = model_data.swap_4d_channels
+
     epoch = (cfg.initial_epoch, cfg.initial_fileno)
 
     if cfg.filter_out_tf_garbage:

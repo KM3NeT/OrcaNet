@@ -63,9 +63,6 @@ def generate_batches_from_hdf5_file_tweak(cfg, files_dict, f_size=None, zero_cen
 
     """
     batchsize = cfg.batchsize
-    class_type = cfg.class_type
-    str_ident = cfg.str_ident
-    swap_col = cfg.swap_4d_channels
     # name of the datagroups in the file
     samples_key = cfg.key_samples
     mc_key = cfg.key_labels

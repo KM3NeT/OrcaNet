@@ -139,13 +139,15 @@ def build_nn_model(cfg):
 
     """
     modeldata = cfg.get_modeldata()
+
     nn_arch = modeldata.nn_arch
     loss_opt = modeldata.loss_opt
     args = modeldata.args
+    class_type = modeldata.class_type
+    str_ident = modeldata.str_ident
+    swap_4d_channels = modeldata.swap_4d_channels
+
     n_bins = cfg.get_n_bins()
-    class_type = cfg.class_type
-    str_ident = cfg.str_ident
-    swap_4d_channels = cfg.swap_4d_channels
 
     if nn_arch == 'WRN':
         model = create_wide_residual_network(n_bins[0], n=1, k=1, dropout=0.2, k_size=3, swap_4d_channels=swap_4d_channels)

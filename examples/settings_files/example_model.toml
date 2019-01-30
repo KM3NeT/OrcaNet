@@ -4,6 +4,7 @@
 #
 [model]
 nn_arch = 'VGG'
+class_type = 'energy_dir_bjorken-y_vtx_errors'
 dropout = 0.0
 n_filters = [64, 64, 64, 64, 64, 64, 128, 128, 128, 128]
 

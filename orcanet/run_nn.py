@@ -177,7 +177,7 @@ def train_model(cfg, model, files_dict, f_size, xs_mean, curr_epoch):
         # TODO Can throw an error if n_events is larger than the file
         f_size = cfg.n_events  # for testing purposes
     callbacks = [BatchLevelPerformanceLogger(cfg, model, curr_epoch), ]
-    training_generator = generate_batches_from_hdf5_file(cfg, files_dict, f_size=f_size, zero_center_image=xs_mean)
+    training_generator = generate_batches_from_hdf5_file(cfg, files_dict, f_size=f_size, zero_center_image=xs_mean, shuffle=cfg.shuffle_train)
     history = model.fit_generator(training_generator, steps_per_epoch=int(f_size / cfg.batchsize), epochs=1,
                                   verbose=cfg.verbose_train, max_queue_size=cfg.max_queue_size, callbacks=callbacks)
     return history
