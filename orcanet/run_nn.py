@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Main code for training and validating NN's.
+Code for training and validating NN's.
 """
 
 import os
@@ -95,9 +95,9 @@ def train_and_validate_model(cfg, model, start_epoch):
     """
     Train a model for one epoch, i.e. on all (remaining) train files once.
 
-    Trains (fit_generator) and validates (evaluate_generator) a Keras model once on the provided
-    training and validation files. The model is saved with an automatically generated filename based on the epoch,
-    log files are written and plots are made.
+    Trains (fit_generator) and validates (evaluate_generator) a Keras model on the provided
+    training and validation files for one epoch. The model is saved with an automatically generated filename based on the epoch,
+    log files are written and summary plots are made.
 
     Parameters
     ----------
@@ -106,7 +106,7 @@ def train_and_validate_model(cfg, model, start_epoch):
     model : ks.Models.model
         Compiled keras model to use for training and validating.
     start_epoch : tuple
-        Upcoming epoch and file number to start this training with.
+        Upcoming epoch and file number.
 
     """
     if cfg.zero_center_folder is not None:
@@ -123,9 +123,11 @@ def train_and_validate_model(cfg, model, start_epoch):
         # skip to the file with the target file number given in the start_epoch tuple.
         if curr_epoch[1] < start_epoch[1]:
             continue
+
         lr = get_learning_rate(cfg, curr_epoch)
         K.set_value(model.optimizer.lr, lr)
         print("Set learning rate to " + str(lr))
+
         # Train the model on one file and save it afterwards
         model_filename = cfg.get_model_path(curr_epoch[0], curr_epoch[1])
         assert not os.path.isfile(model_filename), "You tried to train your model in epoch {} file {}, but this model \
@@ -133,15 +135,16 @@ def train_and_validate_model(cfg, model, start_epoch):
         history_train = train_model(cfg, model, files_dict, f_size, xs_mean, curr_epoch)
         model.save(model_filename)
         print("Saved model as " + model_filename)
+
         # Validate after every n-th file, starting with the first
         if (curr_epoch[1] - 1) % cfg.validate_after_n_train_files == 0:
             history_val = validate_model(cfg, model, xs_mean)
         else:
             history_val = None
-        # Write logfiles
+
+        # Write logfiles and make plots
         write_summary_logfile(cfg, curr_epoch, model, history_train, history_val, K.get_value(model.optimizer.lr))
         write_full_logfile(cfg, model, history_train, history_val, K.get_value(model.optimizer.lr), curr_epoch, files_dict)
-        # Make plots
         update_summary_plot(cfg.main_folder)
         # TODO reimplement, this function throws errors all the time!
         # plot_weights_and_activations(cfg, model, xs_mean, curr_epoch)

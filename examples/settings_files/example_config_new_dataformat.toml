@@ -3,7 +3,7 @@
 # They overwrite the default values which are listed in the definition of the Configuration class.
 #
 [config]
-class_type = ['None', 'energy_dir_bjorken-y_vtx_errors']
+class_type = 'energy_dir_bjorken-y_vtx_errors'
 
 learning_rate = "triple_decay"
 zero_center_folder = "/home/woody/capn/mppi033h/orcanet_test/zero_center_folder/"

@@ -9,6 +9,7 @@ import keras as ks
 from orcanet.model_archs.short_cnn_models import create_vgg_like_model_multi_input_from_single_nns, create_vgg_like_model
 from orcanet.model_archs.wide_resnet import create_wide_residual_network
 from orcanet.utilities.losses import get_all_loss_functions
+from orcanet_contrib.contrib import orca_label_modifiers, orca_sample_modifiers
 
 
 def parallelize_model_to_n_gpus(model, n_gpu, batchsize, loss_functions, optimizer, metrics, loss_weight):
@@ -74,11 +75,12 @@ def get_optimizer_info(loss_opt, optimizer='adam'):
     Parameters
     ----------
     loss_opt : tuple
-        A Tuple with len=2.
-        loss_opt[0]: dict with dicts of loss functions and optionally weights that should be used for each nn output.
+        loss_opt[0]: dict
+            Dicts of loss functions and optionally weights that should be used for each nn output.
             Typically read in from a .toml file.
-            Format: { loss : { function, weight } }
-        loss_opt[1]: dict with metrics that should be used for each nn output.
+            Format: { layer_name : { loss_function, weight } }
+        loss_opt[1]: dict or None
+            Metrics that should be used for each nn output.
     optimizer : str
         Specifies, if "Adam" or "SGD" should be used as optimizer.
 
@@ -101,20 +103,22 @@ def get_optimizer_info(loss_opt, optimizer='adam'):
     else:
         raise NameError("Unknown optimizer name ({})".format(optimizer))
     custom_objects = get_all_loss_functions()
+
     loss_functions, loss_weight = {}, {}
-    for loss_key in loss_opt[0].keys():
+    for layer_name in loss_opt[0].keys():
         # Replace function string with the actual function if it is custom
-        if loss_opt[0][loss_key]["function"] in custom_objects:
-            loss_function = custom_objects[loss_opt[0][loss_key]["function"]]
+        if loss_opt[0][layer_name]["function"] in custom_objects:
+            loss_function = custom_objects[loss_opt[0][layer_name]["function"]]
         else:
-            loss_function = loss_opt[0][loss_key]["function"]
+            loss_function = loss_opt[0][layer_name]["function"]
         # Use given weight, else use default weight of 1
-        if "weight" in loss_opt[0][loss_key]:
-            weight = loss_opt[0][loss_key]["weight"]
+        if "weight" in loss_opt[0][layer_name]:
+            weight = loss_opt[0][layer_name]["weight"]
         else:
             weight = 1.0
-        loss_functions[loss_key] = loss_function
-        loss_weight[loss_key] = weight
+        loss_functions[layer_name] = loss_function
+        loss_weight[layer_name] = weight
+
     metrics = loss_opt[1] if not loss_opt[1] is None else []
 
     return loss_functions, metrics, loss_weight, optimizer
@@ -163,5 +167,8 @@ def build_nn_model(cfg):
     model, batchsize = parallelize_model_to_n_gpus(model, cfg.n_gpu, cfg.batchsize, loss_functions, optimizer, metrics,
                                                    loss_weight)
     model.compile(loss=loss_functions, optimizer=optimizer, metrics=metrics, loss_weights=loss_weight)
+    if swap_4d_channels is not None:
+        cfg.sample_modifier = orca_sample_modifiers(swap_4d_channels, str_ident)
+    cfg.label_modifier = orca_label_modifiers(class_type)
 
     return model
