@@ -15,7 +15,7 @@ import numpy as np
 from orcanet.run_nn import train_and_validate_model
 from orcanet.eval_nn import predict_and_investigate_model_performance, get_modelname
 from orcanet.utilities.input_output_utilities import read_out_list_file, read_out_config_file, read_out_model_file, use_node_local_ssd_for_input, write_full_logfile_startup, h5_get_number_of_rows
-from orcanet.utilities.nn_utilities import load_zero_center_data, get_inputs, generate_batches_from_hdf5_file
+from orcanet.utilities.nn_utilities import load_zero_center_data, get_inputs, generate_batches_from_hdf5_file, get_auto_label_modifier
 from orcanet.utilities.losses import get_all_loss_functions
 
 
@@ -104,6 +104,8 @@ class Configuration(object):
 
     Private attributes
     ------------------
+    _auto_label_modifier : None or function
+        If no label modifier has been specified by the user, use an auto one instead.
     _train_files : dict or None
         A dict containing the paths to the different training files on which the model will be trained on.
         Example for the format for two input sets with two files each:
@@ -181,6 +183,7 @@ class Configuration(object):
             self.main_folder = main_folder+"/"
 
         # Private attributes:
+        self._auto_label_modifier = None
         self._train_files = None
         self._val_files = None
         self._list_file = None
@@ -488,6 +491,8 @@ class Configuration(object):
             return err_names, err_shapes
 
         print("\nInput check\n-----------")
+        # Get a batch of data to investigate the given modifier functions
+        xs, y_values = self.get_batch()
         layer_inputs = get_inputs(model)
         # keys: name of layers, values: shape of input
         layer_inp_shapes = {key: layer_inputs[key].input_shape[1:] for key in layer_inputs}
@@ -498,8 +503,7 @@ class Configuration(object):
             print("\t{}\t{}".format(list_key, list_inp_shapes[list_key]))
 
         if self.sample_modifier is not None:
-            modified = next(self.get_generator())[0]
-            modified_shapes = {modi_key: modified[modi_key].shape[1:] for modi_key in modified}
+            modified_shapes = {modi_key: xs[modi_key].shape[1:] for modi_key in xs}
             print("After applying your sample modifier, they have the following names and shapes:")
             for list_key in modified_shapes:
                 print("\t{}\t{}".format(list_key, modified_shapes[list_key]))
@@ -525,56 +529,42 @@ class Configuration(object):
 
         # ----------------------------------
         print("\nOutput check\n------------")
-        y = next(self.get_generator())[1]
-        list_out_shapes = dict()
-        for key in y:
-            shape = y[key].shape[1:]
-            if len(shape) == 0:
-                list_out_shapes[key] = 1
-            else:
-                list_out_shapes[key] = shape
+        # tuple of strings
+        mc_names = y_values.dtype.names
+        print("The following {} label names are in your toml list file:".format(len(mc_names)))
+        print("\t" + ", ".join(str(name) for name in mc_names), end="\n\n")
 
-        print("After the label modifier, the outputs from your toml list file have the following names and shapes:")
-        for list_key in list_out_shapes:
-            print("\t{}\t{}".format(list_key, list_out_shapes[list_key]))
+        if self.label_modifier is not None:
+            label_names = tuple(self.label_modifier(y_values).keys())
+            print("The following {} labels get produced from them by your label_modifier:".format(len(label_names)))
+            print("\t" + ", ".join(str(name) for name in label_names), end="\n\n")
+        else:
+            label_names = mc_names
+            print("Since you did not specify a label_modifier, the output layers will be provided with "
+                  "labels that match their name from the above.\n\n")
 
-        layer_out_shapes = {}
-        # model.output are tf layers...
-        # for olayer in model.output:
-        #     shape = olayer.shape[1:]
-        #     if len(shape) == 1:
-        #         shape = shape[0]
-        #     model_shapes[olayer.name] = shape
+        # tuple of strings
+        loss_names = tuple(model.loss.keys())
+        print("Your model has the following {} output layers with loss functions:".format(len(loss_names)))
+        print("\t" + ", ".join(str(name) for name in loss_names), end="\n\n")
 
-        # This is probably not a good idea? But you cant access all keras output layers otherwise...
-        for olayer in model._output_layers:
-            shape = olayer.output_shape[1:]
-            if len(shape) == 1:
-                shape = shape[0]
-            layer_out_shapes[olayer.name] = shape
+        err_out_names = []
+        for loss_name in loss_names:
+            if loss_name not in label_names:
+                err_out_names.append(loss_name)
 
-        print("Your model has the following output layer names and shapes:")
-        for key in layer_out_shapes:
-            print("\t{}\t{}".format(key, str(layer_out_shapes[key])))
-
-        err_out_names, err_out_shapes = check_for_error(list_out_shapes, layer_out_shapes)
-
-        if len(err_out_names) == 0 and len(err_out_shapes) == 0:
+        if len(err_out_names) == 0:
             print("Check passed.\n")
         else:
             if len(err_out_names) != 0:
-                err_msg += "No matching output name from the list file for output layer(s): " \
+                err_msg += "No matching label name from the list file for output layer(s): " \
                            + (", ".join(str(e) for e in err_out_names) + "\n")
-            if len(err_out_shapes) != 0:
-                err_msg += "Shapes of layers and labels do not match for the following output layer(s): " \
-                           + (", ".join(str(e) for e in err_out_shapes) + "\n")
             print("Error:", err_msg)
 
         if err_msg != "":
-            #raise AssertionError(err_msg)
-            pass
+            raise AssertionError(err_msg)
 
-    def get_generator(self):
+    def get_generator(self, mc_info=False):
         """
         For testing purposes: Return a generator reading from the first training file.
 
@@ -585,8 +575,19 @@ class Configuration(object):
 
         """
         files_dict = next(self.yield_train_files())
-        generator = generate_batches_from_hdf5_file(self, files_dict)
+        generator = generate_batches_from_hdf5_file(self, files_dict, yield_mc_info=mc_info)
         return generator
+
+    def get_batch(self):
+        """ For testing purposes, return a batch of samples and mc_infos. """
+        files_dict = next(self.yield_train_files())
+        xs = {}
+        for i, inp_name in enumerate(files_dict):
+            with h5py.File(files_dict[inp_name]) as f:
+                xs[inp_name] = f[self.key_samples][:self.batchsize]
+                if i == 0:
+                    mc_info = f[self.key_labels][:self.batchsize]
+        return xs, mc_info
 
 
 def orca_train(cfg, initial_model=None):
@@ -614,7 +615,8 @@ def orca_train(cfg, initial_model=None):
     if epoch[0] == -1 and epoch[1] == -1:
         epoch = cfg.get_latest_epoch()
         print("Automatically set epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
-    # Epoch here is the epoch of the currently existing model (or 0,0 if there is none)
+
+    # Epoch at this point is the epoch of the currently existing model (or 0,0 if there is none)
     if epoch[0] == 0 and epoch[1] == 0:
         assert initial_model is not None, "You need to provide a compiled keras model for the start of the training! (You gave None)"
         model = initial_model
@@ -625,8 +627,11 @@ def orca_train(cfg, initial_model=None):
         path_of_model = cfg.get_model_path(epoch[0], epoch[1])
         print("Loading saved model: "+path_of_model)
         model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
+
+    if cfg.label_modifier is None:
+        cfg._auto_label_modifier = get_auto_label_modifier(tuple(model.loss.keys()))
     cfg.check_connections(model)
-    model.summary()
+    # model.summary()
     if cfg.use_scratch_ssd:
         cfg.use_local_node()
 

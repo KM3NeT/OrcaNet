@@ -95,10 +95,11 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
         # Modify the samples and labels before feeding them into the network
         if cfg.sample_modifier is not None:
             xs = cfg.sample_modifier(xs)
+
         if cfg.label_modifier is not None:
             ys = cfg.label_modifier(y_values)
         else:
-            ys = {name: y_values[name] for name in y_values.dtype.names}
+            ys = cfg._auto_label_modifier(y_values)
 
         if not yield_mc_info:
             yield xs, ys
@@ -107,6 +108,26 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
 
     for file in files.values():
         file.close()
+
+
+def get_auto_label_modifier(names):
+    """
+    Get a label modifier that reads out labels with the given names from a numpy structured array.
+
+    Parameters
+    ----------
+    names : tuple
+        Strings with names appearing in the labels of the dataset.
+
+    Returns
+    -------
+    label_modifier : function
+
+    """
+    def label_modifier(y_values):
+        ys = {name: y_values[name] for name in names}
+        return ys
+    return label_modifier
 
 
 def get_inputs(model):
