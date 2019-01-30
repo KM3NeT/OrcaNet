@@ -343,8 +343,8 @@ class Configuration(object):
         train_files = self.get_train_files()
         n_bins = {}
         for input_key in train_files:
-            f = h5py.File(train_files[input_key][0], "r")
-            n_bins[input_key] = f[self.key_samples].shape[1:]
+            with h5py.File(train_files[input_key][0], "r") as f:
+                n_bins[input_key] = f[self.key_samples].shape[1:]
         return n_bins
 
     def get_multiple_inputs(self):
