@@ -7,6 +7,7 @@ import h5py
 import os
 import keras as ks
 from functools import reduce
+from contextlib import ExitStack
 
 
 def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_image=None, yield_mc_info=False, shuffle=False):
@@ -60,54 +61,53 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
         if f_size < batchsize:
             batchsize = f_size
 
-    # a dict with the names of list inputs as keys, and the opened h5 files as values.
-    files = {}
-    file_lengths = []
-    # open the files and make sure they have the same length
-    for input_key in files_dict:
-        files[input_key] = h5py.File(files_dict[input_key], 'r')
-        file_lengths.append(len(files[input_key][samples_key]))
-    if not file_lengths.count(file_lengths[0]) == len(file_lengths):
-        raise AssertionError("All data files must have the same length! Yours have:\n " + str(file_lengths))
+    with ExitStack() as stack:
+        # a dict with the names of list inputs as keys, and the opened h5 files as values.
+        files = {}
+        file_lengths = []
+        # open the files and make sure they have the same length
+        for input_key in files_dict:
+            files[input_key] = stack.enter_context(h5py.File(files_dict[input_key], 'r'))
+            file_lengths.append(len(files[input_key][samples_key]))
 
-    if f_size is None:
-        f_size = file_lengths[0]
-    # number of full batches available
-    total_no_of_batches = int(f_size/batchsize)
-    # positions of the samples in the file
-    sample_pos = np.arange(total_no_of_batches) * batchsize
-    if shuffle:
-        np.random.shuffle(sample_pos)
-    # append some samples due to preloading by the fit_generator method
-    sample_pos = np.append(sample_pos, sample_pos[:cfg.max_queue_size])
+        if not file_lengths.count(file_lengths[0]) == len(file_lengths):
+            raise AssertionError("All data files must have the same length! Yours have:\n " + str(file_lengths))
 
-    for sample_n in sample_pos:
-        # A dict with every input name as key, and a batch of data as values
-        xs = {}
-        # Read one batch of samples from the files and zero center
-        for input_key in files:
-            xs[input_key] = files[input_key][samples_key][sample_n: sample_n + batchsize]
-            if zero_center_image is not None:
-                xs[input_key] = np.subtract(xs[input_key], zero_center_image[input_key])
-        # Get labels for the nn. Since the labels are hopefully the same for all the files, use the ones from the first
-        y_values = list(files.values())[0][mc_key][sample_n:sample_n + batchsize]
+        if f_size is None:
+            f_size = file_lengths[0]
+        # number of full batches available
+        total_no_of_batches = int(f_size/batchsize)
+        # positions of the samples in the file
+        sample_pos = np.arange(total_no_of_batches) * batchsize
+        if shuffle:
+            np.random.shuffle(sample_pos)
+        # append some samples due to preloading by the fit_generator method
+        sample_pos = np.append(sample_pos, sample_pos[:cfg.max_queue_size])
 
-        # Modify the samples and labels before feeding them into the network
-        if cfg.sample_modifier is not None:
-            xs = cfg.sample_modifier(xs)
+        for sample_n in sample_pos:
+            # A dict with every input name as key, and a batch of data as values
+            xs = {}
+            # Read one batch of samples from the files and zero center
+            for input_key in files:
+                xs[input_key] = files[input_key][samples_key][sample_n: sample_n + batchsize]
+                if zero_center_image is not None:
+                    xs[input_key] = np.subtract(xs[input_key], zero_center_image[input_key])
+            # Get labels for the nn. Since the labels are hopefully the same for all the files, use the ones from the first
+            y_values = list(files.values())[0][mc_key][sample_n:sample_n + batchsize]
 
-        if cfg.label_modifier is not None:
-            ys = cfg.label_modifier(y_values)
-        else:
-            ys = cfg._auto_label_modifier(y_values)
+            # Modify the samples and labels before feeding them into the network
+            if cfg.sample_modifier is not None:
+                xs = cfg.sample_modifier(xs)
 
-        if not yield_mc_info:
-            yield xs, ys
-        else:
-            yield xs, ys, y_values
+            if cfg.label_modifier is not None:
+                ys = cfg.label_modifier(y_values)
+            else:
+                ys = cfg._auto_label_modifier(y_values)
 
-    for file in files.values():
-        file.close()
+            if not yield_mc_info:
+                yield xs, ys
+            else:
+                yield xs, ys, y_values
 
 
 def get_auto_label_modifier(model):
