@@ -24,8 +24,8 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
         Configuration object containing all the configurable options in the OrcaNet scripts.
     files_dict : dict or None
         Pathes of the files to train on.
-        The name of every input (given in the toml list file, can be multiple) as keys, the filepath
-        of a single h5py file to read samples from as values.
+        Keys: The name of every input (given in the toml list file, can be multiple).
+        Values: The filepath of a single h5py file to read samples from.
     f_size : int or None
         Specifies the filesize (#images) of the .h5 file if not the whole .h5 file
         should be used for yielding the xs/ys arrays. This is important if you run fit_generator(epochs>1) with

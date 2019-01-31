@@ -13,7 +13,7 @@ import h5py
 import numpy as np
 
 from orcanet.run_nn import train_and_validate_model
-from orcanet.eval_nn import predict_and_investigate_model_performance, get_modelname
+from orcanet.eval_nn import make_model_evaluation, get_modelname
 from orcanet.utilities.input_output_utilities import read_out_list_file, read_out_config_file, read_out_model_file, use_node_local_ssd_for_input, write_full_logfile_startup, h5_get_number_of_rows
 from orcanet.utilities.nn_utilities import load_zero_center_data, get_inputs, generate_batches_from_hdf5_file, get_auto_label_modifier
 from orcanet.utilities.losses import get_all_loss_functions
@@ -21,7 +21,7 @@ from orcanet.utilities.losses import get_all_loss_functions
 
 class Configuration(object):
     """
-    Container object for all the configurable options in the OrcaNet scripts.
+    Container object for all the configurable options in the OrcaNet scripts. TODO custom loss functions
 
     Sensible default values were chosen for the settings.
     You can change the all of these public attributes (the ones without a leading underscore _) either directly or with a
@@ -291,7 +291,7 @@ class Configuration(object):
 
     def get_model_path(self, epoch, fileno):
         """
-        Get the path to a model (which might not exist yet).
+        Get the path to a model (which might not exist yet). TODO make so that -1-1 will give latest?
 
         Parameters
         ----------
@@ -308,6 +308,12 @@ class Configuration(object):
         """
         model_filename = self.main_folder + 'saved_models/model_epoch_' + str(epoch) + '_file_' + str(fileno) + '.h5'
         return model_filename
+
+    def get_eval_path(self, epoch, fileno, list_name):
+        """ Get the path to a saved evaluation. """
+        eval_filename = self.main_folder \
+                        + 'evaluations/pred_model_epoch_{}_file_{}_on_{}_val_files.npy'.format(epoch, fileno, list_name)
+        return eval_filename
 
     def use_local_node(self):
         """
@@ -326,7 +332,7 @@ class Configuration(object):
         """
         main_folder = self.main_folder
         folders_to_create = [main_folder + "log_train", main_folder + "saved_models",
-                             main_folder + "plots/activations", main_folder + "predictions"]
+                             main_folder + "plots/activations", main_folder + "evaluations"]
         for directory in folders_to_create:
             if not os.path.exists(directory):
                 print("Creating directory: " + directory)
@@ -657,9 +663,9 @@ def orca_train(cfg, initial_model=None):
 
 def orca_eval(cfg):
     """
-    Core code that evaluates a neural network. The input parameters are the same as for orca_train, so that it is compatible
-    with the .toml file.
-    TODO Should be directly callable on a saved model, so that less arguments are required, and maybe no .toml is needed?
+    Evaluate a model on all samples of the validation set in the toml list, and save it as a h5 file.
+
+    The cfg.initial_epoch and cfg.initial_fileno parameters define which model is loaded.
 
     Parameters
     ----------
@@ -667,22 +673,11 @@ def orca_eval(cfg):
         Configuration object containing all the configurable options in the OrcaNet scripts.
 
     """
-    folder_name = cfg.main_folder
-    test_files = cfg.get_val_files()
-    n_bins = cfg.get_n_bins()
-    batchsize = cfg.batchsize
-    list_name = os.path.basename(cfg.get_list_file()).split(".")[0]
-
-    model_data = cfg.get_modeldata()
-    nn_arch = model_data.nn_arch
-    str_ident = model_data.str_ident
-    class_type = model_data.class_type
-    swap_4d_channels = model_data.swap_4d_channels
-
-    epoch = (cfg.initial_epoch, cfg.initial_fileno)
-
     if cfg.filter_out_tf_garbage:
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+
+    list_name = os.path.basename(cfg.get_list_file()).split(".")[0]  # TODO make foolproof
+    epoch = (cfg.initial_epoch, cfg.initial_fileno)
 
     if epoch[0] == -1 and epoch[1] == -1:
         epoch = cfg.get_latest_epoch()
@@ -698,8 +693,6 @@ def orca_eval(cfg):
 
     path_of_model = cfg.get_model_path(epoch[0], epoch[1])
     model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
-    modelname = get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident)
-    arr_filename = folder_name + 'predictions/pred_model_epoch_{}_file_{}_on_{}_val_files.npy'.format(str(epoch[0]), str(epoch[1]), list_name)
 
-    predict_and_investigate_model_performance(cfg, model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
-                                              str_ident, modelname, xs_mean, arr_filename, folder_name)
+    eval_filename = cfg.get_eval_path(epoch[0], epoch[1], list_name)
+    make_model_evaluation(cfg, model, xs_mean, eval_filename, samples=None)

@@ -7,8 +7,10 @@ Main code for evaluating NN's.
 import os
 import numpy as np
 import matplotlib as mpl
+import h5py
 mpl.use('Agg')
-from orcanet.utilities.evaluation_utilities import (get_nn_predictions_and_mc_info,
+from orcanet.utilities.nn_utilities import generate_batches_from_hdf5_file
+from orcanet.utilities.evaluation_utilities import (get_cum_number_of_steps,
                                                     make_energy_to_accuracy_plot_multiple_classes,
                                                     make_prob_hists,
                                                     make_hist_2d_property_vs_property,
@@ -25,8 +27,150 @@ from orcanet.utilities.evaluation_utilities import (get_nn_predictions_and_mc_in
                                                     make_2d_dir_correlation_plot_different_sigmas)
 
 
-# TODO Remove unnecessary input parameters to the following functions if they are already in the cfg
-def predict_and_investigate_model_performance(cfg, model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
+def make_model_evaluation(cfg, model, xs_mean, eval_filename, samples=None):
+    """
+    Evaluate a model on all samples of the validation set in the toml list, and save it as a h5 file.
+
+    Per default, the h5 file will contain a datagroup mc_info straight from the given files, as well as two datagroups
+    per output layer of the network, which have the true and the predicted values in them as numpy arrays, respectively.
+
+    Parameters
+    ----------
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
+    model : ks.model.Model
+        Trained Keras model of a neural network.
+    xs_mean : dict
+        Mean images of the x dataset.
+    eval_filename : str
+        Name and path of the h5 file.
+    samples : int or None
+        Number of events that should be predicted. If samples=None, the whole file will be used.
+
+    """
+    batchsize = cfg.batchsize
+    compression = ("gzip", 1)
+    file_sizes = cfg.get_val_file_sizes()
+    total_file_size = sum(file_sizes)
+    datagroups_created = False
+
+    with h5py.File(eval_filename, 'w') as file_output:
+        # For every val file set (one set can have multiple files if the model has multiple inputs):
+        for f_number, files_dict in enumerate(cfg.yield_val_files()):
+            file_size = file_sizes[f_number]
+            generator = generate_batches_from_hdf5_file(cfg, files_dict, zero_center_image=xs_mean, yield_mc_info=True)
+
+            if samples is None:
+                steps = int(file_size / batchsize)
+                if file_size % batchsize != 0:
+                    # add a smaller step in the end
+                    steps += 1
+            else:
+                steps = int(samples / batchsize)
+
+            for s in range(steps):
+                if s % 100 == 0:
+                    print('Predicting in step ' + str(s) + ' on file ' + str(f_number))
+                # y_true is a dict of ndarrays, mc_info is a structured array, y_pred is a list of ndarrays
+                xs, y_true, mc_info = next(generator)
+                y_pred = model.predict_on_batch(xs)
+                # transform y_pred to dict TODO hacky!
+                y_pred = {out.name.split(':')[0]: y_pred[i] for i, out in enumerate(model._output_layers)}
+
+                datasets = get_datasets(mc_info, y_true, y_pred)
+
+                if not datagroups_created:
+                    for dataset_name, data in datasets.items():
+                        maxshape = (total_file_size,) + data.shape[1:]
+                        chunks = None  # (batchsize,) + data.shape[1:]
+                        file_output.create_dataset(dataset_name, data=data, maxshape=maxshape, chunks=chunks,
+                                                   compression=compression[0], compression_opts=compression[1])
+                        datagroups_created = True
+                else:
+                    for dataset_name, data in datasets.items():
+                        # append data at the end of the dataset
+                        file_output[dataset_name].resize(file_output[dataset_name][dataset_name].shape[0] + data.shape[0], axis=0)
+                        file_output[dataset_name][-data.shape[0]:] = data
+
+
+def get_datasets(mc_info, y_true, y_pred):
+    """
+    Get the dataset names and numpy array contents.
+
+    Every output layer will get one datagroup each for both the label and the prediction.
+    E.g. if your model has an output layer called "energy", the datasets
+    "true_energy" and "reco_energy" will be made.
+
+    Parameters
+    ----------
+    mc_info : ndarray
+        A structured array containing infos for every event, right from the input files.
+    y_true : dict
+        The labels for each output layer of the network.
+    y_pred : dict
+        The predictions of each output layer of the network.
+
+    Returns
+    -------
+    datasets : dict
+        Keys are the name of the datagroups, values the content in the form of numpy arrays.
+
+    """
+    datasets = dict()
+    datasets["mc_info"] = mc_info
+    for out_layer_name in y_true:
+        datasets["true_" + out_layer_name] = y_true[out_layer_name]
+    for out_layer_name in y_pred:
+        datasets["reco_" + out_layer_name] = y_pred[out_layer_name]
+    return datasets
+
+
+def old(mc_info, y_true, y_pred, class_type):
+    ax = np.newaxis
+    if class_type[1] == 'energy_and_direction_and_bjorken-y':
+        # TODO temp old 60b prod
+        y_pred = np.concatenate([y_pred[0], y_pred[1], y_pred[2], y_pred[3], y_pred[4]], axis=1)
+        y_true = np.concatenate(
+            [y_true['energy'], y_true['dir_x'], y_true['dir_y'], y_true['dir_z'], y_true['bjorken-y']],
+            axis=1)  # dont need to save y_true err input
+    elif class_type[1] == 'energy_dir_bjorken-y_errors':
+        y_pred = np.concatenate(y_pred, axis=1)
+        y_true = np.concatenate([y_true['e'], y_true['dir_x'], y_true['dir_y'], y_true['dir_z'], y_true['by']],
+                                axis=1)  # dont need to save y_true err input
+    elif class_type[1] == 'energy_dir_bjorken-y_vtx_errors':
+        y_pred = np.concatenate(y_pred, axis=1)
+        y_true = np.concatenate(
+            [y_true['e'], y_true['dx'], y_true['dy'], y_true['dz'], y_true['by'], y_true['vx'], y_true['vy'],
+             y_true['vz'], y_true['vt']],
+            axis=1)  # dont need to save y_true err input
+    else:
+        raise NameError("Unknown class_type " + str(class_type[1]))
+    # mc labels
+    energy = mc_info[:, 2]
+    particle_type = mc_info[:, 1]
+    is_cc = mc_info[:, 3]
+    event_id = mc_info[:, 0]
+    run_id = mc_info[:, 9]
+    bjorken_y = mc_info[:, 4]
+    dir_x, dir_y, dir_z = mc_info[:, 5], mc_info[:, 6], mc_info[:, 7]
+    vtx_x, vtx_y, vtx_z = mc_info[:, 10], mc_info[:, 11], mc_info[:, 12]
+    time_residual_vtx = mc_info[:, 13]
+    # if mc_info.shape[1] > 13: TODO add prod_ident
+
+    # make a temporary energy_correct array for this batch
+    # arr_nn_pred_temp = np.concatenate([run_id[:, ax], event_id[:, ax], particle_type[:, ax], is_cc[:, ax], energy[:, ax],
+    #                                    bjorken_y[:, ax], dir_x[:, ax], dir_y[:, ax], dir_z[:, ax], y_pred, y_true], axis=1)
+    # print(y_pred.shape)
+    # print(y_true.shape)
+    # alle [...,ax] haben dim 64,1.
+    arr_nn_pred_temp = np.concatenate([run_id[:, ax], event_id[:, ax], particle_type[:, ax], is_cc[:, ax],
+                                       energy[:, ax], bjorken_y[:, ax], dir_x[:, ax], dir_y[:, ax],
+                                       dir_z[:, ax], vtx_x[:, ax], vtx_y[:, ax], vtx_z[:, ax],
+                                       time_residual_vtx[:, ax], y_pred, y_true], axis=1)
+
+
+# TODO Does not work at all
+def investigate_model_performance(cfg, model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
                                               str_ident, modelname, xs_mean, arr_filename, folder_name):
     """
     Function that 1) makes predictions based on a Keras nn model and 2) investigates the performance of the model based on the predictions.
@@ -64,14 +208,7 @@ def predict_and_investigate_model_performance(cfg, model, test_files, n_bins, ba
     #     if 'batch_norm' in layer.name:
     #         layer.stateful = False
 
-    if os.path.exists(arr_filename):
-        print("Loading saved prediction:\n   "+arr_filename)
-        arr_nn_pred = np.load(arr_filename)
-    else:
-        print("Generating new prediction.")
-        arr_nn_pred = get_nn_predictions_and_mc_info(cfg, model, test_files, n_bins, class_type, batchsize, xs_mean, swap_4d_channels, str_ident, samples=None)
-        print("Done! Saving prediction as:\n   "+arr_filename)
-        np.save(arr_filename, arr_nn_pred)
+    arr_nn_pred = np.load(arr_filename)
 
     # arr_nn_pred = np.load('results/plots/saved_predictions/arr_nn_pred_' + modelname + '_final_stateful_false.npy')
     # arr_nn_pred = np.load('results/plots/saved_predictions//arr_nn_pred_model_VGG_4d_xyz-t_and_yzt-x_and_4d_xyzt_track-shower_multi_input_single_train_tight-1_tight-2_lr_0.003_tr_st_test_st_final_stateful_false_1-100GeV_precut.npy')

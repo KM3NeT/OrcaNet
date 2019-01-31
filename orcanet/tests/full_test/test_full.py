@@ -9,7 +9,7 @@ from keras.models import Model
 from keras.layers import Dense, Input, Flatten
 from unittest import TestCase
 
-from orcanet.core import Configuration, orca_train
+from orcanet.core import Configuration, orca_train, orca_eval
 from orcanet.model_archs.model_setup import build_nn_model
 from orcanet.utilities.nn_utilities import load_zero_center_data
 
@@ -90,7 +90,7 @@ class DatasetTest(TestCase):
         cfg.learning_rate = test_learning_rate
         cfg.sample_modifier = test_modifier
         orca_train(cfg)
-        # orca_eval(cfg)
+        orca_eval(cfg)
 
 
 def make_dummy_data(filepath1, filepath2, shape):
