@@ -16,7 +16,7 @@ from orcanet.utilities.nn_utilities import load_zero_center_data, get_inputs, ge
 
 class Configuration(object):
     """
-    Container object for all the configurable options in the OrcaNet scripts. TODO custom loss functions
+    Container object for all the configurable options in the OrcaNet scripts.
 
     Sensible default values were chosen for the settings.
     You can change the all of these public attributes (the ones without a leading underscore _) either directly or with a
@@ -24,13 +24,10 @@ class Configuration(object):
 
     Attributes
     ----------
-    main_folder : str
-        Name of the folder of this model in which everything will be saved, e.g., the summary.txt log file is located in here.
-        Has a '/' at the end.
     batchsize : int
         Batchsize that should be used for the training and validation of the network.
-    custom_objects : list or None
-        Optional dictionary mapping names (strings) to custom classes or functions to be considered by keras, e.g.
+    custom_objects : dict or None
+        Optional dictionary mapping names (strings) to custom classes or functions to be considered by keras
         during deserialization of models.
     dataset_modifier : function or None
         For orca_eval: Function that determines which datasets get created in the resulting h5 file.
@@ -50,9 +47,9 @@ class Configuration(object):
         1 for load the model trained on the first file. If both epoch and fileno are -1, automatically set to the most
         recent file found in the main folder.
     key_samples : str
-        The name of the datagroup in your h5 input files which contains the samples to the network.
+        The name of the datagroup in your h5 input files which contains the samples for the network.
     key_labels : str
-        The name of the datagroup in your h5 input files which contains the labels to the network.
+        The name of the datagroup in your h5 input files which contains the labels for the network.
     label_modifier : function or None
         Operation to be performed on batches of labels read from the input files before they are fed into the model.
         If None is given, all labels with the same name as the output layers will be passed to the model as a dict,
@@ -65,25 +62,28 @@ class Configuration(object):
         float gives the decrease of the learning rate per file (e.g. 0.1 for 10% decrease per file).
         You can also give an arbitrary function, which takes as an input the epoch, the file number and the
         Configuration object (in this order), and returns the learning rate.
+    main_folder : str
+        Name of the folder of this model in which everything will be saved, e.g., the summary.txt log file is located in here.
     max_queue_size : int
         max_queue_size option of the keras training and evaluation generator methods. How many batches get preloaded
         from the generator.
     n_events : None or int
-        For testing purposes. If not the whole .h5 file should be used for training, define the number of events.
+        For testing purposes. If not the whole .h5 file should be used for training, define the number of samples.
     n_gpu : tuple(int, str)
-        Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov') [1].
+        Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov') [1]. TODO should this be here?
     sample_modifier : function or None
         Operation to be performed on batches of samples read from the input files before they are fed into the model.
         TODO online doc on how to do this
     shuffle_train : bool
-        If true, the order at which batches are read out from the files during training are randomized each time.
+        If true, the order in which batches are read out from the files during training are randomized each time they
+        are read out.
     train_logger_display : int
         How many batches should be averaged for one line in the training log files.
     train_logger_flush : int
         After how many lines the training log file should be flushed (updated on the disk).
         -1 for flush at the end of the file only.
     use_scratch_ssd : bool
-        Declares if the input files should be copied to the node-local SSD scratch space (only working at Erlangen CC).
+        Only working at HPC Erlangen: Declares if the input files should be copied to the node-local SSD scratch space.
     validate_after_n_train_files : int
         Validate the model after this many training files have been trained on in an epoch, starting from the first.
         E.g. if validate_after_n_train_files == 3, validation will happen after file 1,4,7,...
@@ -152,7 +152,6 @@ class Configuration(object):
             Path to a toml config file with attributes that are used instead of the default ones.
 
         """
-        # Configuration:
         self.batchsize = 64
         self.custom_objects = None
         self.dataset_modifier = None

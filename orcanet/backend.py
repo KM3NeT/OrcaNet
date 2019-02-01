@@ -5,14 +5,13 @@ Code for training and validating NN's, as well as evaluating them.
 """
 
 import os
-import matplotlib as mpl
 from inspect import signature
 import keras.backend as K
 import h5py
-mpl.use('Agg')
+
 from orcanet.in_out import write_summary_logfile, write_full_logfile, read_logfiles
 from orcanet.utilities.nn_utilities import load_zero_center_data, BatchLevelPerformanceLogger, generate_batches_from_hdf5_file
-from orcanet.utilities.visualization.visualization_tools import plot_all_metrics_to_pdf
+from utilities.visualization import plot_all_metrics_to_pdf
 from orcanet_contrib.contrib import orca_learning_rates
 
 # for debugging

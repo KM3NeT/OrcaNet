@@ -172,6 +172,7 @@ def plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name):
         Where the pdf will get saved.
 
     """
+    plt.ioff()
     # Extract the names of the metrics
     all_metrics = []
     for keyword in summary_data.dtype.names:
