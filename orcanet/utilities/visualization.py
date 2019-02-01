@@ -263,7 +263,7 @@ def get_activations_and_weights(cfg, xs_mean, model, layer_name=None, learning_p
 
     # get input layers and input files
     inputs = get_inputs(model)
-    f = next(cfg.yield_val_files())
+    f = next(cfg.yield_files(for_val_files=True))
     generator = generate_batches_from_hdf5_file(cfg, f, f_size=1, zero_center_image=xs_mean, yield_mc_info=True)
     model_inputs, ys, y_values = next(generator)  # y_values = mc_info for the event
 

@@ -50,7 +50,7 @@ def get_learning_rate(cfg, epoch):
     elif isinstance(user_lr, tuple) or isinstance(user_lr, list):
         if len(user_lr) == 2:
             # Exponentially decaying LR
-            lr = user_lr[0] * (1 - user_lr[1])**(epoch[1] + epoch[0]*len(cfg.get_no_of_train_files()))
+            lr = user_lr[0] * (1 - user_lr[1])**(epoch[1] + epoch[0]*len(cfg.get_no_of_files(for_val_files=False)))
         else:
             raise AssertionError(error_msg, "(Your tuple has length "+str(len(user_lr))+")")
 
@@ -113,9 +113,9 @@ def train_and_validate_model(cfg, model, start_epoch):
         xs_mean = load_zero_center_data(cfg)
     else:
         xs_mean = None
-    f_sizes = cfg.get_train_file_sizes()
+    f_sizes = cfg.get_file_sizes(for_val_files=False)
 
-    for file_no, files_dict in enumerate(cfg.yield_train_files()):
+    for file_no, files_dict in enumerate(cfg.yield_files(for_val_files=False)):
         # no of samples in current file
         f_size = f_sizes[file_no]
         # Only the file number changes during training, as this function trains only for one epoch
@@ -201,8 +201,8 @@ def validate_model(cfg, model, xs_mean):
     """
     # One history for each val file
     histories = []
-    f_sizes = cfg.get_val_file_sizes()
-    for i, files_dict in enumerate(cfg.yield_val_files()):
+    f_sizes = cfg.get_file_sizes(for_val_files=True)
+    for i, files_dict in enumerate(cfg.yield_files(for_val_files=True)):
         print('Validating on file ', i+1, ',', str(files_dict))
         f_size = f_sizes[i]
         if cfg.n_events is not None:
@@ -240,13 +240,13 @@ def make_model_evaluation(cfg, model, xs_mean, eval_filename, samples=None):
     """
     batchsize = cfg.batchsize
     compression = ("gzip", 1)
-    file_sizes = cfg.get_val_file_sizes()
+    file_sizes = cfg.get_file_sizes(for_val_files=True)
     total_file_size = sum(file_sizes)
     datagroups_created = False
 
     with h5py.File(eval_filename, 'w') as h5_file:
         # For every val file set (one set can have multiple files if the model has multiple inputs):
-        for f_number, files_dict in enumerate(cfg.yield_val_files()):
+        for f_number, files_dict in enumerate(cfg.yield_files(for_val_files=True)):
             file_size = file_sizes[f_number]
             generator = generate_batches_from_hdf5_file(cfg, files_dict, zero_center_image=xs_mean, yield_mc_info=True)
 

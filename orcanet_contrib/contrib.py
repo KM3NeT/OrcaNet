@@ -207,7 +207,7 @@ def orca_learning_rates(name):
                 Calculated learning rate for this epoch.
 
             """
-            n_lr_decays = (n_epoch - 1) * cfg.get_no_of_train_files() + (n_file - 1)
+            n_lr_decays = (n_epoch - 1) * cfg.get_no_of_files(for_val_files=False) + (n_file - 1)
             lr_temp = 0.005  # * n_gpu TODO think about multi gpu lr
 
             for i in range(n_lr_decays):

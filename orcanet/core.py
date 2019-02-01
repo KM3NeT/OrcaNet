@@ -35,8 +35,8 @@ class Configuration(object):
         containing the mc_info from the validation files. TODO online doc
     filter_out_tf_garbage : bool
         If true, surpresses the tensorflow info logs which usually spam the terminal.
-    epochs_to_train : int
-        How many new epochs should be trained by running this function. -1 for infinite.
+    epochs_to_train : int or None
+        How many new epochs should be trained by running this function. None for infinite.
     eval_epoch : int
         For orca_eval: The epoch of the model to load for evaluation, e.g. 1 means load the saved model from
         epoch 1 and continue training.
@@ -154,7 +154,7 @@ class Configuration(object):
         self.batchsize = 64
         self.custom_objects = None
         self.dataset_modifier = None
-        self.epochs_to_train = -1
+        self.epochs_to_train = None
         self.eval_epoch = -1
         self.eval_fileno = -1
         self.filter_out_tf_garbage = True
@@ -285,7 +285,7 @@ class Configuration(object):
         """
         if epoch[0] == 0 and epoch[1] == 0:
             next_epoch = (1, 1)
-        elif epoch[1] == self.get_no_of_train_files():
+        elif epoch[1] == self.get_no_of_files(for_val_files=False):
             next_epoch = (epoch[0] + 1, 1)
         else:
             next_epoch = (epoch[0], epoch[1] + 1)
@@ -403,10 +403,15 @@ class Configuration(object):
     def get_list_file(self):
         return self._list_file
 
-    def get_train_file_sizes(self):
+    def get_file_sizes(self, for_val_files):
         """
-        Get the number of samples in each input file.
+        Get the number of samples in each training or validation input file.
         # TODO only uses the no of samples of the first input! check if the others are the same % batchsize
+
+        Parameters
+        ----------
+        for_val_files : bool
+            If true, returns the validation files instead of the training files.
 
         Returns
         -------
@@ -414,34 +419,25 @@ class Configuration(object):
             Its length is equal to the number of files in each input set.
 
         """
-        train_files = self.get_train_files()
+        if for_val_files:
+            files = self.get_val_files()
+        else:
+            files = self.get_train_files()
         file_sizes = []
-        for file in train_files[list(train_files.keys())[0]]:
+        for file in files[list(files.keys())[0]]:
             file_sizes.append(h5_get_number_of_rows(file))
         return file_sizes
 
-    def get_val_file_sizes(self):
+    def get_no_of_files(self, for_val_files):
         """
-        Get the number of samples in each input file.
-        # TODO only uses the no of samples of the first input! check if the others are the same % batchsize
-
-        Returns
-        -------
-        file_sizes : list
-            Its length is equal to the number of files in each input set.
-
-        """
-        val_files = self.get_val_files()
-        file_sizes = []
-        for file in val_files[list(val_files.keys())[0]]:
-            file_sizes.append(h5_get_number_of_rows(file))
-        return file_sizes
-
-    def get_no_of_train_files(self):
-        """
-        Return the number of train files.
+        Return the number of training or validation files.
 
         Only looks up the no of files of one (random) list input, as equal length is checked during read in.
+
+        Parameters
+        ----------
+        for_val_files : bool
+            If true, returns the validation files instead of the training files.
 
         Returns
         -------
@@ -449,29 +445,16 @@ class Configuration(object):
             The number of files.
 
         """
-        train_files = self.get_train_files()
-        no_of_files = len(list(train_files.values())[0])
+        if for_val_files:
+            files = self.get_val_files()
+        else:
+            files = self.get_train_files()
+        no_of_files = len(list(files.values())[0])
         return no_of_files
 
-    def get_no_of_val_files(self):
+    def yield_files(self, for_val_files):
         """
-        Return the number of val files.
-
-        Only looks up the no of files of one (random) list input, as equal length is checked during read in.
-
-        Returns
-        -------
-        no_of_files : int
-            The number of files.
-
-        """
-        val_files = self.get_val_files()
-        no_of_files = len(list(val_files.values())[0])
-        return no_of_files
-
-    def yield_train_files(self):
-        """
-        Yield a train file for every input.
+        Yield a training or validation file for every input.
 
         Yields
         ------
@@ -480,25 +463,12 @@ class Configuration(object):
             They will be yielded in the same order as they are given in the toml file.
 
         """
-        train_files = self.get_train_files()
-        for file_no in range(self.get_no_of_train_files()):
-            files_dict = {key: train_files[key][file_no] for key in train_files}
-            yield files_dict
-
-    def yield_val_files(self):
-        """
-        Yield a validation file for every input.
-
-        Yields
-        ------
-        files_dict : dict
-            The name of every toml list input as a key, one of the filepaths as values.
-            They will be yielded in the same order as they are given in the toml file.
-
-        """
-        val_files = self.get_val_files()
-        for file_no in range(self.get_no_of_val_files()):
-            files_dict = {key: val_files[key][file_no] for key in val_files}
+        if for_val_files:
+            files = self.get_val_files()
+        else:
+            files = self.get_train_files()
+        for file_no in range(self.get_no_of_files(for_val_files)):
+            files_dict = {key: files[key][file_no] for key in files}
             yield files_dict
 
     def check_connections(self, model):
@@ -615,13 +585,13 @@ class Configuration(object):
             Yields tuples with a batch of samples and labels each.
 
         """
-        files_dict = next(self.yield_train_files())
+        files_dict = next(self.yield_files(for_val_files=False))
         generator = generate_batches_from_hdf5_file(self, files_dict, yield_mc_info=mc_info)
         return generator
 
     def get_batch(self):
         """ For testing purposes, return a batch of samples and mc_infos. """
-        files_dict = next(self.yield_train_files())
+        files_dict = next(self.yield_files(for_val_files=False))
         xs = {}
         for i, inp_name in enumerate(files_dict):
             with h5py.File(files_dict[inp_name]) as f:
@@ -664,7 +634,7 @@ def orca_train(cfg, initial_model=None):
             warnings.warn("You provided a model even though this is not the start of the training. Provided model is ignored!")
         path_of_model = cfg.get_model_path(epoch[0], epoch[1])
         print("Loading saved model: "+path_of_model)
-        model = ks.models.load_model(path_of_model, custom_objects=cfg.custom_objects)  # get_all_loss_functions()
+        model = ks.models.load_model(path_of_model, custom_objects=cfg.custom_objects)
 
     if cfg.label_modifier is None:
         cfg._auto_label_modifier = get_auto_label_modifier(model)
@@ -674,7 +644,7 @@ def orca_train(cfg, initial_model=None):
         cfg.use_local_node()
 
     trained_epochs = 0
-    while trained_epochs < cfg.epochs_to_train or cfg.epochs_to_train == -1:
+    while cfg.epochs_to_train is None or trained_epochs < cfg.epochs_to_train:
         # Set epoch to the next file
         epoch = cfg.get_next_epoch(epoch)
         train_and_validate_model(cfg, model, epoch)
