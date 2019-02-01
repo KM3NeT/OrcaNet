@@ -292,14 +292,16 @@ class Configuration(object):
             next_epoch = (epoch[0], epoch[1] + 1)
         return next_epoch
 
-    def get_subfolder(self, name=None):
+    def get_subfolder(self, name=None, create=False):
         """
-        Get the path to one or all subfolders of the main folder. Creates it if it does not exist.
+        Get the path to one or all subfolders of the main folder.
 
         Parameters
         ----------
         name : str or None
             The name of the subfolder.
+        create : bool
+            If the subfolder should be created if it does not exist.
 
         Returns
         -------
@@ -315,7 +317,7 @@ class Configuration(object):
 
         def get(fdr):
             subfdr = subfolders[fdr]
-            if not os.path.exists(subfdr):
+            if create and not os.path.exists(subfdr):
                 print("Creating directory: " + subfdr)
                 os.makedirs(subfdr)
             return subfdr
@@ -648,7 +650,7 @@ def orca_train(cfg, initial_model=None):
     """
     if cfg.filter_out_tf_garbage:
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-    cfg.get_subfolder()
+    cfg.get_subfolder(create=True)
     write_full_logfile_startup(cfg)
     # The epoch that will be incremented during the scripts:
     epoch = (cfg.initial_epoch, cfg.initial_fileno)

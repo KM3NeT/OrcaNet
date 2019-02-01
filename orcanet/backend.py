@@ -87,7 +87,7 @@ def update_summary_plot(cfg):
     """
     summary_logfile = cfg.main_folder + "summary.txt"
     summary_data, full_train_data = read_logfiles(summary_logfile)
-    pdf_name = cfg.get_subfolder("plots") + "/summary_plot.pdf"
+    pdf_name = cfg.get_subfolder("plots", create=True) + "/summary_plot.pdf"
     plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name)
 
 

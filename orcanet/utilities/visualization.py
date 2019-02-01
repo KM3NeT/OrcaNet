@@ -307,7 +307,7 @@ def plot_weights_and_activations(cfg, model, xs_mean, epoch):
     layer_names, activations, weights, y_values = get_activations_and_weights(cfg, xs_mean, model, layer_name=None, learning_phase='test')
 
     fig, axes = plt.subplots()
-    pdf_name = cfg.get_subfolder("activations") + "/act_and_weights_plots_epoch_" + str(epoch) + '.pdf'
+    pdf_name = cfg.get_subfolder("activations", create=True) + "/act_and_weights_plots_epoch_" + str(epoch) + '.pdf'
     pdf_activations_and_weights = PdfPages(pdf_name)
 
     # plot weights

@@ -395,7 +395,7 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
         self.flush = cfg.train_logger_flush
 
         self.seen = 0
-        self.logfile_train_fname = cfg.get_subfolder("log_train") + '/log_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.txt'
+        self.logfile_train_fname = cfg.get_subfolder("log_train", create=True) + '/log_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.txt'
         self.loglist = []
 
         self.cum_metrics = {}
