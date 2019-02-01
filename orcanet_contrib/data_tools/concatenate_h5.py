@@ -238,18 +238,6 @@ def concatenate_h5_files(output_filepath, file_list, cum_rows_list, chunksize, c
                 # add 1 because the group_ids / indices start with 0
                 folder_data[column_name] += np.amax(file_output[folder_name][column_name]) + 1
 
-            # we need to modify the group_id of the y table, for a correct km3pipe readout
-            # elif n > 0 and folder_name == 'y':
-            #     folder_data = input_file[folder_name][()]
-            #     print(folder_data['group_id'])
-            #     folder_data['group_id'] += np.amax(file_output[folder_name]['group_id']) + 1
-            #     # group_ids = input_file[folder_name]['group_id']
-            #     print(folder_data['group_id'])
-            #     #input_file[folder_name]['group_id'] += np.amax(file_output[folder_name]) + 1
-            #     #print(input_file[folder_name]['group_id'])
-            #     #folder_data = input_file[folder_name]
-            #     raise SystemExit
-
             else:
                 folder_data = input_file[folder_name]
 
