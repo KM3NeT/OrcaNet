@@ -16,7 +16,7 @@ from orcanet.utilities.nn_utilities import load_zero_center_data, get_inputs, ge
 
 class Configuration(object):
     """
-    Container object for all the configurable options in the OrcaNet scripts.
+    Container object for all the configurable options in the OrcaNet scripts. TODO add a clober script that properly deletes models + logfiles
 
     Sensible default values were chosen for the settings.
     You can change the all of these public attributes (the ones without a leading underscore _) either directly or with a
@@ -37,13 +37,12 @@ class Configuration(object):
         If true, surpresses the tensorflow info logs which usually spam the terminal.
     epochs_to_train : int
         How many new epochs should be trained by running this function. -1 for infinite.
-    initial_epoch : int
-        The epoch of the model with which the training is supposed to start, e.g. 1 means load the saved model from
-        epoch 1 and continue training. 0 means start a new training (initial_fileno also has to be 0 for this).
-        Can also give -1 to automatically load the most recent epoch found in the main folder, if present, or make
-        a new model otherwise.
-    initial_fileno : int
-        When using multiple files, define the file number with which the training is supposed to start, e.g.
+    eval_epoch : int
+        For orca_eval: The epoch of the model to load for evaluation, e.g. 1 means load the saved model from
+        epoch 1 and continue training.
+        Can also give -1 to automatically load the most recent epoch found in the main folder.
+    eval_fileno : int
+        For orca_eval: When using multiple files, define the file number for the evaluation, e.g.
         1 for load the model trained on the first file. If both epoch and fileno are -1, automatically set to the most
         recent file found in the main folder.
     key_samples : str
@@ -156,9 +155,9 @@ class Configuration(object):
         self.custom_objects = None
         self.dataset_modifier = None
         self.epochs_to_train = -1
+        self.eval_epoch = -1
+        self.eval_fileno = -1
         self.filter_out_tf_garbage = True
-        self.initial_epoch = -1
-        self.initial_fileno = -1
         self.key_samples = "x"
         self.key_labels = "y"
         self.label_modifier = None
@@ -330,7 +329,7 @@ class Configuration(object):
 
     def get_model_path(self, epoch, fileno):
         """
-        Get the path to a model (which might not exist yet). TODO make so that -1-1 will give latest?
+        Get the path to a model (which might not exist yet).
 
         Parameters
         ----------
@@ -652,13 +651,10 @@ def orca_train(cfg, initial_model=None):
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
     cfg.get_subfolder(create=True)
     write_full_logfile_startup(cfg)
-    # The epoch that will be incremented during the scripts:
-    epoch = (cfg.initial_epoch, cfg.initial_fileno)
-    if epoch[0] == -1 and epoch[1] == -1:
-        epoch = cfg.get_latest_epoch()
-        print("Automatically set epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
+    # the epoch of the currently existing model (or 0,0 if there is none)
+    epoch = cfg.get_latest_epoch()
+    print("Set to epoch {} file {}.".format(epoch[0], epoch[1]))
 
-    # Epoch at this point is the epoch of the currently existing model (or 0,0 if there is none)
     if epoch[0] == 0 and epoch[1] == 0:
         assert initial_model is not None, "You need to provide a compiled keras model for the start of the training! (You gave None)"
         model = initial_model
@@ -689,7 +685,7 @@ def orca_eval(cfg):
     """
     Evaluate a model on all samples of the validation set in the toml list, and save it as a h5 file.
 
-    The cfg.initial_epoch and cfg.initial_fileno parameters define which model is loaded.
+    The cfg.eval_epoch and cfg.eval_fileno parameters define which model is loaded.
 
     Parameters
     ----------
@@ -701,7 +697,7 @@ def orca_eval(cfg):
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 
     list_name = os.path.basename(cfg.get_list_file()).split(".")[0]  # TODO make foolproof
-    epoch = (cfg.initial_epoch, cfg.initial_fileno)
+    epoch = (cfg.eval_epoch, cfg.eval_fileno)
 
     if epoch[0] == -1 and epoch[1] == -1:
         epoch = cfg.get_latest_epoch()
