@@ -82,21 +82,21 @@ complevel = 1
 # --- Input groups : these are the datafiles, that should be concatenated somehow --- #
 
 [input_group_1] # You can assign any name to this, doesnt matter which one. However, don't make whitespaces!!
-dir = "/path/to/the/folder/of/the/data/for/this/input/group"
+dir = "/path/to/the/folder/of/the/data/for/this/input_1/group"
 run_ids_train = [1001, 5000]
 run_ids_validate = [1, 1000]
 run_ids_rest = [5001, 20000]
 
 
 [input_group_2] # 1 to 1500
-dir = "/path/to/the/folder/of/the/data/for/this/input/group"
+dir = "/path/to/the/folder/of/the/data/for/this/input_2/group"
 run_ids_train = [101, 500]
 run_ids_validate = [1, 100]
 #run_ids_rest = [501, 600]
 
 
-[muon_cc_3_100] # 1 to 2400
-dir = "/path/to/the/folder/of/the/data/for/this/input/group"
+[input_group_3] # 1 to 2400
+dir = "/path/to/the/folder/of/the/data/for/this/input_3/group"
 run_ids_train = [601, 2400]
 #run_ids_validate = [1, 500] # comment out or delete it, if you dont want it
 run_ids_rest = [501, 600]

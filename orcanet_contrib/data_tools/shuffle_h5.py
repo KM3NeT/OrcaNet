@@ -73,14 +73,14 @@ def parse_input():
     parser.add_argument('-d', '--delete', action='store_true',
                         help='deletes the original input file after the shuffled .h5 is created.')
     parser.add_argument('--chunksize', dest='chunksize', type=int,
-                        help='Specify a chunksize value in order to use chunked storage for the shuffled .h5 file.'
+                        help='Specify a chunksize value in order to use chunked storage for the shuffled .h5 file. \n'
                              ' Otherwise, it will be read from the input file..')
     parser.add_argument('--complib', dest='complib', type=str,
-                        help='Specify a filter that should be used for compression. Either "gzip" or "lzf". '
+                        help='Specify a filter that should be used for compression. Either "gzip" or "lzf". \n'
                              'Otherwise, the filter will be read from the input file.')
     parser.add_argument('--complevel', dest='complevel', type=int,
-                        help='Specify a compression filter strength that should be used for the compression. '
-                             'Otherwise, the filter will be read from the input file. '
+                        help='Specify a compression filter strength that should be used for the compression. \n'
+                             'Otherwise, the filter will be read from the input file. \n'
                              'Can range from 0 to 9. Has no effect on "lzf" compression.')
     parser.add_argument('--legacy_mode', dest='legacy_mode', action='store_true',
                         help='If you want to use the legacy mode, as described in the summary at the top of this python file.')

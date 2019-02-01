@@ -285,11 +285,13 @@ def submit_concatenate_list_files(cfg):
     if not os.path.exists(dirpath + '/job_scripts'):  # check if /logs/cout folder exists, if not create it.
         os.makedirs(dirpath + '/job_scripts')
 
+    #TODO make list files to own dir
+
     # make qsub .sh file
     for listfile_fpath in cfg['output_lists']:
         listfile_fname = os.path.basename(listfile_fpath)
         listfile_fname_wout_ext = os.path.splitext(listfile_fname)[0]
-        conc_outputfile_fpath = cfg['output_file_folder'] + listfile_fname_wout_ext
+        conc_outputfile_fpath = cfg['output_file_folder'] + '/' + listfile_fname_wout_ext + '.h5'
 
         fpath_bash_script = dirpath + '/job_scripts/submit_concatenate_h5_' + listfile_fname_wout_ext + '.sh'
 
@@ -305,12 +307,15 @@ def submit_concatenate_list_files(cfg):
             f.write('\n')
             f.write('# Concatenate the files in the list\n')
 
-            f.write('time python concatenate_h5.py -l ' + listfile_fpath + ' ' + conc_outputfile_fpath +
-                    ' --chunksize ' + str(cfg['chunksize']) + ' --complib ' + str(cfg['complib']) +
-                    ' --complevel ' + str(cfg['complevel']))
+            f.write(
+                    'time python concatenate_h5.py'
+                    + ' --chunksize ' + str(cfg['chunksize'])
+                    + ' --complib ' + str(cfg['complib'])
+                    + ' --complevel ' + str(cfg['complevel'])
+                    + ' -l ' + listfile_fpath + ' ' + conc_outputfile_fpath)
 
         if cfg['submit_jobs'] is True:
-            os.system('qsub -l nodes=1:ppn=4,walltime=01:01:00 ' + fpath_bash_script)
+            os.system('qsub -l nodes=1:ppn=4,walltime=23:59:00 ' + fpath_bash_script)
 
 
 def make_data_split():
