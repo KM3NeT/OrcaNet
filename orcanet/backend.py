@@ -268,7 +268,11 @@ def make_model_evaluation(cfg, model, xs_mean, eval_filename, samples=None):
                 # transform y_pred to dict TODO hacky!
                 y_pred = {out.name.split(':')[0]: y_pred[i] for i, out in enumerate(model._output_layers)}
 
-                datasets = get_datasets(mc_info, y_true, y_pred)
+                if cfg.dataset_modifier is None:
+                    datasets = get_datasets(mc_info, y_true, y_pred)
+                else:
+                    datasets = cfg.dataset_modifier(mc_info, y_true, y_pred)
+
                 # TODO maybe add attr to data, like used files or orcanet version number?
                 if not datagroups_created:
                     for dataset_name, data in datasets.items():
@@ -288,7 +292,7 @@ def get_datasets(mc_info, y_true, y_pred):
     """
     Get the dataset names and numpy array contents.
 
-    Every output layer will get one datagroup each for both the label and the prediction.
+    Every output layer will get one dataset each for both the label and the prediction.
     E.g. if your model has an output layer called "energy", the datasets
     "label_energy" and "pred_energy" will be made.
 

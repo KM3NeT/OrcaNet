@@ -12,7 +12,6 @@ import h5py
 from orcanet.backend import train_and_validate_model, make_model_evaluation
 from orcanet.in_out import read_out_list_file, read_out_config_file, read_out_model_file, use_node_local_ssd_for_input, write_full_logfile_startup, h5_get_number_of_rows
 from orcanet.utilities.nn_utilities import load_zero_center_data, get_inputs, generate_batches_from_hdf5_file, get_auto_label_modifier
-from orcanet.utilities.losses import get_all_loss_functions
 
 
 class Configuration(object):
@@ -29,7 +28,14 @@ class Configuration(object):
         Name of the folder of this model in which everything will be saved, e.g., the summary.txt log file is located in here.
         Has a '/' at the end.
     batchsize : int
-        Batchsize that should be used for the training / inferencing of the cnn.
+        Batchsize that should be used for the training and validation of the network.
+    custom_objects : list or None
+        Optional dictionary mapping names (strings) to custom classes or functions to be considered by keras, e.g.
+        during deserialization of models.
+    dataset_modifier : function or None
+        For orca_eval: Function that determines which datasets get created in the resulting h5 file.
+        If none, every output layer will get one dataset each for both the label and the prediction, and one dataset
+        containing the mc_info from the validation files. TODO online doc
     filter_out_tf_garbage : bool
         If true, surpresses the tensorflow info logs which usually spam the terminal.
     epochs_to_train : int
@@ -148,6 +154,8 @@ class Configuration(object):
         """
         # Configuration:
         self.batchsize = 64
+        self.custom_objects = None
+        self.dataset_modifier = None
         self.epochs_to_train = -1
         self.filter_out_tf_garbage = True
         self.initial_epoch = -1
@@ -640,7 +648,7 @@ def orca_train(cfg, initial_model=None):
             warnings.warn("You provided a model even though this is not the start of the training. Provided model is ignored!")
         path_of_model = cfg.get_model_path(epoch[0], epoch[1])
         print("Loading saved model: "+path_of_model)
-        model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
+        model = ks.models.load_model(path_of_model, custom_objects=cfg.custom_objects)  # get_all_loss_functions()
 
     if cfg.label_modifier is None:
         cfg._auto_label_modifier = get_auto_label_modifier(model)
@@ -688,7 +696,7 @@ def orca_eval(cfg):
         cfg.use_local_node()
 
     path_of_model = cfg.get_model_path(epoch[0], epoch[1])
-    model = ks.models.load_model(path_of_model, custom_objects=get_all_loss_functions())
+    model = ks.models.load_model(path_of_model, custom_objects=cfg.custom_objects)
 
     eval_filename = cfg.get_eval_path(epoch[0], epoch[1], list_name)
     make_model_evaluation(cfg, model, xs_mean, eval_filename, samples=None)

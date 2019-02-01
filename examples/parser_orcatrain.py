@@ -8,11 +8,12 @@ Usage:
 Arguments:
     FOLDER  Path to the folder where everything gets saved to, e.g. the summary.txt, the plots, the trained models, etc.
     LIST    A .toml file which contains the pathes of the training and validation files.
-            An example can be found in config/lists/example_list.toml
+            An example can be found in examples/settings_files/example_list.toml
     CONFIG  A .toml file which sets up the training.
-            An example can be found in config/models/example_config.toml. The possible parameters are listed in
-            utilities/in_out.py in the class Configuration.
+            An example can be found in examples/settings_files/example_config.toml. The possible parameters are listed in
+            core.py in the class Configuration.
     MODEL   Path to a .toml file with infos about a model.
+            An example can be found in examples/settings_files/example_model.toml.
 
 Options:
     -h --help                       Show this screen.
@@ -21,6 +22,7 @@ Options:
 from docopt import docopt
 from orcanet.core import orca_train, Configuration
 from orcanet.model_archs.model_setup import build_nn_model
+from orcanet.utilities.losses import get_all_loss_functions
 
 
 def run_train(main_folder, list_file, config_file, model_file):
@@ -41,6 +43,8 @@ def run_train(main_folder, list_file, config_file, model_file):
     """
     # Set up the cfg object with the input data
     cfg = Configuration(main_folder, list_file, config_file)
+    # Orca networks use some custom loss functions, which need to be handed to keras when loading models
+    cfg.custom_objects = get_all_loss_functions()
     # If this is the start of the training, a compiled model needs to be handed to the orca_train function
     if cfg.get_latest_epoch() == (0, 0):
         # Add Info for building a model with OrcaNet to the cfg object
