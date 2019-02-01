@@ -285,7 +285,7 @@ class Configuration(object):
         """
         if epoch[0] == 0 and epoch[1] == 0:
             next_epoch = (1, 1)
-        elif epoch[1] == self.get_no_of_files(for_val_files=False):
+        elif epoch[1] == self.get_no_of_files("train"):
             next_epoch = (epoch[0] + 1, 1)
         else:
             next_epoch = (epoch[0], epoch[1] + 1)
@@ -403,15 +403,15 @@ class Configuration(object):
     def get_list_file(self):
         return self._list_file
 
-    def get_file_sizes(self, for_val_files):
+    def get_file_sizes(self, which):
         """
         Get the number of samples in each training or validation input file.
         # TODO only uses the no of samples of the first input! check if the others are the same % batchsize
 
         Parameters
         ----------
-        for_val_files : bool
-            If true, returns the validation files instead of the training files.
+        which : str
+            Either train or val.
 
         Returns
         -------
@@ -419,16 +419,18 @@ class Configuration(object):
             Its length is equal to the number of files in each input set.
 
         """
-        if for_val_files:
+        if which == "train":
             files = self.get_val_files()
-        else:
+        elif which == "val":
             files = self.get_train_files()
+        else:
+            raise NameError("Unknown fileset name ", which)
         file_sizes = []
         for file in files[list(files.keys())[0]]:
             file_sizes.append(h5_get_number_of_rows(file))
         return file_sizes
 
-    def get_no_of_files(self, for_val_files):
+    def get_no_of_files(self, which):
         """
         Return the number of training or validation files.
 
@@ -436,8 +438,8 @@ class Configuration(object):
 
         Parameters
         ----------
-        for_val_files : bool
-            If true, returns the validation files instead of the training files.
+        which : str
+            Either train or val.
 
         Returns
         -------
@@ -445,16 +447,23 @@ class Configuration(object):
             The number of files.
 
         """
-        if for_val_files:
+        if which == "train":
             files = self.get_val_files()
-        else:
+        elif which == "val":
             files = self.get_train_files()
+        else:
+            raise NameError("Unknown fileset name ", which)
         no_of_files = len(list(files.values())[0])
         return no_of_files
 
-    def yield_files(self, for_val_files):
+    def yield_files(self, which):
         """
         Yield a training or validation file for every input.
+
+        Parameters
+        ----------
+        which : str
+            Either train or val.
 
         Yields
         ------
@@ -463,11 +472,13 @@ class Configuration(object):
             They will be yielded in the same order as they are given in the toml file.
 
         """
-        if for_val_files:
+        if which == "train":
             files = self.get_val_files()
-        else:
+        elif which == "val":
             files = self.get_train_files()
-        for file_no in range(self.get_no_of_files(for_val_files)):
+        else:
+            raise NameError("Unknown fileset name ", which)
+        for file_no in range(self.get_no_of_files(which)):
             files_dict = {key: files[key][file_no] for key in files}
             yield files_dict
 
@@ -585,13 +596,13 @@ class Configuration(object):
             Yields tuples with a batch of samples and labels each.
 
         """
-        files_dict = next(self.yield_files(for_val_files=False))
+        files_dict = next(self.yield_files("train"))
         generator = generate_batches_from_hdf5_file(self, files_dict, yield_mc_info=mc_info)
         return generator
 
     def get_batch(self):
         """ For testing purposes, return a batch of samples and mc_infos. """
-        files_dict = next(self.yield_files(for_val_files=False))
+        files_dict = next(self.yield_files("train"))
         xs = {}
         for i, inp_name in enumerate(files_dict):
             with h5py.File(files_dict[inp_name]) as f:

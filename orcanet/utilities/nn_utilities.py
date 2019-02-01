@@ -403,7 +403,7 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
             self.cum_metrics[metric] = 0
 
         self.steps_per_total_epoch, self.steps_cum = 0, [0]
-        for f_size in cfg.get_file_sizes(for_val_files=False):
+        for f_size in cfg.get_file_sizes("train"):
             steps_per_file = int(f_size / cfg.batchsize)
             self.steps_per_total_epoch += steps_per_file
             self.steps_cum.append(self.steps_cum[-1] + steps_per_file)

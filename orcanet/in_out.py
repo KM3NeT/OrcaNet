@@ -205,7 +205,7 @@ def write_summary_logfile(cfg, epoch, model, history_train, history_val, lr):
     """
     # get this for the epoch_number_float in the logfile
     steps_per_total_epoch, steps_cum = 0, [0]
-    for f_size in cfg.get_file_sizes(for_val_files=False):
+    for f_size in cfg.get_file_sizes("train"):
         steps_per_file = int(f_size / cfg.batchsize)
         steps_per_total_epoch += steps_per_file
         steps_cum.append(steps_cum[-1] + steps_per_file)

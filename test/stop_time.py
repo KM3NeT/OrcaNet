@@ -150,7 +150,7 @@ def test_generators(batches, intermediate_log, functions, func_kwargs):
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
     cfg = Configuration("./test/", list_file)
     cfg.zero_center_folder = zero_center_folder
-    train_files = next(cfg.yield_files(for_val_files=False))
+    train_files = next(cfg.yield_files("train"))
     # cfg.use_local_node()
     print(batches, "batches from file", train_files)
     print("Batchsize:", cfg.batchsize)
