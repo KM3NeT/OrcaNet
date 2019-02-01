@@ -1,17 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Code for training and validating NN's.
+Code for training and validating NN's, as well as evaluating them.
 """
 
 import os
 import matplotlib as mpl
 from inspect import signature
 import keras.backend as K
+import h5py
 mpl.use('Agg')
-from orcanet.utilities.input_output_utilities import write_summary_logfile, write_full_logfile, read_logfiles
+from orcanet.in_out import write_summary_logfile, write_full_logfile, read_logfiles
 from orcanet.utilities.nn_utilities import load_zero_center_data, BatchLevelPerformanceLogger, generate_batches_from_hdf5_file
-from orcanet.utilities.visualization.visualization_tools import plot_all_metrics_to_pdf, plot_weights_and_activations
+from orcanet.utilities.visualization.visualization_tools import plot_all_metrics_to_pdf
 from orcanet_contrib.contrib import orca_learning_rates
 
 # for debugging
@@ -216,3 +217,100 @@ def validate_model(cfg, model, xs_mean):
 
     return history_val
 
+
+def make_model_evaluation(cfg, model, xs_mean, eval_filename, samples=None):
+    """
+    Evaluate a model on all samples of the validation set in the toml list, and save it as a h5 file.
+
+    Per default, the h5 file will contain a datagroup mc_info straight from the given files, as well as two datagroups
+    per output layer of the network, which have the labels and the predicted values in them as numpy arrays, respectively.
+
+    Parameters
+    ----------
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
+    model : ks.model.Model
+        Trained Keras model of a neural network.
+    xs_mean : dict
+        Mean images of the x dataset.
+    eval_filename : str
+        Name and path of the h5 file.
+    samples : int or None
+        Number of events that should be predicted. If samples=None, the whole file will be used.
+
+    """
+    batchsize = cfg.batchsize
+    compression = ("gzip", 1)
+    file_sizes = cfg.get_val_file_sizes()
+    total_file_size = sum(file_sizes)
+    datagroups_created = False
+
+    with h5py.File(eval_filename, 'w') as h5_file:
+        # For every val file set (one set can have multiple files if the model has multiple inputs):
+        for f_number, files_dict in enumerate(cfg.yield_val_files()):
+            file_size = file_sizes[f_number]
+            generator = generate_batches_from_hdf5_file(cfg, files_dict, zero_center_image=xs_mean, yield_mc_info=True)
+
+            if samples is None:
+                steps = int(file_size / batchsize)
+                if file_size % batchsize != 0:
+                    # add a smaller step in the end
+                    steps += 1
+            else:
+                steps = int(samples / batchsize)
+
+            for s in range(steps):
+                if s % 100 == 0:
+                    print('Predicting in step ' + str(s) + ' on file ' + str(f_number))
+                # y_true is a dict of ndarrays, mc_info is a structured array, y_pred is a list of ndarrays
+                xs, y_true, mc_info = next(generator)
+                y_pred = model.predict_on_batch(xs)
+                # transform y_pred to dict TODO hacky!
+                y_pred = {out.name.split(':')[0]: y_pred[i] for i, out in enumerate(model._output_layers)}
+
+                datasets = get_datasets(mc_info, y_true, y_pred)
+                # TODO maybe add attr to data, like used files or orcanet version number?
+                if not datagroups_created:
+                    for dataset_name, data in datasets.items():
+                        maxshape = (total_file_size,) + data.shape[1:]
+                        chunks = True  # (batchsize,) + data.shape[1:]
+                        h5_file.create_dataset(dataset_name, data=data, maxshape=maxshape, chunks=chunks,
+                                               compression=compression[0], compression_opts=compression[1])
+                        datagroups_created = True
+                else:
+                    for dataset_name, data in datasets.items():
+                        # append data at the end of the dataset
+                        h5_file[dataset_name].resize(h5_file[dataset_name].shape[0] + data.shape[0], axis=0)
+                        h5_file[dataset_name][-data.shape[0]:] = data
+
+
+def get_datasets(mc_info, y_true, y_pred):
+    """
+    Get the dataset names and numpy array contents.
+
+    Every output layer will get one datagroup each for both the label and the prediction.
+    E.g. if your model has an output layer called "energy", the datasets
+    "label_energy" and "pred_energy" will be made.
+
+    Parameters
+    ----------
+    mc_info : ndarray
+        A structured array containing infos for every event, right from the input files.
+    y_true : dict
+        The labels for each output layer of the network.
+    y_pred : dict
+        The predictions of each output layer of the network.
+
+    Returns
+    -------
+    datasets : dict
+        Keys are the name of the datagroups, values the content in the form of numpy arrays.
+
+    """
+    datasets = dict()
+    datasets["mc_info"] = mc_info
+    for out_layer_name in y_true:
+        datasets["label_" + out_layer_name] = y_true[out_layer_name]
+    for out_layer_name in y_pred:
+        datasets["pred_" + out_layer_name] = y_pred[out_layer_name]
+    return datasets

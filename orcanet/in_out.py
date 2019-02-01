@@ -1,14 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Utility code like parsing the command line input or
-technical stuff like copying the files to the node-local SSD.
-
-Reading toml files: There are three different keywords:
-    "input" :   The input to networks.
-    "config" :  The Configuration.
-    "model" :   Options for auto-generated OrcaNet models.
-
+Utility code regarding reading user input, and writing output like logfiles.
 """
 
 import os

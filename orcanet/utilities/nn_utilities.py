@@ -27,9 +27,8 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
         Keys: The name of every input (given in the toml list file, can be multiple).
         Values: The filepath of a single h5py file to read samples from.
     f_size : int or None
-        Specifies the filesize (#images) of the .h5 file if not the whole .h5 file
-        should be used for yielding the xs/ys arrays. This is important if you run fit_generator(epochs>1) with
-        a filesize (and hence # of steps) that is smaller than the .h5 file.
+        Specifies the number of samples to be read from the .h5 file.
+        If none, the whole .h5 file will be used.
     zero_center_image : dict
         Mean image of the dataset used for zero-centering. Every input as a key, ndarray as values.
     yield_mc_info : bool
@@ -75,8 +74,8 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
 
         if f_size is None:
             f_size = file_lengths[0]
-        # number of full batches available
-        total_no_of_batches = int(f_size/batchsize)
+        # number of batches available
+        total_no_of_batches = int(np.ceil(f_size/batchsize))
         # positions of the samples in the file
         sample_pos = np.arange(total_no_of_batches) * batchsize
         if shuffle:

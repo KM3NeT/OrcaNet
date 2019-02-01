@@ -5,16 +5,12 @@ Core scripts for the OrcaNet package.
 """
 
 import os
-import sys
 import warnings
-from collections import namedtuple
 import keras as ks
 import h5py
-import numpy as np
 
-from orcanet.run_nn import train_and_validate_model
-from orcanet.eval_nn import make_model_evaluation, get_modelname
-from orcanet.utilities.input_output_utilities import read_out_list_file, read_out_config_file, read_out_model_file, use_node_local_ssd_for_input, write_full_logfile_startup, h5_get_number_of_rows
+from orcanet.backend import train_and_validate_model, make_model_evaluation
+from orcanet.in_out import read_out_list_file, read_out_config_file, read_out_model_file, use_node_local_ssd_for_input, write_full_logfile_startup, h5_get_number_of_rows
 from orcanet.utilities.nn_utilities import load_zero_center_data, get_inputs, generate_batches_from_hdf5_file, get_auto_label_modifier
 from orcanet.utilities.losses import get_all_loss_functions
 
@@ -312,7 +308,7 @@ class Configuration(object):
     def get_eval_path(self, epoch, fileno, list_name):
         """ Get the path to a saved evaluation. """
         eval_filename = self.main_folder \
-                        + 'evaluations/pred_model_epoch_{}_file_{}_on_{}_val_files.npy'.format(epoch, fileno, list_name)
+                        + 'evaluations/pred_model_epoch_{}_file_{}_on_{}_val_files.h5'.format(epoch, fileno, list_name)
         return eval_filename
 
     def use_local_node(self):

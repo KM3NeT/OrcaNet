@@ -11,7 +11,7 @@ Arguments:
             An example can be found in config/lists/example_list.toml
     CONFIG  A .toml file which sets up the training.
             An example can be found in config/models/example_config.toml. The possible parameters are listed in
-            utilities/input_output_utilities.py in the class Configuration.
+            utilities/in_out.py in the class Configuration.
     MODEL   Path to a .toml file with infos about a model.
 
 Options:
