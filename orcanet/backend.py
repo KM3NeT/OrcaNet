@@ -72,7 +72,7 @@ def get_learning_rate(cfg, epoch):
     return lr
 
 
-def update_summary_plot(main_folder):
+def update_summary_plot(cfg):
     """
     Refresh the summary plot of a model directory, found in ./plots/summary_plot.pdf.
 
@@ -81,13 +81,13 @@ def update_summary_plot(main_folder):
 
     Parameters
     ----------
-    main_folder : str
-        Name of the main folder with the summary.txt in it.
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
 
     """
-    summary_logfile = main_folder + "summary.txt"
+    summary_logfile = cfg.main_folder + "summary.txt"
     summary_data, full_train_data = read_logfiles(summary_logfile)
-    pdf_name = main_folder + "plots/summary_plot.pdf"
+    pdf_name = cfg.get_subfolder("plots") + "/summary_plot.pdf"
     plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name)
 
 
@@ -145,7 +145,7 @@ def train_and_validate_model(cfg, model, start_epoch):
         # Write logfiles and make plots
         write_summary_logfile(cfg, curr_epoch, model, history_train, history_val, K.get_value(model.optimizer.lr))
         write_full_logfile(cfg, model, history_train, history_val, K.get_value(model.optimizer.lr), curr_epoch, files_dict)
-        update_summary_plot(cfg.main_folder)
+        update_summary_plot(cfg)
         # TODO reimplement, this function throws errors all the time!
         # plot_weights_and_activations(cfg, model, xs_mean, curr_epoch)
 

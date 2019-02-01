@@ -292,6 +292,40 @@ class Configuration(object):
             next_epoch = (epoch[0], epoch[1] + 1)
         return next_epoch
 
+    def get_subfolder(self, name=None):
+        """
+        Get the path to one or all subfolders of the main folder. Creates it if it does not exist.
+
+        Parameters
+        ----------
+        name : str or None
+            The name of the subfolder.
+
+        Returns
+        -------
+        subfolder : str or tuple
+            The path of the subfolder. If name is None, all subfolders will be returned as a tuple.
+
+        """
+        subfolders = {"log_train": self.main_folder + "log_train",
+                      "saved_models": self.main_folder + "saved_models",
+                      "plots": self.main_folder + "plots",
+                      "activations": self.main_folder + "plots/activations",
+                      "evaluations": self.main_folder + "evaluations"}
+
+        def get(fdr):
+            subfdr = subfolders[fdr]
+            if not os.path.exists(subfdr):
+                print("Creating directory: " + subfdr)
+                os.makedirs(subfdr)
+            return subfdr
+
+        if name is None:
+            subfolder = [get(name) for name in subfolders]
+        else:
+            subfolder = get(name)
+        return subfolder
+
     def get_model_path(self, epoch, fileno):
         """
         Get the path to a model (which might not exist yet). TODO make so that -1-1 will give latest?
@@ -309,13 +343,12 @@ class Configuration(object):
             Path to a model.
 
         """
-        model_filename = self.main_folder + 'saved_models/model_epoch_' + str(epoch) + '_file_' + str(fileno) + '.h5'
+        model_filename = self.get_subfolder("saved_models") + '/model_epoch_' + str(epoch) + '_file_' + str(fileno) + '.h5'
         return model_filename
 
     def get_eval_path(self, epoch, fileno, list_name):
         """ Get the path to a saved evaluation. """
-        eval_filename = self.main_folder \
-                        + 'evaluations/pred_model_epoch_{}_file_{}_on_{}_val_files.h5'.format(epoch, fileno, list_name)
+        eval_filename = self.get_subfolder("evaluations") + '/pred_model_epoch_{}_file_{}_on_{}_val_files.h5'.format(epoch, fileno, list_name)
         return eval_filename
 
     def use_local_node(self):
@@ -326,20 +359,6 @@ class Configuration(object):
         train_files_ssd, test_files_ssd = use_node_local_ssd_for_input(self.get_train_files(), self.get_val_files())
         self._train_files = train_files_ssd
         self._val_files = test_files_ssd
-
-    def make_folder_structure(self):
-        """
-        Make subfolders for a specific model if they don't exist already. These subfolders will contain e.g. saved models,
-        logfiles, etc.
-
-        """
-        main_folder = self.main_folder
-        folders_to_create = [main_folder + "log_train", main_folder + "saved_models",
-                             main_folder + "plots/activations", main_folder + "evaluations"]
-        for directory in folders_to_create:
-            if not os.path.exists(directory):
-                print("Creating directory: " + directory)
-                os.makedirs(directory)
 
     def get_train_files(self):
         assert self._train_files is not None, "No train files have been specified!"
@@ -629,7 +648,7 @@ def orca_train(cfg, initial_model=None):
     """
     if cfg.filter_out_tf_garbage:
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-    cfg.make_folder_structure()
+    cfg.get_subfolder()
     write_full_logfile_startup(cfg)
     # The epoch that will be incremented during the scripts:
     epoch = (cfg.initial_epoch, cfg.initial_fileno)

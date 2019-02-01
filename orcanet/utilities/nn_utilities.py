@@ -368,8 +368,10 @@ class TensorBoardWrapper(ks.callbacks.TensorBoard):
 
 class BatchLevelPerformanceLogger(ks.callbacks.Callback):
     """
-    Gibt loss aus über alle :display batches, gemittelt über die letzten :display batches
-    TODO
+    Write logfiles during training.
+
+    Averages the losses of the model over some number of batches, and then writes that in a line in the logfile.
+
     """
 
     def __init__(self, cfg, model, epoch):
@@ -379,8 +381,11 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
         ----------
         cfg : object Configuration
             Configuration object containing all the configurable options in the OrcaNet scripts.
-        model
-        epoch
+        model : ks.Modle
+            The keras model.
+        epoch : tuple
+            Epoch and file number.
+
         """
         ks.callbacks.Callback.__init__(self)
         self.display = cfg.train_logger_display
@@ -390,7 +395,7 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
         self.flush = cfg.train_logger_flush
 
         self.seen = 0
-        self.logfile_train_fname = cfg.main_folder + 'log_train/log_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.txt'
+        self.logfile_train_fname = cfg.get_subfolder("log_train") + '/log_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.txt'
         self.loglist = []
 
         self.cum_metrics = {}
