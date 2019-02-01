@@ -215,11 +215,6 @@ class Configuration(object):
             for this object. (From the file " + self._list_file + ")\nYou should not use \
             two different list files for one Configuration object!")
 
-    def check_input_files(self):
-        train_files = self.get_train_files()
-        val_files = self.get_val_files()
-
-
     def set_from_config_file(self, config_file):
         """
         Overwrite default attribute values with values from a config file.
@@ -431,7 +426,8 @@ class Configuration(object):
         file_sizes_full, error_file_sizes, file_sizes = {}, [], []
         for n, file_no_set in enumerate(self.yield_files(which)):
             # the number of samples in the n-th file of all inputs
-            file_sizes_full[n] = [h5_get_number_of_rows(file) for file in file_no_set.values()]
+            file_sizes_full[n] = [h5_get_number_of_rows(file, datasets=[self.key_labels, self.key_samples])
+                                  for file in file_no_set.values()]
             if not file_sizes_full[n].count(file_sizes_full[n][0]) == len(file_sizes_full[n]):
                 error_file_sizes.append(n)
             else:

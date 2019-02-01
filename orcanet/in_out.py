@@ -81,7 +81,6 @@ def read_out_list_file(file):
         raise AssertionError("The specified training inputs do not all have the same number of files!")
     if not n_val.count(n_val[0]) == len(n_val):
         raise AssertionError("The specified validation inputs do not all have the same number of files!")
-    # TODO maybe x and y groups have different number of events? --> Error
     return train_files, validation_files
 
 
@@ -272,19 +271,38 @@ def read_logfiles(summary_logfile):
     return summary_data, full_train_data
 
 
-def h5_get_number_of_rows(h5_filepath):
+def h5_get_number_of_rows(h5_filepath, datasets):
     """
-    Gets the total number of rows of the first dataset of a .h5 file. Hence, all datasets should have the same number of rows!
-    :param string h5_filepath: filepath of the .h5 file.
-    :return: int number_of_rows: number of rows of the .h5 file in the first dataset.
-    """
-    f = h5py.File(h5_filepath, 'r')
-    # remove any keys to pytables folders that may be in the file
-    f_keys_stripped = [x for x in list(f.keys()) if '_i_' not in x]
+    Gets the total number of rows of of a .h5 file.
 
-    number_of_rows = f[f_keys_stripped[0]].shape[0]
-    f.close()
-    return number_of_rows
+    Multiple dataset names can be given as a list to check if they all have the same number of rows (axis 0).
+
+    Parameters
+    ----------
+    h5_filepath : str
+        filepath of the .h5 file.
+    datasets : list
+        The names of datasets in the file to check.
+
+    Returns
+    -------
+    number_of_rows: int
+        number of rows of the .h5 file in the first dataset.
+
+    Raises
+    ------
+    AssertionError
+        If the given datasets do not have the same no of rows.
+
+    """
+    with h5py.File(h5_filepath, 'r') as f:
+        number_of_rows = [f[dataset].shape[0] for dataset in datasets]
+    if not number_of_rows.count(number_of_rows[0]) == len(number_of_rows):
+        err_msg = "Datasets do not have the same number of samples in file " + h5_filepath
+        for i, dataset in enumerate(datasets):
+            err_msg += "\nDataset: {}\tSamples: {}".format(dataset, number_of_rows[i])
+        raise AssertionError(err_msg)
+    return number_of_rows[0]
 
 
 def use_node_local_ssd_for_input(train_files, val_files):
