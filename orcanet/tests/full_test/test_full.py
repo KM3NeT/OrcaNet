@@ -12,6 +12,7 @@ from unittest import TestCase
 from orcanet.core import Configuration, orca_train, orca_eval
 from orcanet.model_archs.model_setup import build_nn_model
 from orcanet.utilities.nn_utilities import load_zero_center_data
+from orcanet.utilities.losses import get_all_loss_functions
 
 
 class DatasetTest(TestCase):
@@ -50,6 +51,7 @@ class DatasetTest(TestCase):
         cfg._val_files = self.val_pathes
         cfg._list_file = "test.toml"
         cfg.zero_center_folder = self.temp_dir
+        cfg.custom_objects = get_all_loss_functions()
         self.cfg = cfg
 
     def tearDown(self):
