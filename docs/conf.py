@@ -56,7 +56,7 @@ autosummary_generate = True
 
 # Document Python Code
 autoapi_type = 'python'
-autoapi_dirs = ['../orcanet']
+autoapi_dirs = ['../orcanet', '../orcanet_contrib']
 autoapi_options = [
     'members', 'undoc-members'
     # , 'private-members', 'special-members'
