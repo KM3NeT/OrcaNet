@@ -69,7 +69,7 @@ def read_out_list_file(file):
     file_content = toml.load(file)
     # TODO raise if the list does not have the proper format
     train_files, validation_files = {}, {}
-    # no of train/val fiels in each input set
+    # no of train/val files in each input set
     n_train, n_val = [], []
     for input_key in file_content:
         train_files[input_key] = tuple(file_content[input_key]["train_files"])
@@ -78,10 +78,9 @@ def read_out_list_file(file):
         n_val.append(len(validation_files[input_key]))
 
     if not n_train.count(n_train[0]) == len(n_train):
-        raise AssertionError("The specified training inputs do not all have the same number of files")
+        raise AssertionError("The specified training inputs do not all have the same number of files!")
     if not n_val.count(n_val[0]) == len(n_val):
-        raise AssertionError("The specified validation inputs do not all have the same number of files")
-    # TODO Maybe files have different number of events? Should give an error
+        raise AssertionError("The specified validation inputs do not all have the same number of files!")
     # TODO maybe x and y groups have different number of events? --> Error
     return train_files, validation_files
 

@@ -215,6 +215,11 @@ class Configuration(object):
             for this object. (From the file " + self._list_file + ")\nYou should not use \
             two different list files for one Configuration object!")
 
+    def check_input_files(self):
+        train_files = self.get_train_files()
+        val_files = self.get_val_files()
+
+
     def set_from_config_file(self, config_file):
         """
         Overwrite default attribute values with values from a config file.
@@ -406,7 +411,6 @@ class Configuration(object):
     def get_file_sizes(self, which):
         """
         Get the number of samples in each training or validation input file.
-        # TODO only uses the no of samples of the first input! check if the others are the same % batchsize
 
         Parameters
         ----------
@@ -418,16 +422,28 @@ class Configuration(object):
         file_sizes : list
             Its length is equal to the number of files in each input set.
 
+        Raises
+        ------
+        AssertionError
+            If there is a different number of samples in any of the files of all inputs.
+
         """
-        if which == "train":
-            files = self.get_val_files()
-        elif which == "val":
-            files = self.get_train_files()
-        else:
-            raise NameError("Unknown fileset name ", which)
-        file_sizes = []
-        for file in files[list(files.keys())[0]]:
-            file_sizes.append(h5_get_number_of_rows(file))
+        file_sizes_full, error_file_sizes, file_sizes = {}, [], []
+        for n, file_no_set in enumerate(self.yield_files(which)):
+            # the number of samples in the n-th file of all inputs
+            file_sizes_full[n] = [h5_get_number_of_rows(file) for file in file_no_set.values()]
+            if not file_sizes_full[n].count(file_sizes_full[n][0]) == len(file_sizes_full[n]):
+                error_file_sizes.append(n)
+            else:
+                file_sizes.append(file_sizes_full[n][0])
+
+        if len(error_file_sizes) != 0:
+            err_msg = "The files you gave for the different inputs of the model do not all have the same " \
+                      "number of samples!\n"
+            for n in error_file_sizes:
+                err_msg += "File no {} has the following files sizes for the different inputs: {}\n".format(n, file_sizes_full[n])
+            raise AssertionError(err_msg)
+
         return file_sizes
 
     def get_no_of_files(self, which):
