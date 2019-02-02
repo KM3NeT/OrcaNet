@@ -41,6 +41,9 @@
 #       Complib parameter, that is used when calling concatenate.py
 #    complevel : int
 #       Complevel parameter, that is used when calling concatenate.py
+#    shuffle_delete : bool
+#       Option for the shuffle_h5 tool, specifies if the input file that will be shuffled should be
+#       deleted after the shuffling is finished.
 #
 #    Input Group Parameters
 #    ----------------------
@@ -76,6 +79,7 @@ data_tools_folder = "/home/woody/capn/mppi033h/Code/OrcaNet/orcanet_contrib/data
 chunksize = 32
 complib = "gzip"
 complevel = 1
+shuffle_delete = false
 
 # --- Options, for submitting jobs to concatenate the .list files. --- #
 

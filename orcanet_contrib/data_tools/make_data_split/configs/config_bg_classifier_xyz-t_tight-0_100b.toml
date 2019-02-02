@@ -41,6 +41,9 @@
 #       Complib parameter, that is used when calling concatenate.py
 #    complevel : int
 #       Complevel parameter, that is used when calling concatenate.py
+#    shuffle_delete : bool
+#       Option for the shuffle_h5 tool, specifies if the input file that will be shuffled should be
+#       deleted after the shuffling is finished.
 #
 #    Input Group Parameters
 #    ----------------------
@@ -70,12 +73,13 @@ print_only = false # only print information of your input_groups, don't make any
 # --- Options, for submitting jobs to concatenate the .list files. --- #
 
 make_qsub_bash_files = true
-submit_jobs = true
+submit_jobs = false
 venv_path = "/home/hpc/capn/mppi033h/.virtualenv/python_3_env"
 data_tools_folder = "/home/woody/capn/mppi033h/Code/OrcaNet/orcanet_contrib/data_tools"
 chunksize = 32
 complib = "gzip"
 complevel = 1
+shuffle_delete = false
 
 # --- Options, for submitting jobs to concatenate the .list files. --- #
 

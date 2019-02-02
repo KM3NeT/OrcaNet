@@ -235,6 +235,9 @@ def make_dsplit_list_files(cfg):
         Dict that contains all configuration options and additional information.
 
     """
+    # check if //conc_list_files folder exists, if not create it.
+    if not os.path.exists(cfg['output_file_folder'] + '/conc_list_files'):
+        os.makedirs(cfg['output_file_folder'] + '/conc_list_files')
 
     for dsplit in ['train', 'validate', 'rest']:
 
@@ -245,7 +248,7 @@ def make_dsplit_list_files(cfg):
         n_output_files = len(cfg['output_' + dsplit][first_key])
 
         for i in range(n_output_files):
-            fpath_output = cfg['output_file_folder'] + '/' + cfg['output_file_name'] + '_' + dsplit + '_' + str(i) + '.list'
+            fpath_output = cfg['output_file_folder'] + '/conc_list_files/' + cfg['output_file_name'] + '_' + dsplit + '_' + str(i) + '.list'
 
             # for later usage
             if 'output_lists' not in cfg:
@@ -258,7 +261,7 @@ def make_dsplit_list_files(cfg):
                         f_out.write(fpath + '\n')
 
 
-def submit_concatenate_list_files(cfg):
+def make_concatenate_and_shuffle_list_files(cfg):
     """
     Function that writes qsub .sh files which concatenates all files inside the .list files.
 
@@ -268,30 +271,22 @@ def submit_concatenate_list_files(cfg):
         Dict that contains all configuration options and additional information.
 
     """
-    """
-    Function that writes a qsub .sh files which concatenates all files inside the .list files from the <savenames> list.
-    :param list savenames: list that contains the savenames of all created .list files.
-    :param str dirpath: path of the directory where the .h5 files are located.
-    :param str p_type_str: string with particle type information for the name of the .list file, e.g. 'elec-CC_and_muon-CC'.
-    :param str proj_type: string with the projection type of the .h5 files in the filepath strings, e.g. 'xyzt'.
-    :param (bool, int) chunking: specifies if chunks should be used and if yes which size the chunks should have.
-    :param (None/str, None/int) compress: Tuple that specifies if a compression should be used for saving.
-    :param bool cuts: specifies if cuts should be used during the concatenation process step.
-    """
+    # TODO include options for multicore
+
     dirpath = cfg['output_file_folder']
 
-    if not os.path.exists(dirpath + '/logs'):  # check if /logs/cout folder exists, if not create it.
+    if not os.path.exists(dirpath + '/logs'):  # check if /logs folder exists, if not create it.
         os.makedirs(dirpath + '/logs')
-    if not os.path.exists(dirpath + '/job_scripts'):  # check if /logs/cout folder exists, if not create it.
+    if not os.path.exists(dirpath + '/job_scripts'):  # check if /job_scripts folder exists, if not create it.
         os.makedirs(dirpath + '/job_scripts')
+    if not os.path.exists(dirpath + '/data_split'):  # check if /data_split folder exists, if not create it.
+        os.makedirs(dirpath + '/data_split')
 
-    #TODO make list files to own dir
-
-    # make qsub .sh file
+    # make qsub .sh file for concatenating
     for listfile_fpath in cfg['output_lists']:
         listfile_fname = os.path.basename(listfile_fpath)
         listfile_fname_wout_ext = os.path.splitext(listfile_fname)[0]
-        conc_outputfile_fpath = cfg['output_file_folder'] + '/' + listfile_fname_wout_ext + '.h5'
+        conc_outputfile_fpath = cfg['output_file_folder'] + '/data_split/' + listfile_fname_wout_ext + '.h5'
 
         fpath_bash_script = dirpath + '/job_scripts/submit_concatenate_h5_' + listfile_fname_wout_ext + '.sh'
 
@@ -316,6 +311,37 @@ def submit_concatenate_list_files(cfg):
 
         if cfg['submit_jobs'] is True:
             os.system('qsub -l nodes=1:ppn=4,walltime=23:59:00 ' + fpath_bash_script)
+
+    # make qsub .sh file for shuffling
+    delete_flag_shuffle_tool = '--delete' if cfg['shuffle_delete'] is True else ''
+    for listfile_fpath in cfg['output_lists']:
+        listfile_fname = os.path.basename(listfile_fpath)
+        listfile_fname_wout_ext = os.path.splitext(listfile_fname)[0]
+
+        # This is the input for the shuffle tool!
+        conc_outputfile_fpath = cfg['output_file_folder'] + '/data_split/' + listfile_fname_wout_ext + '.h5'
+
+        fpath_bash_script = dirpath + '/job_scripts/submit_shuffle_h5_' + listfile_fname_wout_ext + '.sh'
+
+        with open(fpath_bash_script, 'w') as f:
+            f.write('#!/usr/bin/env bash\n')
+            f.write('#\n')
+            f.write('#PBS -o ' + cfg['output_file_folder'] + '/logs/submit_shuffle_h5_' + listfile_fname_wout_ext + '.out'
+                    ' -e ' + cfg['output_file_folder'] + '/logs/submit_shuffle_h5_' + listfile_fname_wout_ext + '.err\n')
+            f.write('\n')
+            f.write('CodeFolder="' + cfg['data_tools_folder'] + '"\n')
+            f.write('cd ${CodeFolder}\n')
+            f.write('source activate ' + cfg['venv_path'] + '\n')
+            f.write('\n')
+            f.write('# Shuffle the h5 file \n')
+
+            f.write(
+                    'time python shuffle_h5.py'
+                    + delete_flag_shuffle_tool
+                    + ' --chunksize ' + str(cfg['chunksize'])
+                    + ' --complib ' + str(cfg['complib'])
+                    + ' --complevel ' + str(cfg['complevel'])
+                    + ' ' + conc_outputfile_fpath)
 
 
 def make_data_split():
@@ -349,7 +375,7 @@ def make_data_split():
     make_dsplit_list_files(cfg)
 
     if cfg['make_qsub_bash_files'] is True:
-        submit_concatenate_list_files(cfg)
+        make_concatenate_and_shuffle_list_files(cfg)
 
 
 if __name__ == '__main__':
