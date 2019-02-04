@@ -234,15 +234,15 @@ def write_summary_logfile(cfg, epoch, model, history_train, history_val, lr):
         logfile.write('\n')
 
 
-def read_logfiles(summary_logfile):
+def read_logfiles(cfg):
     """
     Read out the data from the summary.txt file, and from all training log files in the log_train folder which
     is in the same directory as the summary.txt file.
 
     Parameters
     ----------
-    summary_logfile : str
-        Path of the summary.txt file in a model folder.
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
 
     Returns
     -------
@@ -252,21 +252,21 @@ def read_logfiles(summary_logfile):
         Structured array containing the data from all the training log files, merged into a single array.
 
     """
-    summary_data = np.genfromtxt(summary_logfile, names=True, delimiter="\t")
+    summary_data = np.genfromtxt(cfg.main_folder + "summary.txt", names=True, delimiter="\t")
 
     # list of all files in the log_train folder of this model
-    log_train_folder = "/".join(summary_logfile.split("/")[:-1])+"/log_train/"
+    log_train_folder = cfg.get_subfolder("log_train")
     files = os.listdir(log_train_folder)
     train_file_data = []
     for file in files:
         # file is something like "log_epoch_1_file_2.txt", extract the 1 and 2:
-        epoch, file_no = [int(file.split(".")[0].split("_")[i]) for i in [2,4]]
-        file_data = np.genfromtxt(log_train_folder+file, names=True, delimiter="\t")
+        epoch, file_no = [int(file.split(".")[0].split("_")[i]) for i in [2, 4]]
+        file_data = np.genfromtxt(log_train_folder+"/"+file, names=True, delimiter="\t")
         train_file_data.append([[epoch, file_no], file_data])
+
     train_file_data.sort()
     full_train_data = train_file_data[0][1]
     for [epoch, file_no], file_data in train_file_data[1:]:
-        # file_data["Batch_float"]+=(epoch-1)
         full_train_data = np.append(full_train_data, file_data)
     return summary_data, full_train_data
 

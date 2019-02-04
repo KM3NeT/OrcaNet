@@ -12,7 +12,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from orcanet.utilities.nn_utilities import generate_batches_from_hdf5_file, get_inputs
 
 
-def make_train_val_plot(train_data, val_data=None, label_suffix=None, color=None, title=None):
+def make_train_val_plot(train_data, val_data=None, color=None, title=None, y_label=None):
     """
     Plot a training and optionally a validation line in a single plot.
 
@@ -24,12 +24,12 @@ def make_train_val_plot(train_data, val_data=None, label_suffix=None, color=None
         X data [0] and y data [1] of the train curve. Will be plotted as connected dots.
     val_data : List or None
         X data [0] and y data [1] of the validation curve. Will be plotted as a faint solid line.
-    label_suffix : str or None
-        Label suffix used for the train/val lines.
     color : str or None
         Colors used for the train/val line.
     title : str or None
         Title of the plot.
+    y_label : str or None
+        Y label of the plot.
 
     Returns
     -------
@@ -38,10 +38,7 @@ def make_train_val_plot(train_data, val_data=None, label_suffix=None, color=None
 
     """
     fig, ax = plt.subplots()
-    if label_suffix is not None:
-        train_label, val_label = 'train ' + label_suffix, 'val ' + label_suffix
-    else:
-        train_label, val_label = 'train', 'val'
+    train_label, val_label = 'training', 'validation'
 
     train_plot = plt.plot(train_data[0], train_data[1], color=color, ls='--', zorder=3, label=train_label, lw=0.6, alpha=0.5)
     if val_data is not None:
@@ -56,8 +53,8 @@ def make_train_val_plot(train_data, val_data=None, label_suffix=None, color=None
     plt.xticks(get_epoch_xticks(train_data, val_data))
 
     ax.legend(loc='upper right')
-    plt.xlabel('Epoch [#]')
-    plt.ylabel('Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel(y_label)
     if title is not None:
         title = plt.title(title)
         title.set_position([.5, 1.04])
@@ -129,7 +126,7 @@ def get_epoch_xticks(train_data, val_data=None):
     return x_ticks_major
 
 
-def plot_metric(summary_data, full_train_data, metric_name="loss", make_auto_titles=False, color=None):
+def plot_metric(summary_data, full_train_data, metric_name="loss", title=None, color=None, y_label="loss"):
     """
     Plot and return the training and validation history of a metric over the epochs in a single plot.
 
@@ -142,10 +139,12 @@ def plot_metric(summary_data, full_train_data, metric_name="loss", make_auto_tit
     metric_name : str
         Name of the metric to be plotted over the epoch. This name is what was written in the head line
         of the summary.txt file, except without the train_ or val_ prefix.
-    make_auto_titles : bool
-        If true, the title of the plot will be the name of the metric.
+    title : str or None
+        Title of the plot.
     color : None or str
         The color of the train and val lines. If None is given, the default color cycle is used.
+    y_label : str or None
+        Y label of the plot.
 
     Returns
     -------
@@ -169,11 +168,7 @@ def plot_metric(summary_data, full_train_data, metric_name="loss", make_auto_tit
 
     train_data = [full_train_data["Batch_float"], full_train_data[metric_name]]
 
-    if make_auto_titles:
-        title = metric_name
-    else:
-        title = None
-    fig = make_train_val_plot(train_data, val_data, color=color, title=title)
+    fig = make_train_val_plot(train_data, val_data, color=color, title=title, y_label=y_label)
     return fig
 
 
@@ -209,7 +204,7 @@ def plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name):
             # If this metric is an err metric of a variable, color it the same
             if all_metrics[metric_no-1] == metric.replace("_err", ""):
                 color_counter -= 1
-            fig = plot_metric(summary_data, full_train_data, metric_name=metric, make_auto_titles=True, color=colors[color_counter % len(colors)])
+            fig = plot_metric(summary_data, full_train_data, metric_name=metric, title=metric, color=colors[color_counter % len(colors)])
             color_counter += 1
             pdf.savefig(fig)
             plt.close(fig)

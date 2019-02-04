@@ -85,9 +85,8 @@ def update_summary_plot(cfg):
         Configuration object containing all the configurable options in the OrcaNet scripts.
 
     """
-    summary_logfile = cfg.main_folder + "summary.txt"
-    summary_data, full_train_data = read_logfiles(summary_logfile)
     pdf_name = cfg.get_subfolder("plots", create=True) + "/summary_plot.pdf"
+    summary_data, full_train_data = read_logfiles(cfg.main_folder)
     plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name)
 
 
