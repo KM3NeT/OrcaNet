@@ -138,6 +138,9 @@ def write_full_logfile_startup(cfg):
         f_out.write("New execution of the orca_train function started with the following options:\n\n")
         f_out.write("List file path:\t"+cfg.get_list_file()+"\n")
         f_out.write("Given trainfiles in the .list file:\n")
+
+
+
         f_out.write(str(cfg.get_train_files())+"\n")
         f_out.write("Given validation files in the .list file:\n")
         f_out.write(str(cfg.get_val_files()) + "\n")

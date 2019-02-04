@@ -97,43 +97,6 @@ class Configuration(object):
         If this path is set, zero centering images for the given dataset will either be calculated and saved
         automatically at the start of the training, or loaded if they have been saved before.
 
-    Private attributes
-    ------------------
-    _auto_label_modifier : None or function
-        If no label modifier has been specified by the user, use an auto one instead.
-    _train_files : dict or None
-        A dict containing the paths to the different training files on which the model will be trained on.
-        Example for the format for two input sets with two files each:
-                {
-                 "input_A" : ('path/to/set_A_train_file_1.h5', 'path/to/set_A_train_file_2.h5'),
-                 "input_B" : ('path/to/set_B_train_file_1.h5', 'path/to/set_B_train_file_2.h5'),
-                }
-    _val_files : dict or None
-        Like train_files but for the validation files.
-    _list_file : str or None
-        Path to the list file that was used to set the training and validation files. Is None if no list file
-        has been used.
-    _modeldata : namedtuple or None
-        Optional info only required for building a predefined model with OrcaNet. [default: None]
-        It is not needed for executing orcatrain. It is set via self.load_from_model_file.
-
-        modeldata.nn_arch : str
-            Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
-        modeldata.loss_opt : tuple(dict, dict/str/None,)
-            Tuple that contains 1) the loss_functions and loss_weights as dicts (this is the losses table from the toml file)
-            and 2) the metrics.
-        modeldata.class_type : str
-            Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
-            I.e. (2, 'track-shower')
-        modeldata.str_ident : str
-            Optional string identifier that gets appended to the modelname. Useful when training models which would have
-            the same modelname. Also used for defining models and projections!
-        modeldata.swap_4d_channels : None or str
-            For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
-            Currently available: None -> XYZ-T ; 'yzt-x' -> YZT-X, TODO add multi input options
-        modeldata.args : dict
-            Keyword arguments for the model generation.
-
     """
     def __init__(self, main_folder, list_file=None, config_file=None):
         """
@@ -362,10 +325,32 @@ class Configuration(object):
         self._val_files = test_files_ssd
 
     def get_train_files(self):
+        """
+        Get the trainining file paths.
+
+        Returns
+        -------
+        dict
+            A dict containing the paths to the training files on which the model will be trained on.
+            Example for the format for two input sets with two files each:
+                    {
+                     "input_A" : ('path/to/set_A_train_file_1.h5', 'path/to/set_A_train_file_2.h5'),
+                     "input_B" : ('path/to/set_B_train_file_1.h5', 'path/to/set_B_train_file_2.h5'),
+                    }
+        """
         assert self._train_files is not None, "No train files have been specified!"
         return self._train_files
 
     def get_val_files(self):
+        """
+        Get the validation file paths.
+
+        Returns
+        -------
+        dict
+            A dict containing the paths to the validation files on which the model will be validated on.
+            Same format as th training files above.
+        """
         assert self._val_files is not None, "No validation files have been specified!"
         return self._val_files
 
@@ -398,9 +383,39 @@ class Configuration(object):
         return len(train_files) > 1
 
     def get_modeldata(self):
+        """
+        Returns the optional info only required for building a predefined model with OrcaNet.
+        It is not needed for executing orcatrain. It is set via self.load_from_model_file.
+
+        modeldata.nn_arch : str
+            Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
+        modeldata.loss_opt : tuple(dict, dict/str/None,)
+            Tuple that contains 1) the loss_functions and loss_weights as dicts (this is the losses table from the toml file)
+            and 2) the metrics.
+        modeldata.class_type : str
+            Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
+            I.e. (2, 'track-shower')
+        modeldata.str_ident : str
+            Optional string identifier that gets appended to the modelname. Useful when training models which would have
+            the same modelname. Also used for defining models and projections!
+        modeldata.swap_4d_channels : None or str
+            For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
+            Currently available: None -> XYZ-T ; 'yzt-x' -> YZT-X, TODO add multi input options
+        modeldata.args : dict
+            Keyword arguments for the model generation.
+
+        Returns
+        -------
+        namedtuple or None
+
+        """
         return self._modeldata
 
     def get_list_file(self):
+        """
+        Returns the path to the list file that was used to set the training and validation files.
+        None if no list file has been used.
+        """
         return self._list_file
 
     def get_file_sizes(self, which):
