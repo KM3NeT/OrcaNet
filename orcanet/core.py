@@ -661,6 +661,7 @@ def orca_train(cfg, initial_model=None):
 
     if cfg.label_modifier is None:
         cfg._auto_label_modifier = get_auto_label_modifier(model)
+
     cfg.check_connections(model)
     # model.summary()
     if cfg.use_scratch_ssd:

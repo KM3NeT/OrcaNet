@@ -60,6 +60,12 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
         if f_size < batchsize:
             batchsize = f_size
 
+    if cfg.label_modifier is not None:
+        label_modifier = cfg.label_modifier
+    else:
+        assert cfg._auto_label_modifier is not None, "Auto label modifier has not been set up"
+        label_modifier = cfg._auto_label_modifier
+
     with ExitStack() as stack:
         # a dict with the names of list inputs as keys, and the opened h5 files as values.
         files = {}
@@ -98,10 +104,7 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
             if cfg.sample_modifier is not None:
                 xs = cfg.sample_modifier(xs)
 
-            if cfg.label_modifier is not None:
-                ys = cfg.label_modifier(y_values)
-            else:
-                ys = cfg._auto_label_modifier(y_values)
+            ys = label_modifier(y_values)
 
             if not yield_mc_info:
                 yield xs, ys

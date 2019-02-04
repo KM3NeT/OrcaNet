@@ -12,20 +12,22 @@ from matplotlib.backends.backend_pdf import PdfPages
 from orcanet.utilities.nn_utilities import generate_batches_from_hdf5_file, get_inputs
 
 
-def make_test_train_plot(train_datas, val_datas, labels, colors=None, title=""):
+def make_test_train_plot(train_data, val_data=None, label=None, color=None, title=""):
     """
-    Plot one or more val/train lines in a single plot.
+    Plot a val/train line in a single plot.
+
+    The valdata can contain nan's, or might even be None.
 
     Parameters
     ----------
-    train_datas : list
-        x and y test data as a list. Will be plotted as connected dots.
-    val_datas : list
-        x and y train data as a list. Will be plotted as a faint solid line.
-    labels : list
-        Labels used for the train/test line.
-    colors : list
-        Colors used for the train/test line.
+    train_data : list
+        X data (0) and y data (1) of the train curve. Will be plotted as connected dots.
+    val_data : list or None
+        X data (0) and y data (1) of the validation curve. Will be plotted as a faint solid line.
+    label : str
+        Labels used for the train/val line.
+    color : str or None
+        Colors used for the train/val line.
     title : str
         Title of the plot.
 
@@ -36,26 +38,17 @@ def make_test_train_plot(train_datas, val_datas, labels, colors=None, title=""):
 
     """
     fig, ax = plt.subplots()
-    # Record all the datapoints in the plot for proper scaling.
-    all_x_coordinates_test, all_x_coordinates_train = [], []
-    all_y_coordinates_test, all_y_coordinates_train = [], []
-    for set_no in range(len(train_datas)):
-        train_data = train_datas[set_no]
-        val_data = val_datas[set_no]
-        label = labels[set_no]
 
-        if colors is None:
-            test_plot = plt.plot(val_data[0], val_data[1], marker='o', zorder=3, label='eval ' + label)
-        else:
-            test_plot = plt.plot(val_data[0], val_data[1], color=colors[set_no], marker='o', zorder=3, label='eval ' + label)
-        plt.plot(train_data[0], train_data[1], color=test_plot[0].get_color(), ls='--', zorder=3,
-                 label='train ' + label, lw=0.6, alpha=0.5)
+    train_plot = plt.plot(train_data[0], train_data[1], color=color, ls='--', zorder=3, label='train ' + label, lw=0.6, alpha=0.5)
+    if val_data is not None:
+        # val plot always has the same color as the train plot
+        plt.plot(val_data[0], val_data[1], color=train_plot[0].get_color(), marker='o', zorder=3, label='val ' + label)
 
-        all_x_coordinates_test.extend(val_data[0])
-        all_x_coordinates_train.extend(train_data[0])
-        # Remove the occasional np.nan from the y data
-        all_y_coordinates_test.extend(val_data[1][~np.isnan(val_data[1])])
-        all_y_coordinates_train.extend(train_data[1][~np.isnan(train_data[1])])
+    all_x_coordinates_test.extend(val_data[0])
+    all_x_coordinates_train.extend(train_data[0])
+    # Remove the occasional np.nan from the y data
+    all_y_coordinates_test.extend(val_data[1][~np.isnan(val_data[1])])
+    all_y_coordinates_train.extend(train_data[1][~np.isnan(train_data[1])])
 
     # TODO also incorporate the train curve somehow into the limits
     if not len(all_y_coordinates_test) == 0:
@@ -80,9 +73,9 @@ def make_test_train_plot(train_datas, val_datas, labels, colors=None, title=""):
     return fig
 
 
-def plot_metrics(summary_data, full_train_data, metric_names="loss", make_auto_titles=False, color=None):
+def plot_metric(summary_data, full_train_data, metric_name="loss", make_auto_titles=False, color=None):
     """
-    Plot and return the training and validation history of one (or more) metrices over the epochs in a single plot.
+    Plot and return the training and validation history of a metric over the epochs in a single plot.
 
     Parameters
     ----------
@@ -90,12 +83,11 @@ def plot_metrics(summary_data, full_train_data, metric_names="loss", make_auto_t
         Structured array containing the data from the summary.txt file.
     full_train_data : numpy.ndarray
         Structured array containing the data from all the training log files from ./log_train/, merged into a single array.
-    metric_names : list or str
-        Name or list of names of metrics to be plotted over the epoch. This name is what was written in the head line
+    metric_name : str
+        Name of the metric to be plotted over the epoch. This name is what was written in the head line
         of the summary.txt file, except without the train_ or val_ prefix (as these will be added by this script).
     make_auto_titles : bool
-        If true, the title of the plot will be the name of the first metric in metric_names. Should probably not
-        be used if more than one metric is given.
+        If true, the title of the plot will be the name of the metric.
     color : None or str
         The color of the train and val lines. If None is given, the default color cycle is used.
 
@@ -105,29 +97,24 @@ def plot_metrics(summary_data, full_train_data, metric_names="loss", make_auto_t
         The plot.
 
     """
-    if isinstance(metric_names, str):
-        metric_names = [metric_names, ]
-
-    train_datas, val_datas, labels, colors = [], [], [], []
-    for metric_name in metric_names:
-        summary_label = "val_"+metric_name
-        train_log_label = metric_name
-        if summary_data["Epoch"].shape == ():
-            # This is only the case when just one line is present in the summary.txt file.
-            test_data = [summary_data["Epoch"].reshape(1), summary_data[summary_label].reshape(1)]
-        else:
-            test_data = [summary_data["Epoch"], summary_data[summary_label]]
-        train_data = [full_train_data["Batch_float"], full_train_data[train_log_label]]
-        train_datas.append(train_data)
-        val_datas.append(test_data)
-        labels.append(metric_name)
-        colors.append(color)
+    # Gather the Epoch and y data from the files
+    label = metric_name
+    summary_label = "val_"+metric_name
+    if summary_data["Epoch"].shape == (0,):
+        # When no lines are present in the summary.txt file.
+        val_data = None
+    elif summary_data["Epoch"].shape == ():
+        # When only one line is present in the summary.txt file.
+        val_data = [summary_data["Epoch"].reshape(1), summary_data[summary_label].reshape(1)]
+    else:
+        val_data = [summary_data["Epoch"], summary_data[summary_label]]
+    train_data = [full_train_data["Batch_float"], full_train_data[metric_name]]
 
     if make_auto_titles:
-        title = metric_names[0]
+        title = metric_name
     else:
         title = ""
-    fig = make_test_train_plot(train_datas, val_datas, labels, colors, title)
+    fig = make_test_train_plot(train_data, val_data, label, color, title)
     return fig
 
 
@@ -195,7 +182,7 @@ def plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name):
             # If this metric is an err metric of a variable, color it the same
             if all_metrics[metric_no-1] == metric.replace("_err", ""):
                 color_counter -= 1
-            fig = plot_metrics(summary_data, full_train_data, metric_names=metric, make_auto_titles=True, color=colors[color_counter % len(colors)])
+            fig = plot_metric(summary_data, full_train_data, metric_names=metric, make_auto_titles=True, color=colors[color_counter % len(colors)])
             color_counter += 1
             pdf.savefig(fig)
             plt.close(fig)
