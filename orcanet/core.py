@@ -537,7 +537,8 @@ class Configuration(object):
             print("\t{}\t{}".format(list_key, list_inp_shapes[list_key]))
 
         if self.sample_modifier is not None:
-            modified_shapes = {modi_key: xs[modi_key].shape[1:] for modi_key in xs}
+            modified_xs = self.sample_modifier(xs)
+            modified_shapes = {modi_key: modified_xs[modi_key].shape[1:] for modi_key in modified_xs}
             print("After applying your sample modifier, they have the following names and shapes:")
             for list_key in modified_shapes:
                 print("\t{}\t{}".format(list_key, modified_shapes[list_key]))
