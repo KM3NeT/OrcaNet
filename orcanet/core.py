@@ -549,17 +549,18 @@ class Configuration(object):
 
         err_inp_names, err_inp_shapes = check_for_error(list_inp_shapes, layer_inp_shapes)
 
-        err_msg = ""
+        err_msg_inp = ""
         if len(err_inp_names) == 0 and len(err_inp_shapes) == 0:
-            print("Check passed.\n")
+            print("Input check passed.\n")
         else:
+            print("Input check failed!")
             if len(err_inp_names) != 0:
-                err_msg += "No matching input name from the list file for input layer(s): " \
+                err_msg_inp += "No matching input name from the list file for input layer(s): " \
                            + (", ".join(str(e) for e in err_inp_names) + "\n")
             if len(err_inp_shapes) != 0:
-                err_msg += "Shapes of layers and labels do not match for the following input layer(s): " \
+                err_msg_inp += "Shapes of layers and labels do not match for the following input layer(s): " \
                            + (", ".join(str(e) for e in err_inp_shapes) + "\n")
-            print("Error:", err_msg)
+            print("Error:", err_msg_inp)
 
         # ----------------------------------
         print("\nOutput check\n------------")
@@ -587,14 +588,17 @@ class Configuration(object):
             if loss_name not in label_names:
                 err_out_names.append(loss_name)
 
+        err_msg_out = ""
         if len(err_out_names) == 0:
-            print("Check passed.\n")
+            print("Output check passed.\n")
         else:
+            print("Output check failed!")
             if len(err_out_names) != 0:
-                err_msg += "No matching label name from the list file for output layer(s): " \
+                err_msg_out += "No matching label name from the list file for output layer(s): " \
                            + (", ".join(str(e) for e in err_out_names) + "\n")
-            print("Error:", err_msg)
+            print("Error:", err_msg_out)
 
+        err_msg = err_msg_inp + err_msg_out
         if err_msg != "":
             raise AssertionError(err_msg)
 
