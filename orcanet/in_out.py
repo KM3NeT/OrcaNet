@@ -272,7 +272,7 @@ def read_logfiles(cfg):
         Structured array containing the data from all the training log files, merged into a single array.
 
     """
-    summary_data = np.genfromtxt(cfg.main_folder + "summary.txt", names=True, delimiter="\t")
+    summary_data = np.genfromtxt(cfg.main_folder + "/summary.txt", names=True, delimiter="\t")
 
     # list of all files in the log_train folder of this model
     log_train_folder = cfg.get_subfolder("log_train")
