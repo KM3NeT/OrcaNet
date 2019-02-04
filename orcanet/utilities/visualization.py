@@ -12,7 +12,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from orcanet.utilities.nn_utilities import generate_batches_from_hdf5_file, get_inputs
 
 
-def make_test_train_plot(train_data, val_data=None, label=None, color=None, title=""):
+def make_train_val_plot(train_data, val_data=None, label=None, color=None, title=""):
     """
     Plot a val/train line in a single plot.
 
@@ -114,7 +114,7 @@ def plot_metric(summary_data, full_train_data, metric_name="loss", make_auto_tit
         title = metric_name
     else:
         title = ""
-    fig = make_test_train_plot(train_data, val_data, label, color, title)
+    fig = make_train_val_plot(train_data, val_data, label, color, title)
     return fig
 
 
