@@ -77,7 +77,7 @@ def orca_sample_modifiers(swap_col, str_ident):
 
 def orca_label_modifiers(class_type):
     """
-    TODO add docs
+    Returns one of the label modifiers used for Orca networks.
 
     CAREFUL: y_values is a structured numpy array! if you use advanced numpy indexing, this may lead to errors.
     Let's suppose you want to assign a particular value to one or multiple elements of the y_values array.
@@ -170,7 +170,7 @@ def orca_label_modifiers(class_type):
 
 def orca_learning_rates(name):
     """
-    Learning rate schedules used for ORCA.
+    Returns one of the learning rate schedules used for Orca networks.
 
     Parameters
     ----------

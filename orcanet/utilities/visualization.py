@@ -114,7 +114,7 @@ def get_epoch_xticks(train_data, val_data=None):
     """
     x_values = train_data[0]
     if val_data is not None:
-        x_values.extend(val_data[0])
+        x_values = np.append(x_values, val_data[0])
 
     minimum, maximum = np.amin(x_values), np.amax(x_values)
     start_epoch, end_epoch = np.floor(minimum), np.ceil(maximum)

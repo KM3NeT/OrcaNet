@@ -705,6 +705,11 @@ def orca_eval(cfg):
     cfg : object Configuration
         Configuration object containing all the configurable options in the OrcaNet scripts.
 
+    Returns
+    -------
+    eval_filename : str
+        The path to the created evaluation file.
+
     """
     if cfg.filter_out_tf_garbage:
         os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
@@ -729,3 +734,4 @@ def orca_eval(cfg):
 
     eval_filename = cfg.get_eval_path(epoch[0], epoch[1], list_name)
     make_model_evaluation(cfg, model, xs_mean, eval_filename, samples=None)
+    return eval_filename

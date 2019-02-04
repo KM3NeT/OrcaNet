@@ -63,7 +63,7 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
     if cfg.label_modifier is not None:
         label_modifier = cfg.label_modifier
     else:
-        assert cfg._auto_label_modifier is not None, "Auto label modifier has not been set up"
+        assert cfg._auto_label_modifier is not None, "Auto label modifier has not been set up (can be done with nn_utilities.get_auto_label_modifier)"
         label_modifier = cfg._auto_label_modifier
 
     with ExitStack() as stack:
@@ -167,7 +167,6 @@ def get_inputs(model):
 def load_zero_center_data(cfg):
     """
     Gets the xs_mean array(s) that can be used for zero-centering.
-    TODO Test!
 
     The arrays are either loaded from a previously saved .npz file or they are calculated on the fly by
     calculating the mean value per bin for the given training files. The name of the saved image is derived from the
