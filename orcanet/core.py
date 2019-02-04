@@ -437,7 +437,7 @@ class Configuration(object):
             err_msg = "The files you gave for the different inputs of the model do not all have the same " \
                       "number of samples!\n"
             for n in error_file_sizes:
-                err_msg += "File no {} has the following files sizes for the different inputs: {}\n".format(n, file_sizes_full[n])
+                err_msg += "File no {} in {} has the following files sizes for the different inputs: {}\n".format(n, which, file_sizes_full[n])
             raise AssertionError(err_msg)
 
         return file_sizes
