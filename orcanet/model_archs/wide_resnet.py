@@ -11,7 +11,7 @@ from keras.layers.convolutional import Convolution2D, Convolution3D, MaxPooling2
 from keras.layers.normalization import BatchNormalization
 from keras import backend as K
 
-from orcanet.utilities.nn_utilities import get_dimensions_encoding
+from orcanet.model_archs.file_dump import get_dimensions_encoding
 
 
 def decode_input_dimensions(n_bins, batchsize, swap_4d_channels):
@@ -93,7 +93,7 @@ def decode_input_dimensions(n_bins, batchsize, swap_4d_channels):
     return dim, input_dim, strides, average_pooling_size
 
 
-def create_wide_residual_network(n_bins, nb_classes=2, n=1, k=8, dropout=0.0, k_size=3, verbose=True, swap_4d_channels=None):
+def create_wide_residual_network(n_bins, n=1, k=8, dropout=0.0, k_size=3, verbose=True, swap_4d_channels=None):
     """
     Creates a 2D or 3D Wide Residual Network with specified parameters.
     The torch implementation from the paper differs slightly (change default arguments in BatchNorm):
@@ -111,6 +111,7 @@ def create_wide_residual_network(n_bins, nb_classes=2, n=1, k=8, dropout=0.0, k_
     :param None/str swap_4d_channels: For 3.5D nets, specifies if the default channel (t) should be swapped with another dim.
     :return: Model model: Keras WRN model.
     """
+    nb_classes = 2
     channel_axis = 1 if K.image_data_format() == "channels_first" else -1
 
     # TODO Batchsize has to be given to decode_input_dimensions_vgg, but is not used for constructing the model.

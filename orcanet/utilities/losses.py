@@ -1,8 +1,6 @@
 import keras.backend as K
 import tensorflow as tf
 import math
-import inspect
-import sys
 
 
 def get_all_loss_functions():

@@ -6,6 +6,9 @@
 nn_arch = 'VGG'
 dropout = 0.0
 n_filters = [2,]
+# swap_4d_channels = 'xyz-t_and_xyz-c_single_input'
+str_ident = 'lp_tight-1_60b_errors_mse_w_vtx'
+class_type = 'energy_dir_bjorken-y_vtx_errors'
 
 [model.losses]
 # The loss(es) of the model are listed here. Every loss has an identifier as a keyword,

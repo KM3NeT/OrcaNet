@@ -9,7 +9,7 @@ import keras.backend as K
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
-from orcanet.utilities.nn_utilities import generate_batches_from_hdf5_file
+from orcanet.utilities.nn_utilities import generate_batches_from_hdf5_file, get_inputs
 
 
 def make_test_train_plot(train_datas, val_datas, labels, colors=None, title=""):
@@ -172,6 +172,7 @@ def plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name):
         Where the pdf will get saved.
 
     """
+    plt.ioff()
     # Extract the names of the metrics
     all_metrics = []
     for keyword in summary_data.dtype.names:
@@ -244,15 +245,14 @@ def sort_metric_names_and_errors(metric_names):
 def get_activations_and_weights(cfg, xs_mean, model, layer_name=None, learning_phase='test'):
     """
     Get the weights of a model and also the activations of the model for a single event in the validation set.
-    :param ndarray xs_mean: mean_image of the x (train-) dataset used for zero-centering the data.
+
+    xs_mean : dict
+        Mean image of the dataset used for zero-centering. Every input as a key, ndarray as values.
     :param ks.model model: The model to make the data with.
     :param None/str layer_name: if only the activations of a single layer should be collected.
     :param str learning_phase: string identifier to specify the learning phase during the calculation of the activations.
                                'test', 'train': Dropout, Batchnorm etc. in test/train mode
     """
-    inp = model.input
-    if not isinstance(inp, list):
-        inp = [inp]  # only one input! let's wrap it in a list.
     outputs = [layer.output for layer in model.layers if
                layer.name == layer_name or layer_name is None]  # all layer outputs -> empty tf.tensors
     layer_names = [layer.name for layer in model.layers if
@@ -260,23 +260,25 @@ def get_activations_and_weights(cfg, xs_mean, model, layer_name=None, learning_p
     weights = [layer.get_weights() for layer in model.layers if
                layer.name == layer_name or layer_name is None]
     outputs = outputs[1:]  # remove the first input_layer from fetch
-    funcs = [K.function(inp + [K.learning_phase()], [out]) for out in outputs]  # evaluation functions
 
-    f = cfg.get_val_files()[0][0]
+    # get input layers and input files
+    inputs = get_inputs(model)
+    f = next(cfg.yield_files("val"))
     generator = generate_batches_from_hdf5_file(cfg, f, f_size=1, zero_center_image=xs_mean, yield_mc_info=True)
     model_inputs, ys, y_values = next(generator)  # y_values = mc_info for the event
-    lp = 0. if learning_phase == 'test' else 1.
-    # print(len(model_inputs), type(model_inputs))    # Real: 1, ndarray   Dummy: 1 , list
-    # print(model_inputs[0].shape)    # Real: (11,13,18,131),     Dummy: (1,3,3,3,3)
-    if isinstance(model_inputs, list):
+
+    # doesnt work with dicts for whatever reason so transform into lists instead
+    keys = list(inputs.keys())
+    inp = [inputs[key] for key in keys]
+    model_inputs = [model_inputs[key] for key in keys]
+    if len(inp) == 1:
+        inp = inp[0]
         model_inputs = model_inputs[0]
 
-    if len(model_inputs) > 1:
-        list_inputs = []
-        list_inputs.extend(model_inputs)
-        list_inputs.append(lp)
-    else:
-        list_inputs = [model_inputs, lp]
+    funcs = [K.function([inp, K.learning_phase()], [out]) for out in outputs]  # evaluation functions
+
+    lp = 0. if learning_phase == 'test' else 1.
+    list_inputs = [model_inputs, lp]
 
     layer_outputs = [func(list_inputs)[0] for func in funcs]
     activations = []
@@ -296,8 +298,8 @@ def plot_weights_and_activations(cfg, model, xs_mean, epoch):
         Configuration object containing all the configurable options in the OrcaNet scripts.
     model : ks.models.Model
         The model to do the predictions with.
-    xs_mean : ndarray
-        Zero center image.
+    xs_mean : dict
+        Mean image of the dataset used for zero-centering. Every input as a key, ndarray as values.
     epoch : tuple
         Current epoch and fileno.
 
@@ -305,7 +307,7 @@ def plot_weights_and_activations(cfg, model, xs_mean, epoch):
     layer_names, activations, weights, y_values = get_activations_and_weights(cfg, xs_mean, model, layer_name=None, learning_phase='test')
 
     fig, axes = plt.subplots()
-    pdf_name = cfg.main_folder + "plots/activations/act_and_weights_plots_epoch_" + str(epoch) + '.pdf'
+    pdf_name = cfg.get_subfolder("activations", create=True) + "/act_and_weights_plots_epoch_" + str(epoch) + '.pdf'
     pdf_activations_and_weights = PdfPages(pdf_name)
 
     # plot weights

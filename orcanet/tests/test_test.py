@@ -23,14 +23,3 @@ class TestTest(TestCase):
     def test_true(self):
         self.assertTrue(True)
 
-    def test_build_model(self):
-        model_toml = "examples/settings_files/example_model.toml"
-        cfg = Configuration("test")
-        cfg.set_from_model_file(model_toml)
-
-        # building a model requires n_bins, which requires a dataset. Disable for testing:
-        def test_n_bins():
-            return [[11, 13, 18, 60]]
-        cfg.get_n_bins = test_n_bins
-
-        model = model_setup.build_nn_model(cfg)
