@@ -485,9 +485,9 @@ class Configuration(object):
 
         """
         if which == "train":
-            files = self.get_val_files()
-        elif which == "val":
             files = self.get_train_files()
+        elif which == "val":
+            files = self.get_val_files()
         else:
             raise NameError("Unknown fileset name ", which)
         for file_no in range(self.get_no_of_files(which)):
