@@ -41,16 +41,13 @@ def make_train_val_plot(train_data, val_data=None, label=None, color=None, title
 
     train_plot = plt.plot(train_data[0], train_data[1], color=color, ls='--', zorder=3, label='train ' + label, lw=0.6, alpha=0.5)
     if val_data is not None:
+        # Skip over nan values, so that all dots are connected
+        not_nan = ~np.isnan(val_data[1])
         # val plot always has the same color as the train plot
-        plt.plot(val_data[0], val_data[1], color=train_plot[0].get_color(), marker='o', zorder=3, label='val ' + label)
+        plt.plot(val_data[0][not_nan], val_data[1][not_nan], color=train_plot[0].get_color(), marker='o', zorder=3, label='val ' + label)
 
-    all_x_coordinates_test.extend(val_data[0])
-    all_x_coordinates_train.extend(train_data[0])
-    # Remove the occasional np.nan from the y data
-    all_y_coordinates_test.extend(val_data[1][~np.isnan(val_data[1])])
-    all_y_coordinates_train.extend(train_data[1][~np.isnan(train_data[1])])
 
-    # TODO also incorporate the train curve somehow into the limits
+
     if not len(all_y_coordinates_test) == 0:
         test_metric_min_to_max = np.amax(all_y_coordinates_test) - np.amin(all_y_coordinates_test)
         y_lim = (np.amin(all_y_coordinates_test) - 0.25 * test_metric_min_to_max,
@@ -71,6 +68,12 @@ def make_train_val_plot(train_data, val_data=None, label=None, color=None, title
     plt.grid(True, zorder=0, linestyle='dotted')
 
     return fig
+
+
+def get_lims(y):
+    y_range = np.amax(y) - np.amin(y)
+    y_lims = (np.amin(y) - 0.25 * y_range, np.amax(y) + 0.25 * y_range)
+    return y_lims
 
 
 def plot_metric(summary_data, full_train_data, metric_name="loss", make_auto_titles=False, color=None):
