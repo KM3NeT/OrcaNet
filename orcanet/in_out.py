@@ -67,13 +67,18 @@ def read_out_list_file(file):
     """
     # a dict with inputnames as keys and dicts with the lists of train/val files as values
     file_content = toml.load(file)
-    # TODO raise if the list does not have the proper format
+
     train_files, validation_files = {}, {}
     # no of train/val files in each input set
     n_train, n_val = [], []
-    for input_key in file_content:
-        train_files[input_key] = tuple(file_content[input_key]["train_files"])
-        validation_files[input_key] = tuple(file_content[input_key]["validation_files"])
+    for input_key, input_values in file_content.items():
+        assert isinstance(input_values, dict) and len(input_values.keys()) == 2, \
+            "Wrong input format in toml list file (input {}: {})".format(input_key, input_values)
+        assert "train_files" in input_values.keys(), "No train files specified in toml list file"
+        assert "validation_files" in input_values.keys(), "No validation files specified in toml list file"
+
+        train_files[input_key] = tuple(input_values["train_files"])
+        validation_files[input_key] = tuple(input_values["validation_files"])
         n_train.append(len(train_files[input_key]))
         n_val.append(len(validation_files[input_key]))
 
