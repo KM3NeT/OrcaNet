@@ -618,7 +618,7 @@ class Configuration(object):
         files_dict = next(self.yield_files("train"))
         xs = {}
         for i, inp_name in enumerate(files_dict):
-            with h5py.File(files_dict[inp_name]) as f:
+            with h5py.File(files_dict[inp_name], "r") as f:
                 xs[inp_name] = f[self.key_samples][:self.batchsize]
                 if i == 0:
                     mc_info = f[self.key_labels][:self.batchsize]

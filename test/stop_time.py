@@ -154,7 +154,7 @@ def test_generators(batches, intermediate_log, functions, func_kwargs):
     # cfg.use_local_node()
     print(batches, "batches from file", train_files)
     print("Batchsize:", cfg.batchsize)
-    f = h5py.File(list(train_files.values())[0])
+    f = h5py.File(list(train_files.values())[0], "r")
     print(f["x"].shape)
     xs_mean = None  # np.ones(f["x"].shape[1:])  # load_zero_center_data(cfg)
     f.close()
