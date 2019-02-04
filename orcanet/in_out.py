@@ -144,7 +144,7 @@ def write_full_logfile_startup(cfg):
             [f_out.write("\t" + input_file + "\n") for input_file in input_files]
 
         f_out.write("Given validation files in the .list file:\n")
-        for input_name, input_files in cfg.cfg.get_val_files().items():
+        for input_name, input_files in cfg.get_val_files().items():
             f_out.write(input_name + ":")
             [f_out.write("\t" + input_file + "\n") for input_file in input_files]
 
