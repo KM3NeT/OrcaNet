@@ -137,21 +137,28 @@ def write_full_logfile_startup(cfg):
         f_out.write('----------------------------------'+str(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))+'---------------------------------------------------\n\n')
         f_out.write("New execution of the orca_train function started with the following options:\n\n")
         f_out.write("List file path:\t"+cfg.get_list_file()+"\n")
+
         f_out.write("Given trainfiles in the .list file:\n")
+        for input_name, input_files in cfg.get_train_files().items():
+            f_out.write(input_name + ":")
+            [f_out.write("\t" + input_file + "\n") for input_file in input_files]
 
-
-
-        f_out.write(str(cfg.get_train_files())+"\n")
         f_out.write("Given validation files in the .list file:\n")
-        f_out.write(str(cfg.get_val_files()) + "\n")
+        for input_name, input_files in cfg.cfg.get_val_files().items():
+            f_out.write(input_name + ":")
+            [f_out.write("\t" + input_file + "\n") for input_file in input_files]
+
         f_out.write("\nConfiguration used:\n")
         for key in vars(cfg):
             if not key.startswith("_"):
                 f_out.write("   {}:\t{}\n".format(key, getattr(cfg, key)))
-        f_out.write("\nPrivate attributes:\n")
-        for key in vars(cfg):
-            if key.startswith("_"):
-                f_out.write("   {}:\t{}\n".format(key, getattr(cfg, key)))
+
+        modeldata = cfg.get_modeldata()
+        if modeldata is not None:
+            f_out.write("Given modeldata:")
+            for key, val in modeldata._asdict().items():
+                f_out.write("\t{}:\t{}".format(key, val))
+
         f_out.write("\n")
 
 
@@ -163,8 +170,18 @@ def write_full_logfile(cfg, model, history_train, history_val, lr, epoch, files_
     ----------
     cfg : object Configuration
         Configuration object containing all the configurable options in the OrcaNet scripts.
+    model : Model
+        The keras model.
+    history_train : keras history object
+        The history of the training.
+    history_val : List or None
+        The history of the validation.
+    lr : float
+        The current learning rate.
+    epoch : tuple
+        Current epoch and file number.
     files_dict : dict
-        The name of every input as a key, the path to the n-th training file as values.
+        The name of every input as a key, the path to one of the training file, on which the model has just been trained, as values.
 
     """
     logfile = cfg.main_folder + 'full_log.txt'
@@ -174,9 +191,9 @@ def write_full_logfile(cfg, model, history_train, history_val, lr, epoch, files_
         f_out.write('Current time: ' + str(datetime.now().strftime('%Y-%m-%d %H:%M:%S')) + '\n')
         f_out.write('Decayed learning rate to ' + str(lr) + ' before epoch ' + str(epoch[0]) +
                     ' and file ' + str(epoch[1]) + ')\n')
-        f_out.write('Trained in epoch ' + str(epoch) + ' on file ' + str(epoch[1]) + ', ' + str(files_dict) + '\n')
+        f_out.write('Trained in epoch ' + str(epoch) + ' file number ' + str(epoch[1]) + ', on files ' + str(files_dict) + '\n')
         if history_val is not None:
-            f_out.write('Validated in epoch ' + str(epoch) + ', file ' + str(epoch[1]) + ' on val_files ' + str(cfg.get_val_files()) + '\n')
+            f_out.write('Validated in epoch ' + str(epoch) + ', file ' + str(epoch[1]) + 'on the val files\n')
         f_out.write('History for training / validating: \n')
         f_out.write('Train: ' + str(history_train.history) + '\n')
         if history_val is not None:
