@@ -97,43 +97,6 @@ class Configuration(object):
         If this path is set, zero centering images for the given dataset will either be calculated and saved
         automatically at the start of the training, or loaded if they have been saved before.
 
-    Private attributes
-    ------------------
-    _auto_label_modifier : None or function
-        If no label modifier has been specified by the user, use an auto one instead.
-    _train_files : dict or None
-        A dict containing the paths to the different training files on which the model will be trained on.
-        Example for the format for two input sets with two files each:
-                {
-                 "input_A" : ('path/to/set_A_train_file_1.h5', 'path/to/set_A_train_file_2.h5'),
-                 "input_B" : ('path/to/set_B_train_file_1.h5', 'path/to/set_B_train_file_2.h5'),
-                }
-    _val_files : dict or None
-        Like train_files but for the validation files.
-    _list_file : str or None
-        Path to the list file that was used to set the training and validation files. Is None if no list file
-        has been used.
-    _modeldata : namedtuple or None
-        Optional info only required for building a predefined model with OrcaNet. [default: None]
-        It is not needed for executing orcatrain. It is set via self.load_from_model_file.
-
-        modeldata.nn_arch : str
-            Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
-        modeldata.loss_opt : tuple(dict, dict/str/None,)
-            Tuple that contains 1) the loss_functions and loss_weights as dicts (this is the losses table from the toml file)
-            and 2) the metrics.
-        modeldata.class_type : str
-            Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
-            I.e. (2, 'track-shower')
-        modeldata.str_ident : str
-            Optional string identifier that gets appended to the modelname. Useful when training models which would have
-            the same modelname. Also used for defining models and projections!
-        modeldata.swap_4d_channels : None or str
-            For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
-            Currently available: None -> XYZ-T ; 'yzt-x' -> YZT-X, TODO add multi input options
-        modeldata.args : dict
-            Keyword arguments for the model generation.
-
     """
     def __init__(self, main_folder, list_file=None, config_file=None):
         """
@@ -362,10 +325,32 @@ class Configuration(object):
         self._val_files = test_files_ssd
 
     def get_train_files(self):
+        """
+        Get the trainining file paths.
+
+        Returns
+        -------
+        dict
+            A dict containing the paths to the training files on which the model will be trained on.
+            Example for the format for two input sets with two files each:
+                    {
+                     "input_A" : ('path/to/set_A_train_file_1.h5', 'path/to/set_A_train_file_2.h5'),
+                     "input_B" : ('path/to/set_B_train_file_1.h5', 'path/to/set_B_train_file_2.h5'),
+                    }
+        """
         assert self._train_files is not None, "No train files have been specified!"
         return self._train_files
 
     def get_val_files(self):
+        """
+        Get the validation file paths.
+
+        Returns
+        -------
+        dict
+            A dict containing the paths to the validation files on which the model will be validated on.
+            Same format as th training files above.
+        """
         assert self._val_files is not None, "No validation files have been specified!"
         return self._val_files
 
@@ -398,9 +383,39 @@ class Configuration(object):
         return len(train_files) > 1
 
     def get_modeldata(self):
+        """
+        Returns the optional info only required for building a predefined model with OrcaNet.
+        It is not needed for executing orcatrain. It is set via self.load_from_model_file.
+
+        modeldata.nn_arch : str
+            Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
+        modeldata.loss_opt : tuple(dict, dict/str/None,)
+            Tuple that contains 1) the loss_functions and loss_weights as dicts (this is the losses table from the toml file)
+            and 2) the metrics.
+        modeldata.class_type : str
+            Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
+            I.e. (2, 'track-shower')
+        modeldata.str_ident : str
+            Optional string identifier that gets appended to the modelname. Useful when training models which would have
+            the same modelname. Also used for defining models and projections!
+        modeldata.swap_4d_channels : None or str
+            For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
+            Currently available: None -> XYZ-T ; 'yzt-x' -> YZT-X, TODO add multi input options
+        modeldata.args : dict
+            Keyword arguments for the model generation.
+
+        Returns
+        -------
+        namedtuple or None
+
+        """
         return self._modeldata
 
     def get_list_file(self):
+        """
+        Returns the path to the list file that was used to set the training and validation files.
+        None if no list file has been used.
+        """
         return self._list_file
 
     def get_file_sizes(self, which):
@@ -550,17 +565,18 @@ class Configuration(object):
 
         err_inp_names, err_inp_shapes = check_for_error(list_inp_shapes, layer_inp_shapes)
 
-        err_msg = ""
+        err_msg_inp = ""
         if len(err_inp_names) == 0 and len(err_inp_shapes) == 0:
-            print("Check passed.\n")
+            print("Input check passed.\n")
         else:
+            print("Input check failed!")
             if len(err_inp_names) != 0:
-                err_msg += "No matching input name from the list file for input layer(s): " \
+                err_msg_inp += "No matching input name from the list file for input layer(s): " \
                            + (", ".join(str(e) for e in err_inp_names) + "\n")
             if len(err_inp_shapes) != 0:
-                err_msg += "Shapes of layers and labels do not match for the following input layer(s): " \
+                err_msg_inp += "Shapes of layers and labels do not match for the following input layer(s): " \
                            + (", ".join(str(e) for e in err_inp_shapes) + "\n")
-            print("Error:", err_msg)
+            print("Error:", err_msg_inp)
 
         # ----------------------------------
         print("\nOutput check\n------------")
@@ -588,14 +604,17 @@ class Configuration(object):
             if loss_name not in label_names:
                 err_out_names.append(loss_name)
 
+        err_msg_out = ""
         if len(err_out_names) == 0:
-            print("Check passed.\n")
+            print("Output check passed.\n")
         else:
+            print("Output check failed!")
             if len(err_out_names) != 0:
-                err_msg += "No matching label name from the list file for output layer(s): " \
+                err_msg_out += "No matching label name from the list file for output layer(s): " \
                            + (", ".join(str(e) for e in err_out_names) + "\n")
-            print("Error:", err_msg)
+            print("Error:", err_msg_out)
 
+        err_msg = err_msg_inp + err_msg_out
         if err_msg != "":
             raise AssertionError(err_msg)
 
@@ -662,6 +681,7 @@ def orca_train(cfg, initial_model=None):
 
     if cfg.label_modifier is None:
         cfg._auto_label_modifier = get_auto_label_modifier(model)
+
     cfg.check_connections(model)
     # model.summary()
     if cfg.use_scratch_ssd:
@@ -685,6 +705,11 @@ def orca_eval(cfg):
     ----------
     cfg : object Configuration
         Configuration object containing all the configurable options in the OrcaNet scripts.
+
+    Returns
+    -------
+    eval_filename : str
+        The path to the created evaluation file.
 
     """
     if cfg.filter_out_tf_garbage:
@@ -710,3 +735,4 @@ def orca_eval(cfg):
 
     eval_filename = cfg.get_eval_path(epoch[0], epoch[1], list_name)
     make_model_evaluation(cfg, model, xs_mean, eval_filename, samples=None)
+    return eval_filename

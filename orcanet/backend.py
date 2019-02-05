@@ -85,9 +85,8 @@ def update_summary_plot(cfg):
         Configuration object containing all the configurable options in the OrcaNet scripts.
 
     """
-    summary_logfile = cfg.main_folder + "summary.txt"
-    summary_data, full_train_data = read_logfiles(summary_logfile)
     pdf_name = cfg.get_subfolder("plots", create=True) + "/summary_plot.pdf"
+    summary_data, full_train_data = read_logfiles(cfg)
     plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name)
 
 
@@ -171,6 +170,11 @@ def train_model(cfg, model, files_dict, f_size, xs_mean, curr_epoch):
     curr_epoch : tuple(int, int)
         The number of the current epoch and the current filenumber.
 
+    Returns
+    -------
+    history : keras history object
+        The history of the training on this file.
+
     """
     print('Training in epoch ' + str(curr_epoch[0]) + ' on file ' + str(curr_epoch[1]) + ' ,', str(files_dict))
     if cfg.n_events is not None:
@@ -197,6 +201,11 @@ def validate_model(cfg, model, xs_mean):
         Keras model instance of a neural network.
     xs_mean : dict
         Mean image of the dataset used for zero-centering. Every input as a key, ndarray as values.
+
+    Returns
+    -------
+    history_val : List
+        The history of the validation.
 
     """
     # One history for each val file

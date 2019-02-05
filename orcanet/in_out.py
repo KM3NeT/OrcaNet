@@ -67,13 +67,18 @@ def read_out_list_file(file):
     """
     # a dict with inputnames as keys and dicts with the lists of train/val files as values
     file_content = toml.load(file)
-    # TODO raise if the list does not have the proper format
+
     train_files, validation_files = {}, {}
     # no of train/val files in each input set
     n_train, n_val = [], []
-    for input_key in file_content:
-        train_files[input_key] = tuple(file_content[input_key]["train_files"])
-        validation_files[input_key] = tuple(file_content[input_key]["validation_files"])
+    for input_key, input_values in file_content.items():
+        assert isinstance(input_values, dict) and len(input_values.keys()) == 2, \
+            "Wrong input format in toml list file (input {}: {})".format(input_key, input_values)
+        assert "train_files" in input_values.keys(), "No train files specified in toml list file"
+        assert "validation_files" in input_values.keys(), "No validation files specified in toml list file"
+
+        train_files[input_key] = tuple(input_values["train_files"])
+        validation_files[input_key] = tuple(input_values["validation_files"])
         n_train.append(len(train_files[input_key]))
         n_val.append(len(validation_files[input_key]))
 
@@ -137,18 +142,28 @@ def write_full_logfile_startup(cfg):
         f_out.write('----------------------------------'+str(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))+'---------------------------------------------------\n\n')
         f_out.write("New execution of the orca_train function started with the following options:\n\n")
         f_out.write("List file path:\t"+cfg.get_list_file()+"\n")
+
         f_out.write("Given trainfiles in the .list file:\n")
-        f_out.write(str(cfg.get_train_files())+"\n")
+        for input_name, input_files in cfg.get_train_files().items():
+            f_out.write(input_name + ":")
+            [f_out.write("\t" + input_file + "\n") for input_file in input_files]
+
         f_out.write("Given validation files in the .list file:\n")
-        f_out.write(str(cfg.get_val_files()) + "\n")
+        for input_name, input_files in cfg.get_val_files().items():
+            f_out.write(input_name + ":")
+            [f_out.write("\t" + input_file + "\n") for input_file in input_files]
+
         f_out.write("\nConfiguration used:\n")
         for key in vars(cfg):
             if not key.startswith("_"):
                 f_out.write("   {}:\t{}\n".format(key, getattr(cfg, key)))
-        f_out.write("\nPrivate attributes:\n")
-        for key in vars(cfg):
-            if key.startswith("_"):
-                f_out.write("   {}:\t{}\n".format(key, getattr(cfg, key)))
+
+        modeldata = cfg.get_modeldata()
+        if modeldata is not None:
+            f_out.write("Given modeldata:")
+            for key, val in modeldata._asdict().items():
+                f_out.write("\t{}:\t{}".format(key, val))
+
         f_out.write("\n")
 
 
@@ -160,8 +175,18 @@ def write_full_logfile(cfg, model, history_train, history_val, lr, epoch, files_
     ----------
     cfg : object Configuration
         Configuration object containing all the configurable options in the OrcaNet scripts.
+    model : Model
+        The keras model.
+    history_train : keras history object
+        The history of the training.
+    history_val : List or None
+        The history of the validation.
+    lr : float
+        The current learning rate.
+    epoch : tuple
+        Current epoch and file number.
     files_dict : dict
-        The name of every input as a key, the path to the n-th training file as values.
+        The name of every input as a key, the path to one of the training file, on which the model has just been trained, as values.
 
     """
     logfile = cfg.main_folder + 'full_log.txt'
@@ -171,9 +196,9 @@ def write_full_logfile(cfg, model, history_train, history_val, lr, epoch, files_
         f_out.write('Current time: ' + str(datetime.now().strftime('%Y-%m-%d %H:%M:%S')) + '\n')
         f_out.write('Decayed learning rate to ' + str(lr) + ' before epoch ' + str(epoch[0]) +
                     ' and file ' + str(epoch[1]) + ')\n')
-        f_out.write('Trained in epoch ' + str(epoch) + ' on file ' + str(epoch[1]) + ', ' + str(files_dict) + '\n')
+        f_out.write('Trained in epoch ' + str(epoch) + ' file number ' + str(epoch[1]) + ', on files ' + str(files_dict) + '\n')
         if history_val is not None:
-            f_out.write('Validated in epoch ' + str(epoch) + ', file ' + str(epoch[1]) + ' on val_files ' + str(cfg.get_val_files()) + '\n')
+            f_out.write('Validated in epoch ' + str(epoch) + ', file ' + str(epoch[1]) + 'on the val files\n')
         f_out.write('History for training / validating: \n')
         f_out.write('Train: ' + str(history_train.history) + '\n')
         if history_val is not None:
@@ -201,6 +226,7 @@ def write_summary_logfile(cfg, epoch, model, history_train, history_val, lr):
         The current learning rate of the model.
 
     """
+    seperator = " | "
     # get this for the epoch_number_float in the logfile
     steps_per_total_epoch, steps_cum = 0, [0]
     for f_size in cfg.get_file_sizes("train"):
@@ -209,40 +235,64 @@ def write_summary_logfile(cfg, epoch, model, history_train, history_val, lr):
         steps_cum.append(steps_cum[-1] + steps_per_file)
     epoch_number_float = epoch[0] - (steps_per_total_epoch - steps_cum[epoch[1]]) / float(steps_per_total_epoch)
 
+    def get_cell(content, width=9, precision=4):
+        """ Return a cell content as a str, with a given width (and precision for floats). """
+        if isinstance(content, str):
+            cell = format(content, "<"+str(width))
+        else:
+            cell = format(format(float(content), "."+str(precision)+"g"), "<"+str(width))
+        return cell
+
     # Write the logfile
     logfile_fname = cfg.main_folder + 'summary.txt'
+    # The widths of the cells. At least 9 wide, or londer depending on the name of the metric.
+    # As train_ or val_ gets added, its longer than the name of the metric itself.
+    widths_train = [max(9, len(metric_name) + 6) for metric_name in model.metrics_names]
+    widths_val = [max(9, len(metric_name) + 4) for metric_name in model.metrics_names]
+
     with open(logfile_fname, 'a+') as logfile:
-        # Write the headline
+        # Write the headlines if file is empty
         if os.stat(logfile_fname).st_size == 0:
-            logfile.write('Epoch\tLR\t')
-            for i, metric in enumerate(model.metrics_names):
-                logfile.write("train_" + str(metric) + "\tval_" + str(metric))
-                if i + 1 < len(model.metrics_names):
-                    logfile.write("\t")
+            logfile.write('{Epoch}{seperator}{LR}'.format(Epoch=get_cell("Epoch"),
+                                                          LR=get_cell("LR"),
+                                                          seperator=seperator))
+            for i, metric_name in enumerate(model.metrics_names):
+                logfile.write("{seperator}{train}{seperator}{val}".format(train=get_cell("train_" + str(metric_name), widths_train[i]),
+                                                                          val=get_cell("val_" + str(metric_name), widths_val[i]),
+                                                                          seperator=seperator))
             logfile.write('\n')
+            logfile.write("-" * 10 + "+" + "-" * 11)
+            for metric_no in range(len(widths_train)):
+                width1 = widths_train[metric_no]
+                width2 = widths_val[metric_no]
+                logfile.write("+"+"-"*(width1+2)+"+"+"-"*(width2+2))
+            logfile.write('\n')
+
         # Write the content: Epoch, LR, train_1, val_1, ...
-        logfile.write("{:.4g}\t".format(float(epoch_number_float)))
-        logfile.write("{:.4g}\t".format(float(lr)))
+        logfile.write("{Epoch}{seperator}{LR}".format(Epoch=get_cell(epoch_number_float),
+                                                      LR=get_cell(lr),
+                                                      seperator=seperator))
         for i, metric_name in enumerate(model.metrics_names):
-            logfile.write("{:.4g}\t".format(float(history_train.history[metric_name][0])))
+            logfile.write("{seperator}{train}".format(train=get_cell(history_train.history[metric_name][0], widths_train[i]),
+                                                      seperator=seperator))
             if history_val is None:
-                logfile.write("nan")
+                logfile.write("{seperator}{val}".format(val=get_cell("nan", widths_val[i]),
+                                                        seperator=seperator))
             else:
-                logfile.write("{:.4g}".format(float(history_val[i])))
-            if i + 1 < len(model.metrics_names):
-                logfile.write("\t")
+                logfile.write("{seperator}{val}".format(val=get_cell(history_val[i], widths_val[i]),
+                                                        seperator=seperator))
         logfile.write('\n')
 
 
-def read_logfiles(summary_logfile):
+def read_logfiles(cfg):
     """
     Read out the data from the summary.txt file, and from all training log files in the log_train folder which
     is in the same directory as the summary.txt file.
 
     Parameters
     ----------
-    summary_logfile : str
-        Path of the summary.txt file in a model folder.
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
 
     Returns
     -------
@@ -252,21 +302,21 @@ def read_logfiles(summary_logfile):
         Structured array containing the data from all the training log files, merged into a single array.
 
     """
-    summary_data = np.genfromtxt(summary_logfile, names=True, delimiter="\t")
+    summary_data = np.genfromtxt(cfg.main_folder + "/summary.txt", names=True, delimiter="|", autostrip=True, comments="--")
 
     # list of all files in the log_train folder of this model
-    log_train_folder = "/".join(summary_logfile.split("/")[:-1])+"/log_train/"
+    log_train_folder = cfg.get_subfolder("log_train")
     files = os.listdir(log_train_folder)
     train_file_data = []
     for file in files:
         # file is something like "log_epoch_1_file_2.txt", extract the 1 and 2:
-        epoch, file_no = [int(file.split(".")[0].split("_")[i]) for i in [2,4]]
-        file_data = np.genfromtxt(log_train_folder+file, names=True, delimiter="\t")
+        epoch, file_no = [int(file.split(".")[0].split("_")[i]) for i in [2, 4]]
+        file_data = np.genfromtxt(log_train_folder+"/"+file, names=True, delimiter="\t")
         train_file_data.append([[epoch, file_no], file_data])
+
     train_file_data.sort()
     full_train_data = train_file_data[0][1]
     for [epoch, file_no], file_data in train_file_data[1:]:
-        # file_data["Batch_float"]+=(epoch-1)
         full_train_data = np.append(full_train_data, file_data)
     return summary_data, full_train_data
 
