@@ -28,6 +28,7 @@ As of now, these docs only contain the API documentation.
    :caption: Contents:
 
    CONTRIBUTING
+   modifiers
    Source (Git) <https://git.km3net.de/ml/OrcaNet.git>
 
 
