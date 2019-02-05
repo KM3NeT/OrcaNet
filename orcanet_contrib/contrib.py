@@ -158,8 +158,8 @@ def orca_label_modifiers(class_type):
             # categorical [shower, track] -> [1,0] = shower, [0,1] = track
             categorical_ts = np.zeros((batchsize, 2), dtype='bool')
 
-            categorical_ts[is_not_muon_cc][:, 0] = 1
-            categorical_ts[is_muon_cc][:, 1] = 1
+            categorical_ts[:, 0] = is_not_muon_cc
+            categorical_ts[:, 1] = is_muon_cc
 
             ys['ts_output'] = categorical_ts.astype(np.float32)
             return ys
@@ -177,9 +177,9 @@ def orca_label_modifiers(class_type):
             batchsize = y_values.shape[0]
             categorical_bg = np.zeros((batchsize, 3), dtype='bool')
 
-            categorical_bg[is_not_mupage_nor_rn][:, 0] = 1
-            categorical_bg[is_mupage][:, 1] = 1
-            categorical_bg[is_random_noise][:, 2] = 1
+            categorical_bg[:, 0] = is_not_mupage_nor_rn
+            categorical_bg[:, 1] = is_mupage
+            categorical_bg[:, 2] = is_random_noise
 
             ys['bg_output'] = categorical_bg.astype(np.float32)
             return ys
