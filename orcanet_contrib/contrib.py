@@ -8,7 +8,7 @@ def orca_sample_modifiers(swap_col, str_ident):
     They will permute columns, and/or add permuted columns to xs.
 
     The input to the functions is:
-        xs_list : dict
+        xs_files : dict
             Dict that contains the input samples from the file(s).
             The keys are the names of the inputs in the toml list file.
             The values are a single batch of data from each corresponding file.
@@ -36,37 +36,37 @@ def orca_sample_modifiers(swap_col, str_ident):
                              'tyz-x': (0, 4, 2, 3, 1)}
 
     if swap_col in swap_4d_channels_dict:
-        def swap_columns(xs_list):
+        def swap_columns(xs_files):
             # Transpose dimensions
             xs_layer = dict()
-            keys = list(xs_list.keys())
-            xs_layer[keys[0]] = np.transpose(xs_list, swap_4d_channels_dict[swap_col])
+            keys = list(xs_files.keys())
+            xs_layer[keys[0]] = np.transpose(xs_files, swap_4d_channels_dict[swap_col])
             return xs_layer
         sample_modifier = swap_columns
 
     elif swap_col == 'xyz-t_and_yzt-x':
-        def sample_modifier(xs_list):
+        def sample_modifier(xs_files):
             # Use xyz-t, and also transpose it to yzt-x and use that, too.
             xs_layer = dict()
-            xs_layer["xyz-t"] = xs_list["xyz-t"]
-            xs_layer["yzt-x"] = np.transpose(xs_list["xyz-t"], swap_4d_channels_dict['yzt-x'])
+            xs_layer['xyz-t'] = xs_files['xyz-t']
+            xs_layer['yzt-x'] = np.transpose(xs_files['xyz-t'], swap_4d_channels_dict['yzt-x'])
             return xs_layer
 
     elif 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2' in swap_col + str_ident:
-        def sample_modifier(xs_list):
+        def sample_modifier(xs_files):
             # Use xyz-t in two different time cuts, and also transpose them to yzt-x and use these, too.
             xs_layer = dict()
-            xs_layer["xyz-t_tight-1"] = xs_list["xyz-t_tight-1"]
-            xs_layer["xyz-t_tight-2"] = xs_list["xyz-t_tight-2"]
-            xs_layer["yzt-x_tight-1"] = np.transpose(xs_list["xyz-t_tight-1"], swap_4d_channels_dict['yzt-x'])
-            xs_layer["yzt-x_tight-2"] = np.transpose(xs_list["xyz-t_tight-2"], swap_4d_channels_dict['yzt-x'])
+            xs_layer['xyz-t_tight-1'] = xs_files['xyz-t_tight-1']
+            xs_layer['xyz-t_tight-2'] = xs_files['xyz-t_tight-2']
+            xs_layer['yzt-x_tight-1'] = np.transpose(xs_files['xyz-t_tight-1'], swap_4d_channels_dict['yzt-x'])
+            xs_layer['yzt-x_tight-2'] = np.transpose(xs_files['xyz-t_tight-2'], swap_4d_channels_dict['yzt-x'])
             return xs_layer
 
     elif swap_col == 'xyz-t_and_xyz-c_single_input':
-        def sample_modifier(xs_list):
+        def sample_modifier(xs_files):
             # Concatenate xyz-t and xyz-c to a single input
             xs_layer = dict()
-            xs_layer['xyz-t_and_xyz-c_single_input'] = np.concatenate([xs_list["xyz-t"], xs_list["xyz-c"]], axis=-1)
+            xs_layer['xyz-t_and_xyz-c_single_input'] = np.concatenate([xs_files['xyz-t'], xs_files['xyz-c']], axis=-1)
             return xs_layer
 
     else:
@@ -155,11 +155,33 @@ def orca_label_modifiers(class_type):
             is_not_muon_cc = np.invert(is_muon_cc)
 
             batchsize = y_values.shape[0]
-            categorical_ts = np.zeros((batchsize, 2), dtype='bool')  # categorical [shower, track] -> [1,0] = shower, [0,1] = track
+            # categorical [shower, track] -> [1,0] = shower, [0,1] = track
+            categorical_ts = np.zeros((batchsize, 2), dtype='bool')
+
             categorical_ts[is_not_muon_cc][:, 0] = 1
             categorical_ts[is_muon_cc][:, 1] = 1
 
             ys['ts_output'] = categorical_ts.astype(np.float32)
+            return ys
+
+    elif class_type == 'bg_classifier':
+        def label_modifier(y_values):
+            # for every sample, [1,0,0] for neutrinos, [0,1,0] for mupage and [0,0,1] for random_noise
+            # particle types: mupage: np.abs(13), random_noise = 0, neutrinos =
+            ys = dict()
+            particle_type = y_values['particle_type']
+            is_mupage = np.abs(particle_type) == 13
+            is_random_noise = np.abs(particle_type == 0)
+            is_not_mupage_nor_rn = np.invert(np.logical_or(is_mupage, is_random_noise))
+
+            batchsize = y_values.shape[0]
+            categorical_bg = np.zeros((batchsize, 3), dtype='bool')
+
+            categorical_bg[is_not_mupage_nor_rn][:, 0] = 1
+            categorical_bg[is_mupage][:, 1] = 1
+            categorical_bg[is_random_noise][:, 2] = 1
+
+            ys['bg_output'] = categorical_bg.astype(np.float32)
             return ys
 
     else:

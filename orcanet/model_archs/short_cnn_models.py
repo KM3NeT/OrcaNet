@@ -14,7 +14,7 @@ from orcanet.model_archs.file_dump import get_dimensions_encoding
 # ------------- VGG-like model -------------#
 
 
-def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident = ''):
+def decode_input_dimensions_vgg(n_bins, batchsize, swap_col, str_ident =''):
     """
     Returns the general dimension (2D/3D), the input dimensions (i.e. bs x 11 x 13 x 18 x channels=1 for 3D)
     and appropriate max_pool_sizes depending on the projection type.
@@ -25,7 +25,7 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident =
         Number of bins (x,y,z,t) of the data. Can contain multiple n_bins tuples for different inputs.
     batchsize : int
         Batchsize that is used for the training / inferencing of the cnn.
-    swap_4d_channels : None/str
+    swap_col : None/str
         For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
     str_ident : str
         Optional string identifier that gets appended to the modelname.
@@ -44,7 +44,7 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident =
     """
     # TODO Change this to actually use the dict keywords!
     n_bins = list(n_bins.values())
-    if n_bins[0].count(1) == 1: # 3d case
+    if n_bins[0].count(1) == 1:  # 3d case
         dim = 3
         input_dim = get_dimensions_encoding(n_bins[0], batchsize)  # includes batchsize
 
@@ -60,66 +60,66 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident =
             raise IndexError('No suitable 3D projection found in decode_input_dimensions().'
                              'Please add the projection type with the pooling dict to the function.')
 
-    elif n_bins[0].count(1) == 0: # 4d case, 3.5D
+    elif n_bins[0].count(1) == 0:  # 4d case, 3.5D
         dim = 3
         if len(n_bins) > 1:
 
-            if swap_4d_channels == 'xyz-t_and_yzt-x' and 'tight-1_tight-2' not in str_ident:
-                max_pool_sizes = {'net_1': {3: (2, 2, 2), 7: (2, 2, 2)}, # only used if training from scratch
+            if swap_col == 'xyz-t_and_yzt-x' and 'tight-1_tight-2' not in str_ident:
+                max_pool_sizes = {'net_1': {3: (2, 2, 2), 7: (2, 2, 2)},  # only used if training from scratch
                                   'net_2': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}}
                 input_dim = get_dimensions_encoding(n_bins[0], batchsize)  # includes batchsize
-                input_dim = [(input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]), # xyz-t
-                             (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1])] # yzt-x
+                input_dim = [(input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]),  # xyz-t
+                             (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1])]  # yzt-x
 
-            elif swap_4d_channels == 'xyz-t_and_yzt-x' and 'multi_input_single_train_tight-1_tight-2' in str_ident:
-                max_pool_sizes = {'net_1': {3: (2, 2, 2), 7: (2, 2, 2)}, # only used if training from scratch
+            elif swap_col == 'xyz-t_and_yzt-x' and 'multi_input_single_train_tight-1_tight-2' in str_ident:
+                max_pool_sizes = {'net_1': {3: (2, 2, 2), 7: (2, 2, 2)},  # only used if training from scratch
                                   'net_2': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)},
                                   'net_3': {3: (2, 2, 2), 7: (2, 2, 2)},
                                   'net_4': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}}
                 input_dim = get_dimensions_encoding(n_bins[0], batchsize)  # includes batchsize
-                input_dim = [(input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]), # xyz-t
-                             (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1]), # yzt-x
-                             (input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]), # xyz-t
-                             (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1])] # yzt-x
+                input_dim = [(input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]),  # xyz-t
+                             (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1]),  # yzt-x
+                             (input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]),  # xyz-t
+                             (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1])]  # yzt-x
 
-            elif swap_4d_channels == 'xyz-t_and_xyz-c_single_input':
-                max_pool_sizes = {5: (2, 2, 2), 9: (2, 2, 2)}  # 2 more layers ; same as swap_4d_channels=None for len(n_bins)=1
+            elif swap_col == 'xyz-t_and_xyz-c_single_input':
+                max_pool_sizes = {5: (2, 2, 2), 9: (2, 2, 2)}  # 2 more layers ; same as swap_col=None for len(n_bins)=1
                 input_dim = get_dimensions_encoding(n_bins[0], batchsize)
                 input_dim = (input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4] + 31)
 
-            elif swap_4d_channels is None:
+            elif swap_col is None:
                 max_pool_sizes = {'net_1': {5: (2, 2, 2), 9: (2, 2, 2)},
                                   'net_2': {5: (2, 2, 2), 9: (2, 2, 2)}}
                 input_dim = get_dimensions_encoding(n_bins[0], batchsize)  # includes batchsize
-                input_dim = [(input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]), # xyz-t tight-1
-                             (input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4])] # xyz-t tight-2
+                input_dim = [(input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]),  # xyz-t tight-1
+                             (input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4])]  # xyz-t tight-2
 
             else:
                 raise IOError('3.5D projection types with len(n_bins) > 1 other than "yzt-x_all-t_and_yzt-x_tight-1-t" are not yet supported.')
 
         else:
             input_dim = get_dimensions_encoding(n_bins[0], batchsize)  # includes batchsize
-            if swap_4d_channels is None:
+            if swap_col is None:
                 print('Using a VGG-like 3.5D CNN with XYZ data and T/C channel information.')
-                #max_pool_sizes = {3: (2, 2, 2), 7: (2, 2, 2)}
+                # max_pool_sizes = {3: (2, 2, 2), 7: (2, 2, 2)}
                 max_pool_sizes = {5: (2, 2, 2), 9: (2, 2, 2)} # 2 more layers
-                #max_pool_sizes = {7: (2, 2, 2), 11: (2, 2, 2)}  # 4 more layers
+                # max_pool_sizes = {7: (2, 2, 2), 11: (2, 2, 2)}  # 4 more layers
 
-            elif swap_4d_channels == 'yzt-x':
+            elif swap_col == 'yzt-x':
                 print('Using a VGG-like 3.5D CNN with YZT data and X channel information.')
-                #max_pool_sizes = {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}
+                # max_pool_sizes = {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}
                 max_pool_sizes = {2: (1, 1, 2), 5: (2, 2, 2), 9: (2, 2, 2)} # 2 more layers
-                input_dim = (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1]) # [bs,y,z,t,x]
+                input_dim = (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1])  # [bs,y,z,t,x]
 
-            elif swap_4d_channels == 'xyz-t_and_yzt-x':
+            elif swap_col == 'xyz-t_and_yzt-x':
                 max_pool_sizes = {'net_1': {3: (2, 2, 2), 7: (2, 2, 2)},
                                   'net_2': {1: (1, 1, 2), 3: (2, 2, 2), 7: (2, 2, 2)}}
-                input_dim = [(input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]), # xyz-t
-                             (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1])] # yzt-x
+                input_dim = [(input_dim[0], input_dim[1], input_dim[2], input_dim[3], input_dim[4]),  # xyz-t
+                             (input_dim[0], input_dim[2], input_dim[3], input_dim[4], input_dim[1])]  # yzt-x
 
-            elif swap_4d_channels == 'conv_lstm': # TODO fix whole function to make it more general and not only 3.5D stuff
+            elif swap_col == 'conv_lstm':  # TODO fix whole function to make it more general and not only 3.5D stuff
                 max_pool_sizes = {1: (2, 2, 2), 5: (2, 2, 2)}
-                input_dim = (input_dim[0], input_dim[4], input_dim[1], input_dim[2], input_dim[3], 1) # t-xyz
+                input_dim = (input_dim[0], input_dim[4], input_dim[1], input_dim[2], input_dim[3], 1)  # t-xyz
 
             else:
                 raise IOError('3.5D projection types other than XYZ-T and YZT-X are not yet supported.'
@@ -132,7 +132,7 @@ def decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels, str_ident =
     return dim, input_dim, max_pool_sizes
 
 
-def create_vgg_like_model(n_bins, class_type, n_filters=None, dropout=0, k_size=3, swap_4d_channels=None,
+def create_vgg_like_model(n_bins, class_type, n_filters=None, dropout=0, k_size=3, swap_col=None,
                           activation='relu', kernel_reg=None):
     """
     Returns a VGG-like model (stacked conv. layers) with MaxPooling and Dropout if wished.
@@ -152,7 +152,7 @@ def create_vgg_like_model(n_bins, class_type, n_filters=None, dropout=0, k_size=
         Adds dropout if >0.
     k_size : int
         Kernel size which is used for all dimensions.
-    swap_4d_channels : None/str
+    swap_col : None/str
         For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
     activation : str
         Type of activation function that should be used for the net. E.g. 'linear', 'relu', 'elu', 'selu'.
@@ -165,16 +165,16 @@ def create_vgg_like_model(n_bins, class_type, n_filters=None, dropout=0, k_size=
         A VGG-like Keras nn instance.
 
     """
-    if n_filters is None: n_filters = (64,64,64,64,64,128,128,128)
+    if n_filters is None: n_filters = (64, 64, 64, 64, 64, 128, 128, 128)
     if kernel_reg is 'l2': kernel_reg = l2(0.0001)
 
     # TODO Batchsize has to be given to decode_input_dimensions_vgg, but is not used for constructing the model.
     # For now: Just use some random value.
     batchsize = 64
 
-    dim, input_dim, max_pool_sizes = decode_input_dimensions_vgg(n_bins, batchsize, swap_4d_channels)
+    dim, input_dim, max_pool_sizes = decode_input_dimensions_vgg(n_bins, batchsize, swap_col)
 
-    input_layer = Input(shape=input_dim[1:], dtype=K.floatx())  # input_layer
+    input_layer = Input(shape=input_dim[1:], name=swap_col, dtype=K.floatx())  # input_layer
     x = conv_block(input_layer, dim, n_filters[0], k_size=k_size, dropout=dropout, max_pooling=max_pool_sizes.get(0), activation=activation, kernel_reg=kernel_reg)
 
     for i in range(1, len(n_filters)):
@@ -268,6 +268,10 @@ def add_dense_layers_to_cnn(conv_output_flat, class_type, dropout=0, activation=
 
     if class_type == 'track-shower':  # categorical problem
         x = Dense(2, activation='softmax', kernel_initializer='he_normal', name='ts_output')(x)
+        outputs.append(x)
+
+    if class_type == 'bg_classifier':  # categorical problem
+        x = Dense(3, activation='softmax', kernel_initializer='he_normal', name='bg_output')(x)
         outputs.append(x)
 
     else:  # regression case, one output for each regression label

@@ -146,23 +146,23 @@ def build_nn_model(cfg):
     args = modeldata.args
     class_type = modeldata.class_type
     str_ident = modeldata.str_ident
-    swap_4d_channels = modeldata.swap_4d_channels
+    swap_col = modeldata.swap_4d_channels
 
     n_bins = cfg.get_n_bins()
 
     if nn_arch == 'WRN':
-        model = create_wide_residual_network(n_bins[0], n=1, k=1, dropout=0.2, k_size=3, swap_4d_channels=swap_4d_channels)
+        model = create_wide_residual_network(n_bins[0], n=1, k=1, dropout=0.2, k_size=3, swap_4d_channels=swap_col)
 
     elif nn_arch == 'VGG':
         if 'multi_input_single_train' in str_ident:
             dropout = (0, 0.1)
             model = create_vgg_like_model_multi_input_from_single_nns(n_bins, str_ident,
-                                                                      dropout=dropout, swap_4d_channels=swap_4d_channels)
+                                                                      dropout=dropout, swap_4d_channels=swap_col)
         else:
             dropout = args["dropout"]
             n_filters = args["n_filters"]
             model = create_vgg_like_model(n_bins, class_type, dropout=dropout,
-                                          n_filters=n_filters, swap_4d_channels=swap_4d_channels)  # 2 more layers
+                                          n_filters=n_filters, swap_col=swap_col)  # 2 more layers
     else:
         raise ValueError('Currently, only "WRN" or "VGG" are available as nn_arch')
 
@@ -170,8 +170,8 @@ def build_nn_model(cfg):
     model, batchsize = parallelize_model_to_n_gpus(model, cfg.n_gpu, cfg.batchsize, loss_functions, optimizer, metrics,
                                                    loss_weight)
     model.compile(loss=loss_functions, optimizer=optimizer, metrics=metrics, loss_weights=loss_weight)
-    if swap_4d_channels is not None:
-        cfg.sample_modifier = orca_sample_modifiers(swap_4d_channels, str_ident)
+    if swap_col is not None:
+        cfg.sample_modifier = orca_sample_modifiers(swap_col, str_ident)
     cfg.label_modifier = orca_label_modifiers(class_type)
 
     return model
