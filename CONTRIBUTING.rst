@@ -1,4 +1,6 @@
-DISCLAIMER: This is totally copy & pasted & modified from the excellent km3pipe equivalent.
+Contributing
+============
+.. contents:: :local:
 
 Contact Us
 ----------
@@ -13,6 +15,9 @@ such things!
 
 Use the appropriate template and file a new issue here:
 https://git.km3net.de/ml/OrcaNet/issues
+
+If you're not in the KM3NeT collaboration, please open an issue on github:
+https://github.com/ViaFerrata/OrcaNet/issues
 
 Please follow the instructions in the templates to provide all the
 necessary information which will help other people to understand the
@@ -40,7 +45,7 @@ Get a local copy to work on (use the SSH address `git@git...`, not the HTTP one)
     git clone git@git.km3net.de:your_git_username/OrcaNet.git
 
 Now you need to add a reference to the original repository, so you can sync your
-own fork with the KM3Pipe repository::
+own fork with the OrcaNet repository::
 
     cd OrcaNet
     git remote add upstream git@git.km3net.de:ml/OrcaNet.git
@@ -76,3 +81,5 @@ Make sure to regularly ``git fetch upstream`` and merge changes to your own bran
 
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+DISCLAIMER: This is totally copy & pasted & modified from the excellent km3pipe equivalent.

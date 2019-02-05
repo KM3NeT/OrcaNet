@@ -23,7 +23,7 @@ import orcanet
 
 # -- Project information -----------------------------------------------------
 
-project = 'OrcaNet'
+project = "OrcaNet {}".format(orcanet.__version__)
 copyright = u'{0}, Michael Moser and Stefan Reck'.format(date.today().year)
 author = 'Michael Moser and Stefan Reck'
 
@@ -109,6 +109,10 @@ html_theme_options = {
     'logo_only': True,
 }
 html_logo = "_static/orcanet_wide_transparent_white.png"
+
+# The name for this set of Sphinx documents.  If None, it defaults to
+# "<project> v<release> documentation".
+html_title = "OrcaNet {}".format(orcanet.__version__)
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the

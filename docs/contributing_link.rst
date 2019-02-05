@@ -1,0 +1,3 @@
+.. include:: ../CONTRIBUTING.rst
+
+# TODO doesnt work, it puts all sections of the CONTRIBUTING.rst in the toctree...
