@@ -36,7 +36,7 @@ def transf_arr(x):
 x = get_structured_array()
 xd = get_dict()
 model = build_test_model()
-
+model.summary()
 y_pred = model.predict_on_batch(x)
 y_pred[0] = np.reshape(y_pred[0], y_pred[0].shape[:-1])
 # y_pred = {out.name.split(':')[0]: y_pred[i] for i, out in enumerate(model.outputs)}

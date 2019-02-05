@@ -165,6 +165,8 @@ def plot_metric(summary_data, full_train_data, metric_name="loss", title=None, c
         val_data = [summary_data["Epoch"].reshape(1), summary_data[summary_label].reshape(1)]
     else:
         val_data = [summary_data["Epoch"], summary_data[summary_label]]
+    if np.all(np.isnan(val_data)):
+        val_data = None
 
     train_data = [full_train_data["Batch_float"], full_train_data[metric_name]]
 

@@ -226,6 +226,7 @@ def write_summary_logfile(cfg, epoch, model, history_train, history_val, lr):
         The current learning rate of the model.
 
     """
+    seperator = " | "
     # get this for the epoch_number_float in the logfile
     steps_per_total_epoch, steps_cum = 0, [0]
     for f_size in cfg.get_file_sizes("train"):
@@ -234,37 +235,52 @@ def write_summary_logfile(cfg, epoch, model, history_train, history_val, lr):
         steps_cum.append(steps_cum[-1] + steps_per_file)
     epoch_number_float = epoch[0] - (steps_per_total_epoch - steps_cum[epoch[1]]) / float(steps_per_total_epoch)
 
-    def get_cell(content, width=12, precision=5):
+    def get_cell(content, width=9, precision=4):
         """ Return a cell content as a str, with a given width (and precision for floats). """
         if isinstance(content, str):
-            cell = format(content, ">"+str(width))
+            cell = format(content, "<"+str(width))
         else:
-            cell = format(format(float(content), "."+str(precision)+"g"), ">"+str(width))
+            cell = format(format(float(content), "."+str(precision)+"g"), "<"+str(width))
         return cell
 
     # Write the logfile
     logfile_fname = cfg.main_folder + 'summary.txt'
+    # The widths of the cells. At least 9 wide, or londer depending on the name of the metric.
+    # As train_ or val_ gets added, its longer than the name of the metric itself.
+    widths_train = [max(9, len(metric_name) + 6) for metric_name in model.metrics_names]
+    widths_val = [max(9, len(metric_name) + 4) for metric_name in model.metrics_names]
+
     with open(logfile_fname, 'a+') as logfile:
-        # Write the headline if file is empty
+        # Write the headlines if file is empty
         if os.stat(logfile_fname).st_size == 0:
-            logfile.write('{}\t{}\t'.format(get_cell("Epoch"), get_cell("LR")))
-            for i, metric in enumerate(model.metrics_names):
-                logfile.write("{}\t{}".format(get_cell("train_" + str(metric)), get_cell("val_" + str(metric))))
-                if i + 1 < len(model.metrics_names):
-                    logfile.write("\t")
+            logfile.write('{Epoch}{seperator}{LR}'.format(Epoch=get_cell("Epoch"),
+                                                          LR=get_cell("LR"),
+                                                          seperator=seperator))
+            for i, metric_name in enumerate(model.metrics_names):
+                logfile.write("{seperator}{train}{seperator}{val}".format(train=get_cell("train_" + str(metric_name), widths_train[i]),
+                                                                          val=get_cell("val_" + str(metric_name), widths_val[i]),
+                                                                          seperator=seperator))
+            logfile.write('\n')
+            logfile.write("-" * 10 + "+" + "-" * 11)
+            for metric_no in range(len(widths_train)):
+                width1 = widths_train[metric_no]
+                width2 = widths_val[metric_no]
+                logfile.write("+"+"-"*(width1+2)+"+"+"-"*(width2+2))
             logfile.write('\n')
 
         # Write the content: Epoch, LR, train_1, val_1, ...
-        logfile.write("{}\t".format(get_cell(epoch_number_float)))
-        logfile.write("{}\t".format(get_cell(lr)))
+        logfile.write("{Epoch}{seperator}{LR}".format(Epoch=get_cell(epoch_number_float),
+                                                      LR=get_cell(lr),
+                                                      seperator=seperator))
         for i, metric_name in enumerate(model.metrics_names):
-            logfile.write("{}\t".format(get_cell(history_train.history[metric_name][0])))
+            logfile.write("{seperator}{train}".format(train=get_cell(history_train.history[metric_name][0], widths_train[i]),
+                                                      seperator=seperator))
             if history_val is None:
-                logfile.write(get_cell("nan"))
+                logfile.write("{seperator}{val}".format(val=get_cell("nan", widths_val[i]),
+                                                        seperator=seperator))
             else:
-                logfile.write("{}".format(get_cell(history_val[i])))
-            if i + 1 < len(model.metrics_names):
-                logfile.write("\t")
+                logfile.write("{seperator}{val}".format(val=get_cell(history_val[i], widths_val[i]),
+                                                        seperator=seperator))
         logfile.write('\n')
 
 
@@ -286,7 +302,7 @@ def read_logfiles(cfg):
         Structured array containing the data from all the training log files, merged into a single array.
 
     """
-    summary_data = np.genfromtxt(cfg.main_folder + "/summary.txt", names=True, delimiter="\t", autostrip=True)
+    summary_data = np.genfromtxt(cfg.main_folder + "/summary.txt", names=True, delimiter="|", autostrip=True, comments="--")
 
     # list of all files in the log_train folder of this model
     log_train_folder = cfg.get_subfolder("log_train")
