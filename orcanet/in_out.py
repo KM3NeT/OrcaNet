@@ -234,26 +234,35 @@ def write_summary_logfile(cfg, epoch, model, history_train, history_val, lr):
         steps_cum.append(steps_cum[-1] + steps_per_file)
     epoch_number_float = epoch[0] - (steps_per_total_epoch - steps_cum[epoch[1]]) / float(steps_per_total_epoch)
 
+    def get_cell(content, width=12, precision=5):
+        """ Return a cell content as a str, with a given width (and precision for floats). """
+        if isinstance(content, str):
+            cell = format(content, ">"+str(width))
+        else:
+            cell = format(format(float(content), "."+str(precision)+"g"), ">"+str(width))
+        return cell
+
     # Write the logfile
     logfile_fname = cfg.main_folder + 'summary.txt'
     with open(logfile_fname, 'a+') as logfile:
-        # Write the headline
+        # Write the headline if file is empty
         if os.stat(logfile_fname).st_size == 0:
-            logfile.write('Epoch\tLR\t')
+            logfile.write('{}\t{}\t'.format(get_cell("Epoch"), get_cell("LR")))
             for i, metric in enumerate(model.metrics_names):
-                logfile.write("train_" + str(metric) + "\tval_" + str(metric))
+                logfile.write("{}\t{}".format(get_cell("train_" + str(metric)), get_cell("val_" + str(metric))))
                 if i + 1 < len(model.metrics_names):
                     logfile.write("\t")
             logfile.write('\n')
+
         # Write the content: Epoch, LR, train_1, val_1, ...
-        logfile.write("{:.4g}\t".format(float(epoch_number_float)))
-        logfile.write("{:.4g}\t".format(float(lr)))
+        logfile.write("{}\t".format(get_cell(epoch_number_float)))
+        logfile.write("{}\t".format(get_cell(lr)))
         for i, metric_name in enumerate(model.metrics_names):
-            logfile.write("{:.4g}\t".format(float(history_train.history[metric_name][0])))
+            logfile.write("{}\t".format(get_cell(history_train.history[metric_name][0])))
             if history_val is None:
-                logfile.write("nan")
+                logfile.write(get_cell("nan"))
             else:
-                logfile.write("{:.4g}".format(float(history_val[i])))
+                logfile.write("{}".format(get_cell(history_val[i])))
             if i + 1 < len(model.metrics_names):
                 logfile.write("\t")
         logfile.write('\n')
@@ -277,7 +286,7 @@ def read_logfiles(cfg):
         Structured array containing the data from all the training log files, merged into a single array.
 
     """
-    summary_data = np.genfromtxt(cfg.main_folder + "/summary.txt", names=True, delimiter="\t")
+    summary_data = np.genfromtxt(cfg.main_folder + "/summary.txt", names=True, delimiter="\t", autostrip=True)
 
     # list of all files in the log_train folder of this model
     log_train_folder = cfg.get_subfolder("log_train")
