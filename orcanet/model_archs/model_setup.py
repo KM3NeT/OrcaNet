@@ -9,10 +9,9 @@ import keras as ks
 from orcanet.model_archs.short_cnn_models import create_vgg_like_model_multi_input_from_single_nns, create_vgg_like_model
 from orcanet.model_archs.wide_resnet import create_wide_residual_network
 from orcanet.utilities.losses import get_all_loss_functions
-from orcanet_contrib.contrib import orca_label_modifiers, orca_sample_modifiers
 
 
-def parallelize_model_to_n_gpus(model, n_gpu, batchsize, loss_functions, optimizer, metrics, loss_weight):
+def parallelize_model_to_n_gpus(model, n_gpu, batchsize):
     """
     Parallelizes the nn-model to multiple gpu's.
 
@@ -26,14 +25,6 @@ def parallelize_model_to_n_gpus(model, n_gpu, batchsize, loss_functions, optimiz
         Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov') [1].
     batchsize : int
         Batchsize that is used for the training / inferencing of the cnn.
-    loss_functions : dict/str
-        Dict/str with loss functions that should be used for each nn output. # TODO fix, make single loss func also use dict
-    optimizer : ks.optimizers
-        Keras optimizer instance, currently either "Adam" or "SGD".
-    metrics : dict/str/None
-        Dict/str with metrics that should be used for each nn output.
-    loss_weight : dict/None
-        Dict with loss weights that should be used for each sub-loss.
 
     Returns
     -------
@@ -60,68 +51,72 @@ def parallelize_model_to_n_gpus(model, n_gpu, batchsize, loss_functions, optimiz
             model = make_parallel(model, gpus_list, usenccl=False, initsync=True, syncopt=False, enqueue=False)
             print_mgpu_modelsummary(model)
 
-            model.compile(loss=loss_functions, optimizer=optimizer, metrics=metrics, loss_weights=loss_weight)  # TODO check if necessary
-
             return model, batchsize
 
     else:
         raise ValueError('Currently, no multi_gpu mode other than "avolkov" is available.')
 
 
-def get_optimizer_info(loss_opt, optimizer='adam'):
+def get_optimizer_info(compile_opt, optimizer='adam'):
     """
     Returns optimizer information for the training procedure.
 
     Parameters
     ----------
-    loss_opt : tuple
-        loss_opt[0]: dict
-            Dicts of loss functions and optionally weights that should be used for each nn output.
-            Typically read in from a .toml file.
-            Format: { layer_name : { loss_function, weight } }
-        loss_opt[1]: dict or None
-            Metrics that should be used for each nn output.
+    compile_opt : dict
+        Dict of loss functions and optionally weights & metrics that should be used for each nn output.
+        Format: { layer_name : { loss_function:, weight:, metrics: } }
+        The loss_function is a string or a function, the weight is a float and metrics is a list of functions/strings.
+        Typically read in from a .toml file.
     optimizer : str
         Specifies, if "Adam" or "SGD" should be used as optimizer.
 
     Returns
     -------
     loss_functions : dict
-        Cf. loss_opt[0].
-    metrics : dict
-        Cf. loss_opt[1].
-    loss_weight : dict
-        Cf. loss_opt[2].
+        Dict with a loss function for each output, that is used for the loss argument of the Keras compile method.
+    loss_metrics : dict
+        Dict with a metrics list for each output, that is used for the metrics argument of the Keras compile method.
+    loss_weights : dict
+        Dict with a weight for each output, that is used for the weights argument of the Keras compile method.
     optimizer : ks.optimizers
         Keras optimizer instance, currently either "Adam" or "SGD".
 
     """
     if optimizer == 'adam':
         optimizer = ks.optimizers.Adam(beta_1=0.9, beta_2=0.999, epsilon=0.1, decay=0.0)  # epsilon=1 for deep networks
-    elif optimizer == "sgd":
+    elif optimizer == 'sgd':
         optimizer = ks.optimizers.SGD(momentum=0.9, decay=0, nesterov=True)
     else:
-        raise NameError("Unknown optimizer name ({})".format(optimizer))
+        raise NameError('Unknown optimizer name ({})'.format(optimizer))
     custom_objects = get_all_loss_functions()
 
-    loss_functions, loss_weight = {}, {}
-    for layer_name in loss_opt[0].keys():
+    loss_functions, loss_weights, loss_metrics = {}, {}, {}
+    for layer_name in compile_opt.keys():
+
         # Replace function string with the actual function if it is custom
-        if loss_opt[0][layer_name]["function"] in custom_objects:
-            loss_function = custom_objects[loss_opt[0][layer_name]["function"]]
+        if compile_opt[layer_name]['function'] in custom_objects:
+            loss_function = custom_objects[compile_opt[layer_name]['function']]
         else:
-            loss_function = loss_opt[0][layer_name]["function"]
+            loss_function = compile_opt[layer_name]['function']
+
         # Use given weight, else use default weight of 1
-        if "weight" in loss_opt[0][layer_name]:
-            weight = loss_opt[0][layer_name]["weight"]
+        if 'weight' in compile_opt[layer_name]:
+            weight = compile_opt[layer_name]['weight']
         else:
             weight = 1.0
+
+        # Use given metrics, else use no metrics
+        if 'metrics' in compile_opt[layer_name]:
+            metrics = compile_opt[layer_name]['metrics']
+        else:
+            metrics = []
+
         loss_functions[layer_name] = loss_function
-        loss_weight[layer_name] = weight
+        loss_weights[layer_name] = weight
+        loss_metrics[layer_name] = metrics
 
-    metrics = loss_opt[1] if not loss_opt[1] is None else []
-
-    return loss_functions, metrics, loss_weight, optimizer
+    return loss_functions, loss_metrics, loss_weights, optimizer
 
 
 def build_nn_model(cfg):
@@ -142,7 +137,7 @@ def build_nn_model(cfg):
     assert modeldata is not None, "You need to specify modeldata before building a model with OrcaNet!"
 
     nn_arch = modeldata.nn_arch
-    loss_opt = modeldata.loss_opt
+    compile_opt = modeldata.compile_opt
     args = modeldata.args
     class_type = modeldata.class_type
     str_ident = modeldata.str_ident
@@ -166,12 +161,10 @@ def build_nn_model(cfg):
     else:
         raise ValueError('Currently, only "WRN" or "VGG" are available as nn_arch')
 
-    loss_functions, metrics, loss_weight, optimizer = get_optimizer_info(loss_opt, optimizer='adam')
-    model, batchsize = parallelize_model_to_n_gpus(model, cfg.n_gpu, cfg.batchsize, loss_functions, optimizer, metrics,
-                                                   loss_weight)
-    model.compile(loss=loss_functions, optimizer=optimizer, metrics=metrics, loss_weights=loss_weight)
-    if swap_col is not None:
-        cfg.sample_modifier = orca_sample_modifiers(swap_col, str_ident)
-    cfg.label_modifier = orca_label_modifiers(class_type)
+    loss_functions, loss_metrics, loss_weights, optimizer = get_optimizer_info(compile_opt, optimizer='adam')
+
+    model, batchsize = parallelize_model_to_n_gpus(model, cfg.n_gpu, cfg.batchsize)
+
+    model.compile(loss=loss_functions, optimizer=optimizer, metrics=loss_metrics, loss_weights=loss_weights)
 
     return model
