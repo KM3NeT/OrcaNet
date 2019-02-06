@@ -225,7 +225,6 @@ def write_summary_logfile(cfg, epoch, model, history_train, history_val, lr):
         The current learning rate of the model.
 
     """
-    seperator = " | "
     # get this for the epoch_number_float in the logfile
     steps_per_total_epoch, steps_cum = 0, [0]
     for f_size in cfg.get_file_sizes("train"):
@@ -234,53 +233,91 @@ def write_summary_logfile(cfg, epoch, model, history_train, history_val, lr):
         steps_cum.append(steps_cum[-1] + steps_per_file)
     epoch_number_float = epoch[0] - (steps_per_total_epoch - steps_cum[epoch[1]]) / float(steps_per_total_epoch)
 
-    def get_cell(content, width=9, precision=4):
-        """ Return a cell content as a str, with a given width (and precision for floats). """
-        if isinstance(content, str):
-            cell = format(content, "<"+str(width))
-        else:
-            cell = format(format(float(content), "."+str(precision)+"g"), "<"+str(width))
-        return cell
+    # Get the widths of the columns. They depend on the widths of the metric names in the first line
+    data = ["Epoch", "LR", ]
+    for i, metric_name in enumerate(model.metrics_names):
+        data.append("train_" + str(metric_name))
+        data.append("val_" + str(metric_name))
+    headline, widths = get_summary_log_line(data)
 
-    # Write the logfile
     logfile_fname = cfg.main_folder + 'summary.txt'
-    # The widths of the cells. At least 9 wide, or londer depending on the name of the metric.
-    # As train_ or val_ gets added, its longer than the name of the metric itself.
-    widths_train = [max(9, len(metric_name) + 6) for metric_name in model.metrics_names]
-    widths_val = [max(9, len(metric_name) + 4) for metric_name in model.metrics_names]
-
     with open(logfile_fname, 'a+') as logfile:
-        # Write the headlines if file is empty
+        # Write the two headlines if the file is empty
         if os.stat(logfile_fname).st_size == 0:
-            logfile.write('{Epoch}{seperator}{LR}'.format(Epoch=get_cell("Epoch"),
-                                                          LR=get_cell("LR"),
-                                                          seperator=seperator))
-            for i, metric_name in enumerate(model.metrics_names):
-                logfile.write("{seperator}{train}{seperator}{val}".format(train=get_cell("train_" + str(metric_name), widths_train[i]),
-                                                                          val=get_cell("val_" + str(metric_name), widths_val[i]),
-                                                                          seperator=seperator))
-            logfile.write('\n')
-            logfile.write("-" * 10 + "+" + "-" * 11)
-            for metric_no in range(len(widths_train)):
-                width1 = widths_train[metric_no]
-                width2 = widths_val[metric_no]
-                logfile.write("+"+"-"*(width1+2)+"+"+"-"*(width2+2))
-            logfile.write('\n')
+            logfile.write(headline + "\n")
+
+            vline = ["-" * width for width in widths]
+            vertical_line = get_summary_log_line(vline, widths, seperator="-+-")
+            logfile.write(vertical_line + "\n")
 
         # Write the content: Epoch, LR, train_1, val_1, ...
-        logfile.write("{Epoch}{seperator}{LR}".format(Epoch=get_cell(epoch_number_float),
-                                                      LR=get_cell(lr),
-                                                      seperator=seperator))
+        data = [epoch_number_float, lr]
         for i, metric_name in enumerate(model.metrics_names):
-            logfile.write("{seperator}{train}".format(train=get_cell(history_train.history[metric_name][0], widths_train[i]),
-                                                      seperator=seperator))
+            data.append(history_train.history[metric_name][0])
             if history_val is None:
-                logfile.write("{seperator}{val}".format(val=get_cell("nan", widths_val[i]),
-                                                        seperator=seperator))
+                data.append("nan")
             else:
-                logfile.write("{seperator}{val}".format(val=get_cell(history_val[i], widths_val[i]),
-                                                        seperator=seperator))
-        logfile.write('\n')
+                data.append(history_val[i])
+
+        line = get_summary_log_line(data, widths)
+        logfile.write(line + '\n')
+
+
+def get_summary_log_line(data, widths=None, seperator=" | ", minimum_cell_width=9, float_precision=4):
+    """
+    Get a line in the proper format for the summary plot, consisting of multiple spaced and seperated cells.
+
+    Parameters
+    ----------
+    data : List
+        Strings or floats of what is in each cell.
+    widths : List or None
+        Optional: The width of every cell. If None, will set it automatically, depending on the data.
+        If widths is given, but what is given in data is wider than the width, the cell will expand without notice.
+    minimum_cell_width : int
+        If widths is None, this defines the minimum width of the cells in characters.
+    seperator : str
+        String that seperates two adjacent cells.
+    float_precision : int
+        Precision to which floats are rounded if they appear in data.
+
+    Returns
+    -------
+    line : str
+        The line.
+    new_widths : List
+        Optional: If the input widths were None: The widths of the cells .
+
+    """
+    if widths is None:
+        new_widths = []
+
+    line = ""
+    for i, entry in enumerate(data):
+        # no seperator before the first entry
+        if i == 0:
+            sep = ""
+        else:
+            sep = seperator
+
+        # If entry is a number, round to given precision and make it a string
+        if not isinstance(entry, str):
+            entry = format(float(entry), "."+str(float_precision)+"g")
+
+        if widths is None:
+            cell_width = max(minimum_cell_width, len(entry))
+            new_widths.append(cell_width)
+        else:
+            cell_width = widths[i]
+
+        cell_cont = format(entry, "<"+str(cell_width))
+
+        line += "{seperator}{entry}".format(seperator=sep, entry=cell_cont,)
+
+    if widths is None:
+        return line, new_widths
+    else:
+        return line
 
 
 def read_logfiles(cfg):
@@ -308,6 +345,8 @@ def read_logfiles(cfg):
     files = os.listdir(log_train_folder)
     train_file_data = []
     for file in files:
+        if not (file.startswith("log_epoch_") and file.endswith(".txt")):
+            continue
         # file is something like "log_epoch_1_file_2.txt", extract the 1 and 2:
         epoch, file_no = [int(file.split(".")[0].split("_")[i]) for i in [2, 4]]
         file_data = np.genfromtxt(log_train_folder+"/"+file, names=True, delimiter="\t")

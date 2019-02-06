@@ -168,7 +168,14 @@ def plot_metric(summary_data, full_train_data, metric_name="loss", title=None, c
     if np.all(np.isnan(val_data)):
         val_data = None
 
-    train_data = [full_train_data["Batch_float"], full_train_data[metric_name]]
+    if full_train_data["Batch_float"].shape == (0,):
+        # When no lines are present
+        raise AssertionError("Your training log files contain no data! I can't plot like this...")
+    elif full_train_data["Batch_float"].shape == ():
+        # When only one line is present
+        train_data = [full_train_data["Batch_float"].reshape(1), full_train_data[metric_name].reshape(1)]
+    else:
+        train_data = [full_train_data["Batch_float"], full_train_data[metric_name]]
 
     fig = make_train_val_plot(train_data, val_data, color=color, title=title, y_label=y_label)
     return fig

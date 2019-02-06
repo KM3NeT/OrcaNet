@@ -7,7 +7,7 @@ They are functions which are applied to both the samples, as well as the labels.
 They require the input and output layers of the network, as well as ever input set in the toml list file to be named.
 This makes it easy to assure that the right data is fed into the right layer of the network, especially if you have multiple inputs or outputs.
 
-Hint: If you have developed a new modifier, it might be smart to test if it actually does what it should with your data.
+**Hint:** If you have developed a new modifier, it might be smart to test if it actually does what it should with your data.
 If you have loaded your toml list file of input data in the Configuration object, you can get a batch of mc_info data like this:
 
 .. code-block:: python
