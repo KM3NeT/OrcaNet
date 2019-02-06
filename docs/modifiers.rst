@@ -142,7 +142,7 @@ The following sample modifier is required:
 
 Dataset modifier
 ----------------
-The dataset modifiers is only used when a model is evaluated with ``orca_eval``.
+The dataset modifiers is only used when a model is evaluated with ``cfg.eval()``.
 It will determine what is written in which dataset in the resulting evaluation h5 file.
 It must be of the following form:
 

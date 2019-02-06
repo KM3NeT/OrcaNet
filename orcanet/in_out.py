@@ -127,7 +127,7 @@ def read_out_model_file(file):
 
 def write_full_logfile_startup(cfg):
     """
-    Whenever the orca_train function is run, this logs all the input parameters in the full log file.
+    Whenever the train function is run, this logs all the input parameters in the full log file.
 
     Parameters
     ----------
@@ -139,7 +139,7 @@ def write_full_logfile_startup(cfg):
     with open(logfile, 'a+') as f_out:
         f_out.write('--------------------------------------------------------------------------------------------------------\n')
         f_out.write('----------------------------------'+str(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))+'---------------------------------------------------\n\n')
-        f_out.write("New execution of the orca_train function started with the following options:\n\n")
+        f_out.write("New training started with the following options:\n\n")
         f_out.write("List file path:\t"+cfg.get_list_file()+"\n")
 
         f_out.write("Given trainfiles in the .list file:\n")

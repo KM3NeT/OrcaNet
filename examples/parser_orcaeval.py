@@ -1,8 +1,8 @@
 """
-Use orca_eval with a parser.
+Evaluate a model with a parser.
 
 Usage:
-    parser_orcaeval.py FOLDER LIST CONFIG
+    parser_orcaeval.py FOLDER LIST CONFIG MODEL
     parser_orcaeval.py (-h | --help)
 
 Arguments:
@@ -12,18 +12,20 @@ Arguments:
     CONFIG  A .toml file which sets up the training.
             An example can be found in examples/settings_files/example_config.toml. The possible parameters are listed in
             core.py in the class Configuration.
+    MODEL   Path to a .toml file with infos about a model.
+            An example can be found in examples/settings_files/example_model.toml.
 
 Options:
     -h --help                       Show this screen.
 
 """
-
 from docopt import docopt
-from orcanet.core import orca_eval, Configuration
+from orcanet.core import Configuration
 from orcanet.utilities.losses import get_all_loss_functions
+from orcanet_contrib.contrib import orca_label_modifiers, orca_sample_modifiers
 
 
-def run_eval(main_folder, list_file, config_file):
+def orca_eval(main_folder, list_file, config_file):
     """
     This shows how to use OrcaNet.
 
@@ -41,18 +43,23 @@ def run_eval(main_folder, list_file, config_file):
     cfg = Configuration(main_folder, list_file, config_file)
     # Orca networks use some custom loss functions, which need to be handed to keras when loading models
     cfg.custom_objects = get_all_loss_functions()
+    # Set the sample and label modifiers needed for feeding data into the network
+    model_data = cfg.get_modeldata()
+    if model_data.swap_4d_channels is not None:
+        cfg.sample_modifier = orca_sample_modifiers(model_data.swap_4d_channels, model_data.str_ident)
+    cfg.label_modifier = orca_label_modifiers(model_data.class_type)
     # Per default, an evaluation will be done for the model with the highest epoch and filenumber.
     # Can be adjusted with cfg.eval_epoch and cfg.eval_fileno
-    orca_eval(cfg)
+    cfg.eval(cfg)
 
 
 def parse_input():
-    """ Run the orca_train function with a parser. """
+    """ Run the cfg.eval function with a parser. """
     args = docopt(__doc__)
     main_folder = args['FOLDER']
     list_file = args['LIST']
     config_file = args['CONFIG']
-    run_eval(main_folder, list_file, config_file)
+    orca_eval(main_folder, list_file, config_file)
 
 
 if __name__ == '__main__':
