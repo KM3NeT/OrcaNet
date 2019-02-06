@@ -10,7 +10,7 @@ n_filters = [2,]
 str_ident = 'lp_tight-1_60b_errors_mse_w_vtx'
 class_type = 'energy_dir_bjorken-y_vtx_errors'
 
-[model.losses]
+[model.compile_opt]
 # The loss(es) of the model are listed here. Every loss has an identifier as a keyword,
 # and a loss function that it will use. Can also give a weight to each loss.
 dx = {function="mse", weight=10}

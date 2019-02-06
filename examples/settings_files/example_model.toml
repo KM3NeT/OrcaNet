@@ -8,7 +8,7 @@ class_type = 'energy_dir_bjorken-y_vtx_errors'
 dropout = 0.0
 n_filters = [64, 64, 64, 64, 64, 64, 128, 128, 128, 128]
 
-[model.losses]
+[model.compile_opt]
 # The loss(es) of the model are listed here.
 # The keyword is the name of the respective layer in the model, for which this loss is used.
 # The value is a dict with a loss function that it will use, and optionally a weight to each loss.
