@@ -10,8 +10,9 @@ import keras as ks
 import h5py
 
 from orcanet.backend import train_and_validate_model, make_model_evaluation
-from orcanet.in_out import read_out_list_file, read_out_config_file, read_out_model_file, use_node_local_ssd_for_input, write_full_logfile_startup, h5_get_number_of_rows
+from orcanet.in_out import read_out_list_file, read_out_config_file, use_node_local_ssd_for_input, write_full_logfile_startup, h5_get_number_of_rows
 from orcanet.utilities.nn_utilities import load_zero_center_data, get_inputs, generate_batches_from_hdf5_file, get_auto_label_modifier
+from orcanet.model_archs.model_setup import read_out_model_file
 
 
 class Configuration(object):
