@@ -274,7 +274,7 @@ def make_model_evaluation(cfg, model, xs_mean, eval_filename, samples=None):
                 xs, y_true, mc_info = next(generator)
                 y_pred = model.predict_on_batch(xs)
                 # transform y_pred to dict TODO hacky!
-                y_pred = {out.name.split(':')[0]: y_pred[i] for i, out in enumerate(model._output_layers)}
+                y_pred = {out: y_pred[i] for i, out in enumerate(model.output_names)}
 
                 if cfg.dataset_modifier is None:
                     datasets = get_datasets(mc_info, y_true, y_pred)
