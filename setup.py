@@ -26,7 +26,12 @@ setup(
         'Intended Audience :: Developers',
         'Intended Audience :: Science/Research',
         'Programming Language :: Python',
-    ]
+    ],
+
+    entry_points={'console_scripts': ['orcatrain=orcanet.examples.parser_orcatrain:main',
+                                      'orcaeval=orcanet.examples.parser_orcaeval:main',
+                                      ]},
+
 )
 
 __author__ = 'Michael Moser and Stefan Reck'

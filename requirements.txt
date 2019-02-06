@@ -13,6 +13,7 @@ twine
 numpydoc
 natsort
 pydocstyle
+pygments
 pytest
 pytest-cov
 pytest-flake8

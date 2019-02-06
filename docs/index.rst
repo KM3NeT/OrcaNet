@@ -27,8 +27,8 @@ As of now, these docs only contain the API documentation.
    :maxdepth: 2
    :caption: Contents:
 
-   CONTRIBUTING
    modifiers
+   CONTRIBUTING
    Source (Git) <https://git.km3net.de/ml/OrcaNet.git>
 
 
