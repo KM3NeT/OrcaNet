@@ -475,11 +475,12 @@ class Configuration(object):
 
         """
         if which == "train":
-            files = self.get_val_files()
-        elif which == "val":
             files = self.get_train_files()
+        elif which == "val":
+            files = self.get_val_files()
         else:
             raise NameError("Unknown fileset name ", which)
+
         no_of_files = len(list(files.values())[0])
         return no_of_files
 
@@ -505,6 +506,7 @@ class Configuration(object):
             files = self.get_val_files()
         else:
             raise NameError("Unknown fileset name ", which)
+
         for file_no in range(self.get_no_of_files(which)):
             files_dict = {key: files[key][file_no] for key in files}
             yield files_dict
