@@ -13,6 +13,7 @@ from orcanet.core import Configuration, orca_train, orca_eval
 from orcanet.model_archs.model_setup import build_nn_model
 from orcanet.utilities.nn_utilities import load_zero_center_data
 from orcanet.utilities.losses import get_all_loss_functions
+from orcanet_contrib.contrib import orca_label_modifiers, orca_sample_modifiers
 
 
 class DatasetTest(TestCase):
@@ -78,6 +79,14 @@ class DatasetTest(TestCase):
         model_file = os.path.join(os.path.dirname(__file__), "model_test.toml")
 
         cfg.set_from_model_file(model_file)
+
+        model_data = cfg.get_modeldata()
+
+        if model_data.swap_4d_channels is not None:
+            cfg.sample_modifier = orca_sample_modifiers(model_data.swap_4d_channels, model_data.str_ident)
+
+        cfg.label_modifier = orca_label_modifiers(model_data.class_type)
+
         initial_model = build_nn_model(cfg)
         orca_train(cfg, initial_model)
 
