@@ -553,15 +553,17 @@ class Configuration(object):
         for list_key in list_inp_shapes:
             print("\t{}\t{}".format(list_key, list_inp_shapes[list_key]))
 
-        if self.sample_modifier is not None:
+        if self.sample_modifier is None:
+            print("\nYou did not specify a sample modifier.")
+        else:
             modified_xs = self.sample_modifier(xs)
             modified_shapes = {modi_key: modified_xs[modi_key].shape[1:] for modi_key in modified_xs}
-            print("After applying your sample modifier, they have the following names and shapes:")
+            print("\nAfter applying your sample modifier, they have the following names and shapes:")
             for list_key in modified_shapes:
                 print("\t{}\t{}".format(list_key, modified_shapes[list_key]))
             list_inp_shapes = modified_shapes
 
-        print("Your model requires the following input names and shapes:")
+        print("\nYour model requires the following input names and shapes:")
         for layer_key in layer_inp_shapes:
             print("\t{}\t{}".format(layer_key, layer_inp_shapes[layer_key]))
 
@@ -569,9 +571,9 @@ class Configuration(object):
 
         err_msg_inp = ""
         if len(err_inp_names) == 0 and len(err_inp_shapes) == 0:
-            print("Input check passed.\n")
+            print("\nInput check passed.\n")
         else:
-            print("Input check failed!")
+            print("\nInput check failed!")
             if len(err_inp_names) != 0:
                 err_msg_inp += "No matching input name from the list file for input layer(s): " \
                            + (", ".join(str(e) for e in err_inp_names) + "\n")
@@ -593,12 +595,12 @@ class Configuration(object):
             print("\t" + ", ".join(str(name) for name in label_names), end="\n\n")
         else:
             label_names = mc_names
-            print("Since you did not specify a label_modifier, the output layers will be provided with "
+            print("You did not specify a label_modifier. The output layers will be provided with "
                   "labels that match their name from the above.\n\n")
 
         # tuple of strings
-        loss_names = tuple(model.loss.keys())
-        print("Your model has the following {} output layers with loss functions:".format(len(loss_names)))
+        loss_names = tuple(model.output_names)
+        print("Your model has the following {} output layers:".format(len(loss_names)))
         print("\t" + ", ".join(str(name) for name in loss_names), end="\n\n")
 
         err_out_names = []
