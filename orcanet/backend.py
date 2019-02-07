@@ -226,9 +226,9 @@ def validate_model(orca, model, xs_mean):
     return history_val
 
 
-def make_model_evaluation(orca, model, xs_mean, eval_filename, samples=None):
+def make_model_prediction(orca, model, xs_mean, eval_filename, samples=None):
     """
-    Evaluate a model on all samples of the validation set in the toml list, and save it as a h5 file.
+    Let a model predict on all samples of the validation set in the toml list, and save it as a h5 file.
 
     Per default, the h5 file will contain a datagroup mc_info straight from the given files, as well as two datagroups
     per output layer of the network, which have the labels and the predicted values in them as numpy arrays, respectively.

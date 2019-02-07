@@ -104,7 +104,7 @@ class IOHandler(object):
                       "saved_models": self.cfg.main_folder + "saved_models",
                       "plots": self.cfg.main_folder + "plots",
                       "activations": self.cfg.main_folder + "plots/activations",
-                      "evaluations": self.cfg.main_folder + "evaluations"}
+                      "predictions": self.cfg.main_folder + "predictions"}
 
         if name is None:
             subfolder = [get(name) for name in subfolders]
@@ -132,10 +132,10 @@ class IOHandler(object):
         model_filename = self.get_subfolder("saved_models") + '/model_epoch_' + str(epoch) + '_file_' + str(fileno) + '.h5'
         return model_filename
 
-    def get_eval_path(self, epoch, fileno, list_name):
-        """ Get the path to a saved evaluation. """
-        eval_filename = self.get_subfolder("evaluations") + '/pred_model_epoch_{}_file_{}_on_{}_val_files.h5'.format(epoch, fileno, list_name)
-        return eval_filename
+    def get_pred_path(self, epoch, fileno, list_name):
+        """ Get the path to a saved prediction. """
+        pred_filename = self.get_subfolder("predictions") + '/pred_model_epoch_{}_file_{}_on_{}_val_files.h5'.format(epoch, fileno, list_name)
+        return pred_filename
 
     def get_n_bins(self):
         """

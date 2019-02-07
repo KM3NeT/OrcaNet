@@ -8,7 +8,7 @@ import os
 import warnings
 import keras as ks
 
-from orcanet.backend import train_and_validate_model, make_model_evaluation
+from orcanet.backend import train_and_validate_model, make_model_prediction
 from orcanet.in_out import read_out_list_file, read_out_config_file, read_out_model_file, use_node_local_ssd_for_input, write_full_logfile_startup, IOHandler
 from orcanet.utilities.nn_utilities import load_zero_center_data, get_auto_label_modifier
 
@@ -360,6 +360,6 @@ class OrcaHandler:
         path_of_model = self.io.get_model_path(epoch[0], epoch[1])
         model = ks.models.load_model(path_of_model, custom_objects=self.cfg.custom_objects)
 
-        eval_filename = self.io.get_eval_path(epoch[0], epoch[1], list_name)
-        make_model_evaluation(self, model, xs_mean, eval_filename, samples=None)
-        return eval_filename
+        pred_filename = self.io.get_pred_path(epoch[0], epoch[1], list_name)
+        make_model_prediction(self, model, xs_mean, pred_filename, samples=None)
+        return pred_filename
