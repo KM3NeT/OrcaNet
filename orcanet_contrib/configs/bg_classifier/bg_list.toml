@@ -62,10 +62,6 @@ train_files = [
 validation_files = [
 "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/data_splits/xyzt/data_split/xyzt_tight_0_100b_bg_classifier_dataset_validate_0_shuffled.h5",
 "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/data_splits/xyzt/data_split/xyzt_tight_0_100b_bg_classifier_dataset_validate_1_shuffled.h5",
-"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/data_splits/xyzt/data_split/xyzt_tight_0_100b_bg_classifier_dataset_validate_2_shuffled.h5",
-"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/data_splits/xyzt/data_split/xyzt_tight_0_100b_bg_classifier_dataset_validate_3_shuffled.h5",
-"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/data_splits/xyzt/data_split/xyzt_tight_0_100b_bg_classifier_dataset_validate_4_shuffled.h5",
-"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/data_splits/xyzt/data_split/xyzt_tight_0_100b_bg_classifier_dataset_validate_5_shuffled.h5",
 ]
 
 [xyz-c]
@@ -104,10 +100,6 @@ train_files = [
 validation_files = [
 "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/data_splits/xyzc/data_split/xyzc_tight_0_100b_bg_classifier_dataset_validate_0_shuffled.h5",
 "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/data_splits/xyzc/data_split/xyzc_tight_0_100b_bg_classifier_dataset_validate_1_shuffled.h5",
-"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/data_splits/xyzc/data_split/xyzc_tight_0_100b_bg_classifier_dataset_validate_2_shuffled.h5",
-"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/data_splits/xyzc/data_split/xyzc_tight_0_100b_bg_classifier_dataset_validate_3_shuffled.h5",
-"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/data_splits/xyzc/data_split/xyzc_tight_0_100b_bg_classifier_dataset_validate_4_shuffled.h5",
-"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_0_100b_t_bg_classifier/data_splits/xyzc/data_split/xyzc_tight_0_100b_bg_classifier_dataset_validate_5_shuffled.h5",
 ]
 
 
