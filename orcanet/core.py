@@ -171,7 +171,6 @@ class Configuration(object):
         """
         if self._list_file is None:
             self._train_files, self._val_files = read_out_list_file(list_file)
-            # Save internally which path was used to load the info
             self._list_file = list_file
         else:
             raise AssertionError("You tried to load filepathes from a list file, but pathes have already been loaded \
@@ -193,9 +192,7 @@ class Configuration(object):
             if hasattr(self, key):
                 setattr(self, key, user_values[key])
             else:
-                raise AssertionError("You tried to set the attribute "+str(key)+" in your config file\n"
-                                     + config_file + "\n, but this attribute is not provided. Check \
-                                     the possible attributes in the definition of the Configuration class.")
+                raise AssertionError("Unknown attribute "+str(key)+" in config file " + config_file)
 
     def import_model_file(self, model_file):
         """ Set attributes for generating models with OrcaNet. """

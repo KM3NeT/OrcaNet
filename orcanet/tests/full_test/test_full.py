@@ -9,7 +9,7 @@ from keras.models import Model
 from keras.layers import Dense, Input, Flatten
 from unittest import TestCase
 
-from orcanet.core import Configuration, orca_train, orca_eval
+from orcanet.core import OrcaHandler
 from orcanet.model_archs.model_setup import build_nn_model
 from orcanet.utilities.nn_utilities import load_zero_center_data
 from orcanet.utilities.losses import get_all_loss_functions
@@ -44,16 +44,16 @@ class DatasetTest(TestCase):
 
         # Set up the configuration object
         config_file = os.path.join(os.path.dirname(__file__), "config_test.toml")
-
         main_folder = self.temp_dir + "model/"
-        cfg = Configuration(main_folder, config_file=config_file)
 
-        cfg._train_files = self.train_pathes
-        cfg._val_files = self.val_pathes
-        cfg._list_file = "test.toml"
-        cfg.zero_center_folder = self.temp_dir
-        cfg.custom_objects = get_all_loss_functions()
-        self.cfg = cfg
+        orca = OrcaHandler(main_folder, config_file=config_file)
+        orca.cfg._train_files = self.train_pathes
+        orca.cfg._val_files = self.val_pathes
+        orca.cfg._list_file = "test.toml"
+        orca.cfg.zero_center_folder = self.temp_dir
+        orca.cfg.custom_objects = get_all_loss_functions()
+
+        self.orca = orca
 
     def tearDown(self):
         """ Remove the .temp directory. """
@@ -61,34 +61,34 @@ class DatasetTest(TestCase):
 
     def test_zero_center(self):
         """ Calculate the zero center image and check if it works properly. """
-        cfg = self.cfg
-        xs_mean = load_zero_center_data(cfg)
+        orca = self.orca
+        xs_mean = load_zero_center_data(orca.cfg)
         target_xs_mean = np.ones(self.shape)/4
         self.assertTrue(np.allclose(xs_mean["input_1"], target_xs_mean))
 
-        file = cfg.zero_center_folder + cfg._list_file + '_input_' + "input_1" + '.npz'
+        file = orca.cfg.zero_center_folder + orca.cfg._list_file + '_input_' + "input_1" + '.npz'
         zero_center_used_ip_files = np.load(file)['zero_center_used_ip_files']
-        self.assertTrue(np.array_equal(zero_center_used_ip_files, cfg._train_files["input_1"]))
+        self.assertTrue(np.array_equal(zero_center_used_ip_files, orca.cfg._train_files["input_1"]))
 
     def test_multi_input_model(self):
         """
         Make a model and train it with the test toml files provided to check if it throws an error.
         Also resumes training after the first epoch with a custom lr to check if that works.
         """
-        cfg = self.cfg
+        orca = self.orca
         model_file = os.path.join(os.path.dirname(__file__), "model_test.toml")
 
-        cfg.import_model_file(model_file)
+        orca.cfg.import_model_file(model_file)
 
-        model_data = cfg.get_modeldata()
+        model_data = orca.cfg.get_modeldata()
 
         if model_data.swap_4d_channels is not None:
-            cfg.sample_modifier = orca_sample_modifiers(model_data.swap_4d_channels, model_data.str_ident)
+            orca.cfg.sample_modifier = orca_sample_modifiers(model_data.swap_4d_channels, model_data.str_ident)
 
-        cfg.label_modifier = orca_label_modifiers(model_data.class_type)
+        orca.cfg.label_modifier = orca_label_modifiers(model_data.class_type)
 
-        initial_model = build_nn_model(cfg)
-        orca_train(cfg, initial_model)
+        initial_model = build_nn_model(orca.cfg)
+        orca.train(initial_model)
 
         def test_learning_rate(epoch, fileno, cfg):
             lr = (1 + epoch)*(1 + fileno) * 0.001
@@ -98,10 +98,10 @@ class DatasetTest(TestCase):
             xs = {key: xs[key] * 2 for key in xs}
             return xs
 
-        cfg.learning_rate = test_learning_rate
-        cfg.sample_modifier = test_modifier
-        orca_train(cfg)
-        orca_eval(cfg)
+        orca.cfg.learning_rate = test_learning_rate
+        orca.cfg.sample_modifier = test_modifier
+        orca.train()
+        orca.predict()
 
 
 def make_dummy_data(filepath1, filepath2, shape):
