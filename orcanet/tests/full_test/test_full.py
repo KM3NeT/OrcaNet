@@ -9,7 +9,7 @@ from keras.models import Model
 from keras.layers import Dense, Input, Flatten
 from unittest import TestCase
 
-from orcanet.core import Configuration
+from orcanet.core import Configuration, orca_train, orca_eval
 from orcanet.model_archs.model_setup import build_nn_model
 from orcanet.utilities.nn_utilities import load_zero_center_data
 from orcanet.utilities.losses import get_all_loss_functions
@@ -88,7 +88,7 @@ class DatasetTest(TestCase):
         cfg.label_modifier = orca_label_modifiers(model_data.class_type)
 
         initial_model = build_nn_model(cfg)
-        cfg.train(initial_model)
+        orca_train(cfg, initial_model)
 
         def test_learning_rate(epoch, fileno, cfg):
             lr = (1 + epoch)*(1 + fileno) * 0.001
@@ -100,8 +100,8 @@ class DatasetTest(TestCase):
 
         cfg.learning_rate = test_learning_rate
         cfg.sample_modifier = test_modifier
-        cfg.train()
-        cfg.eval()
+        orca_train(cfg)
+        orca_eval(cfg)
 
 
 def make_dummy_data(filepath1, filepath2, shape):

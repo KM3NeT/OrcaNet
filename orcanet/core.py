@@ -16,9 +16,8 @@ from orcanet.utilities.nn_utilities import load_zero_center_data, get_inputs, ge
 
 class Configuration(object):
     """
-    Main class of OrcaNet. Holds all configurable options.
+    Container object for all the configurable options in the OrcaNet scripts. TODO add a clober script that properly deletes models + logfiles
 
-    TODO add a clober script that properly deletes models + logfiles
     Sensible default values were chosen for the settings.
     You can change the all of these public attributes (the ones without a leading underscore _) either directly or with a
     .toml config file via the method set_from_config_file().
@@ -31,7 +30,7 @@ class Configuration(object):
         Optional dictionary mapping names (strings) to custom classes or functions to be considered by keras
         during deserialization of models.
     dataset_modifier : function or None
-        For evaluating: Function that determines which datasets get created in the resulting h5 file.
+        For orca_eval: Function that determines which datasets get created in the resulting h5 file.
         If none, every output layer will get one dataset each for both the label and the prediction, and one dataset
         containing the mc_info from the validation files. TODO online doc
     filter_out_tf_garbage : bool
@@ -39,11 +38,11 @@ class Configuration(object):
     epochs_to_train : int or None
         How many new epochs should be trained by running this function. None for infinite.
     eval_epoch : int
-        For evaluating: The epoch of the model to load for evaluation, e.g. 1 means load the saved model from
+        For orca_eval: The epoch of the model to load for evaluation, e.g. 1 means load the saved model from
         epoch 1 and continue training.
         Can also give -1 to automatically load the most recent epoch found in the main folder.
     eval_fileno : int
-        For evaluating: When using multiple files, define the file number for the evaluation, e.g.
+        For orca_eval: When using multiple files, define the file number for the evaluation, e.g.
         1 for load the model trained on the first file. If both epoch and fileno are -1, automatically set to the most
         recent file found in the main folder.
     key_samples : str
@@ -374,6 +373,15 @@ class Configuration(object):
                 n_bins[input_key] = f[self.key_samples].shape[1:]
         return n_bins
 
+    def get_multiple_inputs(self):
+        """
+        Return True when seperate sets of input files were given (e.g. for networks taking data
+        simulataneosly from different files).
+
+        """
+        train_files = self.get_train_files()
+        return len(train_files) > 1
+
     def get_modeldata(self):
         """
         Returns the optional info only required for building a predefined model with OrcaNet.
@@ -639,87 +647,96 @@ class Configuration(object):
                     mc_info = f[self.key_labels][:self.batchsize]
         return xs, mc_info
 
-    def train(self, initial_model=None):
-        """
-        Core code that trains a neural network.
 
-        Set up everything for the training (like the folder structure and potentially loading in a saved model)
-        and train for the given number of epochs.
+def orca_train(cfg, initial_model=None):
+    """
+    Core code that trains a neural network.
 
-        Parameters
-        ----------
-        initial_model : ks.models.Model or None
-            Compiled keras model to use for training and validation. Only required for the first epoch of training, as
-            the most recent saved model will be loaded otherwise.
+    Set up everything for the training (like the folder structure and potentially loading in a saved model)
+    and train for the given number of epochs.
 
-        """
-        if self.filter_out_tf_garbage:
-            os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-        self.get_subfolder(create=True)
-        write_full_logfile_startup(self)
-        # the epoch of the currently existing model (or 0,0 if there is none)
-        epoch = self.get_latest_epoch()
-        print("Set to epoch {} file {}.".format(epoch[0], epoch[1]))
+    Parameters
+    ----------
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
+    initial_model : ks.models.Model or None
+        Compiled keras model to use for training and validation. Only required for the first epoch of training, as
+        the most recent saved model will be loaded otherwise.
 
-        if epoch[0] == 0 and epoch[1] == 0:
-            assert initial_model is not None, "You need to provide a compiled keras model for the start of the training! (You gave None)"
-            model = initial_model
-        else:
-            # Load an existing model
-            if initial_model is not None:
-                warnings.warn("You provided a model even though this is not the start of the training. Provided model is ignored!")
-            path_of_model = self.get_model_path(epoch[0], epoch[1])
-            print("Loading saved model: "+path_of_model)
-            model = ks.models.load_model(path_of_model, custom_objects=self.custom_objects)
+    """
+    if cfg.filter_out_tf_garbage:
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+    cfg.get_subfolder(create=True)
+    write_full_logfile_startup(cfg)
+    # the epoch of the currently existing model (or 0,0 if there is none)
+    epoch = cfg.get_latest_epoch()
+    print("Set to epoch {} file {}.".format(epoch[0], epoch[1]))
 
-        if self.label_modifier is None:
-            self._auto_label_modifier = get_auto_label_modifier(model)
+    if epoch[0] == 0 and epoch[1] == 0:
+        assert initial_model is not None, "You need to provide a compiled keras model for the start of the training! (You gave None)"
+        model = initial_model
+    else:
+        # Load an existing model
+        if initial_model is not None:
+            warnings.warn("You provided a model even though this is not the start of the training. Provided model is ignored!")
+        path_of_model = cfg.get_model_path(epoch[0], epoch[1])
+        print("Loading saved model: "+path_of_model)
+        model = ks.models.load_model(path_of_model, custom_objects=cfg.custom_objects)
 
-        self.check_connections(model)
-        # model.summary()
-        if self.use_scratch_ssd:
-            self.use_local_node()
+    if cfg.label_modifier is None:
+        cfg._auto_label_modifier = get_auto_label_modifier(model)
 
-        trained_epochs = 0
-        while self.epochs_to_train is None or trained_epochs < self.epochs_to_train:
-            # Set epoch to the next file
-            epoch = self.get_next_epoch(epoch)
-            train_and_validate_model(self, model, epoch)
-            trained_epochs += 1
+    cfg.check_connections(model)
+    # model.summary()
+    if cfg.use_scratch_ssd:
+        cfg.use_local_node()
 
-    def eval(self):
-        """
-        Evaluate a model on all samples of the validation set in the toml list, and save it as a h5 file.
+    trained_epochs = 0
+    while cfg.epochs_to_train is None or trained_epochs < cfg.epochs_to_train:
+        # Set epoch to the next file
+        epoch = cfg.get_next_epoch(epoch)
+        train_and_validate_model(cfg, model, epoch)
+        trained_epochs += 1
 
-        The cfg.eval_epoch and cfg.eval_fileno parameters define which model is loaded.
 
-        Returns
-        -------
-        eval_filename : str
-            The path to the created evaluation file.
+def orca_eval(cfg):
+    """
+    Evaluate a model on all samples of the validation set in the toml list, and save it as a h5 file.
 
-        """
-        if self.filter_out_tf_garbage:
-            os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+    The cfg.eval_epoch and cfg.eval_fileno parameters define which model is loaded.
 
-        list_name = os.path.basename(self.get_list_file()).split(".")[0]  # TODO make foolproof
-        epoch = (self.eval_epoch, self.eval_fileno)
+    Parameters
+    ----------
+    cfg : object Configuration
+        Configuration object containing all the configurable options in the OrcaNet scripts.
 
-        if epoch[0] == -1 and epoch[1] == -1:
-            epoch = self.get_latest_epoch()
-            print("Automatically set epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
+    Returns
+    -------
+    eval_filename : str
+        The path to the created evaluation file.
 
-        if self.zero_center_folder is not None:
-            xs_mean = load_zero_center_data(self)
-        else:
-            xs_mean = None
+    """
+    if cfg.filter_out_tf_garbage:
+        os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 
-        if self.use_scratch_ssd:
-            self.use_local_node()
+    list_name = os.path.basename(cfg.get_list_file()).split(".")[0]  # TODO make foolproof
+    epoch = (cfg.eval_epoch, cfg.eval_fileno)
 
-        path_of_model = self.get_model_path(epoch[0], epoch[1])
-        model = ks.models.load_model(path_of_model, custom_objects=self.custom_objects)
+    if epoch[0] == -1 and epoch[1] == -1:
+        epoch = cfg.get_latest_epoch()
+        print("Automatically set epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
 
-        eval_filename = self.get_eval_path(epoch[0], epoch[1], list_name)
-        make_model_evaluation(self, model, xs_mean, eval_filename, samples=None)
-        return eval_filename
+    if cfg.zero_center_folder is not None:
+        xs_mean = load_zero_center_data(cfg)
+    else:
+        xs_mean = None
+
+    if cfg.use_scratch_ssd:
+        cfg.use_local_node()
+
+    path_of_model = cfg.get_model_path(epoch[0], epoch[1])
+    model = ks.models.load_model(path_of_model, custom_objects=cfg.custom_objects)
+
+    eval_filename = cfg.get_eval_path(epoch[0], epoch[1], list_name)
+    make_model_evaluation(cfg, model, xs_mean, eval_filename, samples=None)
+    return eval_filename

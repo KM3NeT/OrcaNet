@@ -1,4 +1,4 @@
-# Info for building an OrcaNet model. This is not required for training.
+# Info for building an OrcaNet model. This is not required for using orca_train.
 # nn_arch is mandatory, as it is the name of the architecture that will be loaded.
 # Depending on the architecture, other options like the number of layers also have to be given.
 #
