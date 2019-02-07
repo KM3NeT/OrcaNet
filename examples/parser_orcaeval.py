@@ -19,11 +19,12 @@ Options:
 """
 
 from docopt import docopt
-from orcanet.core import orca_eval, Configuration
+from orcanet.core import OrcaHandler
 from orcanet.utilities.losses import get_all_loss_functions
+from orcanet_contrib.contrib import orca_label_modifiers, orca_sample_modifiers
 
 
-def run_eval(main_folder, list_file, config_file):
+def run_pred(main_folder, list_file, config_file):
     """
     This shows how to use OrcaNet.
 
@@ -37,13 +38,19 @@ def run_eval(main_folder, list_file, config_file):
         Path to a .toml file which overwrites some of the default settings for training and validating a model.
 
     """
-    # Set up the cfg object with the input data
-    cfg = Configuration(main_folder, list_file, config_file)
+    # Set up the OrcaHandler with the input data
+    orca = OrcaHandler(main_folder, list_file, config_file)
     # Orca networks use some custom loss functions, which need to be handed to keras when loading models
-    cfg.custom_objects = get_all_loss_functions()
+    orca.cfg.custom_objects = get_all_loss_functions()
+    # Load the modifiers
+    model_data = orca.cfg.get_modeldata()
+    if model_data.swap_4d_channels is not None:
+        orca.cfg.sample_modifier = orca_sample_modifiers(model_data.swap_4d_channels, model_data.str_ident)
+    orca.cfg.label_modifier = orca_label_modifiers(model_data.class_type)
+
     # Per default, an evaluation will be done for the model with the highest epoch and filenumber.
     # Can be adjusted with cfg.eval_epoch and cfg.eval_fileno
-    orca_eval(cfg)
+    orca.predict()
 
 
 def parse_input():
@@ -52,7 +59,7 @@ def parse_input():
     main_folder = args['FOLDER']
     list_file = args['LIST']
     config_file = args['CONFIG']
-    run_eval(main_folder, list_file, config_file)
+    run_pred(main_folder, list_file, config_file)
 
 
 if __name__ == '__main__':

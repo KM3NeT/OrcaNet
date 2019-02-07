@@ -159,7 +159,7 @@ def test_generators(batches, intermediate_log, functions, func_kwargs):
     xs_mean = None  # np.ones(f["x"].shape[1:])  # load_zero_center_data(cfg)
     f.close()
 
-    cfg.set_from_model_file(modelfile)
+    cfg.import_model_file(modelfile)
     model = build_nn_model(cfg)
     # model.summary()
 

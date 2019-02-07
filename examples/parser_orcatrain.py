@@ -20,7 +20,7 @@ Options:
 
 """
 from docopt import docopt
-from orcanet.core import orca_train, Configuration
+from orcanet.core import OrcaHandler
 from orcanet.model_archs.model_setup import build_nn_model
 from orcanet.utilities.losses import get_all_loss_functions
 from orcanet_contrib.contrib import orca_label_modifiers, orca_sample_modifiers
@@ -42,30 +42,27 @@ def run_train(main_folder, list_file, config_file, model_file):
         Path to a file with parameters to build a model of a predefined architecture with OrcaNet.
 
     """
-    # Set up the cfg object with the input data
-    cfg = Configuration(main_folder, list_file, config_file)
+    # Set up the OrcaHandler with the input data
+    orca = OrcaHandler(main_folder, list_file, config_file)
     # Orca networks use some custom loss functions, which need to be handed to keras when loading models
-    cfg.custom_objects = get_all_loss_functions()
-
+    orca.cfg.custom_objects = get_all_loss_functions()
     # Add Info for building a model with OrcaNet to the cfg object
-    cfg.set_from_model_file(model_file)
-
+    orca.cfg.import_model_file(model_file)
     # If this is the start of the training, a compiled model needs to be handed to the orca_train function
-    if cfg.get_latest_epoch() == (0, 0):
+    if orca.cfg.get_latest_epoch() == (0, 0):
         # Build it
-        initial_model = build_nn_model(cfg)
+        initial_model = build_nn_model(orca.cfg)
     else:
         # No model is required if the training is continued, as it will be loaded automatically
         initial_model = None
 
-    model_data = cfg.get_modeldata()
-
+    # Load the modifiers
+    model_data = orca.cfg.get_modeldata()
     if model_data.swap_4d_channels is not None:
-        cfg.sample_modifier = orca_sample_modifiers(model_data.swap_4d_channels, model_data.str_ident)
+        orca.cfg.sample_modifier = orca_sample_modifiers(model_data.swap_4d_channels, model_data.str_ident)
+    orca.cfg.label_modifier = orca_label_modifiers(model_data.class_type)
 
-    cfg.label_modifier = orca_label_modifiers(model_data.class_type)
-
-    orca_train(cfg, initial_model)
+    orca.train(initial_model)
 
 
 def parse_input():

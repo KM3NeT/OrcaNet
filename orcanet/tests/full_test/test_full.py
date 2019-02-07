@@ -78,7 +78,7 @@ class DatasetTest(TestCase):
         cfg = self.cfg
         model_file = os.path.join(os.path.dirname(__file__), "model_test.toml")
 
-        cfg.set_from_model_file(model_file)
+        cfg.import_model_file(model_file)
 
         model_data = cfg.get_modeldata()
 
