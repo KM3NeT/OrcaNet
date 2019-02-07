@@ -62,7 +62,7 @@ class DatasetTest(TestCase):
     def test_zero_center(self):
         """ Calculate the zero center image and check if it works properly. """
         orca = self.orca
-        xs_mean = load_zero_center_data(orca.cfg)
+        xs_mean = load_zero_center_data(orca)
         target_xs_mean = np.ones(self.shape)/4
         self.assertTrue(np.allclose(xs_mean["input_1"], target_xs_mean))
 
@@ -87,7 +87,7 @@ class DatasetTest(TestCase):
 
         orca.cfg.label_modifier = orca_label_modifiers(model_data.class_type)
 
-        initial_model = build_nn_model(orca.cfg)
+        initial_model = build_nn_model(orca)
         orca.train(initial_model)
 
         def test_learning_rate(epoch, fileno, cfg):

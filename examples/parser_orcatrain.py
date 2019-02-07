@@ -51,7 +51,7 @@ def run_train(main_folder, list_file, config_file, model_file):
     # If this is the start of the training, a compiled model needs to be handed to the orca_train function
     if orca.cfg.get_latest_epoch() == (0, 0):
         # Build it
-        initial_model = build_nn_model(orca.cfg)
+        initial_model = build_nn_model(orca)
     else:
         # No model is required if the training is continued, as it will be loaded automatically
         initial_model = None

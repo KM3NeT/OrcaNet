@@ -498,39 +498,39 @@ def read_out_model_file(file):
     return modeldata
 
 
-def write_full_logfile_startup(cfg):
+def write_full_logfile_startup(orca):
     """
     Whenever the orca_train function is run, this logs all the input parameters in the full log file.
 
     Parameters
     ----------
-    cfg : object Configuration
-        Configuration object containing all the configurable options in the OrcaNet scripts.
+    orca : object OrcaHandler
+        Contains all the configurable options in the OrcaNet scripts.
 
     """
-    logfile = cfg.main_folder + 'full_log.txt'
+    logfile = orca.cfg.main_folder + 'full_log.txt'
     with open(logfile, 'a+') as f_out:
         f_out.write('--------------------------------------------------------------------------------------------------------\n')
         f_out.write('----------------------------------'+str(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))+'---------------------------------------------------\n\n')
         f_out.write("New execution of the orca_train function started with the following options:\n\n")
-        f_out.write("List file path:\t"+cfg.get_list_file()+"\n")
+        f_out.write("List file path:\t"+orca.cfg.get_list_file()+"\n")
 
         f_out.write("Given trainfiles in the .list file:\n")
-        for input_name, input_files in cfg.get_train_files().items():
+        for input_name, input_files in orca.cfg.get_train_files().items():
             f_out.write(input_name + ":")
             [f_out.write("\t" + input_file + "\n") for input_file in input_files]
 
         f_out.write("Given validation files in the .list file:\n")
-        for input_name, input_files in cfg.get_val_files().items():
+        for input_name, input_files in orca.cfg.get_val_files().items():
             f_out.write(input_name + ":")
             [f_out.write("\t" + input_file + "\n") for input_file in input_files]
 
         f_out.write("\nConfiguration used:\n")
-        for key in vars(cfg):
+        for key in vars(orca.cfg):
             if not key.startswith("_"):
-                f_out.write("   {}:\t{}\n".format(key, getattr(cfg, key)))
+                f_out.write("   {}:\t{}\n".format(key, getattr(orca.cfg, key)))
 
-        modeldata = cfg.get_modeldata()
+        modeldata = orca.cfg.get_modeldata()
         if modeldata is not None:
             f_out.write("Given modeldata:")
             for key, val in modeldata._asdict().items():
@@ -539,14 +539,14 @@ def write_full_logfile_startup(cfg):
         f_out.write("\n")
 
 
-def write_full_logfile(cfg, model, history_train, history_val, lr, epoch, files_dict):
+def write_full_logfile(orca, model, history_train, history_val, lr, epoch, files_dict):
     """
     Function for saving various information during training and validation to a .txt file.
 
     Parameters
     ----------
-    cfg : object Configuration
-        Configuration object containing all the configurable options in the OrcaNet scripts.
+    orca : object OrcaHandler
+        Contains all the configurable options in the OrcaNet scripts.
     model : Model
         The keras model.
     history_train : keras history object
@@ -561,7 +561,7 @@ def write_full_logfile(cfg, model, history_train, history_val, lr, epoch, files_
         The name of every input as a key, the path to one of the training file, on which the model has just been trained, as values.
 
     """
-    logfile = cfg.main_folder + 'full_log.txt'
+    logfile = orca.cfg.main_folder + 'full_log.txt'
     with open(logfile, 'a+') as f_out:
         f_out.write('---------------Epoch {} File {}-------------------------------------------------------------------------\n'.format(epoch[0], epoch[1]))
         f_out.write('\n')
@@ -578,14 +578,14 @@ def write_full_logfile(cfg, model, history_train, history_val, lr, epoch, files_
         f_out.write('\n')
 
 
-def write_summary_logfile(cfg, epoch, model, history_train, history_val, lr):
+def write_summary_logfile(orca, epoch, model, history_train, history_val, lr):
     """
     Write to the summary.txt file in every trained model folder.
 
     Parameters
     ----------
-    cfg : object Configuration
-        Configuration object containing all the configurable options in the OrcaNet scripts.
+    orca : object OrcaHandler
+        Contains all the configurable options in the OrcaNet scripts.
     epoch : tuple(int, int)
         The number of the current epoch and the current filenumber.
     model : ks.model.Model
@@ -600,8 +600,8 @@ def write_summary_logfile(cfg, epoch, model, history_train, history_val, lr):
     """
     # get this for the epoch_number_float in the logfile
     steps_per_total_epoch, steps_cum = 0, [0]
-    for f_size in cfg.get_file_sizes("train"):
-        steps_per_file = int(f_size / cfg.batchsize)
+    for f_size in orca.io.get_file_sizes("train"):
+        steps_per_file = int(f_size / orca.cfg.batchsize)
         steps_per_total_epoch += steps_per_file
         steps_cum.append(steps_cum[-1] + steps_per_file)
     epoch_number_float = epoch[0] - (steps_per_total_epoch - steps_cum[epoch[1]]) / float(steps_per_total_epoch)
@@ -613,7 +613,7 @@ def write_summary_logfile(cfg, epoch, model, history_train, history_val, lr):
         data.append("val_" + str(metric_name))
     headline, widths = get_summary_log_line(data)
 
-    logfile_fname = cfg.main_folder + 'summary.txt'
+    logfile_fname = orca.cfg.main_folder + 'summary.txt'
     with open(logfile_fname, 'a+') as logfile:
         # Write the two headlines if the file is empty
         if os.stat(logfile_fname).st_size == 0:
@@ -693,15 +693,15 @@ def get_summary_log_line(data, widths=None, seperator=" | ", minimum_cell_width=
         return line
 
 
-def read_logfiles(cfg):
+def read_logfiles(orca):
     """
     Read out the data from the summary.txt file, and from all training log files in the log_train folder which
     is in the same directory as the summary.txt file.
 
     Parameters
     ----------
-    cfg : object Configuration
-        Configuration object containing all the configurable options in the OrcaNet scripts.
+    orca : object OrcaHandler
+        Contains all the configurable options in the OrcaNet scripts.
 
     Returns
     -------
@@ -711,10 +711,10 @@ def read_logfiles(cfg):
         Structured array containing the data from all the training log files, merged into a single array.
 
     """
-    summary_data = np.genfromtxt(cfg.main_folder + "/summary.txt", names=True, delimiter="|", autostrip=True, comments="--")
+    summary_data = np.genfromtxt(orca.cfg.main_folder + "/summary.txt", names=True, delimiter="|", autostrip=True, comments="--")
 
     # list of all files in the log_train folder of this model
-    log_train_folder = cfg.get_subfolder("log_train")
+    log_train_folder = orca.io.get_subfolder("log_train")
     files = os.listdir(log_train_folder)
     train_file_data = []
     for file in files:

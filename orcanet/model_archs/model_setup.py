@@ -119,13 +119,13 @@ def get_optimizer_info(compile_opt, optimizer='adam'):
     return loss_functions, loss_metrics, loss_weights, optimizer
 
 
-def build_nn_model(cfg):
+def build_nn_model(orca):
     """
     Function that builds a Keras nn model with a specific type of architecture. Can also parallelize to multiple GPUs.
 
     Parameters
     ----------
-    cfg : Object Configuration
+    orca : Object OrcaHandler
         Contains all the configurable options in the OrcaNet scripts.
     Returns
     -------
@@ -133,7 +133,8 @@ def build_nn_model(cfg):
         A Keras nn instance.
 
     """
-    modeldata = cfg.get_modeldata()
+    n_bins = orca.io.get_n_bins()
+    modeldata = orca.cfg.get_modeldata()
     assert modeldata is not None, "You need to specify modeldata before building a model with OrcaNet!"
 
     nn_arch = modeldata.nn_arch
@@ -142,8 +143,6 @@ def build_nn_model(cfg):
     class_type = modeldata.class_type
     str_ident = modeldata.str_ident
     swap_col = modeldata.swap_4d_channels
-
-    n_bins = cfg.get_n_bins()
 
     if nn_arch == 'WRN':
         model = create_wide_residual_network(n_bins[0], n=1, k=1, dropout=0.2, k_size=3, swap_4d_channels=swap_col)
@@ -163,7 +162,7 @@ def build_nn_model(cfg):
 
     loss_functions, loss_metrics, loss_weights, optimizer = get_optimizer_info(compile_opt, optimizer='adam')
 
-    model, batchsize = parallelize_model_to_n_gpus(model, cfg.n_gpu, cfg.batchsize)
+    model, batchsize = parallelize_model_to_n_gpus(model, orca.cfg.n_gpu, orca.cfg.batchsize)
 
     model.compile(loss=loss_functions, optimizer=optimizer, metrics=loss_metrics, loss_weights=loss_weights)
 

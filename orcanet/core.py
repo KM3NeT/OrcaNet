@@ -296,7 +296,7 @@ class OrcaHandler:
         if self.cfg.filter_out_tf_garbage:
             os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
         self.io.get_subfolder(create=True)
-        write_full_logfile_startup(self.cfg)
+        write_full_logfile_startup(self)
         # the epoch of the currently existing model (or 0,0 if there is none)
         epoch = self.io.get_latest_epoch()
         print("Set to epoch {} file {}.".format(epoch[0], epoch[1]))
@@ -324,7 +324,7 @@ class OrcaHandler:
         while self.cfg.epochs_to_train is None or trained_epochs < self.cfg.epochs_to_train:
             # Set epoch to the next file
             epoch = self.io.get_next_epoch(epoch)
-            train_and_validate_model(self.cfg, model, epoch)
+            train_and_validate_model(self, model, epoch)
             trained_epochs += 1
 
     def predict(self):
@@ -350,7 +350,7 @@ class OrcaHandler:
             print("Automatically set epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
 
         if self.cfg.zero_center_folder is not None:
-            xs_mean = load_zero_center_data(self.cfg)
+            xs_mean = load_zero_center_data(self)
         else:
             xs_mean = None
 
@@ -361,5 +361,5 @@ class OrcaHandler:
         model = ks.models.load_model(path_of_model, custom_objects=self.cfg.custom_objects)
 
         eval_filename = self.io.get_eval_path(epoch[0], epoch[1], list_name)
-        make_model_evaluation(self.cfg, model, xs_mean, eval_filename, samples=None)
+        make_model_evaluation(self, model, xs_mean, eval_filename, samples=None)
         return eval_filename
