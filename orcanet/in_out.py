@@ -89,6 +89,42 @@ def read_out_list_file(file):
     return train_files, validation_files
 
 
+def read_out_model_file(file):
+    """
+    Read out parameters for creating models with OrcaNet from a toml file.
+
+    Parameters
+    ----------
+    file : str
+        Path to the toml file.
+
+    Returns
+    -------
+    modeldata : namedtuple
+        Infos for building a predefined model with OrcaNet.
+
+    """
+    file_content = toml.load(file)['model']
+    nn_arch = file_content.pop('nn_arch')
+    compile_opt = file_content.pop('compile_opt')
+
+    class_type = ''
+    str_ident = ''
+    swap_4d_channels = None
+
+    if 'class_type' in file_content:
+        class_type = file_content.pop('class_type')
+    if 'str_ident' in file_content:
+        str_ident = file_content.pop('str_ident')
+    if 'swap_4d_channels' in file_content:
+        swap_4d_channels = file_content.pop('swap_4d_channels')
+
+    ModelData = namedtuple('ModelData', 'nn_arch compile_opt class_type str_ident swap_4d_channels args')
+    modeldata = ModelData(nn_arch, compile_opt, class_type, str_ident, swap_4d_channels, file_content)
+
+    return modeldata
+
+
 def write_full_logfile_startup(cfg):
     """
     Whenever the train function is run, this logs all the input parameters in the full log file.
