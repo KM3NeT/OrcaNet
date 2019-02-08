@@ -10,10 +10,9 @@ from keras.layers import Dense, Input, Flatten
 from unittest import TestCase
 
 from orcanet.core import OrcaHandler
-from orcanet.model_archs.model_setup import build_nn_model
+from orcanet.model_archs.model_setup import OrcaModel
+
 from orcanet.utilities.nn_utilities import load_zero_center_data
-from orcanet.utilities.losses import get_all_loss_functions
-from orcanet_contrib.contrib import orca_label_modifiers, orca_sample_modifiers
 
 
 class DatasetTest(TestCase):
@@ -31,14 +30,12 @@ class DatasetTest(TestCase):
         else:
             os.makedirs(self.temp_dir)
 
+        # Make dummy data of given shape
         self.shape = (3, 3, 3, 3)
-
         train_inp = (self.temp_dir + "train1.h5", self.temp_dir + "train2.h5")
         self.train_pathes = {"input_1": train_inp}
-
         val_inp = (self.temp_dir + "val1.h5", self.temp_dir + "val2.h5")
         self.val_pathes = {"input_1": val_inp}
-
         for path1, path2 in (train_inp, val_inp):
             make_dummy_data(path1, path2, self.shape)
 
@@ -51,7 +48,6 @@ class DatasetTest(TestCase):
         orca.cfg._val_files = self.val_pathes
         orca.cfg._list_file = "test.toml"
         orca.cfg.zero_center_folder = self.temp_dir
-        orca.cfg.custom_objects = get_all_loss_functions()
 
         self.orca = orca
 
@@ -78,16 +74,10 @@ class DatasetTest(TestCase):
         orca = self.orca
         model_file = os.path.join(os.path.dirname(__file__), "model_test.toml")
 
-        orca.cfg.import_model_file(model_file)
+        orcamodel = OrcaModel(model_file)
+        initial_model = orcamodel.build(orca)
+        orcamodel.update_orca(orca)
 
-        model_data = orca.cfg.get_modeldata()
-
-        if model_data.swap_4d_channels is not None:
-            orca.cfg.sample_modifier = orca_sample_modifiers(model_data.swap_4d_channels, model_data.str_ident)
-
-        orca.cfg.label_modifier = orca_label_modifiers(model_data.class_type)
-
-        initial_model = build_nn_model(orca)
         orca.train(initial_model)
 
         def test_learning_rate(epoch, fileno, cfg):

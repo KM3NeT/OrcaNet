@@ -20,10 +20,9 @@ Options:
 
 """
 from docopt import docopt
+
 from orcanet.core import OrcaHandler
-from orcanet.model_archs.model_setup import build_nn_model
-from orcanet.utilities.losses import get_all_loss_functions
-from orcanet_contrib.contrib import orca_label_modifiers, orca_sample_modifiers
+from orcanet.model_archs.model_setup import OrcaModel
 
 
 def run_train(main_folder, list_file, config_file, model_file):
@@ -44,23 +43,17 @@ def run_train(main_folder, list_file, config_file, model_file):
     """
     # Set up the OrcaHandler with the input data
     orca = OrcaHandler(main_folder, list_file, config_file)
-    # Orca networks use some custom loss functions, which need to be handed to keras when loading models
-    orca.cfg.custom_objects = get_all_loss_functions()
-    # Add Info for building a model with OrcaNet to the cfg object
-    orca.cfg.import_model_file(model_file)
-    # If this is the start of the training, a compiled model needs to be handed to the orca_train function
-    if orca.cfg.get_latest_epoch() == (0, 0):
-        # Build it
-        initial_model = build_nn_model(orca)
-    else:
-        # No model is required if the training is continued, as it will be loaded automatically
-        initial_model = None
 
-    # Load the modifiers
-    model_data = orca.cfg.get_modeldata()
-    if model_data.swap_4d_channels is not None:
-        orca.cfg.sample_modifier = orca_sample_modifiers(model_data.swap_4d_channels, model_data.str_ident)
-    orca.cfg.label_modifier = orca_label_modifiers(model_data.class_type)
+    # The OrcaModel class allows to use some predefined models
+    orcamodel = OrcaModel(model_file)
+    # If this is the start of the training, a compiled model needs to be handed to the orca_train function
+    # No model is required if the training is continued, as it will be loaded automatically
+    if orca.cfg.get_latest_epoch() == (0, 0):
+        initial_model = orcamodel.build(orca)
+    else:
+        initial_model = None
+    # Load the modifiers and custom objects needed for this model
+    orcamodel.update_orca(orca)
 
     orca.train(initial_model)
 
