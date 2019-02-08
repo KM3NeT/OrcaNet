@@ -6,6 +6,7 @@ Code for plotting Orca evaluations.
 
 import numpy as np
 import matplotlib as mpl
+import h5py
 mpl.use('Agg')
 from orcanet_contrib.evaluation_utilities import (make_energy_to_accuracy_plot_multiple_classes,
                                                   make_prob_hists,
@@ -21,50 +22,7 @@ from orcanet_contrib.evaluation_utilities import (make_energy_to_accuracy_plot_m
                                                   make_1d_reco_err_div_by_std_plot,
                                                   make_1d_reco_err_to_reco_residual_plot,
                                                   make_2d_dir_correlation_plot_different_sigmas)
-
-
-def old(mc_info, y_true, y_pred, class_type):
-    ax = np.newaxis
-    if class_type[1] == 'energy_and_direction_and_bjorken-y':
-        # TODO temp old 60b prod
-        y_pred = np.concatenate([y_pred[0], y_pred[1], y_pred[2], y_pred[3], y_pred[4]], axis=1)
-        y_true = np.concatenate(
-            [y_true['energy'], y_true['dir_x'], y_true['dir_y'], y_true['dir_z'], y_true['bjorken-y']],
-            axis=1)  # dont need to save y_true err input
-    elif class_type[1] == 'energy_dir_bjorken-y_errors':
-        y_pred = np.concatenate(y_pred, axis=1)
-        y_true = np.concatenate([y_true['e'], y_true['dir_x'], y_true['dir_y'], y_true['dir_z'], y_true['by']],
-                                axis=1)  # dont need to save y_true err input
-    elif class_type[1] == 'energy_dir_bjorken-y_vtx_errors':
-        y_pred = np.concatenate(y_pred, axis=1)
-        y_true = np.concatenate(
-            [y_true['e'], y_true['dx'], y_true['dy'], y_true['dz'], y_true['by'], y_true['vx'], y_true['vy'],
-             y_true['vz'], y_true['vt']],
-            axis=1)  # dont need to save y_true err input
-    else:
-        raise NameError("Unknown class_type " + str(class_type[1]))
-    # mc labels
-    energy = mc_info[:, 2]
-    particle_type = mc_info[:, 1]
-    is_cc = mc_info[:, 3]
-    event_id = mc_info[:, 0]
-    run_id = mc_info[:, 9]
-    bjorken_y = mc_info[:, 4]
-    dir_x, dir_y, dir_z = mc_info[:, 5], mc_info[:, 6], mc_info[:, 7]
-    vtx_x, vtx_y, vtx_z = mc_info[:, 10], mc_info[:, 11], mc_info[:, 12]
-    time_residual_vtx = mc_info[:, 13]
-    # if mc_info.shape[1] > 13: TODO add prod_ident
-
-    # make a temporary energy_correct array for this batch
-    # arr_nn_pred_temp = np.concatenate([run_id[:, ax], event_id[:, ax], particle_type[:, ax], is_cc[:, ax], energy[:, ax],
-    #                                    bjorken_y[:, ax], dir_x[:, ax], dir_y[:, ax], dir_z[:, ax], y_pred, y_true], axis=1)
-    # print(y_pred.shape)
-    # print(y_true.shape)
-    # alle [...,ax] haben dim 64,1.
-    arr_nn_pred_temp = np.concatenate([run_id[:, ax], event_id[:, ax], particle_type[:, ax], is_cc[:, ax],
-                                       energy[:, ax], bjorken_y[:, ax], dir_x[:, ax], dir_y[:, ax],
-                                       dir_z[:, ax], vtx_x[:, ax], vtx_y[:, ax], vtx_z[:, ax],
-                                       time_residual_vtx[:, ax], y_pred, y_true], axis=1)
+from orcanet_contrib.plotting.bg_classifier import make_prob_hists_bg_classifier
 
 
 # TODO Does not work at all
@@ -102,16 +60,15 @@ def investigate_model_performance(cfg, model, test_files, n_bins, batchsize, cla
         Name of the folder in the cnns directory in which everything will be saved.
 
     """
-    # for layer in model.layers: # temp
-    #     if 'batch_norm' in layer.name:
-    #         layer.stateful = False
+    f = h5py.File(filepath, 'r')
+    # arr_nn_pred = np.load(arr_filename)
 
-    arr_nn_pred = np.load(arr_filename)
+    if class_type == 'bg_classifier':
+        make_prob_hists_bg_classifier(pred_file, savefolder)
 
-    # arr_nn_pred = np.load('results/plots/saved_predictions/arr_nn_pred_' + modelname + '_final_stateful_false.npy')
-    # arr_nn_pred = np.load('results/plots/saved_predictions//arr_nn_pred_model_VGG_4d_xyz-t_and_yzt-x_and_4d_xyzt_track-shower_multi_input_single_train_tight-1_tight-2_lr_0.003_tr_st_test_st_final_stateful_false_1-100GeV_precut.npy')
 
-    if class_type == 'track-shower':  # categorical
+
+    elif class_type == 'track-shower':  # categorical
         precuts = (False, '3-100_GeV_prod')
 
         make_energy_to_accuracy_plot_multiple_classes(arr_nn_pred, title='Classified as track', filename=folder_name + 'plots/ts_' + modelname,

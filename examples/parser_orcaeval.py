@@ -43,7 +43,8 @@ def run_eval(main_folder, list_file, config_file):
     cfg.custom_objects = get_all_loss_functions()
     # Per default, an evaluation will be done for the model with the highest epoch and filenumber.
     # Can be adjusted with cfg.eval_epoch and cfg.eval_fileno
-    orca_eval(cfg)
+    pred_filename = orca_eval(cfg)
+
 
 
 def parse_input():
