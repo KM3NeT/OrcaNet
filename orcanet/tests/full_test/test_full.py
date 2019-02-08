@@ -41,9 +41,9 @@ class DatasetTest(TestCase):
 
         # Set up the configuration object
         config_file = os.path.join(os.path.dirname(__file__), "config_test.toml")
-        main_folder = self.temp_dir + "model/"
+        output_folder = self.temp_dir + "model/"
 
-        orca = OrcaHandler(main_folder, config_file=config_file)
+        orca = OrcaHandler(output_folder, config_file=config_file)
         orca.cfg._train_files = self.train_pathes
         orca.cfg._val_files = self.val_pathes
         orca.cfg._list_file = "test.toml"
