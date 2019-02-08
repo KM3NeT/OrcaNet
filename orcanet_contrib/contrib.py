@@ -206,7 +206,7 @@ def orca_learning_rates(name):
 
     """
     if name == "triple_decay":
-        def learning_rate(n_epoch, n_file, cfg):
+        def learning_rate(n_epoch, n_file, orca):
             """
             Function that calculates the current learning rate based on the number of already trained epochs.
 
@@ -220,8 +220,8 @@ def orca_learning_rates(name):
                 The number of the current epoch which is used to calculate the new learning rate.
             n_file : int
                 The number of the current filenumber which is used to calculate the new learning rate.
-            cfg : object Configuration
-                Configuration object containing all the configurable options in the OrcaNet scripts.
+            orca : object OrcaHandler
+                Contains all the configurable options in the OrcaNet scripts.
 
             Returns
             -------
@@ -229,7 +229,7 @@ def orca_learning_rates(name):
                 Calculated learning rate for this epoch.
 
             """
-            n_lr_decays = (n_epoch - 1) * cfg.get_no_of_files("train") + (n_file - 1)
+            n_lr_decays = (n_epoch - 1) * orca.io.get_no_of_files("train") + (n_file - 1)
             lr_temp = 0.005  # * n_gpu TODO think about multi gpu lr
 
             for i in range(n_lr_decays):

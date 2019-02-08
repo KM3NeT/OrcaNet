@@ -28,8 +28,8 @@ setup(
         'Programming Language :: Python',
     ],
 
-    entry_points={'console_scripts': ['orcatrain=orcanet.examples.parser_orcatrain:main',
-                                      'orcaeval=orcanet.examples.parser_orcaeval:main',
+    entry_points={'console_scripts': ['orcatrain=orcanet_contrib.parser_orcatrain:main',
+                                      'orcapred=orcanet_contrib.parser_orcapred:main',
                                       ]},
 
 )

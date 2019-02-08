@@ -275,10 +275,12 @@ def sort_metric_names_and_errors(metric_names):
     return sorted_metrics
 
 
-def get_activations_and_weights(cfg, xs_mean, model, layer_name=None, learning_phase='test'):
+def get_activations_and_weights(orca, xs_mean, model, layer_name=None, learning_phase='test'):
     """
     Get the weights of a model and also the activations of the model for a single event in the validation set.
 
+    orca : object OrcaHandler
+        Contains all the configurable options in the OrcaNet scripts.
     xs_mean : dict
         Mean image of the dataset used for zero-centering. Every input as a key, ndarray as values.
     :param ks.model model: The model to make the data with.
@@ -296,8 +298,8 @@ def get_activations_and_weights(cfg, xs_mean, model, layer_name=None, learning_p
 
     # get input layers and input files
     inputs = get_inputs(model)
-    f = next(cfg.yield_files("val"))
-    generator = generate_batches_from_hdf5_file(cfg, f, f_size=1, zero_center_image=xs_mean, yield_mc_info=True)
+    f = next(orca.io.yield_files("val"))
+    generator = generate_batches_from_hdf5_file(orca, f, f_size=1, zero_center_image=xs_mean, yield_mc_info=True)
     model_inputs, ys, y_values = next(generator)  # y_values = mc_info for the event
 
     # doesnt work with dicts for whatever reason so transform into lists instead
@@ -321,14 +323,14 @@ def get_activations_and_weights(cfg, xs_mean, model, layer_name=None, learning_p
     return layer_names, activations, weights, y_values
 
 
-def plot_weights_and_activations(cfg, model, xs_mean, epoch):
+def plot_weights_and_activations(orca, model, xs_mean, epoch):
     """
     Plots the weights of a model and the activations for one event to a .pdf file.
 
     Parameters
     ----------
-    cfg : object Configuration
-        Configuration object containing all the configurable options in the OrcaNet scripts.
+    orca : object OrcaHandler
+        Contains all the configurable options in the OrcaNet scripts.
     model : ks.models.Model
         The model to do the predictions with.
     xs_mean : dict
@@ -337,10 +339,10 @@ def plot_weights_and_activations(cfg, model, xs_mean, epoch):
         Current epoch and fileno.
 
     """
-    layer_names, activations, weights, y_values = get_activations_and_weights(cfg, xs_mean, model, layer_name=None, learning_phase='test')
+    layer_names, activations, weights, y_values = get_activations_and_weights(orca, xs_mean, model, layer_name=None, learning_phase='test')
 
     fig, axes = plt.subplots()
-    pdf_name = cfg.get_subfolder("activations", create=True) + "/act_and_weights_plots_epoch_" + str(epoch) + '.pdf'
+    pdf_name = orca.io.get_subfolder("activations", create=True) + "/act_and_weights_plots_epoch_" + str(epoch) + '.pdf'
     pdf_activations_and_weights = PdfPages(pdf_name)
 
     # plot weights

@@ -20,19 +20,18 @@ Options:
 
 """
 from docopt import docopt
-from orcanet.core import orca_train, Configuration
-from orcanet.model_archs.model_setup import build_nn_model
-from orcanet.utilities.losses import get_all_loss_functions
-from orcanet_contrib.contrib import orca_label_modifiers, orca_sample_modifiers
+
+from orcanet.core import OrcaHandler
+from orcanet.model_archs.model_setup import OrcaModel
 
 
-def run_train(main_folder, list_file, config_file, model_file):
+def orca_train(output_folder, list_file, config_file, model_file):
     """
-    Use orca_train with a parser.
+    Run orca.train with predefined OrcaModel networks using a parser.
 
     Parameters
     ----------
-    main_folder : str
+    output_folder : str
         Path to the folder where everything gets saved to, e.g. the summary log file, the plots, the trained models, etc.
     list_file : str
         Path to a list file which contains pathes to all the h5 files that should be used for training and validation.
@@ -42,40 +41,31 @@ def run_train(main_folder, list_file, config_file, model_file):
         Path to a file with parameters to build a model of a predefined architecture with OrcaNet.
 
     """
-    # Set up the cfg object with the input data
-    cfg = Configuration(main_folder, list_file, config_file)
-    # Orca networks use some custom loss functions, which need to be handed to keras when loading models
-    cfg.custom_objects = get_all_loss_functions()
+    # Set up the OrcaHandler with the input data
+    orca = OrcaHandler(output_folder, list_file, config_file)
 
-    # Add Info for building a model with OrcaNet to the cfg object
-    cfg.set_from_model_file(model_file)
-
+    # The OrcaModel class allows to use some predefined models
+    orcamodel = OrcaModel(model_file)
     # If this is the start of the training, a compiled model needs to be handed to the orca_train function
-    if cfg.get_latest_epoch() == (0, 0):
-        # Build it
-        initial_model = build_nn_model(cfg)
+    # No model is required if the training is continued, as it will be loaded automatically
+    if orca.cfg.get_latest_epoch() == (0, 0):
+        initial_model = orcamodel.build(orca)
     else:
-        # No model is required if the training is continued, as it will be loaded automatically
         initial_model = None
+    # Load the modifiers and custom objects needed for this model
+    orcamodel.update_orca(orca)
 
-    model_data = cfg.get_modeldata()
-
-    if model_data.swap_4d_channels is not None:
-        cfg.sample_modifier = orca_sample_modifiers(model_data.swap_4d_channels, model_data.str_ident)
-
-    cfg.label_modifier = orca_label_modifiers(model_data.class_type)
-
-    orca_train(cfg, initial_model)
+    orca.train(initial_model)
 
 
 def parse_input():
     """ Run the orca_train function with a parser. """
     args = docopt(__doc__)
-    main_folder = args['FOLDER']
+    output_folder = args['FOLDER']
     list_file = args['LIST']
     config_file = args['CONFIG']
     model_file = args['MODEL']
-    run_train(main_folder, list_file, config_file, model_file)
+    orca_train(output_folder, list_file, config_file, model_file)
 
 
 if __name__ == '__main__':
