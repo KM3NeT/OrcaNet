@@ -8,11 +8,14 @@ They require the input and output layers of the network, as well as ever input s
 This makes it easy to assure that the right data is fed into the right layer of the network, especially if you have multiple inputs or outputs.
 
 **Hint:** If you have developed a new modifier, it might be smart to test if it actually does what it should with your data.
-If you have loaded your toml list file of input data in the Configuration object, you can get a batch of mc_info data like this:
+You can get a batch of samples ``xs`` and ``mc_info`` data from your toml list file like this:
 
 .. code-block:: python
 
-    xs, mc_info = cfg.get_batch()
+    from orcanet.core import OrcaHandler
+
+    orca = OrcaHandler(output_folder, list_file)
+    xs, mc_info = orca.io.get_batch()
 
 You can then apply your modifiers on them.
 
@@ -39,7 +42,7 @@ It can be set via
 
 .. code-block:: python
 
-    cfg.label_modifier = label_modifier
+    orca.cfg.label_modifier = label_modifier
 
 **Hint:** If the names of the dtypes in the toml list file contain the names of the output layers, no sample modifier is required!
 
@@ -99,7 +102,7 @@ It can be set via
 
 .. code-block:: python
 
-    cfg.sample_modifier = sample_modifier
+    orca.cfg.sample_modifier = sample_modifier
 
 **Hint:** If the names of the input sets in the toml list file and the names of the input layers match, no sample modifier is required!
 
@@ -172,6 +175,6 @@ It can be set via
 
 .. code-block:: python
 
-    cfg.dataset_modifier = dataset_modifier
+    orca.cfg.dataset_modifier = dataset_modifier
 
 **Hint:** If no dataset modifier is given, the following datasets will be created: mc_info, and two sets for every output layer (label and pred).
