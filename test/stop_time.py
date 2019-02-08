@@ -20,8 +20,8 @@ import os
 import time
 import numpy as np
 import h5py
-from orcanet.utilities.nn_utilities import generate_batches_from_hdf5_file, load_zero_center_data, get_labels
-from orcanet.core import Configuration
+from orcanet.utilities.nn_utilities import generate_batches_from_hdf5_file, load_zero_center_data
+from orcanet.core import OrcaHandler
 from orcanet.model_archs.model_setup import build_nn_model
 
 
@@ -148,23 +148,23 @@ def test_generators(batches, intermediate_log, functions, func_kwargs):
     modelfile = "/home/woody/capn/mppi013h/Code/OrcaNet/examples/settings_files/example_model.toml"
 
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-    cfg = Configuration("./test/", list_file)
-    cfg.zero_center_folder = zero_center_folder
-    train_files = next(cfg.yield_files("train"))
+    orca = OrcaHandler("./test/", list_file)
+    orca.cfg.zero_center_folder = zero_center_folder
+    train_files = next(orca.io.yield_files("train"))
     # cfg.use_local_node()
     print(batches, "batches from file", train_files)
-    print("Batchsize:", cfg.batchsize)
+    print("Batchsize:", orca.cfg.batchsize)
     f = h5py.File(list(train_files.values())[0], "r")
     print(f["x"].shape)
     xs_mean = None  # np.ones(f["x"].shape[1:])  # load_zero_center_data(cfg)
     f.close()
 
-    cfg.set_from_model_file(modelfile)
-    model = build_nn_model(cfg)
+    orca.cfg.import_model_file(modelfile)
+    model = build_nn_model(orca)
     # model.summary()
 
     # No large dataset in the new ys format exists, so use dummy data to train on instead
-    ys = np.ones((cfg.batchsize, 16))
+    ys = np.ones((orca.cfg.batchsize, 16))
     dtypes = [('event_id', '<f8'), ('particle_type', '<f8'), ('energy', '<f8'), ('is_cc', '<f8'), ('bjorkeny', '<f8'),
               ('dir_x', '<f8'), ('dir_y', '<f8'), ('dir_z', '<f8'), ('time_interaction', '<f8'), ('run_id', '<f8'),
               ('vertex_pos_x', '<f8'), ('vertex_pos_y', '<f8'), ('vertex_pos_z', '<f8'),
@@ -176,7 +176,7 @@ def test_generators(batches, intermediate_log, functions, func_kwargs):
     print("\n")
     for f_no, func in enumerate(functions):
         print("------------- Function", f_no, " -------------")
-        generator = func(cfg, train_files, zero_center_image=xs_mean, **func_kwargs[f_no])
+        generator = func(orca.cfg, train_files, zero_center_image=xs_mean, **func_kwargs[f_no])
         print("Shape of batches:", list(next(generator)[0].values())[0].shape, "\n")
         average_read_time, average_model_time = [], []
         for i in range(batches):

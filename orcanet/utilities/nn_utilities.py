@@ -10,7 +10,7 @@ from functools import reduce
 from contextlib import ExitStack
 
 
-def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_image=None, yield_mc_info=False, shuffle=False):
+def generate_batches_from_hdf5_file(orca, files_dict, f_size=None, zero_center_image=None, yield_mc_info=False, shuffle=False):
     """
     Yields batches of input data from h5 files.
 
@@ -20,8 +20,8 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
 
     Parameters
     ----------
-    cfg : object Configuration
-        Configuration object containing all the configurable options in the OrcaNet scripts.
+    orca : object OrcaHandler
+        Contains all the configurable options in the OrcaNet scripts.
     files_dict : dict or None
         Pathes of the files to train on.
         Keys: The name of every input (given in the toml list file, can be multiple).
@@ -51,20 +51,20 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
         Mc info from the file. Only yielded if yield_mc_info is True.
 
     """
-    batchsize = cfg.batchsize
+    batchsize = orca.cfg.batchsize
     # name of the datagroups in the file
-    samples_key = cfg.key_samples
-    mc_key = cfg.key_labels
+    samples_key = orca.cfg.key_samples
+    mc_key = orca.cfg.key_labels
     # If the batchsize is larger than the f_size, make batchsize smaller or nothing would be yielded
     if f_size is not None:
         if f_size < batchsize:
             batchsize = f_size
 
-    if cfg.label_modifier is not None:
-        label_modifier = cfg.label_modifier
+    if orca.cfg.label_modifier is not None:
+        label_modifier = orca.cfg.label_modifier
     else:
-        assert cfg._auto_label_modifier is not None, "Auto label modifier has not been set up (can be done with nn_utilities.get_auto_label_modifier)"
-        label_modifier = cfg._auto_label_modifier
+        assert orca.cfg._auto_label_modifier is not None, "Auto label modifier has not been set up (can be done with nn_utilities.get_auto_label_modifier)"
+        label_modifier = orca.cfg._auto_label_modifier
 
     with ExitStack() as stack:
         # a dict with the names of list inputs as keys, and the opened h5 files as values.
@@ -87,7 +87,7 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
         if shuffle:
             np.random.shuffle(sample_pos)
         # append some samples due to preloading by the fit_generator method
-        sample_pos = np.append(sample_pos, sample_pos[:cfg.max_queue_size])
+        sample_pos = np.append(sample_pos, sample_pos[:orca.cfg.max_queue_size])
 
         for sample_n in sample_pos:
             # A dict with every input name as key, and a batch of data as values
@@ -101,8 +101,8 @@ def generate_batches_from_hdf5_file(cfg, files_dict, f_size=None, zero_center_im
             y_values = list(files.values())[0][mc_key][sample_n:sample_n + batchsize]
 
             # Modify the samples and labels before feeding them into the network
-            if cfg.sample_modifier is not None:
-                xs = cfg.sample_modifier(xs)
+            if orca.cfg.sample_modifier is not None:
+                xs = orca.cfg.sample_modifier(xs)
 
             ys = label_modifier(y_values)
 
@@ -164,7 +164,7 @@ def get_inputs(model):
 # ------------- Zero center functions -------------#
 
 
-def load_zero_center_data(cfg):
+def load_zero_center_data(orca):
     """
     Gets the xs_mean array(s) that can be used for zero-centering.
 
@@ -174,8 +174,8 @@ def load_zero_center_data(cfg):
 
     Parameters
     ----------
-    cfg : object Configuration
-        Configuration object containing all the configurable options in the OrcaNet scripts.
+    orca : object OrcaHandler
+        Contains all the configurable options in the OrcaNet scripts.
 
     Returns
     -------
@@ -186,9 +186,9 @@ def load_zero_center_data(cfg):
         { "input_A" : ndarray, "input_B" : ndarray }
 
     """
-    all_train_files = cfg.get_train_files()
-    zero_center_folder = cfg.zero_center_folder
-    train_files_list_name = os.path.basename(cfg.get_list_file())
+    all_train_files = orca.cfg.get_files("train")
+    zero_center_folder = orca.cfg.zero_center_folder
+    train_files_list_name = os.path.basename(orca.cfg.get_list_file())
 
     xs_mean = {}
     # loop over multiple input data files for a single event, each input needs its own xs_mean
@@ -208,7 +208,7 @@ def load_zero_center_data(cfg):
         else:
             print('Calculating the xs_mean_array for list input ' + str(input_key) + ' in order to zero_center the data!')
             # if the train dataset is split over multiple files, we need to average over the single xs_mean_for_ip arrays.
-            xs_mean_for_ip_i = get_mean_image(all_train_files_for_ip_i, cfg.key_samples, cfg.n_gpu[0])
+            xs_mean_for_ip_i = get_mean_image(all_train_files_for_ip_i, orca.cfg.key_samples)
 
             filename = zero_center_folder + train_files_list_name + '_input_' + str(input_key) + '.npz'
             np.savez(filename, xs_mean=xs_mean_for_ip_i, zero_center_used_ip_files=all_train_files_for_ip_i)
@@ -276,17 +276,16 @@ def get_precalculated_xs_mean_if_exists(zero_center_files, all_train_files_for_i
     return xs_mean_for_ip_i
 
 
-def get_mean_image(filepaths, key_samples, n_gpu):
+def get_mean_image(filepaths, key_samples):
     """
     Returns the mean_image of a xs dataset.
     Calculating still works if xs is larger than the available memory and also if the file is compressed!
     :param list filepaths: Filepaths of the data upon which the mean_image should be calculated.
     :param str key_samples: The name of the datagroup in your h5 input files which contains the samples to the network.
-    :param int n_gpu: Number of used gpu's that is related to how much RAM is available (16G per GPU).
     :return: ndarray xs_mean: mean_image of the x dataset. Can be used for zero-centering later on.
     """
     # check available memory and divide the mean calculation in steps
-    total_memory = n_gpu * 8e9  # In bytes. Take 1/2 of what is available per GPU (16G), just to make sure.
+    total_memory = 4e9  # * n_gpu # In bytes. Take max. 1/2 of what is available per GPU (16G), just to make sure.
 
     xs_means = []
     file_sizes = []
@@ -375,14 +374,13 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
     Averages the losses of the model over some number of batches, and then writes that in a line in the logfile.
 
     """
-
-    def __init__(self, cfg, model, epoch):
+    def __init__(self, orca, model, epoch):
         """
 
         Parameters
         ----------
-        cfg : object Configuration
-            Configuration object containing all the configurable options in the OrcaNet scripts.
+        orca : object OrcaHandler
+            Contains all the configurable options in the OrcaNet scripts.
         model : ks.Modle
             The keras model.
         epoch : tuple
@@ -390,14 +388,14 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
 
         """
         ks.callbacks.Callback.__init__(self)
-        self.display = cfg.train_logger_display
+        self.display = orca.cfg.train_logger_display
         self.epoch_number = epoch[0]
         self.f_number = epoch[1]
         self.model = model
-        self.flush = cfg.train_logger_flush
+        self.flush = orca.cfg.train_logger_flush
 
         self.seen = 0
-        self.logfile_train_fname = cfg.get_subfolder("log_train", create=True) + '/log_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.txt'
+        self.logfile_train_fname = orca.io.get_subfolder("log_train", create=True) + '/log_epoch_' + str(epoch[0]) + '_file_' + str(epoch[1]) + '.txt'
         self.loglist = []
 
         self.cum_metrics = {}
@@ -405,8 +403,8 @@ class BatchLevelPerformanceLogger(ks.callbacks.Callback):
             self.cum_metrics[metric] = 0
 
         self.steps_per_total_epoch, self.steps_cum = 0, [0]
-        for f_size in cfg.get_file_sizes("train"):
-            steps_per_file = int(f_size / cfg.batchsize)
+        for f_size in orca.io.get_file_sizes("train"):
+            steps_per_file = int(f_size / orca.cfg.batchsize)
             self.steps_per_total_epoch += steps_per_file
             self.steps_cum.append(self.steps_cum[-1] + steps_per_file)
 
