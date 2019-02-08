@@ -119,19 +119,36 @@ class OrcaModel:
         return model
 
     def update_orca(self, orca):
-        """ Update the orca object for using the model.
         """
-        assert orca.cfg.sample_modifier is None, "Can not set sample modifier: " \
-                                                 "Has already been set: {}".format(orca.cfg.sample_modifier)
-        assert orca.cfg.label_modifier is None, "Can not set label modifier: " \
-                                                "Has already been set: {}".format(orca.cfg.label_modifier)
-        assert orca.cfg.custom_objects is None, "Can not set custom objects: " \
-                                                "Have already been set: {}".format(orca.cfg.custom_objects)
+        Update the orca object for using the model.
 
+        If sth is None, dont update it in the orca. Otherwise, make sure its None
+        there before setting anything (to not screw with the orca).
+
+        """
         if self.swap_4d_channels is not None:
-            orca.cfg.sample_modifier = orca_sample_modifiers(self.swap_4d_channels, self.str_ident)
-        orca.cfg.label_modifier = orca_label_modifiers(self.class_type)
-        orca.cfg.custom_objects = self.custom_objects
+            sample_modifier = orca_sample_modifiers(self.swap_4d_channels, self.str_ident)
+        else:
+            sample_modifier = None
+        label_modifier = orca_label_modifiers(self.class_type)
+
+        if sample_modifier is not None:
+            assert orca.cfg.sample_modifier is None, "Can not set sample modifier: " \
+                                                     "Has already been set: {}".format(orca.cfg.sample_modifier)
+        if label_modifier is not None:
+            assert orca.cfg.label_modifier is None, "Can not set label modifier: " \
+                                                    "Has already been set: {}".format(orca.cfg.label_modifier)
+        if self.custom_objects is not None:
+            assert orca.cfg.custom_objects is None, "Can not set custom objects: " \
+                                                    "Have already been set: {}".format(orca.cfg.custom_objects)
+
+        if sample_modifier is not None:
+            orca.cfg.sample_modifier = sample_modifier
+        if label_modifier is not None:
+            orca.cfg.label_modifier = label_modifier
+        if self.custom_objects is not None:
+            orca.cfg.custom_objects = self.custom_objects
+
 
     def _compile_model(self, model):
         """

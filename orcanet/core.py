@@ -9,7 +9,7 @@ import warnings
 import keras as ks
 
 from orcanet.backend import train_and_validate_model, make_model_prediction
-from orcanet.in_out import read_out_list_file, read_out_config_file, read_out_model_file, use_node_local_ssd_for_input, write_full_logfile_startup, IOHandler
+from orcanet.in_out import read_out_list_file, read_out_config_file, use_node_local_ssd_for_input, write_full_logfile_startup, IOHandler
 from orcanet.utilities.nn_utilities import load_zero_center_data, get_auto_label_modifier
 
 
