@@ -186,7 +186,7 @@ def load_zero_center_data(orca):
         { "input_A" : ndarray, "input_B" : ndarray }
 
     """
-    all_train_files = orca.cfg.get_train_files()
+    all_train_files = orca.cfg.get_files("train")
     zero_center_folder = orca.cfg.zero_center_folder
     train_files_list_name = os.path.basename(orca.cfg.get_list_file())
 

@@ -149,7 +149,7 @@ class IOHandler(object):
             Toml-list input names as keys, list of the bins as values.
 
         """
-        train_files = self.cfg.get_train_files()
+        train_files = self.cfg.get_files("train")
         n_bins = {}
         for input_key in train_files:
             with h5py.File(train_files[input_key][0], "r") as f:
@@ -212,13 +212,7 @@ class IOHandler(object):
             The number of files.
 
         """
-        if which == "train":
-            files = self.cfg.get_train_files()
-        elif which == "val":
-            files = self.cfg.get_val_files()
-        else:
-            raise NameError("Unknown fileset name ", which)
-
+        files = self.cfg.get_files(which)
         no_of_files = len(list(files.values())[0])
         return no_of_files
 
@@ -238,13 +232,7 @@ class IOHandler(object):
             They will be yielded in the same order as they are given in the toml file.
 
         """
-        if which == "train":
-            files = self.cfg.get_train_files()
-        elif which == "val":
-            files = self.cfg.get_val_files()
-        else:
-            raise NameError("Unknown fileset name ", which)
-
+        files = self.cfg.get_files(which)
         for file_no in range(self.get_no_of_files(which)):
             files_dict = {key: files[key][file_no] for key in files}
             yield files_dict
@@ -516,12 +504,12 @@ def write_full_logfile_startup(orca):
         f_out.write("List file path:\t"+orca.cfg.get_list_file()+"\n")
 
         f_out.write("Given trainfiles in the .list file:\n")
-        for input_name, input_files in orca.cfg.get_train_files().items():
+        for input_name, input_files in orca.cfg.get_files("train").items():
             f_out.write(input_name + ":")
             [f_out.write("\t" + input_file + "\n") for input_file in input_files]
 
         f_out.write("Given validation files in the .list file:\n")
-        for input_name, input_files in orca.cfg.get_val_files().items():
+        for input_name, input_files in orca.cfg.get_files("val").items():
             f_out.write(input_name + ":")
             [f_out.write("\t" + input_file + "\n") for input_file in input_files]
 

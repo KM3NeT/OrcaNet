@@ -20,7 +20,7 @@ class Configuration(object):
     TODO add a clober script that properly deletes models + logfiles
     Sensible default values were chosen for the settings.
     You can change the all of these public attributes (the ones without a leading underscore _) either directly or with a
-    .toml config file via the method import_config_file().
+    .toml config file via the method update_config().
 
     Attributes
     ----------
@@ -157,7 +157,7 @@ class Configuration(object):
         if list_file is not None:
             self.import_list_file(list_file)
         if config_file is not None:
-            self.import_config_file(config_file)
+            self.update_config(config_file)
 
     def import_list_file(self, list_file):
         """
@@ -169,17 +169,15 @@ class Configuration(object):
             Path to a toml list file with pathes to all the h5 files that should be used for training and validation.
 
         """
-        if self._list_file is None:
-            self._train_files, self._val_files = read_out_list_file(list_file)
-            self._list_file = list_file
-        else:
-            raise AssertionError("You tried to load filepathes from a list file, but pathes have already been loaded \
-            for this object. (From the file " + self._list_file + ")\nYou should not use \
-            two different list files for one Configuration object!")
+        assert self._list_file is not None, "You tried to load filepathes from a list file, but pathes have already " \
+                                            "been loaded for this object. (From the file " + self._list_file \
+                                            + ")\nYou can not use two different list files at once!"
+        self._train_files, self._val_files = read_out_list_file(list_file)
+        self._list_file = list_file
 
-    def import_config_file(self, config_file):
+    def update_config(self, config_file):
         """
-        Overwrite default attribute values with values from a config file.
+        Update the default configuration with values from a config file.
 
         Parameters
         ----------
@@ -189,14 +187,8 @@ class Configuration(object):
         """
         user_values = read_out_config_file(config_file)
         for key in user_values:
-            if hasattr(self, key):
-                setattr(self, key, user_values[key])
-            else:
-                raise AssertionError("Unknown attribute "+str(key)+" in config file " + config_file)
-
-    def import_model_file(self, model_file):
-        """ Set attributes for generating models with OrcaNet. """
-        self._modeldata = read_out_model_file(model_file)
+            assert hasattr(self, key), "Unknown attribute "+str(key)+" in config file " + config_file
+            setattr(self, key, user_values[key])
 
     def get_list_file(self):
         """
@@ -205,35 +197,41 @@ class Configuration(object):
         """
         return self._list_file
 
-    def get_train_files(self):
+    def get_files(self, which):
         """
-        Get the trainining file paths.
+        Get the training file paths.
 
         Returns
         -------
         dict
-            A dict containing the paths to the training files on which the model will be trained on.
+            A dict containing the paths to the training or validation files on which the model will be trained on.
             Example for the format for two input sets with two files each:
                     {
-                     "input_A" : ('path/to/set_A_train_file_1.h5', 'path/to/set_A_train_file_2.h5'),
-                     "input_B" : ('path/to/set_B_train_file_1.h5', 'path/to/set_B_train_file_2.h5'),
+                     "input_A" : ('path/to/set_A_file_1.h5', 'path/to/set_A_file_2.h5'),
+                     "input_B" : ('path/to/set_B_file_1.h5', 'path/to/set_B_file_2.h5'),
                     }
         """
-        assert self._train_files is not None, "No train files have been specified!"
-        return self._train_files
+        if which == "train":
+            assert self._train_files is not None, "No train files have been specified!"
+            return self._train_files
+        elif which == "val":
+            assert self._val_files is not None, "No validation files have been specified!"
+            return self._val_files
+        else:
+            raise NameError("Unknown fileset name ", which)
 
-    def get_val_files(self):
+    def use_local_node(self):
         """
-        Get the validation file paths.
+        Copies the test and val files to the node-local ssd scratch folder and sets the new filepaths of the train and val data.
+        Speeds up I/O and reduces RRZE network load.
+        """
+        train_files_ssd, val_files_ssd = use_node_local_ssd_for_input(self.get_files("train"), self.get_files("val"))
+        self._train_files = train_files_ssd
+        self._val_files = val_files_ssd
 
-        Returns
-        -------
-        dict
-            A dict containing the paths to the validation files on which the model will be validated on.
-            Same format as th training files above.
-        """
-        assert self._val_files is not None, "No validation files have been specified!"
-        return self._val_files
+    def import_model_file(self, model_file):
+        """ Set attributes for generating models with OrcaNet. """
+        self._modeldata = read_out_model_file(model_file)
 
     def get_modeldata(self):
         """
@@ -264,15 +262,6 @@ class Configuration(object):
         """
         return self._modeldata
 
-    def use_local_node(self):
-        """
-        Copies the test and val files to the node-local ssd scratch folder and sets the new filepaths of the train and val data.
-        Speeds up I/O and reduces RRZE network load.
-        """
-        train_files_ssd, test_files_ssd = use_node_local_ssd_for_input(self.get_train_files(), self.get_val_files())
-        self._train_files = train_files_ssd
-        self._val_files = test_files_ssd
-
 
 class OrcaHandler:
     def __init__(self, main_folder, list_file=None, config_file=None):
@@ -293,6 +282,8 @@ class OrcaHandler:
             the most recent saved model will be loaded otherwise.
 
         """
+        assert self.cfg.get_list_file() is not None, "No files specified. You need to load a toml list file " \
+                                                     "with your files before training"
         if self.cfg.filter_out_tf_garbage:
             os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
         self.io.get_subfolder(create=True)
@@ -339,6 +330,8 @@ class OrcaHandler:
             The path to the created evaluation file.
 
         """
+        assert self.cfg.get_list_file() is not None, "No files specified. You need to load a toml list file " \
+                                                     "with your files before predicting"
         if self.cfg.filter_out_tf_garbage:
             os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 
