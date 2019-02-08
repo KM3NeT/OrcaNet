@@ -9,7 +9,7 @@ import toml
 
 from orcanet.model_archs.short_cnn_models import create_vgg_like_model_multi_input_from_single_nns, create_vgg_like_model
 from orcanet.model_archs.wide_resnet import create_wide_residual_network
-from orcanet.utilities.losses import get_all_loss_functions
+from orcanet.model_archs.losses import get_all_loss_functions
 from orcanet_contrib.contrib import orca_label_modifiers, orca_sample_modifiers
 
 
@@ -26,6 +26,19 @@ class OrcaModel:
         Typically read in from a .toml file.
     optimizer : str
         Specifies, if "Adam" or "SGD" should be used as optimizer.
+    nn_arch : str
+        Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
+    class_type : str
+        Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
+        I.e. (2, 'track-shower')
+    str_ident : str
+        Optional string identifier that gets appended to the modelname. Useful when training models which would have
+        the same modelname. Also used for defining models and projections!
+    swap_4d_channels : None or str
+        For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
+        Currently available: None -> XYZ-T ; 'yzt-x' -> YZT-X, TODO add multi input options
+    kwargs : dict
+        Keyword arguments for the model generation.
 
     """
 
@@ -99,6 +112,7 @@ class OrcaModel:
             raise ValueError('Currently, only "WRN" or "VGG" are available as nn_arch')
 
         if parallelized:
+            # model = ks.utils.multi_gpu_model(model, n_gpu[1])
             model, orca.cfg.batchsize = parallelize_model_to_n_gpus(model, n_gpu, batchsize)
         self._compile_model(model)
 
@@ -193,7 +207,7 @@ def parallelize_model_to_n_gpus(model, n_gpu, batchsize):
             assert n_gpu[0] > 1 and isinstance(n_gpu[0],
                                                int), 'You probably made a typo: n_gpu must be an int with n_gpu >= 1!'
 
-            from utilities.multi_gpu.multi_gpu import get_available_gpus, make_parallel, print_mgpu_modelsummary
+            from orcanet.model_archs.multi_gpu.multi_gpu import get_available_gpus, make_parallel, print_mgpu_modelsummary
 
             gpus_list = get_available_gpus(n_gpu[0])
             ngpus = len(gpus_list)

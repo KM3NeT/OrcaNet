@@ -151,7 +151,6 @@ class Configuration(object):
         self._train_files = None
         self._val_files = None
         self._list_file = None
-        self._modeldata = None
 
         # Load the optionally given list and config files.
         if list_file is not None:
@@ -228,39 +227,6 @@ class Configuration(object):
         train_files_ssd, val_files_ssd = use_node_local_ssd_for_input(self.get_files("train"), self.get_files("val"))
         self._train_files = train_files_ssd
         self._val_files = val_files_ssd
-
-    def import_model_file(self, model_file):
-        """ Set attributes for generating models with OrcaNet. """
-        self._modeldata = read_out_model_file(model_file)
-
-    def get_modeldata(self):
-        """
-        Returns the optional info only required for building a predefined model with OrcaNet.
-        It is not needed for executing orcatrain. It is set via self.load_from_model_file.
-
-        modeldata.nn_arch : str
-            Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
-        modeldata.loss_opt : tuple(dict, dict/str/None,)
-            Tuple that contains 1) the loss_functions and loss_weights as dicts (this is the losses table from the toml file)
-            and 2) the metrics.
-        modeldata.class_type : str
-            Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
-            I.e. (2, 'track-shower')
-        modeldata.str_ident : str
-            Optional string identifier that gets appended to the modelname. Useful when training models which would have
-            the same modelname. Also used for defining models and projections!
-        modeldata.swap_4d_channels : None or str
-            For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
-            Currently available: None -> XYZ-T ; 'yzt-x' -> YZT-X, TODO add multi input options
-        modeldata.args : dict
-            Keyword arguments for the model generation.
-
-        Returns
-        -------
-        namedtuple or None
-
-        """
-        return self._modeldata
 
 
 class OrcaHandler:

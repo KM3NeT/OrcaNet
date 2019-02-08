@@ -518,12 +518,6 @@ def write_full_logfile_startup(orca):
             if not key.startswith("_"):
                 f_out.write("   {}:\t{}\n".format(key, getattr(orca.cfg, key)))
 
-        modeldata = orca.cfg.get_modeldata()
-        if modeldata is not None:
-            f_out.write("Given modeldata:")
-            for key, val in modeldata._asdict().items():
-                f_out.write("\t{}:\t{}".format(key, val))
-
         f_out.write("\n")
 
 
