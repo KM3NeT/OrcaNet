@@ -36,7 +36,7 @@ class OrcaModel:
         the same modelname. Also used for defining models and projections!
     swap_4d_channels : None or str
         For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
-        Currently available: None -> XYZ-T ; 'yzt-x' -> YZT-X, TODO add multi input options
+        Currently available: None -> XYZ-T ; 'yzt-x' -> YZT-X
     kwargs : dict
         Keyword arguments for the model generation.
 
@@ -71,7 +71,7 @@ class OrcaModel:
 
         self.kwargs = file_content
 
-    def build(self, orca, parallelized=False):
+    def build(self, orca, n_gpu=None):
         """
         Function that builds a Keras nn model with a specific type of architecture.
 
@@ -82,8 +82,8 @@ class OrcaModel:
         ----------
         orca : Object OrcaHandler
             Contains all the configurable options in the OrcaNet scripts.
-        parallelized : bool
-            If true, will parallelize the model to the n_gpus given in the cfg.
+        n_gpu : int or None
+            Number of gpu's that the model should be parallelized to. None for no parallelization.
 
         Returns
         -------
@@ -92,7 +92,6 @@ class OrcaModel:
 
         """
         n_bins = orca.io.get_n_bins()
-        n_gpu = orca.cfg.n_gpu
         batchsize = orca.cfg.batchsize
 
         if self.nn_arch == 'WRN':
@@ -111,8 +110,7 @@ class OrcaModel:
         else:
             raise ValueError('Currently, only "WRN" or "VGG" are available as nn_arch')
 
-        if parallelized:
-            # model = ks.utils.multi_gpu_model(model, n_gpu[1])
+        if n_gpu is not None:
             model, orca.cfg.batchsize = parallelize_model_to_n_gpus(model, n_gpu, batchsize)
         self._compile_model(model)
 
@@ -148,7 +146,6 @@ class OrcaModel:
             orca.cfg.label_modifier = label_modifier
         if self.custom_objects is not None:
             orca.cfg.custom_objects = self.custom_objects
-
 
     def _compile_model(self, model):
         """
@@ -194,7 +191,7 @@ class OrcaModel:
         return model
 
 
-def parallelize_model_to_n_gpus(model, n_gpu, batchsize):
+def parallelize_model_to_n_gpus(model, n_gpu, batchsize, mode="avolkov"):
     """
     Parallelizes the nn-model to multiple gpu's.
 
@@ -204,10 +201,12 @@ def parallelize_model_to_n_gpus(model, n_gpu, batchsize):
     ----------
     model : ks.model.Model
         Keras model of a neural network.
-    n_gpu : tuple(int, str)
-        Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov') [1].
+    n_gpu : int
+        Number of gpu's that the model should be parallelized to.
     batchsize : int
         Batchsize that is used for the training / inferencing of the cnn.
+    mode : str
+        Avolkov or keras.
 
     Returns
     -------
@@ -217,25 +216,27 @@ def parallelize_model_to_n_gpus(model, n_gpu, batchsize):
         The new batchsize scaled by the number of used gpu's.
 
     """
-    if n_gpu[1] == 'avolkov':
-        if n_gpu[0] == 1:
-            return model, batchsize
-        else:
-            assert n_gpu[0] > 1 and isinstance(n_gpu[0],
-                                               int), 'You probably made a typo: n_gpu must be an int with n_gpu >= 1!'
+    assert n_gpu > 1 and isinstance(n_gpu, int), 'You probably made a typo: n_gpu must be an int with n_gpu >= 1!'
 
-            from orcanet.model_archs.multi_gpu.multi_gpu import get_available_gpus, make_parallel, print_mgpu_modelsummary
+    if mode == "avolkov":
+        from orcanet.model_archs.multi_gpu.multi_gpu import get_available_gpus, make_parallel, print_mgpu_modelsummary
 
-            gpus_list = get_available_gpus(n_gpu[0])
-            ngpus = len(gpus_list)
-            print('Using GPUs: {}'.format(', '.join(gpus_list)))
-            batchsize = batchsize * ngpus
+        gpus_list = get_available_gpus(n_gpu)
+        ngpus = len(gpus_list)
+        print('Using GPUs: {}'.format(', '.join(gpus_list)))
 
-            # Data-Parallelize the model via function
-            model = make_parallel(model, gpus_list, usenccl=False, initsync=True, syncopt=False, enqueue=False)
-            print_mgpu_modelsummary(model)
+        # Data-Parallelize the model via function
+        model = make_parallel(model, gpus_list, usenccl=False, initsync=True, syncopt=False, enqueue=False)
+        print_mgpu_modelsummary(model)
+        batchsize = batchsize * ngpus
 
-            return model, batchsize
+    elif mode == "keras":
+        # For keras, one has to save the original model, not the saved one...
+        model = ks.utils.multi_gpu_model(model, n_gpu)
+        batchsize *= n_gpu
 
     else:
-        raise ValueError('Currently, no multi_gpu mode other than "avolkov" is available.')
+        raise NameError("Unknown mode", mode)
+
+    return model, batchsize
+

@@ -208,7 +208,7 @@ def load_zero_center_data(orca):
         else:
             print('Calculating the xs_mean_array for list input ' + str(input_key) + ' in order to zero_center the data!')
             # if the train dataset is split over multiple files, we need to average over the single xs_mean_for_ip arrays.
-            xs_mean_for_ip_i = get_mean_image(all_train_files_for_ip_i, orca.cfg.key_samples, orca.cfg.n_gpu[0])
+            xs_mean_for_ip_i = get_mean_image(all_train_files_for_ip_i, orca.cfg.key_samples)
 
             filename = zero_center_folder + train_files_list_name + '_input_' + str(input_key) + '.npz'
             np.savez(filename, xs_mean=xs_mean_for_ip_i, zero_center_used_ip_files=all_train_files_for_ip_i)
@@ -276,17 +276,16 @@ def get_precalculated_xs_mean_if_exists(zero_center_files, all_train_files_for_i
     return xs_mean_for_ip_i
 
 
-def get_mean_image(filepaths, key_samples, n_gpu):
+def get_mean_image(filepaths, key_samples):
     """
     Returns the mean_image of a xs dataset.
     Calculating still works if xs is larger than the available memory and also if the file is compressed!
     :param list filepaths: Filepaths of the data upon which the mean_image should be calculated.
     :param str key_samples: The name of the datagroup in your h5 input files which contains the samples to the network.
-    :param int n_gpu: Number of used gpu's that is related to how much RAM is available (16G per GPU).
     :return: ndarray xs_mean: mean_image of the x dataset. Can be used for zero-centering later on.
     """
     # check available memory and divide the mean calculation in steps
-    total_memory = n_gpu * 8e9  # In bytes. Take 1/2 of what is available per GPU (16G), just to make sure.
+    total_memory = 4e9  # * n_gpu # In bytes. Take max. 1/2 of what is available per GPU (16G), just to make sure.
 
     xs_means = []
     file_sizes = []

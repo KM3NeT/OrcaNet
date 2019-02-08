@@ -7,9 +7,10 @@ Core scripts for the OrcaNet package.
 import os
 import warnings
 import keras as ks
+import toml
 
 from orcanet.backend import train_and_validate_model, make_model_prediction
-from orcanet.in_out import read_out_list_file, read_out_config_file, use_node_local_ssd_for_input, write_full_logfile_startup, IOHandler
+from orcanet.in_out import read_out_list_file, use_node_local_ssd_for_input, write_full_logfile_startup, IOHandler
 from orcanet.utilities.nn_utilities import load_zero_center_data, get_auto_label_modifier
 
 
@@ -32,7 +33,7 @@ class Configuration(object):
     dataset_modifier : function or None
         For orca_eval: Function that determines which datasets get created in the resulting h5 file.
         If none, every output layer will get one dataset each for both the label and the prediction, and one dataset
-        containing the mc_info from the validation files. TODO online doc
+        containing the mc_info from the validation files.
     filter_out_tf_garbage : bool
         If true, surpresses the tensorflow info logs which usually spam the terminal.
     epochs_to_train : int or None
@@ -53,7 +54,6 @@ class Configuration(object):
         Operation to be performed on batches of labels read from the input files before they are fed into the model.
         If None is given, all labels with the same name as the output layers will be passed to the model as a dict,
         with the keys being the dtype names.
-        TODO online doc on how to do this
     learning_rate : float or tuple or function
         The learning rate for the training.
         If it is a float, the learning rate will be constantly this value.
@@ -68,11 +68,8 @@ class Configuration(object):
         from the generator.
     n_events : None or int
         For testing purposes. If not the whole .h5 file should be used for training, define the number of samples.
-    n_gpu : tuple(int, str)
-        Number of gpu's that the model should be parallelized to [0] and the multi-gpu mode (e.g. 'avolkov') [1]. TODO should this be here?
     sample_modifier : function or None
         Operation to be performed on batches of samples read from the input files before they are fed into the model.
-        TODO online doc on how to do this
     shuffle_train : bool
         If true, the order in which batches are read out from the files during training are randomized each time they
         are read out.
@@ -127,7 +124,6 @@ class Configuration(object):
         self.learning_rate = 0.001
         self.max_queue_size = 10
         self.n_events = None
-        self.n_gpu = (1, 'avolkov')
         self.sample_modifier = None
         self.shuffle_train = False
         self.train_logger_display = 100
@@ -180,11 +176,11 @@ class Configuration(object):
 
         Parameters
         ----------
-        config_file : str or None
-            Path to a toml config file with attributes that are used instead of the default ones.
+        config_file : str
+            Path to a toml config file with attribute values to use instead of the default ones.
 
         """
-        user_values = read_out_config_file(config_file)
+        user_values = toml.load(config_file)["config"]
         for key in user_values:
             assert hasattr(self, key), "Unknown attribute "+str(key)+" in config file " + config_file
             setattr(self, key, user_values[key])

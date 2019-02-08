@@ -374,29 +374,6 @@ class IOHandler(object):
         return xs, mc_info
 
 
-def read_out_config_file(file):
-    """
-    Extract the variables of a model from the .toml file and convert them to a dict.
-
-    Toml can not handle arrays with mixed types of variables, so some conversion are done.
-
-    Parameters
-    ----------
-    file : str
-        Path and name of the .toml file that defines the properties of the model.
-
-    Returns
-    -------
-    keyword_arguments : dict
-        Values for the OrcaNet scripts, as listed in the Configuration class.
-
-    """
-    file_content = toml.load(file)["config"]
-    if "n_gpu" in file_content:
-        file_content["n_gpu"][0] = int(file_content["n_gpu"][0])
-    return file_content
-
-
 def read_out_list_file(file):
     """
     Reads out a list file in .toml format containing the pathes to training
@@ -448,42 +425,6 @@ def read_out_list_file(file):
     if not n_val.count(n_val[0]) == len(n_val):
         raise AssertionError("The specified validation inputs do not all have the same number of files!")
     return train_files, validation_files
-
-
-def read_out_model_file(file):
-    """
-    Read out parameters for creating models with OrcaNet from a toml file.
-
-    Parameters
-    ----------
-    file : str
-        Path to the toml file.
-
-    Returns
-    -------
-    modeldata : namedtuple
-        Infos for building a predefined model with OrcaNet.
-
-    """
-    file_content = toml.load(file)['model']
-    nn_arch = file_content.pop('nn_arch')
-    compile_opt = file_content.pop('compile_opt')
-
-    class_type = ''
-    str_ident = ''
-    swap_4d_channels = None
-
-    if 'class_type' in file_content:
-        class_type = file_content.pop('class_type')
-    if 'str_ident' in file_content:
-        str_ident = file_content.pop('str_ident')
-    if 'swap_4d_channels' in file_content:
-        swap_4d_channels = file_content.pop('swap_4d_channels')
-
-    ModelData = namedtuple('ModelData', 'nn_arch compile_opt class_type str_ident swap_4d_channels args')
-    modeldata = ModelData(nn_arch, compile_opt, class_type, str_ident, swap_4d_channels, file_content)
-
-    return modeldata
 
 
 def write_full_logfile_startup(orca):
