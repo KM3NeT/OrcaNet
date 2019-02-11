@@ -48,7 +48,7 @@ def orca_train(output_folder, list_file, config_file, model_file):
     orcamodel = OrcaModel(model_file)
     # If this is the start of the training, a compiled model needs to be handed to the orca_train function
     # No model is required if the training is continued, as it will be loaded automatically
-    if orca.cfg.get_latest_epoch() == (0, 0):
+    if orca.io.get_latest_epoch() == (0, 0):
         initial_model = orcamodel.build(orca)
     else:
         initial_model = None
