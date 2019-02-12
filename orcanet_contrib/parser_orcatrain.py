@@ -25,7 +25,7 @@ from orcanet.core import OrcaHandler
 from orcanet.model_archs.model_setup import OrcaModel
 
 
-def orca_train(output_folder, list_file, config_file, model_file):
+def orca_train(output_folder, list_file, config_file, model_file, recompile_model=False):
     """
     Run orca.train with predefined OrcaModel networks using a parser.
 
@@ -46,6 +46,7 @@ def orca_train(output_folder, list_file, config_file, model_file):
 
     # The OrcaModel class allows to use some predefined models
     orcamodel = OrcaModel(model_file)
+
     # If this is the start of the training, a compiled model needs to be handed to the orca_train function
     # No model is required if the training is continued, as it will be loaded automatically
     if orca.io.get_latest_epoch() == (0, 0):
@@ -55,7 +56,12 @@ def orca_train(output_folder, list_file, config_file, model_file):
     # Load the modifiers and custom objects needed for this model
     orcamodel.update_orca(orca)
 
-    orca.train(initial_model)
+    if recompile_model is False:
+        recompiled_model = None
+    else:
+        recompiled_model = orcamodel.recompile_model(orca)
+
+    orca.train(initial_model, force_model=recompiled_model)
 
 
 def parse_input():
