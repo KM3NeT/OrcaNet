@@ -53,18 +53,16 @@ def orca_train(output_folder, list_file, config_file, model_file, recompile_mode
     # If this is the start of the training, a compiled model needs to be handed to the orca_train function
     # No model is required if the training is continued, as it will be loaded automatically
     if orca.io.get_latest_epoch() == (0, 0):
-        initial_model = orcamodel.build(orca)
+        model = orcamodel.build(orca)
     else:
-        initial_model = None
+        model = None
     # Load the modifiers and custom objects needed for this model
     orcamodel.update_orca(orca)
 
-    if recompile_model is False:
-        recompiled_model = None
-    else:
-        recompiled_model = orcamodel.recompile_model(orca)
+    if recompile_model is True:
+        model = orcamodel.recompile_model(orca)
 
-    orca.train(initial_model, forced_model=recompiled_model)
+    orca.train(model=model, force_model=recompile_model)
 
 
 def parse_input():
