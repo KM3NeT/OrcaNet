@@ -13,21 +13,21 @@ swap_4d_channels = 'xyz-t_and_xyz-c_single_input'
 # The loss(es) of the model are listed here.
 # The keyword is the name of the respective layer in the model, for which this loss is used.
 # The value is a dict with a loss function that it will use, and optionally a weight to each loss.
-dx = {function="mse", weight=10}
-dy = {function="mse", weight=10}
-dz = {function='mean_absolute_error', weight=15}
+dx = {function="mean_absolute_error", weight=25}
+dy = {function="mean_absolute_error", weight=25}
+dz = {function='mean_absolute_error', weight=35}
 vx = {function='mean_absolute_error', weight=1}
 vy = {function='mean_absolute_error', weight=1}
 vz = {function='mean_absolute_error', weight=1}
-vt = {function='mean_absolute_error', weight=1e-10}
-e  = {function='mean_absolute_error'}
-by = {function='mean_absolute_error', weight=10}
+vt = {function='mean_absolute_error', weight=1e-20}
+e  = {function='mean_absolute_error', weight=1}
+by = {function='mean_absolute_error', weight=20}
 dx_err = {function='loss_uncertainty_mse'}
 dy_err = {function='loss_uncertainty_mse'}
 dz_err = {function='loss_uncertainty_mse', weight=1.25}
-vx_err = {function='loss_uncertainty_mse'}
-vy_err = {function='loss_uncertainty_mse'}
-vz_err = {function='loss_uncertainty_mse'}
-vt_err = {function='loss_uncertainty_mse', weight=1e-10}
-e_err  = {function='loss_uncertainty_mse', weight=1e-2}
+vx_err = {function='loss_uncertainty_mse', weight=5e-4}
+vy_err = {function='loss_uncertainty_mse', weight=5e-4}
+vz_err = {function='loss_uncertainty_mse', weight=5e-4}
+vt_err = {function='loss_uncertainty_mse', weight=1e-20}
+e_err  = {function='loss_uncertainty_mse', weight=1e-3}
 by_err = {function='loss_uncertainty_mse'}

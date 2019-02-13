@@ -190,6 +190,30 @@ class OrcaModel:
         model.compile(loss=loss_functions, optimizer=optimizer, metrics=loss_metrics, loss_weights=loss_weights)
         return model
 
+    def recompile_model(self, orcahandler_instance):
+        """
+        Compile a loaded keras model once again.
+
+        Parameters
+        ----------
+        orcahandler_instance : orcanet.core.OrcaHandler
+            An instance of the top-level OrcaHandler class.
+        Returns
+        -------
+        recompiled_model : ks.models.Model
+            The loaded and recompiled keras model.
+
+        """
+        epoch = orcahandler_instance.io.get_latest_epoch()
+        path_of_model = orcahandler_instance.io.get_model_path(epoch[0], epoch[1])
+        print("Loading saved model: " + path_of_model)
+        model = ks.models.load_model(path_of_model, custom_objects=orcahandler_instance.cfg.custom_objects)
+
+        print("Recompiling the saved model")
+        recompiled_model = self._compile_model(model)
+
+        return recompiled_model
+
 
 def parallelize_model_to_n_gpus(model, n_gpu, batchsize, mode="avolkov"):
     """

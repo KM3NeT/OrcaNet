@@ -16,7 +16,8 @@ Arguments:
             An example can be found in examples/settings_files/example_model.toml.
 
 Options:
-    -h --help                       Show this screen.
+    -h --help    Show this screen.
+    --recompile  Recompile the keras model, e.g. needed if the loss weights are changed during the training.
 
 """
 from docopt import docopt
@@ -25,7 +26,7 @@ from orcanet.core import OrcaHandler
 from orcanet.model_archs.model_setup import OrcaModel
 
 
-def orca_train(output_folder, list_file, config_file, model_file):
+def orca_train(output_folder, list_file, config_file, model_file, recompile_model=False):
     """
     Run orca.train with predefined OrcaModel networks using a parser.
 
@@ -39,6 +40,8 @@ def orca_train(output_folder, list_file, config_file, model_file):
         Path to a .toml file which overwrites some of the default settings for training and validating a model.
     model_file : str
         Path to a file with parameters to build a model of a predefined architecture with OrcaNet.
+    recompile_model : bool
+        If the model should be recompiled or not. Necessary, if e.g. the loss_weights are changed during the training.
 
     """
     # Set up the OrcaHandler with the input data
@@ -46,16 +49,20 @@ def orca_train(output_folder, list_file, config_file, model_file):
 
     # The OrcaModel class allows to use some predefined models
     orcamodel = OrcaModel(model_file)
+
     # If this is the start of the training, a compiled model needs to be handed to the orca_train function
     # No model is required if the training is continued, as it will be loaded automatically
     if orca.io.get_latest_epoch() == (0, 0):
-        initial_model = orcamodel.build(orca)
+        model = orcamodel.build(orca)
     else:
-        initial_model = None
+        model = None
     # Load the modifiers and custom objects needed for this model
     orcamodel.update_orca(orca)
 
-    orca.train(initial_model)
+    if recompile_model is True:
+        model = orcamodel.recompile_model(orca)
+
+    orca.train(model=model, force_model=recompile_model)
 
 
 def parse_input():
@@ -65,7 +72,8 @@ def parse_input():
     list_file = args['LIST']
     config_file = args['CONFIG']
     model_file = args['MODEL']
-    orca_train(output_folder, list_file, config_file, model_file)
+    recompile_model = args['--recompile']
+    orca_train(output_folder, list_file, config_file, model_file, recompile_model=recompile_model)
 
 
 if __name__ == '__main__':
