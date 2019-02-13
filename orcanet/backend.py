@@ -272,7 +272,10 @@ def make_model_prediction(orca, model, xs_mean, eval_filename, samples=None):
                     print('Predicting in step ' + str(s) + ' on file ' + str(f_number))
                 # y_true is a dict of ndarrays, mc_info is a structured array, y_pred is a list of ndarrays
                 xs, y_true, mc_info = next(generator)
+
                 y_pred = model.predict_on_batch(xs)
+                if not isinstance(y_pred, list): # if only one output, transform to a list for the hacky below
+                    y_pred = [y_pred]
                 # transform y_pred to dict TODO hacky!
                 y_pred = {out: y_pred[i] for i, out in enumerate(model.output_names)}
 

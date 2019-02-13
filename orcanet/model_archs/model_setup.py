@@ -11,7 +11,7 @@ import toml
 from orcanet.model_archs.short_cnn_models import create_vgg_like_model_multi_input_from_single_nns, create_vgg_like_model
 from orcanet.model_archs.wide_resnet import create_wide_residual_network
 from orcanet.model_archs.losses import get_all_loss_functions
-from orcanet_contrib.contrib import orca_label_modifiers, orca_sample_modifiers
+from orcanet_contrib.contrib import orca_label_modifiers, orca_sample_modifiers, orca_dataset_modifiers
 
 
 class OrcaModel:
@@ -31,7 +31,7 @@ class OrcaModel:
         Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
     class_type : str
         Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
-        I.e. (2, 'track-shower')
+        I.e. (2, 'track-shower') # TODO outdated docs
     str_ident : str
         Optional string identifier that gets appended to the modelname. Useful when training models which would have
         the same modelname. Also used for defining models and projections!
