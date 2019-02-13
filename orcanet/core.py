@@ -237,8 +237,9 @@ class OrcaHandler:
             from the disk.
 
         """
-        assert self.cfg.get_list_file() is not None, "No files specified. You need to load a toml list file " \
-                                                     "with your files before training"
+        if self.cfg.get_list_file() is None:
+            raise ValueError("No files specified. You need to load a toml list file with your files before training")
+
         if self.cfg.filter_out_tf_garbage:
             os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
         self.io.get_subfolder(create=True)
@@ -248,15 +249,18 @@ class OrcaHandler:
         print("Set to epoch {} file {}.".format(epoch[0], epoch[1]))
 
         if epoch[0] == 0 and epoch[1] == 0:
-            assert model is not None, "You need to provide a compiled keras model for the start of the training! (You gave None)"
+            if model is not None:
+                raise ValueError("You need to provide a compiled keras model for the start of the training! (You gave None)")
             model = model
         elif force_model is True:
+            if model is None:
+                raise ValueError('You set "force_model" to True, but didnt provide a model in "model" that should be used!')
             print('You forced the OrcaHandler.train() method to use a keras model specified with the parameter "forced_model"!')
             model = model
         else:
             # Load an existing model
             if model is not None:
-                warnings.warn("You provided a model even though this is not the start of the training. Provided model is ignored!")
+                raise ValueError("You provided a model even though this is not the start of the training. Provided model is ignored!")
             path_of_model = self.io.get_model_path(epoch[0], epoch[1])
             print("Loading saved model: " + path_of_model)
             model = ks.models.load_model(path_of_model, custom_objects=self.cfg.custom_objects)
