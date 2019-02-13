@@ -53,7 +53,8 @@ def orca_pred(output_folder, list_file, config_file, model_file):
     # Can be adjusted with cfg.eval_epoch and cfg.eval_fileno
     pred_filename = orca.predict()
 
-    make_performance_plots(pred_filename, orcamodel.class_type, SAVEFOLDER)
+    plots_folder = orca.io.get_subfolder(name='plots')
+    make_performance_plots(pred_filename, orcamodel.class_type, plots_folder)
 
 
 def parse_input():

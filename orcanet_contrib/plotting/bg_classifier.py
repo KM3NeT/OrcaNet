@@ -52,7 +52,7 @@ def make_prob_hists_bg_classifier(pred_file, savefolder):
     fig, axes = plt.subplots()
 
     for bg_class in ['muon', 'random_noise', 'neutrino']:
-        prob_class = pred_file['prob_' + bg_class]
+        prob_class = pred_file['pred']['prob_' + bg_class]
         ptype, is_cc = pred_file['mc_info']['particle_type'], pred_file['mc_info']['is_cc']
         make_prob_hists_for_class(prob_class, ptype, is_cc, axes)
         configure_and_save_plot(bg_class, savefolder)

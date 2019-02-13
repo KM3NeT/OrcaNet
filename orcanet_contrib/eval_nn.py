@@ -4,6 +4,7 @@
 Code for making performance plots based on nn model predictions.
 """
 
+import os
 import matplotlib as mpl
 import h5py
 mpl.use('Agg')
@@ -24,24 +25,32 @@ from orcanet_contrib.evaluation_utilities import (make_energy_to_accuracy_plot_m
 from orcanet_contrib.plotting.bg_classifier import make_prob_hists_bg_classifier
 
 
-# TODO Does not work at all
-def make_performance_plots(pred_filepath, class_type, savefolder):
+# TODO reintegrate old regression + ts plots
+def make_performance_plots(pred_filepath, class_type, plots_folder):
     """
+    Function that makes plots based on the results of a hdf5 file with nn predictions (specified in pred_filepath).
 
     Parameters
     ----------
-    pred_filepath
-    class_type
-    savefolder
-
-    Returns
-    -------
+    pred_filepath : str
+        Path to a h5 OrcaNet prediction file.
+    class_type : str
+        TODO
+    plots_folder : str
+        Path to the general plots folder in the OrcaNet dir structure.
 
     """
     pred_file = h5py.File(pred_filepath, 'r')
+    main_perf_plots_path = plots_folder + '/pred_performance'
 
     if class_type == 'bg_classifier':
-        make_prob_hists_bg_classifier(pred_file, savefolder)
+        make_plots_subfolders(main_perf_plots_path, class_type)
+        make_prob_hists_bg_classifier(pred_file, main_perf_plots_path + '/1d')
+
+    else:
+        raise ValueError('The class_type ' + str(class_type) + ' is not known.')
+
+    pred_file.close()
 
     # elif class_type == 'ts_classifier':  # categorical
     #     # TODO doesnt work
@@ -101,9 +110,31 @@ def make_performance_plots(pred_filepath, class_type, savefolder):
     #         make_1d_reco_err_to_reco_residual_plot(arr_nn_pred, modelname, folder_name, precuts=precuts)
     #         make_2d_dir_correlation_plot_different_sigmas(arr_nn_pred, modelname, folder_name, precuts=precuts)
 
-    pred_file.close()
+
+def make_plots_subfolders(main_perf_plots_path, class_type):
+    """
+    Makes the directories for the plots of a certain class_type based on the main plots dir.
+
+    Parameters
+    ----------
+    main_perf_plots_path : str
+        Path to the pred_performance plots folder in the OrcaNet dir structure.
+    class_type : str
+        TODO
+
+    """
+    if class_type == 'bg_classifier':
+        subfolders = ['1d']
+    else:
+        raise ValueError('The class_type ' + str(class_type) + ' is not known.')
+
+    for folder in subfolders:
+        if not os.path.exists(main_perf_plots_path + '/' + folder):
+            print('Creating directory: ' + main_perf_plots_path + '/' + folder)
+            os.makedirs(main_perf_plots_path + '/' + folder)
 
 
+# TODO not needed anymore?
 def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident=''):
     """
     Derives the name of a model based on its number of bins and the class_type tuple.

@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+TODO
+"""
 import numpy as np
 
 
@@ -188,6 +193,53 @@ def orca_label_modifiers(class_type):
         raise ValueError('The label ' + str(class_type) + ' in class_type is not available.')
 
     return label_modifier
+
+
+def orca_dataset_modifiers(class_type):
+    """
+    Returns one of the dataset modifiers used for predicting with OrcaNet.
+
+    Parameters
+    ----------
+    class_type : str
+        TODO
+
+    """
+    if class_type == 'bg_classifier':
+        def dataset_modifier(mc_info, y_true, y_pred):
+
+            # y_pred and y_true are dicts with keys for each output
+            # we only have 1 output in case of the bg classifier
+            y_pred = y_pred['bg_output']
+            y_true = y_true['bg_output']
+
+            datasets = dict() # y_pred is a list of arrays
+            datasets['mc_info'] = mc_info # is already a structured array
+
+            # make pred dataset
+            dtypes = np.dtype([('prob_neutrino', y_pred.dtype), ('prob_muon', y_pred.dtype), ('prob_random_noise', y_pred.dtype)])
+            pred = np.empty(y_pred.shape[0], dtype=dtypes)
+            pred['prob_neutrino'] = y_pred[:, 0]
+            pred['prob_muon'] = y_pred[:, 1]
+            pred['prob_random_noise'] = y_pred[:, 2]
+
+            datasets['pred'] = pred
+
+            # make true dataset
+            dtypes = np.dtype([('cat_neutrino', y_true.dtype), ('cat_muon', y_true.dtype), ('cat_random_noise', y_true.dtype)])
+            true = np.empty(y_true.shape[0], dtype=dtypes)
+            true['cat_neutrino'] = y_true[:, 0]
+            true['cat_muon'] = y_true[:, 1]
+            true['cat_random_noise'] = y_true[:, 2]
+
+            datasets['true'] = true
+
+            return datasets
+
+    else:
+        raise ValueError('The dataset modifier for the class_type ' + str(class_type) + ' is not known.')
+
+    return dataset_modifier
 
 
 def orca_learning_rates(name):

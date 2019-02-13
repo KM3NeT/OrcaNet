@@ -11,7 +11,7 @@ import toml
 from orcanet.model_archs.short_cnn_models import create_vgg_like_model_multi_input_from_single_nns, create_vgg_like_model
 from orcanet.model_archs.wide_resnet import create_wide_residual_network
 from orcanet.model_archs.losses import get_all_loss_functions
-from orcanet_contrib.contrib import orca_label_modifiers, orca_sample_modifiers
+from orcanet_contrib.contrib import orca_label_modifiers, orca_sample_modifiers, orca_dataset_modifiers
 
 
 class OrcaModel:
@@ -31,7 +31,7 @@ class OrcaModel:
         Architecture of the neural network. Currently, only 'VGG' or 'WRN' are available.
     class_type : str
         Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
-        I.e. (2, 'track-shower')
+        I.e. (2, 'track-shower') # TODO outdated docs
     str_ident : str
         Optional string identifier that gets appended to the modelname. Useful when training models which would have
         the same modelname. Also used for defining models and projections!
@@ -130,6 +130,7 @@ class OrcaModel:
         else:
             sample_modifier = None
         label_modifier = orca_label_modifiers(self.class_type)
+        dataset_modifier = orca_dataset_modifiers(self.class_type)
 
         if sample_modifier is not None:
             assert orca.cfg.sample_modifier is None, "Can not set sample modifier: " \
@@ -137,6 +138,9 @@ class OrcaModel:
         if label_modifier is not None:
             assert orca.cfg.label_modifier is None, "Can not set label modifier: " \
                                                     "Has already been set: {}".format(orca.cfg.label_modifier)
+        if dataset_modifier is not None:
+            assert orca.cfg.dataset_modifier is None, "Can not set dataset modifier: " \
+                                                    "Has already been set: {}".format(orca.cfg.dataset_modifier)
         if self.custom_objects is not None:
             assert orca.cfg.custom_objects is None, "Can not set custom objects: " \
                                                     "Have already been set: {}".format(orca.cfg.custom_objects)
@@ -145,6 +149,8 @@ class OrcaModel:
             orca.cfg.sample_modifier = sample_modifier
         if label_modifier is not None:
             orca.cfg.label_modifier = label_modifier
+        if dataset_modifier is not None:
+            orca.cfg.dataset_modifier = dataset_modifier
         if self.custom_objects is not None:
             orca.cfg.custom_objects = self.custom_objects
 
