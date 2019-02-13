@@ -23,6 +23,7 @@ from docopt import docopt
 
 from orcanet.core import OrcaHandler
 from orcanet.model_archs.model_setup import OrcaModel
+from orcanet_contrib.eval_nn import make_performance_plots
 
 
 def orca_pred(output_folder, list_file, config_file, model_file):
@@ -50,7 +51,9 @@ def orca_pred(output_folder, list_file, config_file, model_file):
 
     # Per default, an evaluation will be done for the model with the highest epoch and filenumber.
     # Can be adjusted with cfg.eval_epoch and cfg.eval_fileno
-    orca.predict()
+    pred_filename = orca.predict()
+
+    make_performance_plots(pred_filename, orcamodel.class_type, SAVEFOLDER)
 
 
 def parse_input():

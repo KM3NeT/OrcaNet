@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Code for plotting Orca evaluations.
+Code for making performance plots based on nn model predictions.
 """
 
-import numpy as np
 import matplotlib as mpl
 import h5py
 mpl.use('Agg')
@@ -26,101 +25,83 @@ from orcanet_contrib.plotting.bg_classifier import make_prob_hists_bg_classifier
 
 
 # TODO Does not work at all
-def investigate_model_performance(cfg, model, test_files, n_bins, batchsize, class_type, swap_4d_channels,
-                                              str_ident, modelname, xs_mean, arr_filename, folder_name):
+def make_performance_plots(pred_filepath, class_type, savefolder):
     """
-    Function that 1) makes predictions based on a Keras nn model and 2) investigates the performance of the model based on the predictions.
 
     Parameters
     ----------
-    cfg : object Configuration
-        Configuration object containing all the configurable options in the OrcaNet scripts.
-    model : ks.model.Model
-        Keras model of a neural network.
-    test_files : list(([test_filepaths], test_filesize))
-        List of tuples that contains the testfiles and their number of rows.
-    n_bins : list(tuple(int))
-        Number of bins for each dimension (x,y,z,t) in both the train- and test_files. Can contain multiple n_bins tuples.
-    batchsize : int
-        Batchsize that is used for predicting.
-    class_type : str
-        Declares the number of output classes / regression variables and a string identifier to specify the exact output classes.
-    swap_4d_channels : None/str
-        For 4D data input (3.5D models). Specifies, if the channels of the 3.5D net should be swapped.
-    str_ident : str
-        Optional string identifier that gets appended to the modelname.
-    modelname : str
-        Name of the model.
-    xs_mean : ndarray
-        Mean_image of the x (train-) dataset used for zero-centering the train-/testdata.
-    arr_filename : str
-        Filename of the arr_nn_pred, which will be generated or loaded. It contains all predicitons of a model
-        and true values, for a specific dataset.
-    folder_name : str
-        Name of the folder in the cnns directory in which everything will be saved.
+    pred_filepath
+    class_type
+    savefolder
+
+    Returns
+    -------
 
     """
-    f = h5py.File(filepath, 'r')
-    # arr_nn_pred = np.load(arr_filename)
+    pred_file = h5py.File(pred_filepath, 'r')
 
     if class_type == 'bg_classifier':
         make_prob_hists_bg_classifier(pred_file, savefolder)
 
-    elif class_type == 'ts_classifier':  # categorical
-        precuts = (False, '3-100_GeV_prod')
+    # elif class_type == 'ts_classifier':  # categorical
+    #     # TODO doesnt work
+    #     precuts = (False, '3-100_GeV_prod')
+    #
+    #     make_energy_to_accuracy_plot_multiple_classes(arr_nn_pred, title='Classified as track', filename=folder_name + 'plots/ts_' + modelname,
+    #                                                   precuts=precuts, corr_cut_pred_0=0.5)
+    #
+    #     make_prob_hists(arr_nn_pred, folder_name, modelname=modelname, precuts=precuts)
+    #     make_hist_2d_property_vs_property(arr_nn_pred, folder_name, modelname, property_types=('bjorken-y', 'probability'),
+    #                                       e_cut=(1, 100), precuts=precuts)
+    #     calculate_and_plot_separation_pid(arr_nn_pred, folder_name, modelname, precuts=precuts)
+    #
+    # else:  # regression
+    #     # TODO doesnt work
+    #     # TODO make the shallow reco not hardcoded
+    #     arr_nn_pred_shallow = np.load('/home/woody/capn/mppi033h/Data/various/arr_nn_pred.npy')
+    #     # precuts = (True, 'regr_3-100_GeV_prod_and_1-3_GeV_prod')
+    #     precuts = (False, '3-100_GeV_prod')
+    #     if 'energy' in class_type:
+    #         print('Generating plots for energy performance investigations')
+    #
+    #         # DL
+    #         make_2d_energy_resolution_plot(arr_nn_pred, modelname, folder_name, precuts=precuts,
+    #                                        correct_energy=(True, 'median'))
+    #         make_1d_energy_reco_metric_vs_energy_plot(arr_nn_pred, modelname, folder_name, metric='median_relative', precuts=precuts,
+    #                                                   correct_energy=(True, 'median'), compare_shallow=(True, arr_nn_pred_shallow))
+    #         make_1d_energy_std_div_e_true_plot(arr_nn_pred, modelname, folder_name, precuts=precuts,
+    #                                            compare_shallow=(True, arr_nn_pred_shallow), correct_energy=(True, 'median'))
+    #         # shallow reco
+    #         make_2d_energy_resolution_plot(arr_nn_pred_shallow, 'shallow_reco', folder_name, precuts=precuts)
+    #
+    #     if 'dir' in class_type:
+    #         print('Generating plots for directional performance investigations')
+    #
+    #         # DL
+    #         make_1d_dir_metric_vs_energy_plot(arr_nn_pred, modelname, folder_name, metric='median', precuts=precuts,
+    #                                           compare_shallow=(True, arr_nn_pred_shallow))
+    #         make_2d_dir_correlation_plot(arr_nn_pred, modelname, folder_name, precuts=precuts)
+    #         # shallow reco
+    #         make_2d_dir_correlation_plot(arr_nn_pred_shallow, 'shallow_reco', folder_name, precuts=precuts)
+    #
+    #     if 'bjorken-y' in class_type:
+    #         print('Generating plots for bjorken-y performance investigations')
+    #
+    #         # DL
+    #         make_1d_bjorken_y_metric_vs_energy_plot(arr_nn_pred, modelname, folder_name, metric='median', precuts=precuts,
+    #                                                 compare_shallow=(True, arr_nn_pred_shallow))
+    #         make_2d_bjorken_y_resolution_plot(arr_nn_pred, modelname, folder_name, precuts=precuts)
+    #         # shallow reco
+    #         make_2d_bjorken_y_resolution_plot(arr_nn_pred_shallow, 'shallow_reco', folder_name, precuts=precuts)
+    #
+    #     if 'errors' in class_type:
+    #         print('Generating plots for error performance investigations')
+    #
+    #         make_1d_reco_err_div_by_std_plot(arr_nn_pred, modelname, folder_name, precuts=precuts)  # TODO take precuts from above?
+    #         make_1d_reco_err_to_reco_residual_plot(arr_nn_pred, modelname, folder_name, precuts=precuts)
+    #         make_2d_dir_correlation_plot_different_sigmas(arr_nn_pred, modelname, folder_name, precuts=precuts)
 
-        make_energy_to_accuracy_plot_multiple_classes(arr_nn_pred, title='Classified as track', filename=folder_name + 'plots/ts_' + modelname,
-                                                      precuts=precuts, corr_cut_pred_0=0.5)
-
-        make_prob_hists(arr_nn_pred, folder_name, modelname=modelname, precuts=precuts)
-        make_hist_2d_property_vs_property(arr_nn_pred, folder_name, modelname, property_types=('bjorken-y', 'probability'),
-                                          e_cut=(1, 100), precuts=precuts)
-        calculate_and_plot_separation_pid(arr_nn_pred, folder_name, modelname, precuts=precuts)
-
-    else:  # regression
-        # TODO make the shallow reco not hardcoded
-        arr_nn_pred_shallow = np.load('/home/woody/capn/mppi033h/Data/various/arr_nn_pred.npy')
-        # precuts = (True, 'regr_3-100_GeV_prod_and_1-3_GeV_prod')
-        precuts = (False, '3-100_GeV_prod')
-        if 'energy' in class_type:
-            print('Generating plots for energy performance investigations')
-
-            # DL
-            make_2d_energy_resolution_plot(arr_nn_pred, modelname, folder_name, precuts=precuts,
-                                           correct_energy=(True, 'median'))
-            make_1d_energy_reco_metric_vs_energy_plot(arr_nn_pred, modelname, folder_name, metric='median_relative', precuts=precuts,
-                                                      correct_energy=(True, 'median'), compare_shallow=(True, arr_nn_pred_shallow))
-            make_1d_energy_std_div_e_true_plot(arr_nn_pred, modelname, folder_name, precuts=precuts,
-                                               compare_shallow=(True, arr_nn_pred_shallow), correct_energy=(True, 'median'))
-            # shallow reco
-            make_2d_energy_resolution_plot(arr_nn_pred_shallow, 'shallow_reco', folder_name, precuts=precuts)
-
-        if 'dir' in class_type:
-            print('Generating plots for directional performance investigations')
-
-            # DL
-            make_1d_dir_metric_vs_energy_plot(arr_nn_pred, modelname, folder_name, metric='median', precuts=precuts,
-                                              compare_shallow=(True, arr_nn_pred_shallow))
-            make_2d_dir_correlation_plot(arr_nn_pred, modelname, folder_name, precuts=precuts)
-            # shallow reco
-            make_2d_dir_correlation_plot(arr_nn_pred_shallow, 'shallow_reco', folder_name, precuts=precuts)
-
-        if 'bjorken-y' in class_type:
-            print('Generating plots for bjorken-y performance investigations')
-
-            # DL
-            make_1d_bjorken_y_metric_vs_energy_plot(arr_nn_pred, modelname, folder_name, metric='median', precuts=precuts,
-                                                    compare_shallow=(True, arr_nn_pred_shallow))
-            make_2d_bjorken_y_resolution_plot(arr_nn_pred, modelname, folder_name, precuts=precuts)
-            # shallow reco
-            make_2d_bjorken_y_resolution_plot(arr_nn_pred_shallow, 'shallow_reco', folder_name, precuts=precuts)
-
-        if 'errors' in class_type:
-            print('Generating plots for error performance investigations')
-
-            make_1d_reco_err_div_by_std_plot(arr_nn_pred, modelname, folder_name, precuts=precuts)  # TODO take precuts from above?
-            make_1d_reco_err_to_reco_residual_plot(arr_nn_pred, modelname, folder_name, precuts=precuts)
-            make_2d_dir_correlation_plot_different_sigmas(arr_nn_pred, modelname, folder_name, precuts=precuts)
+    pred_file.close()
 
 
 def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident=''):
