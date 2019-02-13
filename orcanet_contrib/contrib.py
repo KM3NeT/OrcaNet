@@ -142,7 +142,7 @@ def orca_label_modifiers(class_type):
                 ys[key_label] = ys[key_label].astype(np.float32)
             return ys
 
-    elif class_type == 'track-shower':
+    elif class_type == 'ts_classifier':
         def label_modifier(y_values):
             # for every sample, [0,1] for shower, or [1,0] for track
 

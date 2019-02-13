@@ -111,7 +111,7 @@ def investigate_model_performance(cfg, model, test_files, n_bins, batchsize, cla
     # arr_nn_pred = np.load('results/plots/saved_predictions/arr_nn_pred_' + modelname + '_final_stateful_false.npy')
     # arr_nn_pred = np.load('results/plots/saved_predictions//arr_nn_pred_model_VGG_4d_xyz-t_and_yzt-x_and_4d_xyzt_track-shower_multi_input_single_train_tight-1_tight-2_lr_0.003_tr_st_test_st_final_stateful_false_1-100GeV_precut.npy')
 
-    if class_type == 'track-shower':  # categorical
+    if class_type == 'ts_classifier':  # categorical
         precuts = (False, '3-100_GeV_prod')
 
         make_energy_to_accuracy_plot_multiple_classes(arr_nn_pred, title='Classified as track', filename=folder_name + 'plots/ts_' + modelname,
