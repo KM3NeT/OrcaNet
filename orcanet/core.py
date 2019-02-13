@@ -249,7 +249,7 @@ class OrcaHandler:
         print("Set to epoch {} file {}.".format(epoch[0], epoch[1]))
 
         if epoch[0] == 0 and epoch[1] == 0:
-            if model is not None:
+            if model is None:
                 raise ValueError("You need to provide a compiled keras model for the start of the training! (You gave None)")
             model = model
         elif force_model is True:
