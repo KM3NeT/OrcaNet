@@ -24,6 +24,7 @@ from docopt import docopt
 from orcanet.core import OrcaHandler
 from orcanet.model_archs.model_setup import OrcaModel
 from orcanet_contrib.eval_nn import make_performance_plots
+from orcanet_contrib.contrib import orca_dataset_modifiers
 
 
 def orca_pred(output_folder, list_file, config_file, model_file):
@@ -48,6 +49,10 @@ def orca_pred(output_folder, list_file, config_file, model_file):
     # When predicting with a orca model, the right modifiers and custom objects need to be given
     orcamodel = OrcaModel(model_file)
     orcamodel.update_orca(orca)
+
+    # get dataset modifers for predicting
+    dataset_modifier = orca_dataset_modifiers(orcamodel.class_type)
+    orca.cfg.dataset_modifier = dataset_modifier
 
     # Per default, an evaluation will be done for the model with the highest epoch and filenumber.
     # Can be adjusted with cfg.eval_epoch and cfg.eval_fileno

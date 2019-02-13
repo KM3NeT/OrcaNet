@@ -130,7 +130,6 @@ class OrcaModel:
         else:
             sample_modifier = None
         label_modifier = orca_label_modifiers(self.class_type)
-        dataset_modifier = orca_dataset_modifiers(self.class_type)
 
         if sample_modifier is not None:
             assert orca.cfg.sample_modifier is None, "Can not set sample modifier: " \
@@ -138,9 +137,6 @@ class OrcaModel:
         if label_modifier is not None:
             assert orca.cfg.label_modifier is None, "Can not set label modifier: " \
                                                     "Has already been set: {}".format(orca.cfg.label_modifier)
-        if dataset_modifier is not None:
-            assert orca.cfg.dataset_modifier is None, "Can not set dataset modifier: " \
-                                                    "Has already been set: {}".format(orca.cfg.dataset_modifier)
         if self.custom_objects is not None:
             assert orca.cfg.custom_objects is None, "Can not set custom objects: " \
                                                     "Have already been set: {}".format(orca.cfg.custom_objects)
@@ -149,8 +145,6 @@ class OrcaModel:
             orca.cfg.sample_modifier = sample_modifier
         if label_modifier is not None:
             orca.cfg.label_modifier = label_modifier
-        if dataset_modifier is not None:
-            orca.cfg.dataset_modifier = dataset_modifier
         if self.custom_objects is not None:
             orca.cfg.custom_objects = self.custom_objects
 
