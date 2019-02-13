@@ -154,7 +154,7 @@ class Configuration(object):
             Path to a toml list file with pathes to all the h5 files that should be used for training and validation.
 
         """
-        assert self._list_file is not None, "You tried to load filepathes from a list file, but pathes have already " \
+        assert self._list_file is None, "You tried to load filepathes from a list file, but pathes have already " \
                                             "been loaded for this object. (From the file " + self._list_file \
                                             + ")\nYou can not use two different list files at once!"
         self._train_files, self._val_files = read_out_list_file(list_file)

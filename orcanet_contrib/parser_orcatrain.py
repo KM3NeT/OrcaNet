@@ -2,7 +2,7 @@
 Use orca_train with a parser.
 
 Usage:
-    parser_orcatrain.py FOLDER LIST CONFIG MODEL
+    parser_orcatrain.py [options] FOLDER LIST CONFIG MODEL
     parser_orcatrain.py (-h | --help)
 
 Arguments:

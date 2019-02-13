@@ -4,6 +4,7 @@
 Scripts for making specific models.
 """
 
+import os
 import keras as ks
 import toml
 
@@ -204,6 +205,9 @@ class OrcaModel:
             The loaded and recompiled keras model.
 
         """
+        if orcahandler_instance.cfg.filter_out_tf_garbage:
+            os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+
         epoch = orcahandler_instance.io.get_latest_epoch()
         path_of_model = orcahandler_instance.io.get_model_path(epoch[0], epoch[1])
         print("Loading saved model: " + path_of_model)
