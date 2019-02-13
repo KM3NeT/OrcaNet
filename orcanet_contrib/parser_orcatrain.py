@@ -16,7 +16,8 @@ Arguments:
             An example can be found in examples/settings_files/example_model.toml.
 
 Options:
-    -h --help                       Show this screen.
+    -h --help    Show this screen.
+    --recompile  Recompile the keras model, e.g. needed if the loss weights are changed during the training.
 
 """
 from docopt import docopt
@@ -39,6 +40,8 @@ def orca_train(output_folder, list_file, config_file, model_file, recompile_mode
         Path to a .toml file which overwrites some of the default settings for training and validating a model.
     model_file : str
         Path to a file with parameters to build a model of a predefined architecture with OrcaNet.
+    recompile_model : bool
+        If the model should be recompiled or not. Necessary, if e.g. the loss_weights are changed during the training.
 
     """
     # Set up the OrcaHandler with the input data
@@ -61,7 +64,7 @@ def orca_train(output_folder, list_file, config_file, model_file, recompile_mode
     else:
         recompiled_model = orcamodel.recompile_model(orca)
 
-    orca.train(initial_model, force_model=recompiled_model)
+    orca.train(initial_model, forced_model=recompiled_model)
 
 
 def parse_input():
@@ -71,7 +74,8 @@ def parse_input():
     list_file = args['LIST']
     config_file = args['CONFIG']
     model_file = args['MODEL']
-    orca_train(output_folder, list_file, config_file, model_file)
+    recompile_model = args['--recompile']
+    orca_train(output_folder, list_file, config_file, model_file, recompile_model=recompile_model)
 
 
 if __name__ == '__main__':

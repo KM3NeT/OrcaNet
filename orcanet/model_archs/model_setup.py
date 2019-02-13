@@ -192,13 +192,16 @@ class OrcaModel:
 
     def recompile_model(self, orcahandler_instance):
         """
+        Compile a loaded keras model once again.
 
         Parameters
         ----------
-        orca
-
+        orcahandler_instance : orcanet.core.OrcaHandler
+            An instance of the top-level OrcaHandler class.
         Returns
         -------
+        recompiled_model : ks.models.Model
+            The loaded and recompiled keras model.
 
         """
         epoch = orcahandler_instance.io.get_latest_epoch()

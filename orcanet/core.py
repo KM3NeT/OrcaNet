@@ -220,7 +220,7 @@ class OrcaHandler:
         self.cfg = Configuration(output_folder, list_file, config_file)
         self.io = IOHandler(self.cfg)
 
-    def train(self, initial_model=None):
+    def train(self, initial_model=None, forced_model=None):
         """
         Core code that trains a neural network.
 
@@ -232,6 +232,8 @@ class OrcaHandler:
         initial_model : ks.models.Model or None
             Compiled keras model to use for training and validation. Only required for the first epoch of training, as
             the most recent saved model will be loaded otherwise.
+        forced_model : ks.models.Model or None
+            Use this keras model and don't load the most recently trained model from the disk.
 
         """
         assert self.cfg.get_list_file() is not None, "No files specified. You need to load a toml list file " \
@@ -247,12 +249,15 @@ class OrcaHandler:
         if epoch[0] == 0 and epoch[1] == 0:
             assert initial_model is not None, "You need to provide a compiled keras model for the start of the training! (You gave None)"
             model = initial_model
+        elif forced_model is not None:
+            print('You forced the OrcaHandler.train() method to use a keras model specified with the parameter "forced_model"!')
+            model = forced_model
         else:
             # Load an existing model
             if initial_model is not None:
                 warnings.warn("You provided a model even though this is not the start of the training. Provided model is ignored!")
             path_of_model = self.io.get_model_path(epoch[0], epoch[1])
-            print("Loading saved model: "+path_of_model)
+            print("Loading saved model: " + path_of_model)
             model = ks.models.load_model(path_of_model, custom_objects=self.cfg.custom_objects)
 
         if self.cfg.label_modifier is None:
