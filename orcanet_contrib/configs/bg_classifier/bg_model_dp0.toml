@@ -1,0 +1,16 @@
+# Info for building an OrcaNet model. This is not required for using orca_train.
+# nn_arch is mandatory, as it is the name of the architecture that will be loaded.
+# Depending on the architecture, other options like the number of layers also have to be given.
+#
+[model]
+nn_arch = 'VGG'
+class_type = 'bg_classifier'
+dropout = 0.1
+n_filters = [64, 64, 64, 64, 64, 64, 128, 128, 128, 128]
+swap_4d_channels = "xyz-t_and_xyz-c_single_input"
+
+[model.compile_opt]
+# The loss(es) of the model are listed here.
+# The keyword is the name of the respective layer in the model, for which this loss is used.
+# The value is a dict with a loss function that it will use, and optionally a weight to each loss.
+bg_output = {function="categorical_crossentropy", metrics=['acc']}

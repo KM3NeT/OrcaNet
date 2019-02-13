@@ -35,9 +35,9 @@ class IOHandler(object):
             The highest epoch, file_no pair. (0,0) if the folder is empty or does not exist yet.
 
         """
-        if os.path.exists(self.cfg.main_folder + "saved_models"):
+        if os.path.exists(self.cfg.output_folder + "saved_models"):
             files = []
-            for file in os.listdir(self.cfg.main_folder + "saved_models"):
+            for file in os.listdir(self.cfg.output_folder + "saved_models"):
                 if file.endswith('.h5'):
                     files.append(file)
 
@@ -100,11 +100,11 @@ class IOHandler(object):
                 os.makedirs(subfdr)
             return subfdr
 
-        subfolders = {"log_train": self.cfg.main_folder + "log_train",
-                      "saved_models": self.cfg.main_folder + "saved_models",
-                      "plots": self.cfg.main_folder + "plots",
-                      "activations": self.cfg.main_folder + "plots/activations",
-                      "predictions": self.cfg.main_folder + "predictions"}
+        subfolders = {"log_train": self.cfg.output_folder + "log_train",
+                      "saved_models": self.cfg.output_folder + "saved_models",
+                      "plots": self.cfg.output_folder + "plots",
+                      "activations": self.cfg.output_folder + "plots/activations",
+                      "predictions": self.cfg.output_folder + "predictions"}
 
         if name is None:
             subfolder = [get(name) for name in subfolders]
@@ -437,7 +437,7 @@ def write_full_logfile_startup(orca):
         Contains all the configurable options in the OrcaNet scripts.
 
     """
-    logfile = orca.cfg.main_folder + 'full_log.txt'
+    logfile = orca.cfg.output_folder + 'full_log.txt'
     with open(logfile, 'a+') as f_out:
         f_out.write('--------------------------------------------------------------------------------------------------------\n')
         f_out.write('----------------------------------'+str(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))+'---------------------------------------------------\n\n')
@@ -484,7 +484,7 @@ def write_full_logfile(orca, model, history_train, history_val, lr, epoch, files
         The name of every input as a key, the path to one of the training file, on which the model has just been trained, as values.
 
     """
-    logfile = orca.cfg.main_folder + 'full_log.txt'
+    logfile = orca.cfg.output_folder + 'full_log.txt'
     with open(logfile, 'a+') as f_out:
         f_out.write('---------------Epoch {} File {}-------------------------------------------------------------------------\n'.format(epoch[0], epoch[1]))
         f_out.write('\n')
@@ -536,7 +536,7 @@ def write_summary_logfile(orca, epoch, model, history_train, history_val, lr):
         data.append("val_" + str(metric_name))
     headline, widths = get_summary_log_line(data)
 
-    logfile_fname = orca.cfg.main_folder + 'summary.txt'
+    logfile_fname = orca.cfg.output_folder + 'summary.txt'
     with open(logfile_fname, 'a+') as logfile:
         # Write the two headlines if the file is empty
         if os.stat(logfile_fname).st_size == 0:
@@ -634,7 +634,7 @@ def read_logfiles(orca):
         Structured array containing the data from all the training log files, merged into a single array.
 
     """
-    summary_data = np.genfromtxt(orca.cfg.main_folder + "/summary.txt", names=True, delimiter="|", autostrip=True, comments="--")
+    summary_data = np.genfromtxt(orca.cfg.output_folder + "/summary.txt", names=True, delimiter="|", autostrip=True, comments="--")
 
     # list of all files in the log_train folder of this model
     log_train_folder = orca.io.get_subfolder("log_train")

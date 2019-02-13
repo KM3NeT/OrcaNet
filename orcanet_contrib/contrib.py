@@ -123,7 +123,7 @@ def orca_label_modifiers(class_type):
             # correct energy to visible energy
             visible_energy = y_values[elec_nc_bool_idx]['energy'] * y_values[elec_nc_bool_idx]['bjorkeny']
             # fix energy to visible energy
-            np.place(y_values['energy'], elec_nc_bool_idx, visible_energy)  # TODO fix numpy warning
+            np.place(y_values['energy'], elec_nc_bool_idx, visible_energy)
             # set bjorkeny label of nc events to 1
             np.place(y_values['bjorkeny'], elec_nc_bool_idx, 1)
 
@@ -142,7 +142,7 @@ def orca_label_modifiers(class_type):
                 ys[key_label] = ys[key_label].astype(np.float32)
             return ys
 
-    elif class_type == 'track-shower':
+    elif class_type == 'ts_classifier':
         def label_modifier(y_values):
             # for every sample, [0,1] for shower, or [1,0] for track
 

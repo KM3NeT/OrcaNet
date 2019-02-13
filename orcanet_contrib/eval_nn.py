@@ -66,9 +66,7 @@ def investigate_model_performance(cfg, model, test_files, n_bins, batchsize, cla
     if class_type == 'bg_classifier':
         make_prob_hists_bg_classifier(pred_file, savefolder)
 
-
-
-    elif class_type == 'track-shower':  # categorical
+    elif class_type == 'ts_classifier':  # categorical
         precuts = (False, '3-100_GeV_prod')
 
         make_energy_to_accuracy_plot_multiple_classes(arr_nn_pred, title='Classified as track', filename=folder_name + 'plots/ts_' + modelname,

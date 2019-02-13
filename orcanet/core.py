@@ -38,14 +38,6 @@ class Configuration(object):
         If true, surpresses the tensorflow info logs which usually spam the terminal.
     epochs_to_train : int or None
         How many new epochs should be trained by running this function. None for infinite.
-    eval_epoch : int
-        For orca_eval: The epoch of the model to load for evaluation, e.g. 1 means load the saved model from
-        epoch 1 and continue training.
-        Can also give -1 to automatically load the most recent epoch found in the main folder.
-    eval_fileno : int
-        For orca_eval: When using multiple files, define the file number for the evaluation, e.g.
-        1 for load the model trained on the first file. If both epoch and fileno are -1, automatically set to the most
-        recent file found in the main folder.
     key_samples : str
         The name of the datagroup in your h5 input files which contains the samples for the network.
     key_labels : str
@@ -61,8 +53,6 @@ class Configuration(object):
         float gives the decrease of the learning rate per file (e.g. 0.1 for 10% decrease per file).
         You can also give an arbitrary function, which takes as an input the epoch, the file number and the
         Configuration object (in this order), and returns the learning rate.
-    main_folder : str
-        Name of the folder of this model in which everything will be saved, e.g., the summary.txt log file is located in here.
     max_queue_size : int
         max_queue_size option of the keras training and evaluation generator methods. How many batches get preloaded
         from the generator.
@@ -78,6 +68,8 @@ class Configuration(object):
     train_logger_flush : int
         After how many lines the training log file should be flushed (updated on the disk).
         -1 for flush at the end of the file only.
+    output_folder : str
+        Name of the folder of this model in which everything will be saved, e.g., the summary.txt log file is located in here.
     use_scratch_ssd : bool
         Only working at HPC Erlangen: Declares if the input files should be copied to the node-local SSD scratch space.
     validate_after_n_train_files : int
@@ -95,7 +87,7 @@ class Configuration(object):
         automatically at the start of the training, or loaded if they have been saved before.
 
     """
-    def __init__(self, main_folder, list_file, config_file):
+    def __init__(self, output_folder, list_file, config_file):
         """
         Set the attributes of the Configuration object.
 
@@ -103,7 +95,7 @@ class Configuration(object):
 
         Parameters
         ----------
-        main_folder : str
+        output_folder : str
             Name of the folder of this model in which everything will be saved, e.g., the summary.txt log file is located in here.
         list_file : str or None
             Path to a toml list file with pathes to all the h5 files that should be used for training and validation.
@@ -115,8 +107,6 @@ class Configuration(object):
         self.custom_objects = None
         self.dataset_modifier = None
         self.epochs_to_train = None
-        self.eval_epoch = -1
-        self.eval_fileno = -1
         self.filter_out_tf_garbage = True
         self.key_samples = "x"
         self.key_labels = "y"
@@ -137,10 +127,10 @@ class Configuration(object):
         self._default_values = dict(self.__dict__)
 
         # Main folder:
-        if main_folder[-1] == "/":
-            self.main_folder = main_folder
+        if output_folder[-1] == "/":
+            self.output_folder = output_folder
         else:
-            self.main_folder = main_folder+"/"
+            self.output_folder = output_folder+"/"
 
         # Private attributes:
         self._auto_label_modifier = None
@@ -164,7 +154,7 @@ class Configuration(object):
             Path to a toml list file with pathes to all the h5 files that should be used for training and validation.
 
         """
-        assert self._list_file is not None, "You tried to load filepathes from a list file, but pathes have already " \
+        assert self._list_file is None, "You tried to load filepathes from a list file, but pathes have already " \
                                             "been loaded for this object. (From the file " + self._list_file \
                                             + ")\nYou can not use two different list files at once!"
         self._train_files, self._val_files = read_out_list_file(list_file)
@@ -226,11 +216,11 @@ class Configuration(object):
 
 
 class OrcaHandler:
-    def __init__(self, main_folder, list_file=None, config_file=None):
-        self.cfg = Configuration(main_folder, list_file, config_file)
+    def __init__(self, output_folder, list_file=None, config_file=None):
+        self.cfg = Configuration(output_folder, list_file, config_file)
         self.io = IOHandler(self.cfg)
 
-    def train(self, initial_model=None):
+    def train(self, model=None, force_model=False):
         """
         Core code that trains a neural network.
 
@@ -239,13 +229,17 @@ class OrcaHandler:
 
         Parameters
         ----------
-        initial_model : ks.models.Model or None
-            Compiled keras model to use for training and validation. Only required for the first epoch of training, as
-            the most recent saved model will be loaded otherwise.
+        model : ks.models.Model or None
+            Compiled keras model to use for training and validation. Required for the first epoch of training, as
+            the most recent saved model will be loaded otherwise. Also required, if you use the force_model parameter.
+        force_model : bool
+            Use the keras model specified in the "model" parameter and don't load the most recently trained model
+            from the disk.
 
         """
-        assert self.cfg.get_list_file() is not None, "No files specified. You need to load a toml list file " \
-                                                     "with your files before training"
+        if self.cfg.get_list_file() is None:
+            raise ValueError("No files specified. You need to load a toml list file with your files before training")
+
         if self.cfg.filter_out_tf_garbage:
             os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
         self.io.get_subfolder(create=True)
@@ -255,14 +249,20 @@ class OrcaHandler:
         print("Set to epoch {} file {}.".format(epoch[0], epoch[1]))
 
         if epoch[0] == 0 and epoch[1] == 0:
-            assert initial_model is not None, "You need to provide a compiled keras model for the start of the training! (You gave None)"
-            model = initial_model
+            if model is None:
+                raise ValueError("You need to provide a compiled keras model for the start of the training! (You gave None)")
+            model = model
+        elif force_model is True:
+            if model is None:
+                raise ValueError('You set "force_model" to True, but didnt provide a model in "model" that should be used!')
+            print('You forced the OrcaHandler.train() method to use a keras model specified with the parameter "forced_model"!')
+            model = model
         else:
             # Load an existing model
-            if initial_model is not None:
-                warnings.warn("You provided a model even though this is not the start of the training. Provided model is ignored!")
+            if model is not None:
+                raise ValueError("You provided a model even though this is not the start of the training. Provided model is ignored!")
             path_of_model = self.io.get_model_path(epoch[0], epoch[1])
-            print("Loading saved model: "+path_of_model)
+            print("Loading saved model: " + path_of_model)
             model = ks.models.load_model(path_of_model, custom_objects=self.cfg.custom_objects)
 
         if self.cfg.label_modifier is None:
@@ -280,41 +280,57 @@ class OrcaHandler:
             train_and_validate_model(self, model, epoch)
             trained_epochs += 1
 
-    def predict(self):
+    def predict(self, epoch=-1, fileno=-1):
         """
-        Evaluate a model on all samples of the validation set in the toml list, and save it as a h5 file.
+        Make a prediction if it does not exist yet, and return its filepath.
 
+        Load a model, let it predict on all samples of the validation set in the toml list, and save it as a h5 file.
         The cfg.eval_epoch and cfg.eval_fileno parameters define which model is loaded.
+
+        Parameters
+        ----------
+        epoch : int
+            The epoch of the model to load for prediction
+            Can also give -1 to automatically load the most recent epoch found in the main folder.
+        fileno : int
+            When using multiple files, define the file number for the prediction, e.g.
+            1 for load the model trained on the first file. If both epoch and fileno are -1, automatically set to the most
+            recent file found in the main folder.
 
         Returns
         -------
-        eval_filename : str
-            The path to the created evaluation file.
+        pred_filename : str
+            The path to the created prediction file.
 
         """
         assert self.cfg.get_list_file() is not None, "No files specified. You need to load a toml list file " \
-                                                     "with your files before predicting"
+                                                     "with your files before predicting or loading a prediction"
+
         if self.cfg.filter_out_tf_garbage:
             os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 
-        list_name = os.path.basename(self.cfg.get_list_file()).split(".")[0]  # TODO make foolproof
-        epoch = (self.cfg.eval_epoch, self.cfg.eval_fileno)
+        if epoch == -1 and fileno == -1:
+            epoch, fileno = self.io.get_latest_epoch()
+            print("Automatically set epoch to epoch {} file {}.".format(epoch, fileno))
 
-        if epoch[0] == -1 and epoch[1] == -1:
-            epoch = self.io.get_latest_epoch()
-            print("Automatically set epoch to epoch {} file {}.".format(epoch[0], epoch[1]))
+        list_name = os.path.splitext(os.path.basename(self.cfg.get_list_file()))[0]
+        pred_filename = self.io.get_pred_path(epoch, fileno, list_name)
 
-        if self.cfg.zero_center_folder is not None:
-            xs_mean = load_zero_center_data(self)
+        if os.path.isfile(pred_filename):
+            print("Prediction has already been done.")
+
         else:
-            xs_mean = None
+            if self.cfg.zero_center_folder is not None:
+                xs_mean = load_zero_center_data(self)
+            else:
+                xs_mean = None
 
-        if self.cfg.use_scratch_ssd:
-            self.cfg.use_local_node()
+            if self.cfg.use_scratch_ssd:
+                self.cfg.use_local_node()
 
-        path_of_model = self.io.get_model_path(epoch[0], epoch[1])
-        model = ks.models.load_model(path_of_model, custom_objects=self.cfg.custom_objects)
+            model = ks.models.load_model(self.io.get_model_path(epoch, fileno),
+                                         custom_objects=self.cfg.custom_objects)
 
-        pred_filename = self.io.get_pred_path(epoch[0], epoch[1], list_name)
-        make_model_prediction(self, model, xs_mean, pred_filename, samples=None)
+            make_model_prediction(self, model, xs_mean, pred_filename, samples=None)
+
         return pred_filename

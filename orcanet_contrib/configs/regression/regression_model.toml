@@ -1,0 +1,33 @@
+# Info for building an OrcaNet model. This is not required for using orca_train.
+# nn_arch is mandatory, as it is the name of the architecture that will be loaded.
+# Depending on the architecture, other options like the number of layers also have to be given.
+#
+[model]
+nn_arch = 'VGG'
+class_type = 'energy_dir_bjorken-y_vtx_errors'
+dropout = 0.0
+n_filters = [64, 64, 64, 64, 64, 64, 128, 128, 128, 128]
+swap_4d_channels = 'xyz-t_and_xyz-c_single_input'
+
+[model.compile_opt]
+# The loss(es) of the model are listed here.
+# The keyword is the name of the respective layer in the model, for which this loss is used.
+# The value is a dict with a loss function that it will use, and optionally a weight to each loss.
+dx = {function="mean_absolute_error", weight=25}
+dy = {function="mean_absolute_error", weight=25}
+dz = {function='mean_absolute_error', weight=35}
+vx = {function='mean_absolute_error', weight=1}
+vy = {function='mean_absolute_error', weight=1}
+vz = {function='mean_absolute_error', weight=1}
+vt = {function='mean_absolute_error', weight=1e-20}
+e  = {function='mean_absolute_error', weight=1}
+by = {function='mean_absolute_error', weight=20}
+dx_err = {function='loss_uncertainty_mse'}
+dy_err = {function='loss_uncertainty_mse'}
+dz_err = {function='loss_uncertainty_mse', weight=1.25}
+vx_err = {function='loss_uncertainty_mse', weight=5e-4}
+vy_err = {function='loss_uncertainty_mse', weight=5e-4}
+vz_err = {function='loss_uncertainty_mse', weight=5e-4}
+vt_err = {function='loss_uncertainty_mse', weight=1e-20}
+e_err  = {function='loss_uncertainty_mse', weight=1e-3}
+by_err = {function='loss_uncertainty_mse'}
