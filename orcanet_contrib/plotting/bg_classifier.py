@@ -117,6 +117,6 @@ def make_prob_hists_for_class(prob_class, ptype, is_cc, axes):
     is_random_noise = select_class('random_noise', ptype, is_cc)
     is_neutrino = select_class('neutrino', ptype, is_cc)
 
-    axes.hist(prob_class[is_mupage], bins=40, range=(0, 1), color='b', label='mupage', histtype='step', linestyle='-', zorder=3)
-    axes.hist(prob_class[is_random_noise], bins=40, range=(0, 1), color='r', label='random_noise', histtype='step', linestyle='-', zorder=3)
-    axes.hist(prob_class[is_neutrino], bins=40, range=(0, 1), color='saddlebrown', label='neutrino', histtype='step', linestyle='-', zorder=3)
+    axes.hist(prob_class[is_mupage], density=True, bins=40, range=(0, 1), color='b', label='mupage', histtype='step', linestyle='-', zorder=3)
+    axes.hist(prob_class[is_random_noise], density=True, bins=40, range=(0, 1), color='r', label='random_noise', histtype='step', linestyle='-', zorder=3)
+    axes.hist(prob_class[is_neutrino], density=True, bins=40, range=(0, 1), color='saddlebrown', label='neutrino', histtype='step', linestyle='-', zorder=3)

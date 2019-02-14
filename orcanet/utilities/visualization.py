@@ -6,8 +6,6 @@ Visualization tools used with Keras.
 """
 import numpy as np
 import keras.backend as K
-import matplotlib as mpl
-mpl.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
@@ -39,6 +37,7 @@ def make_train_val_plot(train_data, val_data=None, color=None, title=None, y_lab
         The plot.
 
     """
+    plt.ioff()
     fig, ax = plt.subplots()
     train_label, val_label = 'training', 'validation'
 
@@ -341,6 +340,7 @@ def plot_weights_and_activations(orca, model, xs_mean, epoch):
         Current epoch and fileno.
 
     """
+    plt.ioff()
     layer_names, activations, weights, y_values = get_activations_and_weights(orca, xs_mean, model, layer_name=None, learning_phase='test')
 
     fig, axes = plt.subplots()
