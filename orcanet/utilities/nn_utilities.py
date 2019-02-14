@@ -29,7 +29,7 @@ def generate_batches_from_hdf5_file(orca, files_dict, f_size=None, zero_center_i
     f_size : int or None
         Specifies the number of samples to be read from the .h5 file.
         If none, the whole .h5 file will be used.
-    zero_center_image : dict
+    zero_center_image : dict or None
         Mean image of the dataset used for zero-centering. Every input as a key, ndarray as values.
     yield_mc_info : bool
         Specifies if mc-infos (y_values) should be yielded as well.

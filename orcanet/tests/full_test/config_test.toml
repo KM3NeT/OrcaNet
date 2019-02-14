@@ -8,4 +8,4 @@ batchsize = 5
 train_logger_display=5
 train_logger_flush=-1
 verbose_train = 1
-epochs_to_train = 1
+epochs_to_train = 2

@@ -90,7 +90,7 @@ def update_summary_plot(orca):
     plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name)
 
 
-def train_and_validate_model(orca, model, start_epoch):
+def train_and_validate_model(orca, model, start_epoch, xs_mean=None):
     """
     Train a model for one epoch, i.e. on all (remaining) train files once.
 
@@ -106,12 +106,10 @@ def train_and_validate_model(orca, model, start_epoch):
         Compiled keras model to use for training and validating.
     start_epoch : tuple
         Upcoming epoch and file number.
+    xs_mean : dict or None
+        Zero center arrays, one for every input.
 
     """
-    if orca.cfg.zero_center_folder is not None:
-        xs_mean = load_zero_center_data(orca)
-    else:
-        xs_mean = None
     f_sizes = orca.io.get_file_sizes("train")
 
     for file_no, files_dict in enumerate(orca.io.yield_files("train")):
@@ -129,8 +127,8 @@ def train_and_validate_model(orca, model, start_epoch):
 
         # Train the model on one file and save it afterwards
         model_filename = orca.io.get_model_path(curr_epoch[0], curr_epoch[1])
-        assert not os.path.isfile(model_filename), "You tried to train your model in epoch {} file {}, but this model \
-            has already been trained and saved!".format(curr_epoch[0], curr_epoch[1])
+        assert not os.path.isfile(model_filename), "You tried to train your model in epoch {} file {}, but this model " \
+                                                   "has already been trained and saved!".format(curr_epoch[0], curr_epoch[1])
         history_train = train_model(orca, model, files_dict, f_size, xs_mean, curr_epoch)
         model.save(model_filename)
         print("Saved model as " + model_filename)
@@ -165,7 +163,7 @@ def train_model(orca, model, files_dict, f_size, xs_mean, curr_epoch):
         The name of every input as a key, the path to the n-th training file as values.
     f_size : int
         Number of images contained in f
-    xs_mean : dict
+    xs_mean : dict or None
         Mean image of the dataset used for zero-centering. Every input as a key, ndarray as values.
     curr_epoch : tuple(int, int)
         The number of the current epoch and the current filenumber.
@@ -199,7 +197,7 @@ def validate_model(orca, model, xs_mean):
         Contains all the configurable options in the OrcaNet scripts.
     model : ks.model.Model
         Keras model instance of a neural network.
-    xs_mean : dict
+    xs_mean : dict or None
         Mean image of the dataset used for zero-centering. Every input as a key, ndarray as values.
 
     Returns
@@ -239,7 +237,7 @@ def make_model_prediction(orca, model, xs_mean, eval_filename, samples=None):
         Contains all the configurable options in the OrcaNet scripts.
     model : ks.model.Model
         Trained Keras model of a neural network.
-    xs_mean : dict
+    xs_mean : dict or None
         Mean images of the x dataset.
     eval_filename : str
         Name and path of the h5 file.

@@ -273,11 +273,19 @@ class OrcaHandler:
         if self.cfg.use_scratch_ssd:
             self.cfg.use_local_node()
 
+        if self.cfg.zero_center_folder is not None:
+            xs_mean = load_zero_center_data(self)
+        else:
+            xs_mean = None
+
+        # Set epoch to the next file (the one we are about to train)
+        epoch = self.io.get_next_epoch(epoch)
+
         trained_epochs = 0
         while self.cfg.epochs_to_train is None or trained_epochs < self.cfg.epochs_to_train:
-            # Set epoch to the next file
-            epoch = self.io.get_next_epoch(epoch)
-            train_and_validate_model(self, model, epoch)
+            # Train on remaining files of an epoch
+            train_and_validate_model(self, model, epoch, xs_mean)
+            epoch = (epoch[0]+1, 1)
             trained_epochs += 1
 
     def predict(self, epoch=-1, fileno=-1):
