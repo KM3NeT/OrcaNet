@@ -6,6 +6,8 @@ Visualization tools used with Keras.
 """
 import numpy as np
 import keras.backend as K
+import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
