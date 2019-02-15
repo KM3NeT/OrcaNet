@@ -189,6 +189,25 @@ def orca_label_modifiers(class_type):
             ys['bg_output'] = categorical_bg.astype(np.float32)
             return ys
 
+    elif class_type == 'bg_classifier_2_class':
+        def label_modifier(y_values):
+            # for every sample, [1,0,0] for neutrinos, [0,1,0] for mupage and [0,0,1] for random_noise
+            # particle types: mupage: np.abs(13), random_noise = 0, neutrinos =
+            ys = dict()
+            particle_type = y_values['particle_type']
+            is_mupage = np.abs(particle_type) == 13
+            is_random_noise = np.abs(particle_type == 0)
+            is_not_mupage_nor_rn = np.invert(np.logical_or(is_mupage, is_random_noise))
+
+            batchsize = y_values.shape[0]
+            categorical_bg = np.zeros((batchsize, 2), dtype='bool')
+
+            categorical_bg[:, 0] = is_not_mupage_nor_rn # neutrino
+            categorical_bg[:, 1] = np.invert(is_not_mupage_nor_rn) # is not neutrino
+
+            ys['bg_output'] = categorical_bg.astype(np.float32)
+            return ys
+
     else:
         raise ValueError('The label ' + str(class_type) + ' in class_type is not available.')
 
@@ -231,6 +250,64 @@ def orca_dataset_modifiers(class_type):
             true['cat_neutrino'] = y_true[:, 0]
             true['cat_muon'] = y_true[:, 1]
             true['cat_random_noise'] = y_true[:, 2]
+
+            datasets['true'] = true
+
+            return datasets
+
+    elif class_type == 'bg_classifier_2_class':
+        def dataset_modifier(mc_info, y_true, y_pred):
+
+            # y_pred and y_true are dicts with keys for each output
+            # we only have 1 output in case of the bg classifier
+            y_pred = y_pred['bg_output']
+            y_true = y_true['bg_output']
+
+            datasets = dict() # y_pred is a list of arrays
+            datasets['mc_info'] = mc_info # is already a structured array
+
+            # make pred dataset
+            dtypes = np.dtype([('prob_neutrino', y_pred.dtype), ('prob_not_neutrino', y_pred.dtype)])
+            pred = np.empty(y_pred.shape[0], dtype=dtypes)
+            pred['prob_neutrino'] = y_pred[:, 0]
+            pred['prob_not_neutrino'] = y_pred[:, 1]
+
+            datasets['pred'] = pred
+
+            # make true dataset
+            dtypes = np.dtype([('cat_neutrino', y_true.dtype), ('cat_not_neutrino', y_true.dtype)])
+            true = np.empty(y_true.shape[0], dtype=dtypes)
+            true['cat_neutrino'] = y_true[:, 0]
+            true['cat_not_neutrino'] = y_true[:, 1]
+
+            datasets['true'] = true
+
+            return datasets
+
+    elif class_type == 'ts_classifier':
+        def dataset_modifier(mc_info, y_true, y_pred):
+
+            # y_pred and y_true are dicts with keys for each output
+            # we only have 1 output in case of the ts classifier
+            y_pred = y_pred['ts_output']
+            y_true = y_true['ts_output']
+
+            datasets = dict() # y_pred is a list of arrays
+            datasets['mc_info'] = mc_info # is already a structured array
+
+            # make pred dataset
+            dtypes = np.dtype([('prob_shower', y_pred.dtype), ('prob_track', y_pred.dtype)])
+            pred = np.empty(y_pred.shape[0], dtype=dtypes)
+            pred['prob_shower'] = y_pred[:, 0]
+            pred['prob_track'] = y_pred[:, 1]
+
+            datasets['pred'] = pred
+
+            # make true dataset
+            dtypes = np.dtype([('cat_shower', y_true.dtype), ('cat_track', y_true.dtype)])
+            true = np.empty(y_true.shape[0], dtype=dtypes)
+            true['cat_shower'] = y_true[:, 0]
+            true['cat_track'] = y_true[:, 1]
 
             datasets['true'] = true
 
