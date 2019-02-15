@@ -23,6 +23,7 @@ from orcanet_contrib.evaluation_utilities import (make_energy_to_accuracy_plot_m
                                                   make_1d_reco_err_to_reco_residual_plot,
                                                   make_2d_dir_correlation_plot_different_sigmas)
 from orcanet_contrib.plotting.bg_classifier import make_prob_hists_bg_classifier
+from orcanet_contrib.plotting.ts_classifier import make_e_to_acc_plot_ts, make_ts_prob_hists
 
 
 # TODO reintegrate old regression + ts plots
@@ -47,6 +48,11 @@ def make_performance_plots(pred_filepath, class_type, plots_folder):
         make_plots_subfolders(main_perf_plots_path, class_type)
         make_prob_hists_bg_classifier(pred_file, main_perf_plots_path + '/1d')
 
+    elif class_type == 'ts_classifier':
+        make_plots_subfolders(main_perf_plots_path, class_type)
+        make_e_to_acc_plot_ts(pred_file, 'Classified as track', main_perf_plots_path + '/1d', prob_threshold_shower=0.5)
+        make_ts_prob_hists(pred_file, main_perf_plots_path + '/1d')
+
     else:
         raise ValueError('The class_type ' + str(class_type) + ' is not known.')
 
@@ -56,12 +62,6 @@ def make_performance_plots(pred_filepath, class_type, plots_folder):
     #     # TODO doesnt work
     #     precuts = (False, '3-100_GeV_prod')
     #
-    #     make_energy_to_accuracy_plot_multiple_classes(arr_nn_pred, title='Classified as track', filename=folder_name + 'plots/ts_' + modelname,
-    #                                                   precuts=precuts, corr_cut_pred_0=0.5)
-    #
-    #     make_prob_hists(arr_nn_pred, folder_name, modelname=modelname, precuts=precuts)
-    #     make_hist_2d_property_vs_property(arr_nn_pred, folder_name, modelname, property_types=('bjorken-y', 'probability'),
-    #                                       e_cut=(1, 100), precuts=precuts)
     #     calculate_and_plot_separation_pid(arr_nn_pred, folder_name, modelname, precuts=precuts)
     #
     # else:  # regression
@@ -124,6 +124,8 @@ def make_plots_subfolders(main_perf_plots_path, class_type):
 
     """
     if class_type == 'bg_classifier':
+        subfolders = ['1d']
+    elif class_type == 'ts_classifier':
         subfolders = ['1d']
     else:
         raise ValueError('The class_type ' + str(class_type) + ' is not known.')
