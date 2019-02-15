@@ -13,15 +13,15 @@ swap_4d_channels = 'xyz-t_and_xyz-c_single_input'
 # The loss(es) of the model are listed here.
 # The keyword is the name of the respective layer in the model, for which this loss is used.
 # The value is a dict with a loss function that it will use, and optionally a weight to each loss.
-dx = {function="mean_absolute_error", weight=25}
-dy = {function="mean_absolute_error", weight=25}
-dz = {function='mean_absolute_error', weight=35}
+dx = {function="mean_absolute_error", weight=30}
+dy = {function="mean_absolute_error", weight=30}
+dz = {function='mean_absolute_error', weight=40}
 vx = {function='mean_absolute_error', weight=1}
 vy = {function='mean_absolute_error', weight=1}
 vz = {function='mean_absolute_error', weight=1}
 vt = {function='mean_absolute_error', weight=1e-20}
 e  = {function='mean_absolute_error', weight=1}
-by = {function='mean_absolute_error', weight=20}
+by = {function='mean_absolute_error', weight=30}
 dx_err = {function='loss_uncertainty_mse'}
 dy_err = {function='loss_uncertainty_mse'}
 dz_err = {function='loss_uncertainty_mse', weight=1.25}
