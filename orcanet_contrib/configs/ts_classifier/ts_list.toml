@@ -26,7 +26,7 @@
 # ]
 # -----------------------------
 
-[xyz-t]
+[input_1]
 train_files = [
 "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_ts_classifier/data_splits/xyzt/data_split/xyzt_tight_1_60b_ts_dataset_train_0_shuffled.h5",
 "/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_ts_classifier/data_splits/xyzt/data_split/xyzt_tight_1_60b_ts_dataset_train_1_shuffled.h5",

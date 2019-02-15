@@ -236,6 +236,35 @@ def orca_dataset_modifiers(class_type):
 
             return datasets
 
+    elif class_type == 'ts_classifier':
+        def dataset_modifier(mc_info, y_true, y_pred):
+
+            # y_pred and y_true are dicts with keys for each output
+            # we only have 1 output in case of the ts classifier
+            y_pred = y_pred['ts_output']
+            y_true = y_true['ts_output']
+
+            datasets = dict() # y_pred is a list of arrays
+            datasets['mc_info'] = mc_info # is already a structured array
+
+            # make pred dataset
+            dtypes = np.dtype([('prob_shower', y_pred.dtype), ('prob_track', y_pred.dtype)])
+            pred = np.empty(y_pred.shape[0], dtype=dtypes)
+            pred['prob_shower'] = y_pred[:, 0]
+            pred['prob_track'] = y_pred[:, 1]
+
+            datasets['pred'] = pred
+
+            # make true dataset
+            dtypes = np.dtype([('cat_shower', y_true.dtype), ('cat_track', y_true.dtype)])
+            true = np.empty(y_true.shape[0], dtype=dtypes)
+            true['cat_shower'] = y_true[:, 0]
+            true['cat_track'] = y_true[:, 1]
+
+            datasets['true'] = true
+
+            return datasets
+
     else:
         raise ValueError('The dataset modifier for the class_type ' + str(class_type) + ' is not known.')
 
