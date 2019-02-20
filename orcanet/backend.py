@@ -143,7 +143,7 @@ def train_and_validate_model(orca, model, start_epoch, xs_mean=None):
         write_summary_logfile(orca, curr_epoch, model, history_train, history_val, K.get_value(model.optimizer.lr))
         write_full_logfile(orca, model, history_train, history_val, K.get_value(model.optimizer.lr), curr_epoch, files_dict)
         update_summary_plot(orca)
-        plot_weights_and_activations(cfg, model, xs_mean, curr_epoch)
+        plot_weights_and_activations(orca, model, xs_mean, curr_epoch)
 
 
 def train_model(orca, model, files_dict, f_size, xs_mean, curr_epoch):
