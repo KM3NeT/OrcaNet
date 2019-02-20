@@ -5,11 +5,11 @@ Visualization tools used with Keras.
 2) Visualizes activations for Keras models
 """
 import numpy as np
-import keras.backend as K
+
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
-from orcanet.utilities.nn_utilities import generate_batches_from_hdf5_file, get_inputs
+from orcanet.utilities.nn_utilities import generate_batches_from_hdf5_file, get_layer_output
 
 
 def make_train_val_plot(train_data, val_data=None, color=None, title=None, y_label=None):
@@ -276,21 +276,22 @@ def sort_metric_names_and_errors(metric_names):
     return sorted_metrics
 
 
-def get_activations_and_weights(xs, model, layer_name=None, learning_phase='test'):
+def get_activations_and_weights(model, samples, layer_name=None, mode='test'):
     """
-    Get the weights of a model and also the activations of the model for a single event in the validation set.
+    Get the weights and activations of the layers of a model for
+    a given sample.
 
     Parameters
     ----------
-    xs : dict
-        Input data.
     model : keras model
         The model to make the data with.
+    samples : dict
+        Input data.
     layer_name : str or None
-        If only the activations of a single layer should be collected.
-    learning_phase : str
-        Specify the learning phase during the calculation of the activations.
-        Either 'test' or 'train' (for Dropout, Batchnorm etc.)
+        Name of the layer to get info from. None for all layers.
+    mode : str
+        Mode of the layers during the forward pass. Either train or test.
+        Important for batchnorm, dropout, ...
 
     """
     from keras.layers import InputLayer
@@ -306,62 +307,17 @@ def get_activations_and_weights(xs, model, layer_name=None, learning_phase='test
             if not isinstance(layer, InputLayer):
                 layer_nos.append(layer_no)
 
-    # get input layers and input files
-    inputs = get_inputs(model)
-    # doesnt work with dicts for whatever reason so transform into lists instead
-    model_inputs = [xs[key] for key in inputs.keys()]
-
     activations = [
-        get_layer_output(model, model_inputs, layer_no, learning_phase) for
+        get_layer_output(model, samples, layer_no, mode) for
         layer_no in layer_nos]
 
     return layer_names, activations, weights
 
 
-def get_layer_output(model, samples, layer_no, mode="test"):
-    """
-    Get the output of an intermediate layer from a model.
-
-    Parameters
-    ----------
-    model : keras model
-        The model.
-    samples : List or ndarray
-        The data to apply the model to.
-    layer_no : int
-        Index of the layer.
-    mode : str
-        Either train or test. Important for batchnorm, dropout, ...
-
-    Returns
-    -------
-    layer_output : ndarray
-        The output from the layer.
-
-    """
-    # samples : list
-    if mode == "test":
-        phase = 0
-    elif mode == "train":
-        phase = 1
-    else:
-        raise NameError("Unknown mode: ", mode)
-
-    inp_tensors = model.input  # either a tensor or a list of tensors
-    if not isinstance(inp_tensors, list):
-        inp_tensors = [inp_tensors, ]
-    if not isinstance(samples, list):
-        samples = [samples, ]
-    get_output = K.function(
-        inp_tensors + [K.learning_phase(), ],
-        [model.layers[layer_no].output])
-    layer_output = get_output(samples + [phase, ])[0]
-    return layer_output
-
-
 def plot_weights_and_activations(orca, model, xs_mean, epoch):
     """
-    Plots the weights of a model and the activations for one event to a .pdf file.
+    Plots the weights of a model and the activations for one event from
+    the validation set to a .pdf file.
 
     Parameters
     ----------
@@ -381,7 +337,7 @@ def plot_weights_and_activations(orca, model, xs_mean, epoch):
     generator = generate_batches_from_hdf5_file(orca, f, f_size=1, zero_center_image=xs_mean, yield_mc_info=True)
     xs, ys, y_values = next(generator)  # y_values = mc_info for the event
 
-    layer_names, activations, weights = get_activations_and_weights(xs, model, layer_name=None, learning_phase='test')
+    layer_names, activations, weights = get_activations_and_weights(model, xs, layer_name=None, mode='test')
 
     fig, axes = plt.subplots()
     pdf_name = orca.io.get_subfolder("activations", create=True) + "/act_and_weights_plots_epoch_" + str(epoch) + '.pdf'
