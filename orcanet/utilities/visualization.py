@@ -276,18 +276,22 @@ def sort_metric_names_and_errors(metric_names):
     return sorted_metrics
 
 
-def get_activations_and_weights(orca, xs_mean, model, layer_name=None, learning_phase='test'):
+def get_activations_and_weights(xs, model, layer_name=None, learning_phase='test'):
     """
     Get the weights of a model and also the activations of the model for a single event in the validation set.
 
-    orca : object OrcaHandler
-        Contains all the configurable options in the OrcaNet scripts.
-    xs_mean : dict
-        Mean image of the dataset used for zero-centering. Every input as a key, ndarray as values.
-    :param ks.model model: The model to make the data with.
-    :param None/str layer_name: if only the activations of a single layer should be collected.
-    :param str learning_phase: string identifier to specify the learning phase during the calculation of the activations.
-                               'test', 'train': Dropout, Batchnorm etc. in test/train mode
+    Parameters
+    ----------
+    xs : dict
+        Input data.
+    model : keras model
+        The model to make the data with.
+    layer_name : str or None
+        If only the activations of a single layer should be collected.
+    learning_phase : str
+        Specify the learning phase during the calculation of the activations.
+        Either 'test' or 'train' (for Dropout, Batchnorm etc.)
+
     """
     outputs = [layer.output for layer in model.layers if
                layer.name == layer_name or layer_name is None]  # all layer outputs -> empty tf.tensors
@@ -299,14 +303,11 @@ def get_activations_and_weights(orca, xs_mean, model, layer_name=None, learning_
 
     # get input layers and input files
     inputs = get_inputs(model)
-    f = next(orca.io.yield_files("val"))
-    generator = generate_batches_from_hdf5_file(orca, f, f_size=1, zero_center_image=xs_mean, yield_mc_info=True)
-    model_inputs, ys, y_values = next(generator)  # y_values = mc_info for the event
 
     # doesnt work with dicts for whatever reason so transform into lists instead
     keys = list(inputs.keys())
     inp = [inputs[key] for key in keys]
-    model_inputs = [model_inputs[key] for key in keys]
+    model_inputs = [xs[key] for key in keys]
     if len(inp) == 1:
         inp = inp[0]
         model_inputs = model_inputs[0]
@@ -321,7 +322,7 @@ def get_activations_and_weights(orca, xs_mean, model, layer_name=None, learning_
     for layer_activations in layer_outputs:
         activations.append(layer_activations)
 
-    return layer_names, activations, weights, y_values
+    return layer_names, activations, weights
 
 
 def plot_weights_and_activations(orca, model, xs_mean, epoch):
@@ -341,7 +342,12 @@ def plot_weights_and_activations(orca, model, xs_mean, epoch):
 
     """
     plt.ioff()
-    layer_names, activations, weights, y_values = get_activations_and_weights(orca, xs_mean, model, layer_name=None, learning_phase='test')
+
+    f = next(orca.io.yield_files("val"))
+    generator = generate_batches_from_hdf5_file(orca, f, f_size=1, zero_center_image=xs_mean, yield_mc_info=True)
+    xs, ys, y_values = next(generator)  # y_values = mc_info for the event
+
+    layer_names, activations, weights = get_activations_and_weights(xs, model, layer_name=None, learning_phase='test')
 
     fig, axes = plt.subplots()
     pdf_name = orca.io.get_subfolder("activations", create=True) + "/act_and_weights_plots_epoch_" + str(epoch) + '.pdf'
