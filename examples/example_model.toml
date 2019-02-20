@@ -1,17 +1,87 @@
-# Info for building an OrcaNet model. This is not required for using orca_train.
-# nn_arch is mandatory, as it is the name of the architecture that will be loaded.
-# Depending on the architecture, other options like the number of layers also have to be given.
+# Info for building a model with the OrcaBuilder. This will produce a
+# compiled keras model, adapted to the input data given to the OrcaHandler.
+# This is not required to use orca_train, as any model can be used for that.
 #
-[model]
-nn_arch = 'VGG'
-class_type = 'energy_dir_bjorken-y_vtx_errors'
-dropout = 0.0
-n_filters = [64, 64, 64, 64, 64, 64, 128, 128, 128, 128]
+# The model itself is defined by a "body" section, consisting of a
+# sequential arrangement of predefined layer blocks, and a "head" section,
+# which produces the output. E.g., the body might consist of convolutional
+# layer blocks (convolution, BatchNorm, Activation, MaxPooling and/or Dropout),
+# and the head might be a flatten layer followed by some dense layer blocks,
+# which produce a categorical output.
+#
+# Info for compiling the model is given in the section [compile]. This includes
+# the used optimizer (e.g. adam) and the loss functions for each output
+# of the network.
 
-[model.compile_opt]
+# ----------------------------------------------------------------------
+[body]
+# The architecture to use. Currently available are:
+# - single: One input
+# - multi:  Multiple inputs, all with the same network, then concatenated + head.
+# - merge:  Concatenate multiple saved networks after the flatten layer,
+#           change dropout to 0, then add head.
+architecture = "single"
+
+# default values for the trunk layers of the network:
+# Type of the block to be added; available: conv_block, dense_block
+# See orcanet/builder_util/layer_blocks.py for possible arguments.
+type = "conv_block"
+# Specifies the dimension of convolutional blocks, either 2 or 3
+conv_dim = 3
+# Kernel size of the convolution.
+kernel_size = 3
+# Add a dropout layer with given rate.
+dropout = 0.2
+# Pool size of a MaxPooling layer, e.g. (1,1,2)
+# pool_sizes = 2
+# Activation function that should be used. e.g. 'linear', 'relu'...
+activation = 'relu'
+# Add a batch normalization layer
+batchnorm=true
+
+# blocks in the body section of the resulting network.
+# Each dict makes a new block. The default values above will be inserted
+# only if they are missing, i.e. the values below are not overwritten.
+blocks = [
+          {filters=64},
+          {filters=64},
+          {filters=64, pool_size=[2, 2, 2]},
+          {filters=64},
+          {filters=64},
+          {filters=64},
+          {filters=128, pool_size=[2, 2, 2]},
+          {filters=128},
+          {filters=128},
+          {filters=128},
+          ]
+
+
+# ----------------------------------------------------------------------
+[head]
+# The head is the last layers of the network.
+# Available architectures:
+# -categorical:      3 dense layer blocks + Softmax output (one-hot)
+# -regression_error: for each predicted quantity: 3 dense layer blocks +
+#                    4 dense layer blocks for respective error
+architecture = "regression_error"
+# additional arguments for the given head architecture
+output_args = {output_names=['e', 'dx', 'dy', 'dz', 'by', 'vx', 'vy', 'vz', 'vt']}
+
+# default values for the blocks in the head:
+# dropout = None
+# kernel_reg = None
+# activation = "relu"
+
+
+# ----------------------------------------------------------------------
+[compile]
+optimizer = "adam"
+
+[compile.losses]
 # The loss(es) of the model are listed here.
-# The keyword is the name of the respective layer in the model, for which this loss is used.
-# The value is a dict with a loss function that it will use, and optionally a weight to each loss.
+# The keyword is the name of the respective layer in the model, for which
+# this loss is used. The value is a dict with a loss function that it will
+# use, and optionally a weight to each loss and/or a metric.
 dx = {function="mse", weight=10}
 dy = {function="mse", weight=10}
 dz = {function='mean_absolute_error', weight=15}
@@ -21,6 +91,7 @@ vz = {function='mean_absolute_error', weight=1}
 vt = {function='mean_absolute_error', weight=1e-10}
 e  = {function='mean_absolute_error'}
 by = {function='mean_absolute_error', weight=10}
+
 dx_err = {function='loss_uncertainty_mse'}
 dy_err = {function='loss_uncertainty_mse'}
 dz_err = {function='loss_uncertainty_mse', weight=1.25}
@@ -30,3 +101,20 @@ vz_err = {function='loss_uncertainty_mse'}
 vt_err = {function='loss_uncertainty_mse', weight=1e-10}
 e_err  = {function='loss_uncertainty_mse', weight=1e-2}
 by_err = {function='loss_uncertainty_mse'}
+
+
+# ----------------------------------------------------------------------
+# This section is optional. Can be used to load modifiers in the OrcaHandler
+# that were used for orca analyses before constructing the model. Done via
+# orcanet_contrib.orca_handler_util.update_orca_objects
+[orca_modifiers]
+sample_modifier = 'xyz-t_and_xyz-c_single_input'
+label_modifier = 'energy_dir_bjorken-y_vtx_errors'
+
+
+
+
+
+
+
+

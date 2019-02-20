@@ -7,10 +7,8 @@ Utility code regarding reading user input, and writing output like logfiles.
 import os
 import shutil
 import h5py
-import toml
 import numpy as np
 from datetime import datetime
-from collections import namedtuple
 
 from orcanet.utilities.nn_utilities import get_inputs, generate_batches_from_hdf5_file
 
@@ -52,6 +50,10 @@ class IOHandler(object):
         else:
             latest_epoch = (0, 0)
         return latest_epoch
+
+    def is_new(self):
+        """ Is this a new training, aka no saved models exist? """
+        return self.get_latest_epoch() == (0, 0)
 
     def get_next_epoch(self, epoch):
         """
@@ -373,58 +375,26 @@ class IOHandler(object):
                     mc_info = f[self.cfg.key_labels][:self.cfg.batchsize]
         return xs, mc_info
 
+    def get_input_shapes(self):
+        """
+        Get the input names and shapes of the data after the modifier has
+        been applied.
 
-def read_out_list_file(file):
-    """
-    Reads out a list file in .toml format containing the pathes to training
-    and validation files and bring it into the proper format.
+        Returns
+        -------
+        input_shapes : dict
+            Keys: Name of the inputs of the model.
+            Values: Their shape without the batchsize.
 
-    Parameters
-    ----------
-    file : str
-        Path to a .list file containing the paths to training and validation files to be used during training.
-
-    Returns
-    -------
-    train_files : dict
-        A dict containing the paths to the different training files given in the list_file.
-        Example for the output format:
-                {
-                 "input_A" : ('path/to/set_A_train_file_1.h5', 'path/to/set_A_train_file_2.h5', ...)
-                 "input_B" : ('path/to/set_B_train_file_1.h5', 'path/to/set_B_train_file_2.h5', ...)
-                 ...
-                }
-    validation_files : dict
-        Like the above but for validation files.
-
-    Raises
-    -------
-    AssertionError
-        If different inputs have a different number of training or validation files.
-
-    """
-    # a dict with inputnames as keys and dicts with the lists of train/val files as values
-    file_content = toml.load(file)
-
-    train_files, validation_files = {}, {}
-    # no of train/val files in each input set
-    n_train, n_val = [], []
-    for input_key, input_values in file_content.items():
-        assert isinstance(input_values, dict) and len(input_values.keys()) == 2, \
-            "Wrong input format in toml list file (input {}: {})".format(input_key, input_values)
-        assert "train_files" in input_values.keys(), "No train files specified in toml list file"
-        assert "validation_files" in input_values.keys(), "No validation files specified in toml list file"
-
-        train_files[input_key] = tuple(input_values["train_files"])
-        validation_files[input_key] = tuple(input_values["validation_files"])
-        n_train.append(len(train_files[input_key]))
-        n_val.append(len(validation_files[input_key]))
-
-    if not n_train.count(n_train[0]) == len(n_train):
-        raise AssertionError("The specified training inputs do not all have the same number of files!")
-    if not n_val.count(n_val[0]) == len(n_val):
-        raise AssertionError("The specified validation inputs do not all have the same number of files!")
-    return train_files, validation_files
+        """
+        if self.cfg.sample_modifier is None:
+            input_shapes = self.get_n_bins()
+        else:
+            xs, mc_info = self.get_batch()
+            xs_mod = self.cfg.sample_modifier(xs)
+            input_shapes = {input_name: input_xs.shape[1:]
+                            for input_name, input_xs in xs_mod.items()}
+        return input_shapes
 
 
 def write_full_logfile_startup(orca):

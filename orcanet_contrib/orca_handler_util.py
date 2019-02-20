@@ -4,9 +4,66 @@
 TODO
 """
 import numpy as np
+import toml
+
+from orcanet_contrib.custom_objects import get_custom_objects
 
 
-def orca_sample_modifiers(swap_col, str_ident):
+def update_orca_objects(orca, model_file):
+    """
+    Update the orca object for using the model.
+
+    Look up and load in the respective sample-, label-, and dataset-
+    modifiers, as well as the custom objects.
+    Will assert that the respective objects have not already been set
+    to a non-default value (nothing is overwritten).
+
+    Parameters
+    ----------
+    orca : object OrcaHandler
+        Contains all the configurable options in the OrcaNet scripts.
+    model_file : str
+        Path to a toml file which has the infos about which modifiers
+        to use.
+
+    """
+    file_content = toml.load(model_file)
+    orca_modifiers = file_content["orca_modifiers"]
+
+    sample_modifier = orca_modifiers.get("sample_modifier")
+    label_modifier = orca_modifiers.get("label_modifier")
+    dataset_modifier = orca_modifiers.get("dataset_modifier")
+
+    if sample_modifier is not None:
+        assert orca.cfg.sample_modifier is None, \
+            "Can not set sample modifier: Has already been set: " \
+            "{}".format(orca.cfg.sample_modifier)
+    if label_modifier is not None:
+        assert orca.cfg.label_modifier is None, \
+            "Can not set label modifier: Has already been set: " \
+            "{}".format(orca.cfg.label_modifier)
+    if dataset_modifier is not None:
+        assert orca.cfg.dataset_modifier is None, \
+            "Can not set dataset modifier: Has already been set: " \
+            "{}".format(orca.cfg.dataset_modifier)
+    assert orca.cfg.custom_objects is None, \
+        "Can not set custom objects: Have already been set: " \
+        "{}".format(orca.cfg.custom_objects)
+
+    if sample_modifier is not None:
+        print("Using orca sample modifier: ", sample_modifier)
+        orca.cfg.sample_modifier = orca_sample_modifiers(sample_modifier)
+    if label_modifier is not None:
+        print("Using orca label modifier: ", label_modifier)
+        orca.cfg.label_modifier = orca_label_modifiers(label_modifier)
+    if dataset_modifier is not None:
+        print("Using orca dataset modifier: ", dataset_modifier)
+        # orca.cfg.dataset_modifier = orca_dataset_modifiers(dataset_modifier)
+    print("Using orca custom objects")
+    orca.cfg.custom_objects = get_custom_objects()
+
+
+def orca_sample_modifiers(name):
     """
     Returns one of the sample modifiers used for Orca networks.
 
@@ -26,10 +83,8 @@ def orca_sample_modifiers(swap_col, str_ident):
 
     Parameters
     ----------
-    swap_col : None/str
-        Define which channels to swap.
-    str_ident : str
-        Additional operations.
+    name : None/str
+        Name of the smpale modifier to return.
 
     Returns
     -------
@@ -37,37 +92,40 @@ def orca_sample_modifiers(swap_col, str_ident):
         The sample modifier function.
 
     """
-    swap_4d_channels_dict = {'yzt-x': (0, 2, 3, 4, 1), 'xyt-z': (0, 1, 2, 4, 3), 't-xyz': (0, 4, 1, 2, 3),
-                             'tyz-x': (0, 4, 2, 3, 1)}
+    # assuming input is bxyzt
+    xyzt_permute = {'yzt-x': (0, 2, 3, 4, 1),
+                    'xyt-z': (0, 1, 2, 4, 3),
+                    't-xyz': (0, 4, 1, 2, 3),
+                    'tyz-x': (0, 4, 2, 3, 1)}
 
-    if swap_col in swap_4d_channels_dict:
+    if name in xyzt_permute:
         def swap_columns(xs_files):
             # Transpose dimensions
             xs_layer = dict()
             keys = list(xs_files.keys())
-            xs_layer[keys[0]] = np.transpose(xs_files, swap_4d_channels_dict[swap_col])
+            xs_layer[keys[0]] = np.transpose(xs_files, xyzt_permute[name])
             return xs_layer
         sample_modifier = swap_columns
 
-    elif swap_col == 'xyz-t_and_yzt-x':
+    elif name == 'xyz-t_and_yzt-x':
         def sample_modifier(xs_files):
             # Use xyz-t, and also transpose it to yzt-x and use that, too.
             xs_layer = dict()
             xs_layer['xyz-t'] = xs_files['xyz-t']
-            xs_layer['yzt-x'] = np.transpose(xs_files['xyz-t'], swap_4d_channels_dict['yzt-x'])
+            xs_layer['yzt-x'] = np.transpose(xs_files['xyz-t'], xyzt_permute['yzt-x'])
             return xs_layer
 
-    elif 'xyz-t_and_yzt-x' + 'multi_input_single_train_tight-1_tight-2' in swap_col + str_ident:
+    elif name == 'xyz-t_and_yzt-x_multi_input_single_train_tight-1_tight-2':
         def sample_modifier(xs_files):
             # Use xyz-t in two different time cuts, and also transpose them to yzt-x and use these, too.
             xs_layer = dict()
             xs_layer['xyz-t_tight-1'] = xs_files['xyz-t_tight-1']
             xs_layer['xyz-t_tight-2'] = xs_files['xyz-t_tight-2']
-            xs_layer['yzt-x_tight-1'] = np.transpose(xs_files['xyz-t_tight-1'], swap_4d_channels_dict['yzt-x'])
-            xs_layer['yzt-x_tight-2'] = np.transpose(xs_files['xyz-t_tight-2'], swap_4d_channels_dict['yzt-x'])
+            xs_layer['yzt-x_tight-1'] = np.transpose(xs_files['xyz-t_tight-1'], xyzt_permute['yzt-x'])
+            xs_layer['yzt-x_tight-2'] = np.transpose(xs_files['xyz-t_tight-2'], xyzt_permute['yzt-x'])
             return xs_layer
 
-    elif swap_col == 'xyz-t_and_xyz-c_single_input':
+    elif name == 'xyz-t_and_xyz-c_single_input':
         def sample_modifier(xs_files):
             # Concatenate xyz-t and xyz-c to a single input
             xs_layer = dict()
@@ -75,12 +133,12 @@ def orca_sample_modifiers(swap_col, str_ident):
             return xs_layer
 
     else:
-        raise ValueError('The argument "swap_col"=' + str(swap_col) + ' is not valid.')
+        raise ValueError('Unknown input_type: ' + str(name))
 
     return sample_modifier
 
 
-def orca_label_modifiers(class_type):
+def orca_label_modifiers(name):
     """
     Returns one of the label modifiers used for Orca networks.
 
@@ -110,7 +168,7 @@ def orca_label_modifiers(class_type):
 
     Parameters
     ----------
-    class_type : str
+    name : str
 
     Returns
     -------
@@ -119,7 +177,7 @@ def orca_label_modifiers(class_type):
 
     """
 
-    if class_type == 'energy_dir_bjorken-y_vtx_errors':
+    if name == 'energy_dir_bjorken-y_vtx_errors':
         def label_modifier(y_values):
             ys = dict()
             particle_type, is_cc = y_values['particle_type'], y_values['is_cc']
@@ -147,7 +205,7 @@ def orca_label_modifiers(class_type):
                 ys[key_label] = ys[key_label].astype(np.float32)
             return ys
 
-    elif class_type == 'ts_classifier':
+    elif name == 'ts_classifier':
         def label_modifier(y_values):
             # for every sample, [0,1] for shower, or [1,0] for track
 
@@ -169,7 +227,7 @@ def orca_label_modifiers(class_type):
             ys['ts_output'] = categorical_ts.astype(np.float32)
             return ys
 
-    elif class_type == 'bg_classifier':
+    elif name == 'bg_classifier':
         def label_modifier(y_values):
             # for every sample, [1,0,0] for neutrinos, [0,1,0] for mupage and [0,0,1] for random_noise
             # particle types: mupage: np.abs(13), random_noise = 0, neutrinos =
@@ -190,22 +248,22 @@ def orca_label_modifiers(class_type):
             return ys
 
     else:
-        raise ValueError('The label ' + str(class_type) + ' in class_type is not available.')
+        raise ValueError("Unknown output_type: " + str(name))
 
     return label_modifier
 
 
-def orca_dataset_modifiers(class_type):
+def orca_dataset_modifiers(name):
     """
     Returns one of the dataset modifiers used for predicting with OrcaNet.
 
     Parameters
     ----------
-    class_type : str
+    name : str
         TODO
 
     """
-    if class_type == 'bg_classifier':
+    if name == 'bg_classifier':
         def dataset_modifier(mc_info, y_true, y_pred):
 
             # y_pred and y_true are dicts with keys for each output
@@ -236,7 +294,7 @@ def orca_dataset_modifiers(class_type):
 
             return datasets
 
-    elif class_type == 'ts_classifier':
+    elif name == 'ts_classifier':
         def dataset_modifier(mc_info, y_true, y_pred):
 
             # y_pred and y_true are dicts with keys for each output
@@ -266,12 +324,12 @@ def orca_dataset_modifiers(class_type):
             return datasets
 
     else:
-        raise ValueError('The dataset modifier for the class_type ' + str(class_type) + ' is not known.')
+        raise ValueError('Unknown dataset modifier: ' + str(name))
 
     return dataset_modifier
 
 
-def orca_learning_rates(name):
+def orca_learning_rates(name, total_file_no):
     """
     Returns one of the learning rate schedules used for Orca networks.
 
@@ -279,6 +337,8 @@ def orca_learning_rates(name):
     ----------
     name : str
         Name of the schedule.
+    total_file_no : int
+        How many files there are to train on.
 
     Returns
     -------
@@ -287,7 +347,7 @@ def orca_learning_rates(name):
 
     """
     if name == "triple_decay":
-        def learning_rate(n_epoch, n_file, orca):
+        def learning_rate(n_epoch, n_file):
             """
             Function that calculates the current learning rate based on the number of already trained epochs.
 
@@ -301,8 +361,6 @@ def orca_learning_rates(name):
                 The number of the current epoch which is used to calculate the new learning rate.
             n_file : int
                 The number of the current filenumber which is used to calculate the new learning rate.
-            orca : object OrcaHandler
-                Contains all the configurable options in the OrcaNet scripts.
 
             Returns
             -------
@@ -310,7 +368,7 @@ def orca_learning_rates(name):
                 Calculated learning rate for this epoch.
 
             """
-            n_lr_decays = (n_epoch - 1) * orca.io.get_no_of_files("train") + (n_file - 1)
+            n_lr_decays = (n_epoch - 1) * total_file_no + (n_file - 1)
             lr_temp = 0.005  # * n_gpu TODO think about multi gpu lr
 
             for i in range(n_lr_decays):

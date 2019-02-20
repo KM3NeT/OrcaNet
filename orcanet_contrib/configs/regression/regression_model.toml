@@ -1,21 +1,43 @@
-# Info for building an OrcaNet model. This is not required for using orca_train.
-# nn_arch is mandatory, as it is the name of the architecture that will be loaded.
-# Depending on the architecture, other options like the number of layers also have to be given.
-#
-[model]
-nn_arch = 'VGG'
-class_type = 'energy_dir_bjorken-y_vtx_errors'
-dropout = 0.0
-n_filters = [64, 64, 64, 64, 64, 64, 128, 128, 128, 128]
-swap_4d_channels = 'xyz-t_and_xyz-c_single_input'
+[body]
+architecture = "single"
 
-[model.compile_opt]
-# The loss(es) of the model are listed here.
-# The keyword is the name of the respective layer in the model, for which this loss is used.
-# The value is a dict with a loss function that it will use, and optionally a weight to each loss.
-dx = {function="mean_absolute_error", weight=25}
-dy = {function="mean_absolute_error", weight=25}
-dz = {function='mean_absolute_error', weight=35}
+# default values for the trunk layers of the network:
+type = "conv_block"
+conv_dim = 3
+kernel_size = 3
+dropout = 0.0
+activation = 'relu'
+batchnorm=true
+
+
+# config of every layer block, will overwrite the default values above
+blocks = [
+          {filters=64},
+          {filters=64},
+          {filters=64},
+          {filters=64},
+          {filters=64, pool_size=[2, 2, 2]},
+          {filters=64},
+          {filters=128},
+          {filters=128},
+          {filters=128, pool_size=[2, 2, 2]},
+          {filters=128},
+          ]
+
+# ----------------------------------------------------------------------
+[head]
+architecture = "regression_error"
+architecture_args = {output_names=['e', 'dx', 'dy', 'dz', 'by', 'vx', 'vy', 'vz', 'vt']}
+
+
+# ----------------------------------------------------------------------
+[compile]
+optimizer = "adam"
+
+[compile.losses]
+dx = {function="mean_absolute_error", weight=10}
+dy = {function="mean_absolute_error", weight=10}
+dz = {function='mean_absolute_error', weight=15}
 vx = {function='mean_absolute_error', weight=1}
 vy = {function='mean_absolute_error', weight=1}
 vz = {function='mean_absolute_error', weight=1}
@@ -31,3 +53,8 @@ vz_err = {function='loss_uncertainty_mse', weight=5e-4}
 vt_err = {function='loss_uncertainty_mse', weight=1e-20}
 e_err  = {function='loss_uncertainty_mse', weight=1e-3}
 by_err = {function='loss_uncertainty_mse'}
+
+# ----------------------------------------------------------------------
+[orca_modifiers]
+sample_modifier = 'xyz-t_and_xyz-c_single_input'
+label_modifier = 'energy_dir_bjorken-y_vtx_errors'

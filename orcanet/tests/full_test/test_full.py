@@ -6,11 +6,12 @@ import h5py
 import os
 import shutil
 from keras.models import Model
-from keras.layers import Dense, Input, Flatten
+from keras.layers import Dense, Input, Flatten, Convolution3D
 from unittest import TestCase
 
 from orcanet.core import OrcaHandler
-from orcanet.model_archs.model_setup import OrcaModel
+from orcanet.orca_builder import OrcaBuilder
+from orcanet_contrib.orca_handler_util import update_orca_objects
 
 from orcanet.utilities.nn_utilities import load_zero_center_data
 
@@ -19,8 +20,8 @@ class DatasetTest(TestCase):
     """ Tests which require a dataset. """
     def setUp(self):
         """
-        Make a .temp directory in the current working directory, generate dummy data in it and set up the
-        cfg object.
+        Make a .temp directory in the current working directory, generate
+        dummy data in it and set up the cfg object.
 
         """
         self.temp_dir = os.path.join(os.getcwd(), ".temp/")
@@ -33,9 +34,9 @@ class DatasetTest(TestCase):
         # Make dummy data of given shape
         self.shape = (3, 3, 3, 3)
         train_inp = (self.temp_dir + "train1.h5", self.temp_dir + "train2.h5")
-        self.train_pathes = {"input_1": train_inp}
+        self.train_pathes = {"testing_input": train_inp}
         val_inp = (self.temp_dir + "val1.h5", self.temp_dir + "val2.h5")
-        self.val_pathes = {"input_1": val_inp}
+        self.val_pathes = {"testing_input": val_inp}
         for path1, path2 in (train_inp, val_inp):
             make_dummy_data(path1, path2, self.shape)
 
@@ -60,27 +61,28 @@ class DatasetTest(TestCase):
         orca = self.orca
         xs_mean = load_zero_center_data(orca)
         target_xs_mean = np.ones(self.shape)/4
-        self.assertTrue(np.allclose(xs_mean["input_1"], target_xs_mean))
+        self.assertTrue(np.allclose(xs_mean["testing_input"], target_xs_mean))
 
-        file = orca.cfg.zero_center_folder + orca.cfg._list_file + '_input_' + "input_1" + '.npz'
+        file = orca.cfg.zero_center_folder + orca.cfg._list_file + '_input_' + "testing_input" + '.npz'
         zero_center_used_ip_files = np.load(file)['zero_center_used_ip_files']
-        self.assertTrue(np.array_equal(zero_center_used_ip_files, orca.cfg._train_files["input_1"]))
+        self.assertTrue(np.array_equal(zero_center_used_ip_files, orca.cfg._train_files["testing_input"]))
 
     def test_multi_input_model(self):
         """
-        Make a model and train it with the test toml files provided to check if it throws an error.
-        Also resumes training after the first epoch with a custom lr to check if that works.
+        Make a model and train it with the test toml files provided to check
+        if it throws an error. Also resumes training after the first epoch
+        with a custom lr to check if that works.
         """
         orca = self.orca
         model_file = os.path.join(os.path.dirname(__file__), "model_test.toml")
+        update_orca_objects(orca, model_file)
 
-        orcamodel = OrcaModel(model_file)
-        initial_model = orcamodel.build(orca)
-        orcamodel.update_orca(orca)
+        builder = OrcaBuilder(model_file)
+        initial_model = builder.build(orca)
 
         orca.train(initial_model)
 
-        def test_learning_rate(epoch, fileno, cfg):
+        def test_learning_rate(epoch, fileno):
             lr = (1 + epoch)*(1 + fileno) * 0.001
             return lr
 
@@ -92,6 +94,40 @@ class DatasetTest(TestCase):
         orca.cfg.sample_modifier = test_modifier
         orca.train()
         orca.predict()
+
+    def test_model_setup_CNN_model(self):
+        orca = self.orca
+        model_file = os.path.join(os.path.dirname(__file__), "model_CNN.toml")
+        builder = OrcaBuilder(model_file)
+        model = builder.build(orca)
+
+        self.assertEqual(model.input_shape[1:], self.shape)
+        self.assertEqual(model.output_shape[1:], (2, ))
+        self.assertEqual(len(model.layers), 14)
+
+    def test_merge_models(self):
+        def build_model(inp_layer_name, inp_shape):
+            inp = Input(inp_shape, name=inp_layer_name)
+            x = Convolution3D(3, 3)(inp)
+            x = Flatten()(x)
+            out = Dense(1, name="out_0")(x)
+
+            model = Model(inp, out)
+            return model
+
+        model_file = os.path.join(os.path.dirname(__file__), "model_CNN.toml")
+        builder = OrcaBuilder(model_file)
+        model1 = build_model("inp_A", self.shape)
+        model2 = build_model("inp_B", self.shape)
+        merged_model = builder.merge_models([model1, model2])
+
+        for layer in model1.layers + model2.layers:
+            if isinstance(layer, Dense):
+                continue
+            merged_layer = merged_model.get_layer(layer.name)
+            for i in range(len(layer.get_weights())):
+                self.assertTrue(np.array_equal(layer.get_weights()[i],
+                                               merged_layer.get_weights()[i]))
 
 
 def make_dummy_data(filepath1, filepath2, shape):
@@ -111,9 +147,11 @@ def make_dummy_data(filepath1, filepath2, shape):
     xs1 = np.concatenate([np.ones((75,) + shape), np.zeros((75,) + shape)])
     xs2 = np.concatenate([np.ones((25,) + shape), np.zeros((225,) + shape)])
 
-    dtypes = [('event_id', '<f8'), ('particle_type', '<f8'), ('energy', '<f8'), ('is_cc', '<f8'), ('bjorkeny', '<f8'),
-              ('dir_x', '<f8'), ('dir_y', '<f8'), ('dir_z', '<f8'), ('time_interaction', '<f8'), ('run_id', '<f8'),
-              ('vertex_pos_x', '<f8'), ('vertex_pos_y', '<f8'), ('vertex_pos_z', '<f8'), ('time_residual_vertex', '<f8'),
+    dtypes = [('event_id', '<f8'), ('particle_type', '<f8'), ('energy', '<f8'),
+              ('is_cc', '<f8'), ('bjorkeny', '<f8'), ('dir_x', '<f8'),
+              ('dir_y', '<f8'), ('dir_z', '<f8'), ('time_interaction', '<f8'),
+              ('run_id', '<f8'), ('vertex_pos_x', '<f8'), ('vertex_pos_y', '<f8'),
+              ('vertex_pos_z', '<f8'), ('time_residual_vertex', '<f8'),
               ('prod_ident', '<f8'), ('group_id', '<i8')]
     ys1 = np.ones((150, 16)).ravel().view(dtype=dtypes)
     ys2 = np.ones((250, 16)).ravel().view(dtype=dtypes)

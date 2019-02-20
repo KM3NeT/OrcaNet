@@ -12,23 +12,24 @@ import h5py
 from orcanet.in_out import write_summary_logfile, write_full_logfile, read_logfiles
 from orcanet.utilities.nn_utilities import load_zero_center_data, BatchLevelPerformanceLogger, generate_batches_from_hdf5_file
 from orcanet.utilities.visualization import plot_all_metrics_to_pdf
-from orcanet_contrib.contrib import orca_learning_rates
 
 # for debugging
 # from tensorflow.python import debug as tf_debug
 # K.set_session(tf_debug.LocalCLIDebugWrapperSession(tf.Session()))
 
 
-def get_learning_rate(orca, epoch):
+def get_learning_rate(epoch, user_lr, no_train_files):
     """
     Get the learning rate for the current epoch and file number.
 
     Parameters
     ----------
-    orca : object OrcaHandler
-        Contains all the configurable options in the OrcaNet scripts.
     epoch : tuple
         Epoch and file number.
+    user_lr : float or tuple or function.
+        The user input for the lr.
+    no_train_files : int
+        How many train files there are in total.
 
     Returns
     -------
@@ -41,35 +42,34 @@ def get_learning_rate(orca, epoch):
         If the type of the user_lr is not right.
 
     """
-    user_lr = orca.cfg.learning_rate
     error_msg = "The learning rate must be either a float, a tuple of two floats or a function."
-    if isinstance(user_lr, float):
-        # Constant LR
-        lr = user_lr
+    try:
+        # Float => Constant LR
+        lr = float(user_lr)
+        return lr
+    except (ValueError, TypeError):
+        pass
 
-    elif isinstance(user_lr, tuple) or isinstance(user_lr, list):
-        if len(user_lr) == 2:
-            # Exponentially decaying LR
-            lr = user_lr[0] * (1 - user_lr[1])**(epoch[1] + epoch[0]*len(orca.io.get_no_of_files("train")))
-        else:
-            raise AssertionError(error_msg, "(Your tuple has length "+str(len(user_lr))+")")
+    try:
+        # List => Exponentially decaying LR
+        length = len(user_lr)
+        lr_init = float(user_lr[0])
+        lr_decay = float(user_lr[1])
+        assert length == 2, error_msg + " (Your tuple has length " + str(len(user_lr)) + ")"
+        lr = lr_init * (1 - lr_decay) ** (epoch[1] + epoch[0] * no_train_files)
+        return lr
+    except (ValueError, TypeError):
+        pass
 
-    elif isinstance(user_lr, str):
-        if user_lr == "triple_decay":
-            lr_schedule = orca_learning_rates("triple_decay")
-            lr = lr_schedule(epoch[0], epoch[1], orca)
-        else:
-            raise NameError(user_lr, "is an unknown learning rate string!")
-
-    elif callable(user_lr):
-        # User defined function
-        assert len(signature(user_lr).parameters) == 3, "A custom learning rate function must have three input parameters: \
-        The epoch, the file number and the Configuration object."
-        lr = user_lr(epoch[0], epoch[1], orca)
-
-    else:
-        raise AssertionError(error_msg, "(You gave a " + str(type(user_lr)) + ")")
-    return lr
+    try:
+        # Callable => User defined function
+        n_params = len(signature(user_lr).parameters)
+        assert n_params == 2, "A custom learning rate function must have two input parameters: " \
+                              "The epoch and the file number. (yours has {})".format(n_params)
+        lr = user_lr(epoch[0], epoch[1])
+        return lr
+    except (ValueError, TypeError):
+        raise AssertionError(error_msg + " (You gave {} of type {}) ".format(user_lr, type(user_lr)))
 
 
 def update_summary_plot(orca):
@@ -121,7 +121,7 @@ def train_and_validate_model(orca, model, start_epoch, xs_mean=None):
         if curr_epoch[1] < start_epoch[1]:
             continue
 
-        lr = get_learning_rate(orca, curr_epoch)
+        lr = get_learning_rate(curr_epoch, orca.cfg.learning_rate, orca.io.get_no_of_files("train"))
         K.set_value(model.optimizer.lr, lr)
         print("Set learning rate to " + str(lr))
 
