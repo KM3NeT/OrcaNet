@@ -17,7 +17,7 @@ from orcanet_contrib.plotting.regression import (make_2d_prop_to_prop_plot,
                                                  make_2d_true_reco_plot_different_sigmas)
 
 
-def make_performance_plots(pred_filepath, class_type, plots_folder):
+def make_performance_plots(pred_filepath, dataset_modifier, plots_folder):
     """
     Function that makes plots based on the results of a hdf5 file with nn predictions (specified in pred_filepath).
 
@@ -25,8 +25,8 @@ def make_performance_plots(pred_filepath, class_type, plots_folder):
     ----------
     pred_filepath : str
         Path to a h5 OrcaNet prediction file.
-    class_type : str
-        TODO
+    dataset_modifier : str
+        String that specifies the dataset modifier that is used for the file located at pred_filepath.
     plots_folder : str
         Path to the general plots folder in the OrcaNet dir structure.
 
@@ -34,28 +34,28 @@ def make_performance_plots(pred_filepath, class_type, plots_folder):
     pred_file = h5py.File(pred_filepath, 'r')
     main_perf_plots_path = plots_folder + '/pred_performance'
 
-    if class_type == 'bg_classifier':
+    if dataset_modifier == 'bg_classifier':
         cuts = None
 
-        make_plots_subfolders(main_perf_plots_path, class_type)
+        make_plots_subfolders(main_perf_plots_path, dataset_modifier)
         make_prob_hists_bg_classifier(pred_file, main_perf_plots_path + '/1d', cuts=cuts)
 
-    elif class_type == 'ts_classifier':
+    elif dataset_modifier == 'ts_classifier':
         cuts = None
         pred_file_2 = None
 
-        make_plots_subfolders(main_perf_plots_path, class_type)
+        make_plots_subfolders(main_perf_plots_path, dataset_modifier)
         make_e_to_acc_plot_ts(pred_file, 'Classified as track', main_perf_plots_path + '/1d', cuts=cuts, prob_threshold_shower=0.5)
         make_ts_prob_hists(pred_file, main_perf_plots_path + '/1d', cuts=cuts)
         plot_ts_separability(pred_file, main_perf_plots_path + '/1d', pred_file_2=pred_file_2, cuts=cuts)
 
-    elif 'regression' in class_type:
-        make_plots_subfolders(main_perf_plots_path, class_type)
+    elif 'regression' in dataset_modifier:
+        make_plots_subfolders(main_perf_plots_path, dataset_modifier)
         cuts = '1-5GeV_and_3-100GeV_prod'
         reco_energy_correction = 'median'
         pred_file_2nd_reco = None
 
-        if 'energy' in class_type:
+        if 'energy' in dataset_modifier:
             print('Generating plots for energy performance investigations')
             make_2d_prop_to_prop_plot(pred_file, 'energy_true', 'energy_reco', main_perf_plots_path + '/2d',
                                       'e_true_to_e_reco', cuts=cuts, title_prefix='OrcaNet: ')
@@ -70,7 +70,7 @@ def make_performance_plots(pred_filepath, class_type, plots_folder):
                                                        'e_true_to_rel_std_div_energy', reco_energy_correction=reco_energy_correction,
                                                        cuts=cuts, compare_2nd_reco=pred_file_2nd_reco)
 
-        if 'dir' in class_type:
+        if 'dir' in dataset_modifier:
             print('Generating plots for directional performance investigations')
             make_2d_prop_to_prop_plot(pred_file, 'azimuth_true', 'azimuth_reco', main_perf_plots_path + '/2d',
                                       'azimuth_true_to_azimuth_reco', cuts=cuts, title_prefix='OrcaNet: ')
@@ -90,7 +90,7 @@ def make_performance_plots(pred_filepath, class_type, plots_folder):
                                                        'e_true_to_median_error_dirs_spherical', cuts=cuts,
                                                        compare_2nd_reco=pred_file_2nd_reco)
 
-        if 'bjorkeny' in class_type:
+        if 'bjorkeny' in dataset_modifier:
             print('Generating plots for bjorkeny performance investigations')
             make_2d_prop_to_prop_plot(pred_file, 'bjorkeny_true', 'bjorkeny_reco', main_perf_plots_path + '/2d',
                                       'bjorkeny_true_to_bjorkeny_reco', cuts=cuts, title_prefix='OrcaNet: ')
@@ -102,7 +102,7 @@ def make_performance_plots(pred_filepath, class_type, plots_folder):
                                                        'e_true_to_median_error_bjorkeny', cuts=cuts,
                                                        compare_2nd_reco=pred_file_2nd_reco)
 
-        if 'vtx' in class_type:
+        if 'vtx' in dataset_modifier:
             print('Generating plots for vertex performance investigations')
             vtx_tuples = [('vtx_x_true', 'vtx_x_reco'), ('vtx_y_true', 'vtx_y_reco'), ('vtx_y_true', 'vtx_y_reco')]
 
@@ -118,7 +118,7 @@ def make_performance_plots(pred_filepath, class_type, plots_folder):
                                                        'e_true_to_median_error_vertex', cuts=cuts,
                                                        compare_2nd_reco=pred_file_2nd_reco)
 
-        if 'errors' in class_type:
+        if 'errors' in dataset_modifier:
             print('Generating plots for error performance investigations')
             cuts = None
             make_1d_reco_err_div_by_std_dev_plot(pred_file, main_perf_plots_path + '/1d', 'reco_err_div_by_std_dev_', cuts=cuts)
@@ -126,12 +126,12 @@ def make_performance_plots(pred_filepath, class_type, plots_folder):
             make_2d_true_reco_plot_different_sigmas(pred_file, main_perf_plots_path + '/2d', 'true_reco_plot_different_sigmas', cuts=cuts)
 
     else:
-        raise ValueError('The class_type ' + str(class_type) + ' is not known.')
+        raise ValueError('The dataset_modifier ' + str(dataset_modifier) + ' is not known.')
 
     pred_file.close()
 
 
-def make_plots_subfolders(main_perf_plots_path, class_type):
+def make_plots_subfolders(main_perf_plots_path, dataset_modifier):
     """
     Makes the directories for the plots of a certain class_type based on the main plots dir.
 
@@ -139,18 +139,18 @@ def make_plots_subfolders(main_perf_plots_path, class_type):
     ----------
     main_perf_plots_path : str
         Path to the pred_performance plots folder in the OrcaNet dir structure.
-    class_type : str
-        TODO
+    dataset_modifier : str
+        String that specifies the dataset modifier.
 
     """
-    if class_type == 'bg_classifier':
+    if 'bg_classifier' in dataset_modifier:
         subfolders = ['1d']
-    elif class_type == 'ts_classifier':
+    elif 'ts_classifier' in dataset_modifier:
         subfolders = ['1d']
-    elif 'regression' in class_type:
+    elif 'regression' in dataset_modifier:
         subfolders = ['1d', '2d']
     else:
-        raise ValueError('The class_type ' + str(class_type) + ' is not known.')
+        raise ValueError('The dataset_modifier ' + str(dataset_modifier) + ' is not known.')
 
     for folder in subfolders:
         if not os.path.exists(main_perf_plots_path + '/' + folder):

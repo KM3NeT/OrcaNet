@@ -1,3 +1,5 @@
+# Info for building an OrcaNet model.
+
 [body]
 architecture = "single"
 
@@ -43,7 +45,7 @@ vy = {function='mean_absolute_error', weight=1}
 vz = {function='mean_absolute_error', weight=1}
 vt = {function='mean_absolute_error', weight=1e-1}
 e  = {function='mean_absolute_error', weight=1}
-by = {function='mean_absolute_error', weight=20}
+by = {function='mean_absolute_error', weight=90}
 dx_err = {function='loss_uncertainty_mse'}
 dy_err = {function='loss_uncertainty_mse'}
 dz_err = {function='loss_uncertainty_mse', weight=1.25}
@@ -58,3 +60,4 @@ by_err = {function='loss_uncertainty_mse'}
 [orca_modifiers]
 sample_modifier = 'xyz-t_and_xyz-c_single_input'
 label_modifier = 'energy_dir_bjorken-y_vtx_errors'
+dataset_modifier = 'regression_energy_dir_bjorken-y_vtx_errors'

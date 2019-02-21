@@ -1,3 +1,5 @@
+# Info for building an OrcaNet model.
+
 [body]
 architecture = "single"
 
@@ -39,3 +41,4 @@ bg_output = {function="categorical_crossentropy", metrics=['acc']}
 [orca_modifiers]
 sample_modifier = 'xyz-t_and_xyz-c_single_input'
 label_modifier = 'bg_classifier'
+dataset_modifier = 'bg_classifier'

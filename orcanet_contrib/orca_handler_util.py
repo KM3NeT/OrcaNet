@@ -84,7 +84,7 @@ def orca_sample_modifiers(name):
     Parameters
     ----------
     name : None/str
-        Name of the smpale modifier to return.
+        Name of the sample modifier to return.
 
     Returns
     -------
@@ -169,6 +169,7 @@ def orca_label_modifiers(name):
     Parameters
     ----------
     name : str
+        Name of the label modifier that should be used.
 
     Returns
     -------
@@ -279,7 +280,7 @@ def orca_dataset_modifiers(name):
     Parameters
     ----------
     name : str
-        TODO
+        Name of the dataset modifier that should be used.
 
     """
     if name == 'bg_classifier':
@@ -371,7 +372,7 @@ def orca_dataset_modifiers(name):
 
             return datasets
 
-    elif name == 'energy_dir_bjorken-y_vtx_errors':
+    elif name == 'regression_energy_dir_bjorken-y_vtx_errors':
         def dataset_modifier(mc_info, y_true, y_pred):
 
             datasets = dict()
