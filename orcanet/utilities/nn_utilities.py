@@ -163,7 +163,7 @@ def get_inputs(model):
     return layers
 
 
-def get_layer_output(model, samples, layer_no, mode="test"):
+def get_layer_output(model, samples, layer_name, mode="test"):
     """
     Get the output of an intermediate layer from a model.
 
@@ -173,8 +173,8 @@ def get_layer_output(model, samples, layer_no, mode="test"):
         The model.
     samples : List or ndarray
         The data to apply the model to.
-    layer_no : int
-        Index of the layer.
+    layer_name : str
+        Name of the layer.
     mode : str
         Mode of the layers during the forward pass. Either train or test.
         Important for batchnorm, dropout, ...
@@ -209,7 +209,7 @@ def get_layer_output(model, samples, layer_no, mode="test"):
 
     get_output = K.function(
         inp_tensors + [K.learning_phase(), ],
-        [model.layers[layer_no].output])
+        [model.get_layer(layer_name).output])
     layer_output = get_output(xs + [phase, ])[0]
     return layer_output
 

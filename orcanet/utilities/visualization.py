@@ -276,10 +276,11 @@ def sort_metric_names_and_errors(metric_names):
     return sorted_metrics
 
 
-def get_activations_and_weights(model, samples, layer_name=None, mode='test'):
+def plot_actv_wghts(model, samples, layer_name, mode='test'):
     """
-    Get the weights and activations of the layers of a model for
-    a given sample.
+    Make plots of the weights and activations of one layer of a model.
+
+    Arrays will be flattend before plotting them as histograms.
 
     Parameters
     ----------
@@ -295,53 +296,31 @@ def get_activations_and_weights(model, samples, layer_name=None, mode='test'):
 
     Returns
     -------
-    actv_wghts : dict
-        Keys : Name of layer.
-        Values : [acitvations, weights], as [ndarray, list of ndarrays]
+    fig_a : plt figure
+        The plot of the activations of the given layer.
+    fig_w : plt figure or None
+        The plot of the weights of the given layer. None if the layer
+        has no weights.
 
     """
-    actv_wghts = dict()
-    for layer_no, layer in enumerate(model.layers):
-        if layer_name is None or layer.name == layer_name:
-            weights = layer.get_weights()
-            if layer.name in model.input_names:
-                activations = samples[layer.name]
-            else:
-                activations = get_layer_output(model, samples, layer_no, mode)
-            actv_wghts[layer.name] = [activations, weights]
 
-    return actv_wghts
-
-
-def plot_actv_wghts(model, samples, layer_name, mode='test'):
-    """
-
-    Parameters
-    ----------
-    model
-    samples
-    layer_name
-    mode
-
-    Returns
-    -------
-
-    """
-    actv_wghts = get_activations_and_weights(
-        model, samples, layer_name=layer_name, mode=mode)
-
-    actv_wghts = actv_wghts[layer_name]
+    layer = model.get_layer(layer_name)
+    weights = layer.get_weights()
+    if layer.name in model.input_names:
+        activations = samples[layer.name]
+    else:
+        activations = get_layer_output(model, samples, layer.name, mode)
 
     fig_a, ax_a = plt.subplots()
-    plt.hist(actv_wghts[0].flatten(), bins=100)
+    plt.hist(activations.flatten(), bins=100)
     plt.title('Activations for layer ' + str(layer_name))
     plt.xlabel('Activation (layer output)')
     plt.ylabel('Quantity [#]')
 
-    if actv_wghts[1]:
+    if weights:
         fig_w, ax_w = plt.subplots()
         w = None
-        for j, w_temp in enumerate(actv_wghts[1]):
+        for j, w_temp in enumerate(weights):
             # ignore different origins of the weights
             if j == 0:
                 w = np.array(w_temp.flatten(), dtype=np.float64)
