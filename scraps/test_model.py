@@ -3,8 +3,6 @@ from keras.layers import Input, Dense, Concatenate, Dropout
 import numpy as np
 from keras import backend as K
 
-from orcanet.utilities.nn_utilities import get_inputs
-
 
 def build_double_inp():
     inp_1 = Input((1,), name="inp_0")
