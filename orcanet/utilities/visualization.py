@@ -313,6 +313,52 @@ def get_activations_and_weights(model, samples, layer_name=None, mode='test'):
     return actv_wghts
 
 
+def plot_actv_wghts(model, samples, layer_name, mode='test'):
+    """
+
+    Parameters
+    ----------
+    model
+    samples
+    layer_name
+    mode
+
+    Returns
+    -------
+
+    """
+    actv_wghts = get_activations_and_weights(
+        model, samples, layer_name=layer_name, mode=mode)
+
+    actv_wghts = actv_wghts[layer_name]
+
+    fig_a, ax_a = plt.subplots()
+    plt.hist(actv_wghts[0].flatten(), bins=100)
+    plt.title('Activations for layer ' + str(layer_name))
+    plt.xlabel('Activation (layer output)')
+    plt.ylabel('Quantity [#]')
+
+    if actv_wghts[1]:
+        fig_w, ax_w = plt.subplots()
+        w = None
+        for j, w_temp in enumerate(actv_wghts[1]):
+            # ignore different origins of the weights
+            if j == 0:
+                w = np.array(w_temp.flatten(), dtype=np.float64)
+            else:
+                w_temp_flattened = np.array(w_temp.flatten(), dtype=np.float64)
+                w = np.concatenate((w, w_temp_flattened), axis=0)
+
+            plt.hist(w, bins=100)
+            plt.title('Weights for layer ' + str(layer_name))
+            plt.xlabel('Weight')
+            plt.xlabel('Quantity [#]')
+            plt.tight_layout()
+    else:
+        fig_w = None
+    return fig_a, fig_w
+
+
 def plot_weights_and_activations(orca, model, xs_mean, epoch):
     """
     Plots the weights of a model and the activations for one event from
