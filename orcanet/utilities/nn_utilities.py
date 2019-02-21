@@ -8,6 +8,7 @@ import os
 import keras as ks
 from functools import reduce
 from contextlib import ExitStack
+import keras.backend as K
 
 
 def generate_batches_from_hdf5_file(orca, files_dict, f_size=None, zero_center_image=None, yield_mc_info=False, shuffle=False):
@@ -160,6 +161,58 @@ def get_inputs(model):
         if isinstance(layer, InputLayer):
             layers[layer.name] = layer
     return layers
+
+
+def get_layer_output(model, samples, layer_name, mode="test"):
+    """
+    Get the output of an intermediate layer from a model.
+
+    Parameters
+    ----------
+    model : keras model
+        The model.
+    samples : List or ndarray
+        The data to apply the model to.
+    layer_name : str
+        Name of the layer.
+    mode : str
+        Mode of the layers during the forward pass. Either train or test.
+        Important for batchnorm, dropout, ...
+
+    Returns
+    -------
+    layer_output : ndarray
+        The output from the layer.
+
+    """
+    if mode == "test":
+        phase = 0
+    elif mode == "train":
+        phase = 1
+    else:
+        raise NameError("Unknown mode: ", mode)
+
+    # either a tensor or a list of tensors
+    inp_tensors = model.input
+    # Make input to always be a list
+    if not isinstance(inp_tensors, list):
+        inp_tensors = [inp_tensors, ]
+
+    if isinstance(samples, dict):
+        # doesnt work with dicts so transform into lists instead
+        xs = [samples[key] for key in model.input_names]
+    elif not isinstance(samples, list):
+        # Make input to always be a list
+        xs = [samples, ]
+    else:
+        xs = samples
+
+    get_output = K.function(
+        inp_tensors + [K.learning_phase(), ],
+        [model.get_layer(layer_name).output])
+    layer_output = get_output(xs + [phase, ])[0]
+    return layer_output
+
 
 # ------------- Zero center functions -------------#
 
