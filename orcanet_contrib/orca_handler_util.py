@@ -58,7 +58,7 @@ def update_orca_objects(orca, model_file):
         orca.cfg.label_modifier = orca_label_modifiers(label_modifier)
     if dataset_modifier is not None:
         print("Using orca dataset modifier: ", dataset_modifier)
-        # orca.cfg.dataset_modifier = orca_dataset_modifiers(dataset_modifier)
+        orca.cfg.dataset_modifier = orca_dataset_modifiers(dataset_modifier)
     print("Using orca custom objects")
     orca.cfg.custom_objects = get_custom_objects()
 
