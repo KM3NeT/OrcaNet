@@ -6,9 +6,10 @@ Code for making plots for background classifiers (muon/random_noise/neutrinos).
 
 from matplotlib import pyplot as plt
 import numpy as np
+from orcanet_contrib.plotting.utils import get_event_selection_mask
 
 
-def make_prob_hists_bg_classifier(pred_file, savefolder):
+def make_prob_hists_bg_classifier(pred_file, savefolder, cuts=None):
     """
     Function that makes plots for the reco probability distributions of the background classifier.
 
@@ -20,6 +21,9 @@ def make_prob_hists_bg_classifier(pred_file, savefolder):
         H5py file instance, which stores the background classification predictions of a nn model.
     savefolder : str
         Path of the directory, where the plots should be saved to.
+    cuts : None/str
+        Specifies, if cuts should be used for the plot. Either None or a str, that is available in the
+        load_event_selection_file() function.
 
     """
     def configure_and_save_plot(bg_class, savefolder):
@@ -54,6 +58,13 @@ def make_prob_hists_bg_classifier(pred_file, savefolder):
     for bg_class in ['muon', 'random_noise', 'neutrino']:
         prob_class = pred_file['pred']['prob_' + bg_class]
         ptype, is_cc = pred_file['mc_info']['particle_type'], pred_file['mc_info']['is_cc']
+
+        if cuts is not None:
+            assert isinstance(cuts, str)
+            evt_sel_mask = get_event_selection_mask(pred_file['mc_info'], cut_name=cuts)
+            prob_class = prob_class[evt_sel_mask]
+            ptype, is_cc = ptype[evt_sel_mask], is_cc[evt_sel_mask]
+
         make_prob_hists_for_class(prob_class, ptype, is_cc, axes)
         configure_and_save_plot(bg_class, savefolder)
         plt.cla()
