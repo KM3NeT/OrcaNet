@@ -604,7 +604,9 @@ def read_logfiles(orca):
         Structured array containing the data from all the training log files, merged into a single array.
 
     """
-    summary_data = np.genfromtxt(orca.cfg.output_folder + "/summary.txt", names=True, delimiter="|", autostrip=True, comments="--")
+    summary_data = np.genfromtxt(orca.cfg.output_folder + "/summary.txt",
+                                 names=True, delimiter="|", autostrip=True,
+                                 comments="--")
 
     # list of all files in the log_train folder of this model
     log_train_folder = orca.io.get_subfolder("log_train")
@@ -629,7 +631,8 @@ def h5_get_number_of_rows(h5_filepath, datasets):
     """
     Gets the total number of rows of of a .h5 file.
 
-    Multiple dataset names can be given as a list to check if they all have the same number of rows (axis 0).
+    Multiple dataset names can be given as a list to check if they all
+    have the same number of rows (axis 0).
 
     Parameters
     ----------
@@ -661,7 +664,8 @@ def h5_get_number_of_rows(h5_filepath, datasets):
 
 def use_node_local_ssd_for_input(train_files, val_files):
     """
-    Copies the test and train files to the node-local ssd scratch folder and returns the new filepaths of the train and test data.
+    Copies the test and train files to the node-local ssd scratch folder
+    and returns the new filepaths of the train and test data.
     Speeds up I/O and reduces RRZE network load.
 
     Parameters

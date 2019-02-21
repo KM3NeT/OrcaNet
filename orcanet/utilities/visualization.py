@@ -331,17 +331,17 @@ def plot_actv_wghts(model, samples, layer_name, mode='test'):
             plt.hist(w, bins=100)
             plt.title('Weights for layer ' + str(layer_name))
             plt.xlabel('Weight')
-            plt.xlabel('Quantity [#]')
+            plt.ylabel('Quantity [#]')
             plt.tight_layout()
     else:
         fig_w = None
     return fig_a, fig_w
 
 
-def plot_weights_and_activations(orca, model, xs_mean, epoch):
+def save_actv_wghts(orca, model, xs_mean, epoch):
     """
     Plots the weights of a model and the activations for one event from
-    the validation set to a .pdf file.
+    the validation set to one .pdf file each.
 
     Parameters
     ----------
@@ -361,12 +361,12 @@ def plot_weights_and_activations(orca, model, xs_mean, epoch):
     f = next(orca.io.yield_files("val"))
     generator = generate_batches_from_hdf5_file(
         orca, f, f_size=1, zero_center_image=xs_mean, yield_mc_info=True)
-    xs, ys, y_values = next(generator)  # y_values = mc_info for the event
+    xs, ys, y_values = next(generator)
 
-    pdf_name_act = "{}/activations_epoch_{}.pdf".format(
-        orca.io.get_subfolder("activations", create=True), epoch)
-    pdf_name_wght = "{}/weights_epoch_{}.pdf".format(
-        orca.io.get_subfolder("activations", create=True), epoch)
+    pdf_name_act = "{}/activations_epoch_{}_file_{}.pdf".format(
+        orca.io.get_subfolder("activations", create=True), epoch[0], epoch[1])
+    pdf_name_wght = "{}/weights_epoch_{}_file_{}.pdf".format(
+        orca.io.get_subfolder("activations", create=True), epoch[0], epoch[1])
 
     with PdfPages(pdf_name_act) as pdf_act:
         with PdfPages(pdf_name_wght) as pdf_wght:
