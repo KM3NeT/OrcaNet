@@ -271,8 +271,8 @@ def orca_dataset_modifiers(name):
             y_pred = y_pred['bg_output']
             y_true = y_true['bg_output']
 
-            datasets = dict() # y_pred is a list of arrays
-            datasets['mc_info'] = mc_info # is already a structured array
+            datasets = dict()
+            datasets['mc_info'] = mc_info  # is already a structured array
 
             # make pred dataset
             dtypes = np.dtype([('prob_neutrino', y_pred.dtype), ('prob_muon', y_pred.dtype), ('prob_random_noise', y_pred.dtype)])
@@ -302,8 +302,8 @@ def orca_dataset_modifiers(name):
             y_pred = y_pred['ts_output']
             y_true = y_true['ts_output']
 
-            datasets = dict() # y_pred is a list of arrays
-            datasets['mc_info'] = mc_info # is already a structured array
+            datasets = dict()
+            datasets['mc_info'] = mc_info  # is already a structured array
 
             # make pred dataset
             dtypes = np.dtype([('prob_shower', y_pred.dtype), ('prob_track', y_pred.dtype)])
@@ -322,6 +322,51 @@ def orca_dataset_modifiers(name):
             datasets['true'] = true
 
             return datasets
+
+    elif class_type == 'energy_dir_bjorken-y_vtx_errors':
+        def dataset_modifier(mc_info, y_true, y_pred):
+
+            datasets = dict()
+            datasets['mc_info'] = mc_info  # is already a structured array
+
+            # make pred dataset
+            """y_pred and y_true are dicts with keys for each output,
+               here, we have 1 key for each regression variable"""
+
+            pred_labels_and_nn_output_names = [('pred_energy', 'e'), ('pred_dir_x', 'dx'), ('pred_dir_y', 'dy'),
+                                               ('pred_dir_z', 'dz'), ('pred_bjorkeny', 'by'), ('pred_vtx_x', 'vx'),
+                                               ('pred_vtx_y', 'vy'), ('pred_vtx_z', 'vz'), ('pred_vtx_t', 'vt'),
+                                               ('pred_err_energy', 'e_err'), ('pred_err_dir_x', 'dx_err'),
+                                               ('pred_err_dir_y', 'dy_err'), ('pred_err_dir_z', 'dz_err'),
+                                               ('pred_err_bjorkeny', 'by_err'), ('pred_err_vtx_x', 'vx_err'),
+                                               ('pred_err_vtx_y', 'vy_err'), ('pred_err_vtx_z', 'vz_err'),
+                                               ('pred_err_vtx_t', 'vt_err')]
+
+            dtypes_pred = [(tpl[0], y_pred[tpl[1].dtype]) for tpl in pred_labels_and_nn_output_names]
+            pred = np.empty(len(dtypes_pred), dtype=dtypes_pred)
+
+            for tpl in pred_labels_and_nn_output_names:
+                pred[tpl[0]] = y_pred[tpl[1]]
+
+            datasets['pred'] = pred
+
+            # make true dataset
+            true_labels_and_nn_output_names = [('true_energy', 'e'), ('true_dir_x', 'dx'), ('true_dir_y', 'dy'),
+                                               ('true_dir_z', 'dz'), ('true_bjorkeny', 'by'), ('true_vtx_x', 'vx'),
+                                               ('true_vtx_y', 'vy'), ('true_vtx_z', 'vz'), ('true_vtx_t', 'vt'),
+                                               ('true_err_energy', 'e_err'), ('true_err_dir_x', 'dx_err'),
+                                               ('true_err_dir_y', 'dy_err'), ('true_err_dir_z', 'dz_err'),
+                                               ('true_err_bjorkeny', 'by_err'), ('true_err_vtx_x', 'vx_err'),
+                                               ('true_err_vtx_y', 'vy_err'), ('true_err_vtx_z', 'vz_err'),
+                                               ('true_err_vtx_t', 'vt_err')]
+
+            dtypes_true = [(tpl[0], y_true[tpl[1].dtype]) for tpl in true_labels_and_nn_output_names]
+            true = np.empty(len(dtypes_pred), dtype=dtypes_true)
+
+            for tpl in true_labels_and_nn_output_names:
+                true[tpl[0]] = y_true[tpl[1]]
+
+            datasets['true'] = true
 
     else:
         raise ValueError('Unknown dataset modifier: ' + str(name))
