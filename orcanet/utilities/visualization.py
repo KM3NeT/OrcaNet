@@ -384,41 +384,16 @@ def plot_weights_and_activations(orca, model, xs_mean, epoch):
         orca, f, f_size=1, zero_center_image=xs_mean, yield_mc_info=True)
     xs, ys, y_values = next(generator)  # y_values = mc_info for the event
 
-    actv_wghts = get_activations_and_weights(
-        model, xs, layer_name=None, mode='test')
-
-    pdf_name = "{}/act_and_weights_plots_epoch_{}.pdf".format(
+    pdf_name_act = "{}/activations_epoch_{}.pdf".format(
+        orca.io.get_subfolder("activations", create=True), epoch)
+    pdf_name_wght = "{}/weights_epoch_{}.pdf".format(
         orca.io.get_subfolder("activations", create=True), epoch)
 
-    with PdfPages(pdf_name) as pdf_activations_and_weights:
-        fig, axes = plt.subplots()
-        for layer_name, actv_wghts in actv_wghts.items():
-            plt.hist(actv_wghts[0].flatten(), bins=100)
-            plt.title('Activations for layer ' + str(layer_name))
-            plt.xlabel('Activation (layer output)')
-            plt.ylabel('Quantity [#]')
-            pdf_activations_and_weights.savefig(fig)
-            plt.cla()
-
-        for layer_name, actv_wghts in actv_wghts.items():
-            w = None
-
-            if not actv_wghts[1]:
-                continue  # skip if layer weights are empty
-            for j, w_temp in enumerate(actv_wghts[1]):
-                # ignore different origins of the weights
-                if j == 0:
-                    w = np.array(w_temp.flatten(), dtype=np.float64)
-                else:
-                    w_temp_flattened = np.array(w_temp.flatten(), dtype=np.float64)
-                    w = np.concatenate((w, w_temp_flattened), axis=0)
-
-            plt.hist(w, bins=100)
-            plt.title('Weights for layer ' + str(layer_name))
-            plt.xlabel('Weight')
-            plt.xlabel('Quantity [#]')
-            plt.tight_layout()
-            pdf_activations_and_weights.savefig(fig)
-            plt.cla()
-
-    plt.close()
+    with PdfPages(pdf_name_act) as pdf_act:
+        with PdfPages(pdf_name_wght) as pdf_wght:
+            for layer in model.layers:
+                fig_a, fig_w = plot_actv_wghts(model, xs, layer.name, mode='test')
+                pdf_act.savefig(fig_a)
+                pdf_wght.savefig(fig_w)
+                plt.close(fig_a)
+                plt.close(fig_w)
