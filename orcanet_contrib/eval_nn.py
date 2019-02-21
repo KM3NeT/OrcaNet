@@ -6,26 +6,17 @@ Code for making performance plots based on nn model predictions.
 
 import os
 import matplotlib as mpl
-import h5py
 mpl.use('Agg')
-from orcanet_contrib.evaluation_utilities import (make_energy_to_accuracy_plot_multiple_classes,
-                                                  make_prob_hists,
-                                                  make_hist_2d_property_vs_property,
-                                                  calculate_and_plot_separation_pid,
-                                                  make_2d_energy_resolution_plot,
-                                                  make_1d_energy_reco_metric_vs_energy_plot,
-                                                  make_1d_energy_std_div_e_true_plot,
-                                                  make_1d_dir_metric_vs_energy_plot,
-                                                  make_2d_dir_correlation_plot,
-                                                  make_1d_bjorken_y_metric_vs_energy_plot,
-                                                  make_2d_bjorken_y_resolution_plot,
-                                                  make_1d_reco_err_div_by_std_plot,
-                                                  make_1d_reco_err_to_reco_residual_plot,
-                                                  make_2d_dir_correlation_plot_different_sigmas)
+import h5py
 from orcanet_contrib.plotting.bg_classifier import make_prob_hists_bg_classifier
+from orcanet_contrib.plotting.ts_classifier import make_e_to_acc_plot_ts, make_ts_prob_hists, plot_ts_separability
+from orcanet_contrib.plotting.regression import (make_2d_prop_to_prop_plot,
+                                                 make_1d_property_errors_metric_over_energy,
+                                                 make_1d_reco_err_div_by_std_dev_plot,
+                                                 make_1d_reco_err_to_reco_residual_plot,
+                                                 make_2d_true_reco_plot_different_sigmas)
 
 
-# TODO reintegrate old regression + ts plots
 def make_performance_plots(pred_filepath, class_type, plots_folder):
     """
     Function that makes plots based on the results of a hdf5 file with nn predictions (specified in pred_filepath).
@@ -44,71 +35,100 @@ def make_performance_plots(pred_filepath, class_type, plots_folder):
     main_perf_plots_path = plots_folder + '/pred_performance'
 
     if class_type == 'bg_classifier':
+        cuts = None
+
         make_plots_subfolders(main_perf_plots_path, class_type)
-        make_prob_hists_bg_classifier(pred_file, main_perf_plots_path + '/1d')
+        make_prob_hists_bg_classifier(pred_file, main_perf_plots_path + '/1d', cuts=cuts)
+
+    elif class_type == 'ts_classifier':
+        cuts = None
+        pred_file_2 = None
+
+        make_plots_subfolders(main_perf_plots_path, class_type)
+        make_e_to_acc_plot_ts(pred_file, 'Classified as track', main_perf_plots_path + '/1d', cuts=cuts, prob_threshold_shower=0.5)
+        make_ts_prob_hists(pred_file, main_perf_plots_path + '/1d', cuts=cuts)
+        plot_ts_separability(pred_file, main_perf_plots_path + '/1d', pred_file_2=pred_file_2, cuts=cuts)
+
+    elif 'regression' in class_type:
+        make_plots_subfolders(main_perf_plots_path, class_type)
+        cuts = '1-5GeV_and_3-100GeV_prod'
+        reco_energy_correction = 'median'
+        pred_file_2nd_reco = None
+
+        if 'energy' in class_type:
+            print('Generating plots for energy performance investigations')
+            make_2d_prop_to_prop_plot(pred_file, 'energy_true', 'energy_reco', main_perf_plots_path + '/2d',
+                                      'e_true_to_e_reco', cuts=cuts, title_prefix='OrcaNet: ')
+            if pred_file_2nd_reco is not None:
+                make_2d_prop_to_prop_plot(pred_file_2nd_reco, 'energy_true', 'energy_reco', main_perf_plots_path + '/2d',
+                                          'standard_reco_e_true_to_e_reco', cuts=cuts, title_prefix='Standard Reco: ')
+
+            make_1d_property_errors_metric_over_energy(pred_file, 'energy', (None, 'median'), main_perf_plots_path + '/1d',
+                                                       'e_true_to_median_error_energy', reco_energy_correction=reco_energy_correction,
+                                                       cuts=cuts, compare_2nd_reco=pred_file_2nd_reco)
+            make_1d_property_errors_metric_over_energy(pred_file, 'energy', ('rel_std_div', None), main_perf_plots_path + '/1d',
+                                                       'e_true_to_rel_std_div_energy', reco_energy_correction=reco_energy_correction,
+                                                       cuts=cuts, compare_2nd_reco=pred_file_2nd_reco)
+
+        if 'dir' in class_type:
+            print('Generating plots for directional performance investigations')
+            make_2d_prop_to_prop_plot(pred_file, 'azimuth_true', 'azimuth_reco', main_perf_plots_path + '/2d',
+                                      'azimuth_true_to_azimuth_reco', cuts=cuts, title_prefix='OrcaNet: ')
+            make_2d_prop_to_prop_plot(pred_file, 'zenith_true', 'zenith_reco', main_perf_plots_path + '/2d',
+                                      'zenith_true_to_zenith_reco', cuts=cuts, title_prefix='OrcaNet: ')
+
+            if pred_file_2nd_reco is not None:
+                make_2d_prop_to_prop_plot(pred_file_2nd_reco, 'azimuth_true', 'azimuth_reco', main_perf_plots_path + '/2d',
+                                          'standard_reco_azimuth_true_to_azimuth_reco', cuts=cuts, title_prefix='Standard Reco: ')
+                make_2d_prop_to_prop_plot(pred_file_2nd_reco, 'zenith_true', 'zenith_reco', main_perf_plots_path + '/2d',
+                                          'standard_reco_zenith_true_to_zenith_reco', cuts=cuts, title_prefix='Standard Reco: ')
+
+            make_1d_property_errors_metric_over_energy(pred_file, 'dirs_vector', (None, 'median'), main_perf_plots_path + '/1d',
+                                                       'e_true_to_median_error_dirs_vect', cuts=cuts,
+                                                       compare_2nd_reco=pred_file_2nd_reco)
+            make_1d_property_errors_metric_over_energy(pred_file, 'dirs_spherical', (None, 'median'), main_perf_plots_path + '/1d',
+                                                       'e_true_to_median_error_dirs_spherical', cuts=cuts,
+                                                       compare_2nd_reco=pred_file_2nd_reco)
+
+        if 'bjorkeny' in class_type:
+            print('Generating plots for bjorkeny performance investigations')
+            make_2d_prop_to_prop_plot(pred_file, 'bjorkeny_true', 'bjorkeny_reco', main_perf_plots_path + '/2d',
+                                      'bjorkeny_true_to_bjorkeny_reco', cuts=cuts, title_prefix='OrcaNet: ')
+            if pred_file_2nd_reco is not None:
+                make_2d_prop_to_prop_plot(pred_file_2nd_reco, 'bjorkeny_true', 'bjorkeny_reco', main_perf_plots_path + '/2d',
+                                          'standard_reco_bjorkeny_true_to_bjorkeny_reco', cuts=cuts, title_prefix='Standard Reco: ')
+
+            make_1d_property_errors_metric_over_energy(pred_file, 'bjorkeny', (None, 'median'), main_perf_plots_path + '/1d',
+                                                       'e_true_to_median_error_bjorkeny', cuts=cuts,
+                                                       compare_2nd_reco=pred_file_2nd_reco)
+
+        if 'vtx' in class_type:
+            print('Generating plots for vertex performance investigations')
+            vtx_tuples = [('vtx_x_true', 'vtx_x_reco'), ('vtx_y_true', 'vtx_y_reco'), ('vtx_y_true', 'vtx_y_reco')]
+
+            for vtx_tpl in vtx_tuples:
+                make_2d_prop_to_prop_plot(pred_file, vtx_tpl[0], vtx_tpl[0], main_perf_plots_path + '/2d',
+                                          vtx_tpl[0] + '_to_' + vtx_tpl[1], cuts=cuts, title_prefix='OrcaNet: ')
+                if pred_file_2nd_reco is not None:
+                    make_2d_prop_to_prop_plot(pred_file_2nd_reco, vtx_tpl[0], vtx_tpl[0], main_perf_plots_path + '/2d',
+                                              'standard_reco_' + vtx_tpl[0] + '_to_' + vtx_tpl[1],
+                                              cuts=cuts, title_prefix='Standard Reco: ')
+
+            make_1d_property_errors_metric_over_energy(pred_file, 'vertex_vector', (None, 'median'), main_perf_plots_path + '/1d',
+                                                       'e_true_to_median_error_vertex', cuts=cuts,
+                                                       compare_2nd_reco=pred_file_2nd_reco)
+
+        if 'errors' in class_type:
+            print('Generating plots for error performance investigations')
+            cuts = None
+            make_1d_reco_err_div_by_std_dev_plot(pred_file, main_perf_plots_path + '/1d', 'reco_err_div_by_std_dev_', cuts=cuts)
+            make_1d_reco_err_to_reco_residual_plot(pred_file, main_perf_plots_path + '/1d', 'reco_err_to_true_reco_residual_', cuts=cuts)
+            make_2d_true_reco_plot_different_sigmas(pred_file, main_perf_plots_path + '/2d', 'true_reco_plot_different_sigmas', cuts=cuts)
 
     else:
         raise ValueError('The class_type ' + str(class_type) + ' is not known.')
 
     pred_file.close()
-
-    # elif class_type == 'ts_classifier':  # categorical
-    #     # TODO doesnt work
-    #     precuts = (False, '3-100_GeV_prod')
-    #
-    #     make_energy_to_accuracy_plot_multiple_classes(arr_nn_pred, title='Classified as track', filename=folder_name + 'plots/ts_' + modelname,
-    #                                                   precuts=precuts, corr_cut_pred_0=0.5)
-    #
-    #     make_prob_hists(arr_nn_pred, folder_name, modelname=modelname, precuts=precuts)
-    #     make_hist_2d_property_vs_property(arr_nn_pred, folder_name, modelname, property_types=('bjorken-y', 'probability'),
-    #                                       e_cut=(1, 100), precuts=precuts)
-    #     calculate_and_plot_separation_pid(arr_nn_pred, folder_name, modelname, precuts=precuts)
-    #
-    # else:  # regression
-    #     # TODO doesnt work
-    #     # TODO make the shallow reco not hardcoded
-    #     arr_nn_pred_shallow = np.load('/home/woody/capn/mppi033h/Data/various/arr_nn_pred.npy')
-    #     # precuts = (True, 'regr_3-100_GeV_prod_and_1-3_GeV_prod')
-    #     precuts = (False, '3-100_GeV_prod')
-    #     if 'energy' in class_type:
-    #         print('Generating plots for energy performance investigations')
-    #
-    #         # DL
-    #         make_2d_energy_resolution_plot(arr_nn_pred, modelname, folder_name, precuts=precuts,
-    #                                        correct_energy=(True, 'median'))
-    #         make_1d_energy_reco_metric_vs_energy_plot(arr_nn_pred, modelname, folder_name, metric='median_relative', precuts=precuts,
-    #                                                   correct_energy=(True, 'median'), compare_shallow=(True, arr_nn_pred_shallow))
-    #         make_1d_energy_std_div_e_true_plot(arr_nn_pred, modelname, folder_name, precuts=precuts,
-    #                                            compare_shallow=(True, arr_nn_pred_shallow), correct_energy=(True, 'median'))
-    #         # shallow reco
-    #         make_2d_energy_resolution_plot(arr_nn_pred_shallow, 'shallow_reco', folder_name, precuts=precuts)
-    #
-    #     if 'dir' in class_type:
-    #         print('Generating plots for directional performance investigations')
-    #
-    #         # DL
-    #         make_1d_dir_metric_vs_energy_plot(arr_nn_pred, modelname, folder_name, metric='median', precuts=precuts,
-    #                                           compare_shallow=(True, arr_nn_pred_shallow))
-    #         make_2d_dir_correlation_plot(arr_nn_pred, modelname, folder_name, precuts=precuts)
-    #         # shallow reco
-    #         make_2d_dir_correlation_plot(arr_nn_pred_shallow, 'shallow_reco', folder_name, precuts=precuts)
-    #
-    #     if 'bjorken-y' in class_type:
-    #         print('Generating plots for bjorken-y performance investigations')
-    #
-    #         # DL
-    #         make_1d_bjorken_y_metric_vs_energy_plot(arr_nn_pred, modelname, folder_name, metric='median', precuts=precuts,
-    #                                                 compare_shallow=(True, arr_nn_pred_shallow))
-    #         make_2d_bjorken_y_resolution_plot(arr_nn_pred, modelname, folder_name, precuts=precuts)
-    #         # shallow reco
-    #         make_2d_bjorken_y_resolution_plot(arr_nn_pred_shallow, 'shallow_reco', folder_name, precuts=precuts)
-    #
-    #     if 'errors' in class_type:
-    #         print('Generating plots for error performance investigations')
-    #
-    #         make_1d_reco_err_div_by_std_plot(arr_nn_pred, modelname, folder_name, precuts=precuts)  # TODO take precuts from above?
-    #         make_1d_reco_err_to_reco_residual_plot(arr_nn_pred, modelname, folder_name, precuts=precuts)
-    #         make_2d_dir_correlation_plot_different_sigmas(arr_nn_pred, modelname, folder_name, precuts=precuts)
 
 
 def make_plots_subfolders(main_perf_plots_path, class_type):
@@ -125,6 +145,10 @@ def make_plots_subfolders(main_perf_plots_path, class_type):
     """
     if class_type == 'bg_classifier':
         subfolders = ['1d']
+    elif class_type == 'ts_classifier':
+        subfolders = ['1d']
+    elif 'regression' in class_type:
+        subfolders = ['1d', '2d']
     else:
         raise ValueError('The class_type ' + str(class_type) + ' is not known.')
 
@@ -132,46 +156,3 @@ def make_plots_subfolders(main_perf_plots_path, class_type):
         if not os.path.exists(main_perf_plots_path + '/' + folder):
             print('Creating directory: ' + main_perf_plots_path + '/' + folder)
             os.makedirs(main_perf_plots_path + '/' + folder)
-
-
-# TODO not needed anymore?
-def get_modelname(n_bins, class_type, nn_arch, swap_4d_channels, str_ident=''):
-    """
-    Derives the name of a model based on its number of bins and the class_type tuple.
-    The final modelname is defined as 'model_Nd_proj_class_type[1]'.
-    E.g. 'model_3d_xyz_muon-CC_to_elec-CC'.
-    :param list(tuple) n_bins: Number of bins for each dimension (x,y,z,t) of the training images. Can contain multiple n_bins tuples.
-    :param str class_type: Tuple that declares the number of output classes and a string identifier to specify the exact output classes.
-                                  I.e. (2, 'muon-CC_to_elec-CC')
-    :param str nn_arch: String that declares which neural network model architecture is used.
-    :param None/str swap_4d_channels: For 4D data input (3.5D models). Specifies the projection type.
-    :param str str_ident: Optional str identifier that gets appended to the modelname.
-    :return: str modelname: Derived modelname.
-    """
-    modelname = 'model_' + nn_arch + '_'
-
-    projection = ''
-    for i, bins in enumerate(n_bins):
-
-        dim = 4 - bins.count(1)
-        if i > 0:
-            projection += '_and_'
-        projection += str(dim) + 'd_'
-
-        if bins.count(1) == 0 and i == 0:  # for 4D input # TODO FIX BUG XYZT AFTER NAME
-            if swap_4d_channels is not None:
-                projection += swap_4d_channels
-            else:
-                projection += 'xyz-c' if bins[3] == 31 else 'xyz-t'
-
-        else:  # 2D/3D input
-            if bins[0] > 1: projection += 'x'
-            if bins[1] > 1: projection += 'y'
-            if bins[2] > 1: projection += 'z'
-            if bins[3] > 1: projection += 't'
-
-    str_ident = '_' + str_ident if str_ident is not '' else str_ident
-    modelname += projection + '_' + class_type + str_ident
-
-    return modelname
-

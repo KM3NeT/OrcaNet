@@ -20,9 +20,8 @@ import os
 import time
 import numpy as np
 import h5py
-from orcanet.utilities.nn_utilities import generate_batches_from_hdf5_file, load_zero_center_data
 from orcanet.core import OrcaHandler
-from orcanet.model_archs.model_setup import build_nn_model
+from orca_builder import build_nn_model
 
 
 def generate_batches_from_hdf5_file_tweak(cfg, files_dict, f_size=None, zero_center_image=None, yield_mc_info=False, shuffle=False, batches_at_once=10):

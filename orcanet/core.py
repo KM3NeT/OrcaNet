@@ -10,7 +10,7 @@ import keras as ks
 import toml
 
 from orcanet.backend import train_and_validate_model, make_model_prediction
-from orcanet.in_out import read_out_list_file, use_node_local_ssd_for_input, write_full_logfile_startup, IOHandler
+from orcanet.in_out import use_node_local_ssd_for_input, write_full_logfile_startup, IOHandler
 from orcanet.utilities.nn_utilities import load_zero_center_data, get_auto_label_modifier
 
 
@@ -18,63 +18,77 @@ class Configuration(object):
     """
     Container object for all the configurable options in the OrcaNet scripts.
 
-    TODO add a clober script that properly deletes models + logfiles
     Sensible default values were chosen for the settings.
-    You can change the all of these public attributes (the ones without a leading underscore _) either directly or with a
+    You can change the all of these public attributes (the ones without a
+    leading underscore _) either directly or with a
     .toml config file via the method update_config().
 
     Attributes
     ----------
     batchsize : int
-        Batchsize that should be used for the training and validation of the network.
+        Batchsize that should be used for the training and validation of
+        the network.
     custom_objects : dict or None
-        Optional dictionary mapping names (strings) to custom classes or functions to be considered by keras
-        during deserialization of models.
+        Optional dictionary mapping names (strings) to custom classes or
+        functions to be considered by keras during deserialization of models.
     dataset_modifier : function or None
-        For orca_eval: Function that determines which datasets get created in the resulting h5 file.
-        If none, every output layer will get one dataset each for both the label and the prediction, and one dataset
+        For orca_eval: Function that determines which datasets get created
+        in the resulting h5 file. If none, every output layer will get one
+        dataset each for both the label and the prediction, and one dataset
         containing the mc_info from the validation files.
     filter_out_tf_garbage : bool
-        If true, surpresses the tensorflow info logs which usually spam the terminal.
+        If true, surpresses the tensorflow info logs which usually spam
+        the terminal.
     epochs_to_train : int or None
-        How many new epochs should be trained by running this function. None for infinite.
+        How many new epochs should be trained by running this function.
+        None for infinite.
     key_samples : str
-        The name of the datagroup in your h5 input files which contains the samples for the network.
+        The name of the datagroup in your h5 input files which contains
+        the samples for the network.
     key_labels : str
-        The name of the datagroup in your h5 input files which contains the labels for the network.
+        The name of the datagroup in your h5 input files which contains
+        the labels for the network.
     label_modifier : function or None
-        Operation to be performed on batches of labels read from the input files before they are fed into the model.
-        If None is given, all labels with the same name as the output layers will be passed to the model as a dict,
+        Operation to be performed on batches of labels read from the input files
+        before they are fed into the model. If None is given, all labels with
+        the same name as the output layers will be passed to the model as a dict,
         with the keys being the dtype names.
     learning_rate : float or tuple or function
         The learning rate for the training.
         If it is a float, the learning rate will be constantly this value.
-        If it is a tuple of two floats, the first float gives the learning rate in epoch 1 file 1, and the second
-        float gives the decrease of the learning rate per file (e.g. 0.1 for 10% decrease per file).
-        You can also give an arbitrary function, which takes as an input the epoch, the file number and the
-        Configuration object (in this order), and returns the learning rate.
+        If it is a tuple of two floats, the first float gives the learning rate
+        in epoch 1 file 1, and the second float gives the decrease of the
+        learning rate per file (e.g. 0.1 for 10% decrease per file).
+        You can also give a function, which takes as an input the epoch and the
+        file number (in this order), and returns the learning rate.
     max_queue_size : int
-        max_queue_size option of the keras training and evaluation generator methods. How many batches get preloaded
+        max_queue_size option of the keras training and evaluation generator
+        methods. How many batches get preloaded
         from the generator.
     n_events : None or int
-        For testing purposes. If not the whole .h5 file should be used for training, define the number of samples.
+        For testing purposes. If not the whole .h5 file should be used for
+        training, define the number of samples.
     sample_modifier : function or None
-        Operation to be performed on batches of samples read from the input files before they are fed into the model.
+        Operation to be performed on batches of samples read from the input
+        files before they are fed into the model.
     shuffle_train : bool
-        If true, the order in which batches are read out from the files during training are randomized each time they
-        are read out.
+        If true, the order in which batches are read out from the files during
+        training are randomized each time they are read out.
     train_logger_display : int
         How many batches should be averaged for one line in the training log files.
     train_logger_flush : int
-        After how many lines the training log file should be flushed (updated on the disk).
-        -1 for flush at the end of the file only.
+        After how many lines the training log file should be flushed (updated on
+         the disk). -1 for flush at the end of the file only.
     output_folder : str
-        Name of the folder of this model in which everything will be saved, e.g., the summary.txt log file is located in here.
+        Name of the folder of this model in which everything will be saved,
+        e.g., the summary.txt log file is located in here.
     use_scratch_ssd : bool
-        Only working at HPC Erlangen: Declares if the input files should be copied to the node-local SSD scratch space.
+        Only working at HPC Erlangen: Declares if the input files should be
+        copied to the node-local SSD scratch space.
     validate_after_n_train_files : int
-        Validate the model after this many training files have been trained on in an epoch, starting from the first.
-        E.g. if validate_after_n_train_files == 3, validation will happen after file 1,4,7,...
+        Validate the model after this many training files have been trained on
+        in an epoch, starting from the first. E.g. if it is 3, validation will
+        happen after file 1,4,7,...
     verbose_train : int
         verbose option of keras.model.fit_generator.
         0 = silent, 1 = progress bar, 2 = one line per epoch.
@@ -82,25 +96,31 @@ class Configuration(object):
         verbose option of evaluate_generator.
         0 = silent, 1 = progress bar.
     zero_center_folder : None or str
-        Path to a folder in which zero centering images are stored. [default: None]
-        If this path is set, zero centering images for the given dataset will either be calculated and saved
-        automatically at the start of the training, or loaded if they have been saved before.
+        Path to a folder in which zero centering images are stored.
+        If this path is set, zero centering images for the given dataset will
+        either be calculated and saved automatically at the start of the
+        training, or loaded if they have been saved before.
 
     """
+    # TODO add a clober script that properly deletes models + logfiles
     def __init__(self, output_folder, list_file, config_file):
         """
         Set the attributes of the Configuration object.
 
-        Values are loaded from the given files, if provided. Otherwise, default values are used.
+        Values are loaded from the given files, if provided. Otherwise, default
+        values are used.
 
         Parameters
         ----------
         output_folder : str
-            Name of the folder of this model in which everything will be saved, e.g., the summary.txt log file is located in here.
+            Name of the folder of this model in which everything will be saved,
+            e.g., the summary.txt log file is located in here.
         list_file : str or None
-            Path to a toml list file with pathes to all the h5 files that should be used for training and validation.
+            Path to a toml list file with pathes to all the h5 files that should
+            be used for training and validation.
         config_file : str or None
-            Path to a toml config file with attributes that are used instead of the default ones.
+            Path to a toml config file with attributes that are used instead of
+            the default ones.
 
         """
         self.batchsize = 64
@@ -146,28 +166,52 @@ class Configuration(object):
 
     def import_list_file(self, list_file):
         """
-        Set filepaths to the ones given in a list file.
+        Import the filepaths of the training and validation files from a toml
+        list file.
 
         Parameters
         ----------
-        list_file : str or None
-            Path to a toml list file with pathes to all the h5 files that should be used for training and validation.
+        list_file : str
+            Path to the toml list file.
 
         """
         assert self._list_file is None, "You tried to load filepathes from a list file, but pathes have already " \
                                             "been loaded for this object. (From the file " + self._list_file \
                                             + ")\nYou can not use two different list files at once!"
-        self._train_files, self._val_files = read_out_list_file(list_file)
+
+        file_content = toml.load(list_file)
+        train_files, validation_files = {}, {}
+
+        # no of train/val files in each input set
+        n_train, n_val = [], []
+        for input_key, input_values in file_content.items():
+            assert isinstance(input_values, dict) and len(input_values.keys()) == 2, \
+                "Wrong input format in toml list file (input {}: {})".format(input_key, input_values)
+            assert "train_files" in input_values.keys(), "No train files specified in toml list file"
+            assert "validation_files" in input_values.keys(), "No validation files specified in toml list file"
+
+            train_files[input_key] = tuple(input_values["train_files"])
+            validation_files[input_key] = tuple(input_values["validation_files"])
+            n_train.append(len(train_files[input_key]))
+            n_val.append(len(validation_files[input_key]))
+
+        if not n_train.count(n_train[0]) == len(n_train):
+            raise AssertionError("The specified training inputs do not all have the same number of files!")
+        if not n_val.count(n_val[0]) == len(n_val):
+            raise AssertionError("The specified validation inputs do not all have the same number of files!")
+
+        self._train_files = train_files
+        self._val_files = validation_files
         self._list_file = list_file
 
     def update_config(self, config_file):
         """
-        Update the default configuration with values from a config file.
+        Update the default cfg parameters with values from a toml config file.
 
         Parameters
         ----------
         config_file : str
-            Path to a toml config file with attribute values to use instead of the default ones.
+            Path to a toml config file.
 
         """
         user_values = toml.load(config_file)["config"]
@@ -184,7 +228,7 @@ class Configuration(object):
 
     def get_files(self, which):
         """
-        Get the training file paths.
+        Get the training or validation file paths for each list input set.
 
         Returns
         -------
@@ -195,6 +239,7 @@ class Configuration(object):
                      "input_A" : ('path/to/set_A_file_1.h5', 'path/to/set_A_file_2.h5'),
                      "input_B" : ('path/to/set_B_file_1.h5', 'path/to/set_B_file_2.h5'),
                     }
+
         """
         if which == "train":
             assert self._train_files is not None, "No train files have been specified!"

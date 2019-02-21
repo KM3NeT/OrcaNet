@@ -7,11 +7,12 @@ Loosely based on https://github.com/titu1994/Wide-Residual-Networks/blob/master/
 """
 from keras.models import Model
 from keras.layers import Input, Add, Activation, Dropout, Flatten, Dense
-from keras.layers.convolutional import Convolution2D, Convolution3D, MaxPooling2D, MaxPooling3D, AveragePooling2D, AveragePooling3D
+from keras.layers.convolutional import Convolution2D, Convolution3D, \
+    AveragePooling2D, AveragePooling3D
 from keras.layers.normalization import BatchNormalization
 from keras import backend as K
 
-from orcanet.model_archs.file_dump import get_dimensions_encoding
+from scraps.old_model_scripts.file_dump import get_dimensions_encoding
 
 
 def decode_input_dimensions(n_bins, batchsize, swap_4d_channels):
