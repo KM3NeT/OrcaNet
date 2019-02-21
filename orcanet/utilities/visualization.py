@@ -5,11 +5,11 @@ Visualization tools used with Keras.
 2) Visualizes activations for Keras models
 """
 import numpy as np
-import keras.backend as K
+
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
-from orcanet.utilities.nn_utilities import generate_batches_from_hdf5_file, get_inputs
+from orcanet.utilities.nn_utilities import generate_batches_from_hdf5_file, get_layer_output
 
 
 def make_train_val_plot(train_data, val_data=None, color=None, title=None, y_label=None):
@@ -276,57 +276,72 @@ def sort_metric_names_and_errors(metric_names):
     return sorted_metrics
 
 
-def get_activations_and_weights(orca, xs_mean, model, layer_name=None, learning_phase='test'):
+def plot_actv_wghts(model, samples, layer_name, mode='test'):
     """
-    Get the weights of a model and also the activations of the model for a single event in the validation set.
+    Make plots of the weights and activations of one layer of a model.
 
-    orca : object OrcaHandler
-        Contains all the configurable options in the OrcaNet scripts.
-    xs_mean : dict
-        Mean image of the dataset used for zero-centering. Every input as a key, ndarray as values.
-    :param ks.model model: The model to make the data with.
-    :param None/str layer_name: if only the activations of a single layer should be collected.
-    :param str learning_phase: string identifier to specify the learning phase during the calculation of the activations.
-                               'test', 'train': Dropout, Batchnorm etc. in test/train mode
+    Arrays will be flattend before plotting them as histograms.
+
+    Parameters
+    ----------
+    model : keras model
+        The model to make the data with.
+    samples : dict
+        Input data.
+    layer_name : str or None
+        Name of the layer to get info from. None for all layers.
+    mode : str
+        Mode of the layers during the forward pass. Either train or test.
+        Important for batchnorm, dropout, ...
+
+    Returns
+    -------
+    fig_a : plt figure
+        The plot of the activations of the given layer.
+    fig_w : plt figure or None
+        The plot of the weights of the given layer. None if the layer
+        has no weights.
+
     """
-    outputs = [layer.output for layer in model.layers if
-               layer.name == layer_name or layer_name is None]  # all layer outputs -> empty tf.tensors
-    layer_names = [layer.name for layer in model.layers if
-                   layer.name == layer_name or layer_name is None]
-    weights = [layer.get_weights() for layer in model.layers if
-               layer.name == layer_name or layer_name is None]
-    outputs = outputs[1:]  # remove the first input_layer from fetch
 
-    # get input layers and input files
-    inputs = get_inputs(model)
-    f = next(orca.io.yield_files("val"))
-    generator = generate_batches_from_hdf5_file(orca, f, f_size=1, zero_center_image=xs_mean, yield_mc_info=True)
-    model_inputs, ys, y_values = next(generator)  # y_values = mc_info for the event
+    layer = model.get_layer(layer_name)
+    weights = layer.get_weights()
+    if layer.name in model.input_names:
+        activations = samples[layer.name]
+    else:
+        activations = get_layer_output(model, samples, layer.name, mode)
 
-    # doesnt work with dicts for whatever reason so transform into lists instead
-    keys = list(inputs.keys())
-    inp = [inputs[key] for key in keys]
-    model_inputs = [model_inputs[key] for key in keys]
-    if len(inp) == 1:
-        inp = inp[0]
-        model_inputs = model_inputs[0]
+    fig_a, ax_a = plt.subplots()
+    plt.hist(activations.flatten(), bins=100)
+    plt.title('Activations for layer ' + str(layer_name))
+    plt.xlabel('Activation (layer output)')
+    plt.ylabel('Quantity [#]')
 
-    funcs = [K.function([inp, K.learning_phase()], [out]) for out in outputs]  # evaluation functions
+    if weights:
+        fig_w, ax_w = plt.subplots()
+        w = None
+        for j, w_temp in enumerate(weights):
+            # ignore different origins of the weights
+            if j == 0:
+                w = np.array(w_temp.flatten(), dtype=np.float64)
+            else:
+                w_temp_flattened = np.array(w_temp.flatten(), dtype=np.float64)
+                w = np.concatenate((w, w_temp_flattened), axis=0)
 
-    lp = 0. if learning_phase == 'test' else 1.
-    list_inputs = [model_inputs, lp]
+            plt.hist(w, bins=100)
+            plt.title('Weights for layer ' + str(layer_name))
+            plt.xlabel('Weight')
+            plt.ylabel('Quantity [#]')
+            plt.tight_layout()
+    else:
+        fig_w = None
+    return fig_a, fig_w
 
-    layer_outputs = [func(list_inputs)[0] for func in funcs]
-    activations = []
-    for layer_activations in layer_outputs:
-        activations.append(layer_activations)
 
-    return layer_names, activations, weights, y_values
-
-
-def plot_weights_and_activations(orca, model, xs_mean, epoch):
+def save_actv_wghts(orca, model, xs_mean, epoch):
     """
-    Plots the weights of a model and the activations for one event to a .pdf file.
+    Plots the weights of a model and the activations for one event from
+    the validation set to one .pdf file each.
 
     Parameters
     ----------
@@ -335,55 +350,29 @@ def plot_weights_and_activations(orca, model, xs_mean, epoch):
     model : ks.models.Model
         The model to do the predictions with.
     xs_mean : dict
-        Mean image of the dataset used for zero-centering. Every input as a key, ndarray as values.
+        Mean image of the dataset used for zero-centering.
+        Every input as a key, ndarray as values.
     epoch : tuple
         Current epoch and fileno.
 
     """
     plt.ioff()
-    layer_names, activations, weights, y_values = get_activations_and_weights(orca, xs_mean, model, layer_name=None, learning_phase='test')
 
-    fig, axes = plt.subplots()
-    pdf_name = orca.io.get_subfolder("activations", create=True) + "/act_and_weights_plots_epoch_" + str(epoch) + '.pdf'
-    pdf_activations_and_weights = PdfPages(pdf_name)
+    f = next(orca.io.yield_files("val"))
+    generator = generate_batches_from_hdf5_file(
+        orca, f, f_size=1, zero_center_image=xs_mean, yield_mc_info=True)
+    xs, ys, y_values = next(generator)
 
-    # plot weights
-    event_id = int(y_values[0][0])
-    energy = y_values[0][2]
+    pdf_name_act = "{}/activations_epoch_{}_file_{}.pdf".format(
+        orca.io.get_subfolder("activations", create=True), epoch[0], epoch[1])
+    pdf_name_wght = "{}/weights_epoch_{}_file_{}.pdf".format(
+        orca.io.get_subfolder("activations", create=True), epoch[0], epoch[1])
 
-    try:
-        run_id = int(y_values[0][9])  # if it doesn't exist in the file
-    except IndexError:
-        run_id = ''
-
-    for i, layer_activations in enumerate(activations):
-        plt.hist(layer_activations.flatten(), bins=100)
-        plt.title('Run/Event-ID: ' + str(run_id) + '/' + str(event_id) + ', E=' + str(energy) + 'GeV. \n ' + 'Activations for layer ' + str(layer_names[i]))
-        plt.xlabel('Activation (layer output)')
-        plt.ylabel('Quantity [#]')
-        pdf_activations_and_weights.savefig(fig)
-        plt.cla()
-
-    for i, layer_weights in enumerate(weights):
-        w = None
-
-        if not layer_weights:
-            continue  # skip if layer weights are empty
-        for j, w_temp in enumerate(layer_weights):
-            # ignore different origins of the weights
-            if j == 0:
-                w = np.array(w_temp.flatten(), dtype=np.float64)
-            else:
-                w_temp_flattened = np.array(w_temp.flatten(), dtype=np.float64)
-                w = np.concatenate((w, w_temp_flattened), axis=0)
-
-        plt.hist(w, bins=100)
-        plt.title('Weights for layer ' + str(layer_names[i]))
-        plt.xlabel('Weight')
-        plt.xlabel('Quantity [#]')
-        plt.tight_layout()
-        pdf_activations_and_weights.savefig(fig)
-        plt.cla()
-
-    pdf_activations_and_weights.close()
-    plt.close()
+    with PdfPages(pdf_name_act) as pdf_act:
+        with PdfPages(pdf_name_wght) as pdf_wght:
+            for layer in model.layers:
+                fig_a, fig_w = plot_actv_wghts(model, xs, layer.name, mode='test')
+                pdf_act.savefig(fig_a)
+                pdf_wght.savefig(fig_w)
+                plt.close(fig_a)
+                plt.close(fig_w)

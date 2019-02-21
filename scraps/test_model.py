@@ -4,7 +4,7 @@ import numpy as np
 from keras import backend as K
 
 
-def build_test_model():
+def build_double_inp():
     inp_1 = Input((1,), name="inp_0")
     inp_2 = Input((1,), name="inp_1")
 
@@ -16,6 +16,27 @@ def build_test_model():
 
     test_model = Model((inp_1, inp_2), (output_1, output_2))
     return test_model
+
+
+def build_single_inp():
+    inp = Input((2,), name="inp")
+
+    x = Dense(3)(inp)
+
+    output_1 = Dense(1, name="out_0")(x)
+    output_2 = Dense(2, name="out_1")(x)
+
+    test_model = Model(inp, (output_1, output_2))
+    return test_model
+
+
+def get_xs(model, batchsize=1):
+    """ Get dummy data fitting a model. """
+    shapes = model.input_shape
+    if len(model.input_names) == 1:
+        shapes = [shapes, ]
+    xs = {model.input_names[i]: np.ones([batchsize, ] + list(shapes[i][1:])) for i in range(len(model.input_names))}
+    return xs
 
 
 def dropout_test():
@@ -58,19 +79,3 @@ def get_dict():
 def transf_arr(x):
     xd = {name: x[name] for name in x.dtype.names}
     return xd
-
-
-x = get_structured_array()
-xd = get_dict()
-model = build_test_model()
-model.summary()
-y_pred = model.predict_on_batch(x)
-y_pred[0] = np.reshape(y_pred[0], y_pred[0].shape[:-1])
-# y_pred = {out.name.split(':')[0]: y_pred[i] for i, out in enumerate(model.outputs)}
-dtypes = np.dtype([("out_0", "float32"), ("out_1", "float32", (2,2))])
-
-result = np.array(y_pred, dtypes)
-
-a = np.array( [[1,2], [3,4], [5,6]] )
-aty = np.dtype([("asd", "float32", (2,1))])
-b = np.array(a, aty)
