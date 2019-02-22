@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """"""
 
+import os
 import numpy as np
 import h5py
 from orcanet_contrib.plotting.bg_classifier import select_class
@@ -23,19 +24,86 @@ def cut_summary_file():
     for i, col in enumerate(cols_list):
         col_names[col] = i
 
-    selected_cols = ['bjorkeny', 'dir_x', 'dir_y', 'dir_z', 'energy', 'event_id', 'is_cc', 'is_neutrino', 'n_files_gen',
-                     'pos_x', 'pos_y', 'pos_z', 'run_id', 'time', 'type', 'dusj_best_DusjOrcaUsingProbabilitiesFinalFit_BjorkenY',
-                     'dusj_dir_x', 'dusj_dir_y', 'dusj_dir_z', 'dusj_is_good', 'dusj_energy_corrected', 'gandalf_dir_x',
-                     'gandalf_dir_y', 'gandalf_dir_z', 'gandalf_is_good', 'gandalf_energy_corrected', 'dusj_is_selected',
-                     'gandalf_is_selected', 'frame_index', 'track_score', 'Erange_min', 'noise_score', 'gandalf_loose_is_selected']
+    selected_cols = ('bjorkeny', 'dir_x', 'dir_y', 'dir_z', 'energy', 'event_id', 'frame_index', 'is_cc', 'is_neutrino', 'n_files_gen',
+                     'pos_x', 'pos_y', 'pos_z', 'run_id', 'time', 'type', 'Erange_min', 'dusj_best_DusjOrcaUsingProbabilitiesFinalFit_BjorkenY',
+                     'dusj_dir_x', 'dusj_dir_y', 'dusj_dir_z', 'dusj_pos_x', 'dusj_pos_y', 'dusj_pos_z', 'dusj_time',
+                     'dusj_is_good', 'dusj_energy_corrected', 'gandalf_dir_x',
+                     'gandalf_dir_y', 'gandalf_dir_z', 'gandalf_pos_x', 'gandalf_pos_y', 'gandalf_pos_z', 'gandalf_time',
+                     'gandalf_is_good', 'gandalf_energy_corrected', 'dusj_is_selected', 'gandalf_is_selected',
+                     'gandalf_loose_is_selected', 'muon_score', 'track_score', 'noise_score')
 
     usecols = [col_names[col_name] for col_name in selected_cols]
+    #TODO fix doesnt work, wrong col naming and assignment
 
-    summary_file_arr = np.genfromtxt(meta_filepath, delimiter=' ', usecols=usecols.sort(), names=cols_list)
+    print('Loading the summary file content')
+    dtype = {}
+    dtype['names'] = selected_cols
+    dtype['formats'] = (np.float64, ) * len(selected_cols)
+    summary_file_arr = np.loadtxt(meta_filepath, delimiter=' ', usecols=usecols.sort(), dtype=dtype)
+    # summary_file_arr = np.loadtxt(meta_filepath, delimiter=' ', usecols=usecols.sort(), names=cols_list)  # a lot slower and uses tons more memory
 
     f = h5py.File(savepath, 'w')
+    print('Saving the summary file content')
     f.create_dataset('summary_array', data=summary_file_arr, compression='gzip', compression_opts=1)
     f.close()
+
+
+def make_pred_file():
+    """
+
+    """
+    f_in = h5py.File('/home/saturn/capn/mppi033h/Data/standard_reco_files/summary_file_cut.h5', 'r')
+
+    # bg classifier selections
+    print('Making files for bg classifier')
+    s = f_in['summary_array']
+    dusj_is_selected = s['dusj_is_selected']
+    gandalf_loose_is_selected = s['gandalf_loose_is_selected']
+    selection_classifier_bg = np.logical_or(dusj_is_selected, gandalf_loose_is_selected)
+
+    mc_info_sel_bg = get_mc_info(s, selection=selection_classifier_bg)
+    save_surviving_evt_info_to_npy(mc_info_sel_bg, '/home/saturn/capn/mppi033h/Data/event_selections/evt_selection_bg_classifier.npy')
+
+    pred_bg = get_pred(s, 'bg_classifier_2_class', selection=selection_classifier_bg)
+    save_dsets_to_h5_file(mc_info_sel_bg, pred_bg,
+                          '/home/saturn/capn/mppi033h/Data/standard_reco_files/pred_file_bg_classifier_2_class.h5')
+
+    # ts classifier
+    print('Making files for ts classifier')
+    print(f_in['summary_array']['is_neutrino'])
+    is_neutrino = f_in['summary_array']['is_neutrino'] == 1
+
+    s = f_in['summary_array'][is_neutrino]
+    dusj_is_selected = s['dusj_is_selected']
+    gandalf_loose_is_selected = s['gandalf_loose_is_selected']
+    selection_classifier_ts = np.logical_or(dusj_is_selected, gandalf_loose_is_selected)
+
+    mc_info_sel_ts = get_mc_info(s, selection=selection_classifier_ts)
+    save_surviving_evt_info_to_npy(mc_info_sel_ts, '/home/saturn/capn/mppi033h/Data/event_selections/evt_selection_ts_classifier.npy')
+
+    pred_ts = get_pred(s, 'ts_classifier', selection=selection_classifier_ts)
+    save_dsets_to_h5_file(mc_info_sel_ts, pred_ts,
+                          '/home/saturn/capn/mppi033h/Data/standard_reco_files/pred_file_ts_classifier.h5')
+
+    # regression
+    print('Making files for regression')
+    is_neutrino = f_in['summary_array']['is_neutrino'] == 1
+    s = f_in['summary_array'][is_neutrino]
+    dusj_is_selected = s['dusj_is_selected']
+    gandalf_is_selected = s['gandalf_is_selected']
+    selection_regr = np.logical_or(dusj_is_selected, gandalf_is_selected)
+
+    mc_info_sel_regr = get_mc_info(s, selection=selection_regr)
+    save_surviving_evt_info_to_npy(mc_info_sel_ts,
+                                   '/home/saturn/capn/mppi033h/Data/event_selections/evt_selection_regression.npy')
+
+    pred_regr = get_pred(s, 'regression_e_dir_vtx_by', selection=selection_regr)
+    save_dsets_to_h5_file(mc_info_sel_regr, pred_regr,
+                          '/home/saturn/capn/mppi033h/Data/standard_reco_files/pred_file_regression.h5')
+
+    f_in.close()
+
+    # TODO make print how many events have been thrown away
 
 
 def get_mc_info(s, selection=None):
@@ -75,22 +143,40 @@ def get_mc_info(s, selection=None):
     prod_ident[is_random_noise] = 4
     prod_ident[is_neutrino_low_e] = 2
     prod_ident[is_neutrino_high_e] = 1
-    assert prod_ident != 0
+    assert np.count_nonzero(prod_ident == 0) == 0
 
-    cols_s_out.append(('prod_ident', None))
-    dtypes.append(('prod_ident', np.float64))
+    cols_s_out.append((None, 'prod_id'))
+    dtypes.append(('prod_id', np.float64))
 
-    mc_info = np.empty(len(dtypes), dtype=dtypes)
+    n_evts = s['energy'].shape[0]
+    mc_info = np.empty(n_evts, dtype=dtypes)
     for tpl in cols_s_out:
-        if tpl[0] == 'prod_ident':
-            mc_info['prod_ident'] = prod_ident
+        if tpl[1] == 'prod_id':
+            mc_info['prod_id'] = prod_ident
         else:
-            mc_info[tpl[0]] = s[tpl[1]]
+            mc_info[tpl[1]] = s[tpl[0]]
 
     return mc_info
 
 
-def get_pred(s, mode, selection):
+def save_surviving_evt_info_to_npy(mc_info, savepath):
+    """
+
+    Parameters
+    ----------
+    mc_info
+    savepath
+
+    """
+    ax = np.newaxis
+    arr = np.concatenate([mc_info['run_id'][:, ax], mc_info['event_id'][:, ax],
+                          mc_info['prod_id'][:, ax], mc_info['particle_type'][:, ax],
+                          mc_info['is_cc'][:, ax]], axis=1)
+
+    np.save(savepath, arr)
+
+
+def get_pred(s, mode, selection=None):
     """
 
     Parameters
@@ -119,7 +205,7 @@ def get_pred(s, mode, selection):
 
         dtypes_pred = [('prob_not_neutrino', np.float64), ('prob_neutrino', np.float64)]
         n_evts = prob_not_neutrino.shape[0]
-        pred = np.empty((n_evts, len(dtypes_pred)), dtype=dtypes_pred)
+        pred = np.empty(n_evts, dtype=dtypes_pred)
 
         pred['prob_neutrino'] = prob_neutrino
         pred['prob_not_neutrino'] = prob_not_neutrino
@@ -132,7 +218,7 @@ def get_pred(s, mode, selection):
 
         dtypes_pred = [('prob_track', np.float64), ('prob_shower', np.float64)]
         n_evts = prob_track.shape[0]
-        pred = np.empty((n_evts, len(dtypes_pred)), dtype=dtypes_pred)
+        pred = np.empty(n_evts, dtype=dtypes_pred)
 
         pred['prob_track'] = prob_track
         pred['prob_shower'] = prob_shower
@@ -155,14 +241,14 @@ def get_pred(s, mode, selection):
         labels_track = ['gandalf_dir_x', 'gandalf_dir_y', 'gandalf_dir_z', 'gandalf_pos_x', 'gandalf_pos_y', 'gandalf_pos_z', 'gandalf_time']
         dir_vtx_shower, dir_vtx_track = {}, {}
 
-        for label in labels_shower:
-            dir_vtx_shower = s_shower[label]
+        for i, label in enumerate(labels_shower):
+            dir_vtx_shower[i] = s_shower[label]
 
-        for label in labels_track:
-            dir_vtx_track = s_track[label]
+        for i, label in enumerate(labels_track):
+            dir_vtx_track[i] = s_track[label]
 
         dir_vtx = {}
-        for i in range(dir_vtx_shower):
+        for i in range(len(dir_vtx_shower)):
             dir_vtx[i] = np.concatenate([dir_vtx_shower[i], dir_vtx_track[i]], axis=0)
 
         labels_pred_dset = ['pred_energy', 'pred_dir_x', 'pred_dir_y', 'pred_dir_z', 'pred_bjorkeny', 'pred_vtx_x',
@@ -170,7 +256,7 @@ def get_pred(s, mode, selection):
 
         dtypes_pred = [(label_pred_name, np.float64) for label_pred_name in labels_pred_dset]
         n_evts = energy.shape[0]
-        pred = np.empty((n_evts, len(dtypes_pred)), dtype=dtypes_pred)
+        pred = np.empty(n_evts, dtype=dtypes_pred)
 
         pred['pred_energy'] = energy
         pred['pred_bjorkeny'] = bjorkeny
@@ -178,74 +264,6 @@ def get_pred(s, mode, selection):
         pred['pred_vtx_x'], pred['pred_vtx_y'], pred['pred_vtx_z'], pred['pred_vtx_t'] = dir_vtx[3], dir_vtx[4], dir_vtx[5], dir_vtx[6]
 
     return pred
-
-
-def make_pred_file():
-    """
-
-    """
-    f_in = h5py.File('/home/saturn/capn/mppi033h/Data/standard_reco_files/summary_file_cut.h5', 'r')
-
-    # bg classifier selections
-    s = f_in['summary_array']
-    dusj_is_selected = s['dusj_is_selected']
-    gandalf_loose_is_selected = s['gandalf_loose_is_selected']
-    selection_classifier_bg = np.logical_or(dusj_is_selected, gandalf_loose_is_selected)
-
-    mc_info_sel_bg = get_mc_info(s, selection=selection_classifier_bg)
-    save_surviving_evt_info_to_npy(mc_info_sel_bg, '/home/saturn/capn/mppi033h/Data/event_selections/evt_selection_bg_classifier.npy')
-
-    pred_bg = get_pred(s, mode='bg_classifier_2_class', selection=selection_classifier_bg)
-    save_dsets_to_h5_file(mc_info_sel_bg, pred_bg,
-                          savepath='/home/saturn/capn/mppi033h/Data/standard_reco_files/pred_file_bg_classifier_2_class.h5')
-
-    # ts classifier
-    is_neutrino = s['is_neutrino'] == 1
-    s = f_in['summary_array'][is_neutrino]
-    dusj_is_selected = s['dusj_is_selected']
-    gandalf_loose_is_selected = s['gandalf_loose_is_selected']
-    selection_classifier_ts = np.logical_or(dusj_is_selected, gandalf_loose_is_selected)
-
-    mc_info_sel_ts = get_mc_info(s, selection=selection_classifier_ts)
-    save_surviving_evt_info_to_npy(mc_info_sel_ts, '/home/saturn/capn/mppi033h/Data/event_selections/evt_selection_ts_classifier.npy')
-
-    pred_ts = get_pred(s, mode='ts_classifier', selection=selection_classifier_ts)
-    save_dsets_to_h5_file(mc_info_sel_ts, pred_ts,
-                          savepath='/home/saturn/capn/mppi033h/Data/standard_reco_files/pred_file_ts_classifier.h5')
-
-    # regression
-    is_neutrino = s['is_neutrino'] == 1
-    s = f_in['summary_array'][is_neutrino]
-    dusj_is_selected = s['dusj_is_selected']
-    gandalf_is_selected = s['gandalf_is_selected']
-    selection_regr = np.logical_or(dusj_is_selected, gandalf_is_selected)
-
-    mc_info_sel_regr = get_mc_info(s, selection=selection_regr)
-    save_surviving_evt_info_to_npy(mc_info_sel_ts,
-                                   '/home/saturn/capn/mppi033h/Data/event_selections/evt_selection_regression.npy')
-
-    pred_regr = get_pred(s, mode='regression_e_dir_vtx_by', selection=selection_regr)
-    save_dsets_to_h5_file(mc_info_sel_regr, pred_regr,
-                          savepath='/home/saturn/capn/mppi033h/Data/standard_reco_files/pred_file_regression.h5')
-
-    # TODO make print how many events have been thrown away
-
-
-def save_surviving_evt_info_to_npy(mc_info, savepath):
-    """
-
-    Parameters
-    ----------
-    mc_info
-    savepath
-
-    """
-    ax = np.newaxis()
-    arr = np.concatenate([mc_info['run_id'][:, ax], mc_info['event_id'][:, ax],
-                          mc_info['prod_id'][:, ax], mc_info['particle_type'][:, ax],
-                          mc_info['is_cc'][:, ax]], axis=1)
-
-    np.save(savepath, arr)
 
 
 def save_dsets_to_h5_file(mc_info, pred, savepath):
@@ -265,7 +283,9 @@ def save_dsets_to_h5_file(mc_info, pred, savepath):
 
 
 if __name__ == '__main__':
-    cut_summary_file()  # do on tinyfat or woody with 32g, qsub -I -l nodes=1:ppn=4:sl32g,walltime=05:00:00
+    if os.path.exists('/home/saturn/capn/mppi033h/Data/standard_reco_files/summary_file_cut.h5') is False:
+        cut_summary_file()  # do on tinyfat or woody with 32g, qsub -I -l nodes=1:ppn=4:sl32g,walltime=05:00:00
+
     make_pred_file()
 
 
