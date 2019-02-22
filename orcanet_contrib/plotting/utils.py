@@ -21,17 +21,17 @@ def select_track_shower(ptype, is_cc):
 
     Returns
     -------
-    track : ndarray(ndim=1)
+    is_track : ndarray(ndim=1)
         Boolean array which specifies, if the events from the ptype & is_cc arrays belong to the track class or not.
-    shower : ndarray(ndim=1)
+    is_shower : ndarray(ndim=1)
         Boolean array which specifies, if the events from the ptype & is_cc arrays belong to the shower class or not.
 
     """
     abs_particle_type = np.abs(ptype)
-    track = np.logical_and(abs_particle_type == 14, is_cc is True)
-    shower = np.logical_or(abs_particle_type == 16, abs_particle_type == 12)
+    is_track = np.logical_and(abs_particle_type == 14, is_cc is True)
+    is_shower = np.logical_or(abs_particle_type == 16, abs_particle_type == 12)
 
-    return track, shower
+    return is_track, is_shower
 
 
 def select_ic(ptype, is_cc, interaction_channel):
@@ -181,9 +181,17 @@ def load_event_selection_file(cut_name, dirpath='/home/saturn/capn/mppi033h/Data
         Array with the run_id, event_id, prod_id, particle_type and is_cc info of the selected events.
 
     """
-    if cut_name == '1-5GeV_and_3-100GeV_prod':
+    if cut_name == 'neutrino_regr':
         # contains run_id, event_id, prod_id, particle_type and is_cc
-        selected_events_array = np.load(dirpath + '/ph.npy')
+        selected_events_array = np.load(dirpath + '/evt_selection_regression.npy')
+
+    elif cut_name == 'neutrino_ts':
+        # contains run_id, event_id, prod_id, particle_type and is_cc
+        selected_events_array = np.load(dirpath + '/evt_selection_ts_classifier.npy')
+
+    elif cut_name == 'bg_classifier':
+        # contains run_id, event_id, prod_id, particle_type and is_cc
+        selected_events_array = np.load(dirpath + '/evt_selection_bg_classifier.npy')
 
     else:
         raise ValueError('The specified cut_name "' + str(cut_name) + '" is not available.')

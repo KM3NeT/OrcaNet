@@ -35,13 +35,13 @@ def make_performance_plots(pred_filepath, dataset_modifier, plots_folder):
     main_perf_plots_path = plots_folder + '/pred_performance'
 
     if dataset_modifier == 'bg_classifier':
-        cuts = None
+        cuts = 'bg_classifier'
 
         make_plots_subfolders(main_perf_plots_path, dataset_modifier)
         make_prob_hists_bg_classifier(pred_file, main_perf_plots_path + '/1d', cuts=cuts)
 
     elif dataset_modifier == 'ts_classifier':
-        cuts = None
+        cuts = 'neutrino_ts'
         pred_file_2 = None
 
         make_plots_subfolders(main_perf_plots_path, dataset_modifier)
@@ -51,7 +51,7 @@ def make_performance_plots(pred_filepath, dataset_modifier, plots_folder):
 
     elif 'regression' in dataset_modifier:
         make_plots_subfolders(main_perf_plots_path, dataset_modifier)
-        cuts = '1-5GeV_and_3-100GeV_prod'
+        cuts = 'neutrino_regr'
         reco_energy_correction = 'median'
         pred_file_2nd_reco = None
 

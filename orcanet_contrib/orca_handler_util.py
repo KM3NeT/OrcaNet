@@ -392,7 +392,8 @@ def orca_dataset_modifiers(name):
                                                ('pred_err_vtx_t', 'vt_err')]
 
             dtypes_pred = [(tpl[0], y_pred[tpl[1]].dtype) for tpl in pred_labels_and_nn_output_names]
-            pred = np.empty(len(dtypes_pred), dtype=dtypes_pred)
+            n_evts = y_pred['e'].shape[0]
+            pred = np.empty((n_evts, len(dtypes_pred)), dtype=dtypes_pred)
 
             for tpl in pred_labels_and_nn_output_names:
                 pred[tpl[0]] = y_pred[tpl[1]]
@@ -410,7 +411,7 @@ def orca_dataset_modifiers(name):
                                                ('true_err_vtx_t', 'vt_err')]
 
             dtypes_true = [(tpl[0], y_true[tpl[1]].dtype) for tpl in true_labels_and_nn_output_names]
-            true = np.empty(len(dtypes_true), dtype=dtypes_true)
+            true = np.empty((n_evts, len(dtypes_true)), dtype=dtypes_true)
 
             for tpl in true_labels_and_nn_output_names:
                 true[tpl[0]] = y_true[tpl[1]]
