@@ -4,7 +4,8 @@ from keras import backend as K
 from keras.regularizers import l2
 import inspect
 
-from orcanet.builder_util.layer_blocks import input_block, ConvBlock, DenseBlock
+from orcanet.builder_util.layer_blocks import (
+    input_block, ConvBlock, DenseBlock)
 
 
 class BlockBuilder:
@@ -19,20 +20,28 @@ class BlockBuilder:
         Default values for all blocks in the head section of the model.
 
     """
+
     def __init__(self, body_defaults=None, head_defaults=None):
         """ Set dicts with default values for the layers of the model.
         """
+        self._all_blocks = {
+            "conv_block": ConvBlock,
+            "dense_block": DenseBlock,
+        }
+
         if body_defaults is not None and "kernel_reg" in body_defaults:
             if body_defaults["kernel_reg"] == "l2":
                 body_defaults["kernel_reg"] = l2
             else:
-                raise NameError("Unknown kernel_reg: " + str(body_defaults["kernel_reg"]))
+                raise NameError(
+                    "Unknown kernel_reg: " + str(body_defaults["kernel_reg"]))
 
         if head_defaults is not None and "kernel_reg" in head_defaults:
             if head_defaults["kernel_reg"] == "l2":
                 head_defaults["kernel_reg"] = l2
             else:
-                raise NameError("Unknown kernel_reg: " + str(head_defaults["kernel_reg"]))
+                raise NameError(
+                    "Unknown kernel_reg: " + str(head_defaults["kernel_reg"]))
 
         self._check_arguments(body_defaults)
         self._check_arguments(head_defaults)
@@ -66,9 +75,11 @@ class BlockBuilder:
 
         """
         if not isinstance(input_shape, dict):
-            raise TypeError("input_shapes must be a dict, not ", type(input_shape))
+            raise TypeError(
+                "input_shapes must be a dict, not ", type(input_shape))
         if not len(input_shape) == 1:
-            raise TypeError("input_shapes must have length 1, not ", len(input_shape))
+            raise TypeError(
+                "input_shapes must have length 1, not ", len(input_shape))
 
         input_layer = input_block(input_shape)[0]
 
@@ -144,7 +155,7 @@ class BlockBuilder:
             outputs = self.attach_output_cat(layer, **head_arch_args)
 
         elif head_arch == "regression_error":
-            # regression with error estimation, two outputs for each regression label
+            # regression with error estimation, two outputs for each label
             assert head_arch_args is not None, "No output_kwargs given"
             outputs = self.attach_output_reg_err(layer, **head_arch_args)
 
@@ -155,10 +166,14 @@ class BlockBuilder:
 
     def attach_output_cat(self, layer, categories, output_name):
         """ Small dense network for multiple categories. """
-        x = self.attach_block(layer, {"type": "dense_block", "units": 128},
-                              is_output=True)
-        x = self.attach_block(x, {"type": "dense_block", "units": 32, "dropout": None},
-                              is_output=True)
+        x = self.attach_block(
+            layer, {"type": "dense_block", "units": 128},
+            is_output=True)
+
+        x = self.attach_block(
+            x, {"type": "dense_block", "units": 32, "dropout": None},
+            is_output=True)
+
         out = Dense(units=categories, activation='softmax',
                     kernel_initializer='he_normal', name=output_name)(x)
         return [out, ]
@@ -168,10 +183,13 @@ class BlockBuilder:
         outputs = []
 
         # Network for the labels
-        x = self.attach_block(layer, {"type": "dense_block", "units": 128},
-                              is_output=True)
-        x = self.attach_block(x, {"type": "dense_block", "units": 32, "dropout": None},
-                              is_output=True)
+        x = self.attach_block(
+            layer, {"type": "dense_block", "units": 128},
+            is_output=True)
+
+        x = self.attach_block(
+            x, {"type": "dense_block", "units": 32, "dropout": None},
+            is_output=True)
 
         for name in output_names:
             output_label = Dense(units=1, name=name)(x)
@@ -179,12 +197,18 @@ class BlockBuilder:
 
         # Network for the errors of the labels
         x_err = Lambda(lambda a: K.stop_gradient(a))(layer)
-        x_err = self.attach_block(x_err, {"type": "dense_block", "units": 128},
-                                  is_output=True)
-        x_err = self.attach_block(x_err, {"type": "dense_block", "units": 64},
-                                  is_output=True)
-        x_err = self.attach_block(x_err, {"type": "dense_block", "units": 32, "dropout": None},
-                                  is_output=True)
+
+        x_err = self.attach_block(
+            x_err, {"type": "dense_block", "units": 128},
+            is_output=True)
+
+        x_err = self.attach_block(
+            x_err, {"type": "dense_block", "units": 64},
+            is_output=True)
+
+        x_err = self.attach_block(
+            x_err, {"type": "dense_block", "units": 32, "dropout": None},
+            is_output=True)
 
         for i, name in enumerate(output_names):
             output_label_error = Dense(units=1, activation='linear',
@@ -222,17 +246,12 @@ class BlockBuilder:
 
         return conf
 
-    @staticmethod
-    def _get_blocks(name=None):
-        """ Get the mid section block function depending on the name. """
-        all_blocks = {
-            "conv_block": ConvBlock,
-            "dense_block": DenseBlock,
-            }
+    def _get_blocks(self, name=None):
+        """ Get the block class/function depending on the name. """
         if name is None:
-            return all_blocks
-        elif name in all_blocks:
-            return all_blocks[name]
+            return self._all_blocks
+        elif name in self._all_blocks:
+            return self._all_blocks[name]
         else:
             raise NameError("Unknown block type: " + str(name))
 

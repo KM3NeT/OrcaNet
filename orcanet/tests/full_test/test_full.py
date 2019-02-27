@@ -9,11 +9,9 @@ from keras.models import Model
 from keras.layers import Dense, Input, Flatten, Convolution3D
 from unittest import TestCase
 
-from orcanet.core import OrcaHandler
-from orcanet.orca_builder import OrcaBuilder
-from orcanet_contrib.orca_handler_util import update_orca_objects
-
-from orcanet.utilities.nn_utilities import load_zero_center_data
+from orcanet.core import Organizer
+from orcanet.model_builder import ModelBuilder
+from orcanet_contrib.custom_objects import get_custom_objects
 
 
 class DatasetTest(TestCase):
@@ -44,13 +42,17 @@ class DatasetTest(TestCase):
         config_file = os.path.join(os.path.dirname(__file__), "config_test.toml")
         output_folder = self.temp_dir + "model/"
 
-        orca = OrcaHandler(output_folder, config_file=config_file)
-        orca.cfg._train_files = self.train_pathes
-        orca.cfg._val_files = self.val_pathes
-        orca.cfg._list_file = "test.toml"
-        orca.cfg.zero_center_folder = self.temp_dir
+        def make_orga():
+            orga = Organizer(output_folder, config_file=config_file)
+            orga.cfg._train_files = self.train_pathes
+            orga.cfg._val_files = self.val_pathes
+            orga.cfg._list_file = "test.toml"
+            orga.cfg.zero_center_folder = self.temp_dir
+            orga.cfg.label_modifier = label_modifier
+            orga.cfg.custom_objects = get_custom_objects()
+            return orga
 
-        self.orca = orca
+        self.make_orga = make_orga
 
     def tearDown(self):
         """ Remove the .temp directory. """
@@ -58,14 +60,14 @@ class DatasetTest(TestCase):
 
     def test_zero_center(self):
         """ Calculate the zero center image and check if it works properly. """
-        orca = self.orca
-        xs_mean = load_zero_center_data(orca)
+        orga = self.make_orga()
+        xs_mean = orga.get_xs_mean()
         target_xs_mean = np.ones(self.shape)/4
         self.assertTrue(np.allclose(xs_mean["testing_input"], target_xs_mean))
 
-        file = orca.cfg.zero_center_folder + orca.cfg._list_file + '_input_' + "testing_input" + '.npz'
+        file = orga.cfg.zero_center_folder + orga.cfg._list_file + '_input_' + "testing_input" + '.npz'
         zero_center_used_ip_files = np.load(file)['zero_center_used_ip_files']
-        self.assertTrue(np.array_equal(zero_center_used_ip_files, orca.cfg._train_files["testing_input"]))
+        self.assertTrue(np.array_equal(zero_center_used_ip_files, orga.cfg._train_files["testing_input"]))
 
     def test_multi_input_model(self):
         """
@@ -73,14 +75,13 @@ class DatasetTest(TestCase):
         if it throws an error. Also resumes training after the first epoch
         with a custom lr to check if that works.
         """
-        orca = self.orca
+        orga = self.make_orga()
+
         model_file = os.path.join(os.path.dirname(__file__), "model_test.toml")
-        update_orca_objects(orca, model_file)
+        builder = ModelBuilder(model_file)
+        initial_model = builder.build(orga)
 
-        builder = OrcaBuilder(model_file)
-        initial_model = builder.build(orca)
-
-        orca.train(initial_model)
+        orga.train(initial_model, epochs=2)
 
         def test_learning_rate(epoch, fileno):
             lr = (1 + epoch)*(1 + fileno) * 0.001
@@ -90,16 +91,17 @@ class DatasetTest(TestCase):
             xs = {key: xs[key] * 2 for key in xs}
             return xs
 
-        orca.cfg.learning_rate = test_learning_rate
-        orca.cfg.sample_modifier = test_modifier
-        orca.train()
-        orca.predict()
+        orga = self.make_orga()
+        orga.cfg.learning_rate = test_learning_rate
+        orga.cfg.sample_modifier = test_modifier
+        orga.train(epochs=1)
+        orga.predict()
 
     def test_model_setup_CNN_model(self):
-        orca = self.orca
+        orga = self.make_orga()
         model_file = os.path.join(os.path.dirname(__file__), "model_CNN.toml")
-        builder = OrcaBuilder(model_file)
-        model = builder.build(orca)
+        builder = ModelBuilder(model_file)
+        model = builder.build(orga)
 
         self.assertEqual(model.input_shape[1:], self.shape)
         self.assertEqual(model.output_shape[1:], (2, ))
@@ -116,7 +118,7 @@ class DatasetTest(TestCase):
             return model
 
         model_file = os.path.join(os.path.dirname(__file__), "model_CNN.toml")
-        builder = OrcaBuilder(model_file)
+        builder = ModelBuilder(model_file)
         model1 = build_model("inp_A", self.shape)
         model2 = build_model("inp_B", self.shape)
         merged_model = builder.merge_models([model1, model2])
@@ -161,6 +163,16 @@ def make_dummy_data(filepath1, filepath2, shape):
         h5f.create_dataset('x', data=xs, dtype='uint8')
         h5f.create_dataset('y', data=ys, dtype=dtypes)
         h5f.close()
+
+
+def label_modifier(y_values):
+    ys = dict()
+
+    ys['dx'], ys['dx_err'] = y_values['dir_x'], y_values['dir_x']
+
+    for key_label in ys:
+        ys[key_label] = ys[key_label].astype(np.float32)
+    return ys
 
 
 def make_dummy_model(shape):

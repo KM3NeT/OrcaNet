@@ -6,7 +6,7 @@ Terrible functions I want to get rid off.
 def get_dimensions_encoding(n_bins, batchsize):
     """
     Returns a dimensions tuple for 2,3 and 4 dimensional data.
-    :param int batchsize: Batchsize that is used in generate_batches_from_hdf5_file().
+    :param int batchsize: Batchsize that is used in hdf5_batch_generator().
     :param tuple n_bins: Declares the number of bins for each dimension (x,y,z).
                         If a dimension is equal to 1, it means that the dimension should be left out.
     :return: tuple dimensions: 2D, 3D or 4D dimensions tuple (integers).

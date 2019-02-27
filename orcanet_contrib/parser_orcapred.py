@@ -1,5 +1,5 @@
 """
-Use orca_pred with a parser.
+Use orga.predict with a parser.
 
 Usage:
     parser_orcapred.py FOLDER LIST CONFIG MODEL
@@ -24,14 +24,14 @@ Options:
 from docopt import docopt
 import toml
 
-from orcanet.core import OrcaHandler
+from orcanet.core import Organizer
 from orcanet_contrib.eval_nn import make_performance_plots
-from orcanet_contrib.orca_handler_util import update_orca_objects
+from orcanet_contrib.orca_handler_util import update_objects
 
 
 def orca_pred(output_folder, list_file, config_file, model_file):
     """
-    Run orca.predict with predefined OrcaBuilder networks using a parser.
+    Run orga.predict with predefined ModelBuilder networks using a parser.
 
     Parameters
     ----------
@@ -49,25 +49,25 @@ def orca_pred(output_folder, list_file, config_file, model_file):
         architecture with OrcaNet.
 
     """
-    # Set up the OrcaHandler with the input data
-    orca = OrcaHandler(output_folder, list_file, config_file)
+    # Set up the Organizer with the input data
+    orga = Organizer(output_folder, list_file, config_file)
 
-    # When predicting with a orca model, the right modifiers and custom
+    # When predicting with a orga model, the right modifiers and custom
     # objects need to be given
-    update_orca_objects(orca, model_file)
+    update_objects(orga, model_file)
     # TODO suboptimal:
     label_modifier = toml.load(model_file)["orca_modifiers"]["label_modifier"]
 
     # Per default, a prediction will be done for the model with the
     # highest epoch and filenumber.
-    pred_filename = orca.predict(epoch=-1, fileno=-1)
+    pred_filename = orga.predict(epoch=-1, fileno=-1)
 
-    plots_folder = orca.io.get_subfolder(name='plots')
+    plots_folder = orga.io.get_subfolder(name='plots')
     make_performance_plots(pred_filename, label_modifier, plots_folder)
 
 
 def parse_input():
-    """ Run the orca_train function with a parser. """
+    """ Run the orca_pred function with a parser. """
     args = docopt(__doc__)
     output_folder = args['FOLDER']
     list_file = args['LIST']

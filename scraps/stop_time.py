@@ -20,8 +20,8 @@ import os
 import time
 import numpy as np
 import h5py
-from orcanet.core import OrcaHandler
-from orca_builder import build_nn_model
+from orcanet.core import Organizer
+from model_builder import build_nn_model
 
 
 def generate_batches_from_hdf5_file_tweak(cfg, files_dict, f_size=None, zero_center_image=None, yield_mc_info=False, shuffle=False, batches_at_once=10):
@@ -147,7 +147,7 @@ def test_generators(batches, intermediate_log, functions, func_kwargs):
     modelfile = "/home/woody/capn/mppi013h/Code/OrcaNet/examples/settings_files/example_model.toml"
 
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-    orca = OrcaHandler("./test/", list_file)
+    orca = Organizer("./test/", list_file)
     orca.cfg.zero_center_folder = zero_center_folder
     train_files = next(orca.io.yield_files("train"))
     # cfg.use_local_node()

@@ -1,5 +1,5 @@
 """
-Use orca_train with a parser.
+Use orga.train with a parser.
 
 Usage:
     parser_orcatrain.py [options] FOLDER LIST CONFIG MODEL
@@ -24,15 +24,17 @@ Options:
 
 """
 from docopt import docopt
+import keras as ks
 
-from orcanet.core import OrcaHandler
-from orca_builder import OrcaBuilder
-from orcanet_contrib.orca_handler_util import orca_learning_rates, update_orca_objects
+from orcanet.core import Organizer
+from model_builder import ModelBuilder
+from orcanet_contrib.orca_handler_util import orca_learning_rates, update_objects
 
 
-def orca_train(output_folder, list_file, config_file, model_file, recompile_model=False):
+def orca_train(output_folder, list_file, config_file, model_file,
+               recompile_model=False):
     """
-    Run orca.train with predefined OrcaBuilder networks using a parser.
+    Run orga.train with predefined ModelBuilder networks using a parser.
 
     Parameters
     ----------
@@ -53,35 +55,40 @@ def orca_train(output_folder, list_file, config_file, model_file, recompile_mode
         loss_weights are changed during the training.
 
     """
-    # Set up the OrcaHandler with the input data
-    orca = OrcaHandler(output_folder, list_file, config_file)
+    # Set up the Organizer with the input data
+    orga = Organizer(output_folder, list_file, config_file)
 
-    # Load in the orca sample-, label-, and dataset-modifiers, as well as
+    # Load in the orga sample-, label-, and dataset-modifiers, as well as
     # the custom objects
-    update_orca_objects(orca, model_file)
+    update_objects(orga, model_file)
 
     # If this is the start of the training, a compiled model needs to be
-    # handed to the orca_train function
-    if orca.io.is_new():
-        # The OrcaBuilder class allows to construct models from a toml file,
-        # adapted to the datasets in the orca instance. Its modifiers will
+    # handed to the orga.train function
+    if orga.io.is_new():
+        # The ModelBuilder class allows to construct models from a toml file,
+        # adapted to the datasets in the orga instance. Its modifiers will
         # be taken into account for this
-        builder = OrcaBuilder(model_file)
-        model = builder.build(orca)
+        builder = ModelBuilder(model_file)
+        model = builder.build(orga)
+
+    elif recompile_model is True:
+        builder = ModelBuilder(model_file)
+
+        path_of_model = orga.io.get_model_path(-1, -1)
+        model = ks.models.load_model(path_of_model,
+                                     custom_objects=orga.cfg.custom_objects)
+        print("Recompiling the saved model")
+        model = builder.compile_model(model)
 
     else:
         model = None
 
-        if recompile_model is True:
-            builder = OrcaBuilder(model_file)
-            model = builder.recompile_model(orca)
-
     # Use a custom LR schedule
-    orca.cfg.learning_rate = orca_learning_rates("triple_decay",
-                                                 orca.io.get_no_of_files("train"))
+    orga.cfg.learning_rate = orca_learning_rates("triple_decay",
+                                                 orga.io.get_no_of_files("train"))
 
     # start the training
-    orca.train(model=model, force_model=recompile_model)
+    orga.train(model=model, force_model=recompile_model)
 
 
 def parse_input():
@@ -92,7 +99,8 @@ def parse_input():
     config_file = args['CONFIG']
     model_file = args['MODEL']
     recompile_model = args['--recompile']
-    orca_train(output_folder, list_file, config_file, model_file, recompile_model=recompile_model)
+    orca_train(output_folder, list_file, config_file, model_file,
+               recompile_model=recompile_model)
 
 
 if __name__ == '__main__':

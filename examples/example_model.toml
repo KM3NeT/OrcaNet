@@ -1,5 +1,5 @@
-# Info for building a model with the OrcaBuilder. This will produce a
-# compiled keras model, adapted to the input data given to the OrcaHandler.
+# Info for building a model with the ModelBuilder. This will produce a
+# compiled keras model, adapted to the input data given to the Organizer.
 # This is not required to use orca_train, as any model can be used for that.
 #
 # The model itself is defined by a "body" section, consisting of a
@@ -104,9 +104,9 @@ by_err = {function='loss_uncertainty_mse'}
 
 
 # ----------------------------------------------------------------------
-# This section is optional. Can be used to load modifiers in the OrcaHandler
+# This section is optional. Can be used to load modifiers in the Organizer
 # that were used for orca analyses before constructing the model. Done via
-# orcanet_contrib.orca_handler_util.update_orca_objects
+# orcanet_contrib.orca_handler_util.update_objects
 [orca_modifiers]
 sample_modifier = 'xyz-t_and_xyz-c_single_input'
 label_modifier = 'energy_dir_bjorken-y_vtx_errors'

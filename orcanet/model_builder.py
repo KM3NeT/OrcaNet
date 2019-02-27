@@ -8,17 +8,16 @@ import keras as ks
 from keras.layers import Concatenate, Flatten, BatchNormalization, Dropout
 from keras.models import Model
 import toml
-import os
 
 from orcanet.builder_util.builders import BlockBuilder
 
 
-class OrcaBuilder:
+class ModelBuilder:
     """
-    Can build models adapted to an OrcaHandler instance from a toml file.
+    Can build models adapted to an Organizer instance from a toml file.
 
     The input of the model will match the dimensions of the input
-    data given to the OrcaHandler taking into account the sample
+    data given to the Organizer taking into account the sample
     modifier.
 
     Attributes
@@ -81,16 +80,16 @@ class OrcaBuilder:
             raise KeyError("Missing parameter in toml model file: "
                            + str(option)) from None
 
-    def build(self, orca):
+    def build(self, orga):
         """
         Build the network.
 
-        Input layers will be adapted to the input files in the orca.
-        Can also add the matching modifiers and custom objects to the orca.
+        Input layers will be adapted to the input files in the organizer.
+        Can also add the matching modifiers and custom objects to the orga.
 
         Parameters
         ----------
-        orca : object OrcaHandler
+        orga : object Organizer
             Contains all the configurable options in the OrcaNet scripts.
 
         Returns
@@ -99,8 +98,8 @@ class OrcaBuilder:
             The network.
 
         """
-        input_shapes = orca.io.get_input_shapes()
-        custom_objects = orca.cfg.custom_objects
+        input_shapes = orga.io.get_input_shapes()
+        custom_objects = orga.cfg.custom_objects
 
         if self.body_arch == "single":
             # Build a single input network
@@ -145,14 +144,15 @@ class OrcaBuilder:
 
         """
         if n_gpu is not None:
-            model, orca.cfg.batchsize = parallelize_model(model, n_gpu,
-                                                          orca.cfg.batchsize)
+            model, orga.cfg.batchsize = parallelize_model(model, n_gpu,
+                                                          orga.cfg.batchsize)
         """
         self.compile_model(model, custom_objects)
         model.summary()
         return model
 
-    def merge_models(self, model_list, trainable=False, stateful=True, no_drop=True):
+    def merge_models(self, model_list, trainable=False, stateful=True,
+                     no_drop=True):
         """
         Concatenate two or more single input cnns to a big one.
 
@@ -168,14 +168,21 @@ class OrcaBuilder:
         stateful : bool
             Whether the batchnorms of the loaded models will be stateful.
         no_drop : bool
-            If true, rate of dropout layers from loaded models will be set to zero.
+            If true, rate of dropout layers from loaded models will
+            be set to zero.
+
+        Returns
+        -------
+        model : keras model
+            The uncompiled merged keras model.
 
         """
         # Get the input and Flatten layers in each of the given models
         input_layers, flattens = [], []
         for model in model_list:
             if len(model.inputs) != 1:
-                raise ValueError("model input is not length 1 {}".format(model.inputs))
+                raise ValueError(
+                    "model input is not length 1 {}".format(model.inputs))
             input_layers.append(model.input)
             flatten_found = 0
             for layer in model.layers:
@@ -186,12 +193,15 @@ class OrcaBuilder:
                     flattens.append(layer.output)
                     flatten_found += 1
             if flatten_found != 1:
-                raise TypeError("Expected 1 Flatten layer but got " + str(flatten_found))
+                raise TypeError(
+                    "Expected 1 Flatten layer but got " + str(flatten_found))
 
         # attach new head
         x = Concatenate()(flattens)
-        builder = BlockBuilder(body_defaults=None, head_defaults=self.head_args)
-        output_layer = builder.attach_output_layers(x, self.head_arch, self.head_arch_args)
+        builder = BlockBuilder(body_defaults=None,
+                               head_defaults=self.head_args)
+        output_layer = builder.attach_output_layers(x, self.head_arch,
+                                                    self.head_arch_args)
 
         model = Model(input_layers, output_layer)
         if no_drop:
@@ -210,6 +220,11 @@ class OrcaBuilder:
         custom_objects : dict or None
             Maps names (strings) to custom loss functions.
 
+        Returns
+        -------
+        model : keras model
+            The compiled keras model.
+
         """
         if self.optimizer == 'adam':
             optimizer = ks.optimizers.Adam(beta_1=0.9, beta_2=0.999, epsilon=0.1,
@@ -221,7 +236,7 @@ class OrcaBuilder:
 
         loss_functions, loss_weights, loss_metrics = {}, {}, {}
         for layer_name, layer_info in self.compile_opt.items():
-            # Replace the str function name with the actual function if it is custom
+            # Replace the str function name with actual function if it is custom
             loss_function = layer_info['function']
             if custom_objects is not None and loss_function in custom_objects:
                 loss_function = custom_objects[loss_function]
@@ -245,33 +260,6 @@ class OrcaBuilder:
                       metrics=loss_metrics, loss_weights=loss_weights)
         return model
 
-    def recompile_model(self, orca):
-        """
-        Compile a loaded keras model once again.
-
-        Parameters
-        ----------
-        orca : orcanet.core.OrcaHandler
-            An instance of the top-level OrcaHandler class.
-        Returns
-        -------
-        recompiled_model : ks.models.Model
-            The loaded and recompiled keras model.
-
-        """
-        if orca.cfg.filter_out_tf_garbage:
-            os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-
-        epoch = orca.io.get_latest_epoch()
-        path_of_model = orca.io.get_model_path(epoch[0], epoch[1])
-        print("Loading saved model: " + path_of_model)
-        model = ks.models.load_model(path_of_model, custom_objects=orca.cfg.custom_objects)
-
-        print("Recompiling the saved model")
-        recompiled_model = self.compile_model(model)
-
-        return recompiled_model
-
 
 def change_dropout_rate(model, before_concat, after_concat=None):
     """
@@ -287,8 +275,8 @@ def change_dropout_rate(model, before_concat, after_concat=None):
     before_concat : float
         New dropout rate before the concatenate layer in the model.
     after_concat : float or None
-        New dropout rate after the concatenate layer. None will leave the dropout
-        rate there as it was.
+        New dropout rate after the concatenate layer. None will leave the
+        dropout rate there as it was.
 
     """
     ch_bef, ch_aft, concat_found = 0, 0, 0

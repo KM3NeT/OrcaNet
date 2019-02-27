@@ -3,8 +3,6 @@
 # They overwrite the default values which are listed in the definition of the Configuration class.
 #
 [config]
-batchsize = 5
+batchsize = 7
 train_logger_display=5
 train_logger_flush=-1
-verbose_train = 1
-epochs_to_train = 2

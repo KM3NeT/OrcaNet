@@ -1,11 +1,9 @@
 [body]
-# sample_modifier = 'xyz-t_and_xyz-c_single_input'
 architecture = "single"
 
 # default values for all the layers of the network
 type = "conv_block"
 conv_dim = 3
-dropout = 0.0
 
 # config of every layer block, will overwrite the default values above
 blocks = [
@@ -16,9 +14,7 @@ blocks = [
 
 [head]
 architecture = "regression_error"
-architecture_args = {output_names=['e', 'dx', 'dy', 'dz', 'by', 'vx', 'vy', 'vz', 'vt']}
-
-dropout = 0.2
+architecture_args = {output_names=['dx', ]}
 
 
 [compile]
@@ -26,24 +22,4 @@ optimizer = "adam"
 
 [compile.losses]
 dx = {function="mse", weight=10}
-dy = {function="mse", weight=10}
-dz = {function='mean_absolute_error', weight=15}
-vx = {function='mean_absolute_error', weight=1}
-vy = {function='mean_absolute_error', weight=1}
-vz = {function='mean_absolute_error', weight=1}
-vt = {function='mean_absolute_error', weight=1e-10}
-e  = {function='mean_absolute_error'}
-by = {function='mean_absolute_error', weight=10}
 dx_err = {function='loss_uncertainty_mse'}
-dy_err = {function='loss_uncertainty_mse'}
-dz_err = {function='loss_uncertainty_mse', weight=1.25}
-vx_err = {function='loss_uncertainty_mse'}
-vy_err = {function='loss_uncertainty_mse'}
-vz_err = {function='loss_uncertainty_mse'}
-vt_err = {function='loss_uncertainty_mse', weight=1e-10}
-e_err  = {function='loss_uncertainty_mse', weight=1e-2}
-by_err = {function='loss_uncertainty_mse'}
-
-
-[orca_modifiers]
-label_modifier = 'energy_dir_bjorken-y_vtx_errors'

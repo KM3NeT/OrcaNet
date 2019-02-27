@@ -4,7 +4,7 @@ import numpy as np
 from keras import backend as K
 
 
-def build_double_inp():
+def build_double_inp(compile=False):
     inp_1 = Input((1,), name="inp_0")
     inp_2 = Input((1,), name="inp_1")
 
@@ -15,6 +15,11 @@ def build_double_inp():
     output_2 = Dense(2, name="out_1")(x)
 
     test_model = Model((inp_1, inp_2), (output_1, output_2))
+
+    if compile:
+        test_model.compile("adam", loss={"out_0": "mse", "out_1": "mse"},
+                           metrics={"out_0": "mae", "out_1": "mae"})
+
     return test_model
 
 

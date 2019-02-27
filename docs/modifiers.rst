@@ -12,10 +12,10 @@ You can get a batch of samples ``xs`` and ``mc_info`` data from your toml list f
 
 .. code-block:: python
 
-    from orcanet.core import OrcaHandler
+    from orcanet.core import Organizer
 
-    orca = OrcaHandler(output_folder, list_file)
-    xs, mc_info = orca.io.get_batch()
+    orga = Organizer(output_folder, list_file)
+    xs, mc_info = orga.io.get_batch()
 
 You can then apply your modifiers on them.
 
@@ -42,7 +42,7 @@ It can be set via
 
 .. code-block:: python
 
-    orca.cfg.label_modifier = label_modifier
+    orga.cfg.label_modifier = label_modifier
 
 **Hint:** If the names of the dtypes in the toml list file contain the names of the output layers, no sample modifier is required!
 
@@ -102,7 +102,7 @@ It can be set via
 
 .. code-block:: python
 
-    orca.cfg.sample_modifier = sample_modifier
+    orga.cfg.sample_modifier = sample_modifier
 
 **Hint:** If the names of the input sets in the toml list file and the names of the input layers match, no sample modifier is required!
 
@@ -145,7 +145,7 @@ The following sample modifier is required:
 
 Dataset modifier
 ----------------
-The dataset modifiers is only used when a model is evaluated with ``orca_eval``.
+The dataset modifiers is only used when a model is evaluated with ``orga.predict``.
 It will determine what is written in which dataset in the resulting evaluation h5 file.
 It must be of the following form:
 
@@ -175,6 +175,6 @@ It can be set via
 
 .. code-block:: python
 
-    orca.cfg.dataset_modifier = dataset_modifier
+    orga.cfg.dataset_modifier = dataset_modifier
 
 **Hint:** If no dataset modifier is given, the following datasets will be created: mc_info, and two sets for every output layer (label and pred).

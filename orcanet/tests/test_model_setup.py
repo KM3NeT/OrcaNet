@@ -4,7 +4,7 @@ from keras.layers import Input, Concatenate, Dropout, Dense
 import numpy as np
 from keras import backend as K
 
-from orcanet.orca_builder import change_dropout_rate
+from orcanet.model_builder import change_dropout_rate
 
 
 class TestDropoutChange(TestCase):
