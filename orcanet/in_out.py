@@ -7,9 +7,10 @@ Utility code regarding reading user input, and writing output like logfiles.
 import os
 import shutil
 import h5py
-from datetime import datetime
+import numpy as np
 
 from orcanet.utilities.nn_utilities import get_inputs
+from orcanet.utilities.visualization import plot_history
 
 
 class IOHandler(object):
@@ -19,13 +20,6 @@ class IOHandler(object):
     def __init__(self, cfg):
         self.cfg = cfg
 
-        self._subfolders = {
-            "train_log": self.cfg.output_folder + "train_log",
-            "saved_models": self.cfg.output_folder + "saved_models",
-            "plots": self.cfg.output_folder + "plots",
-            "activations": self.cfg.output_folder + "plots/activations",
-            "predictions": self.cfg.output_folder + "predictions",
-        }
         self._tmpdir_train_files = None
         self._tmpdir_val_files = None
 
@@ -128,15 +122,23 @@ class IOHandler(object):
             will be returned as a tuple.
 
         """
+        subfolders = {
+            "train_log": self.cfg.output_folder + "train_log",
+            "saved_models": self.cfg.output_folder + "saved_models",
+            "plots": self.cfg.output_folder + "plots",
+            "activations": self.cfg.output_folder + "plots/activations",
+            "predictions": self.cfg.output_folder + "predictions",
+        }
+
         def get(fdr):
-            subfdr = self._subfolders[fdr]
+            subfdr = subfolders[fdr]
             if create and not os.path.exists(subfdr):
                 print("Creating directory: " + subfdr)
                 os.makedirs(subfdr)
             return subfdr
 
         if name is None:
-            subfolder = [get(name) for name in self._subfolders]
+            subfolder = [get(name) for name in subfolders]
         else:
             subfolder = get(name)
         return subfolder
@@ -485,56 +487,185 @@ class IOHandler(object):
                     print(line)
 
 
-def log_start_training(orga):
+class HistoryHandler:
     """
-    Whenever the orga.train function is run, this logs all the input parameters
-    in the full log file.
-
-    Parameters
-    ----------
-    orga : object Organizer
-        Contains all the configurable options in the OrcaNet scripts.
-
+    For reading and plotting data from summary and train log files.
     """
-    lines = []
-    log = lines.append
+    def __init__(self, summary_file, train_log_folder):
+        self.summary_filename = summary_file
+        self.train_log_folder = train_log_folder
 
-    log('-'*60)
-    time = datetime.now().strftime('%Y-%m-%d  %H:%M:%S')
-    log('-'*19 + " {} ".format(time) + '-'*19)
-    log("New training run started with the following configuration:\n")
+    def plot_metric(self, metric_name, **kwargs):
+        """
+        Plot the training and validation history of a metric.
 
-    log("Output folder:\t" + orga.cfg.output_folder)
-    log("List file path:\t" + orga.cfg.get_list_file() + "\n")
+        This will read out data from the summary file, as well as
+        all training log files, and plot them over the epoch.
 
-    log("Given trainfiles in the .list file:")
-    for input_name, input_files in orga.cfg.get_files("train").items():
-        log(" " + input_name + ":")
-        [log("\t" + input_file) for input_file in input_files]
+        Parameters
+        ----------
+        metric_name : str
+            Name of the metric to be plotted over the epoch. This name is what
+            was written in the head line of the summary.txt file, except without
+            the train_ or val_ prefix.
+        kwargs
+            Keyword arguments for the plot_history function.
 
-    log("\nGiven validation files in the .list file:")
-    for input_name, input_files in orga.cfg.get_files("val").items():
-        log(" " + input_name + ":")
-        [log("\t" + input_file) for input_file in input_files]
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            The plot.
 
-    log("\nNon-default settings used:")
-    for key, value in vars(orga.cfg).items():
-        defaults = orga.cfg.get_defaults()
-        if key == "output_folder" or key.startswith("_") \
-                or value == defaults.get(key):
-            continue
-        log("   {}:\t{}".format(key, value))
+        """
+        summary_data = self.get_summary_data()
+        full_train_data = self.get_train_data()
+        summary_label = "val_" + metric_name
 
-    """
-    log("\nDefault settings used:")
-    for key, value in vars(orga.cfg).items():
-        defaults = orga.cfg.get_defaults()
-        if value == defaults.get(key):
-            log("   {}:\t{}".format(key, value))
-    """
+        if metric_name not in full_train_data.dtype.names:
+            raise ValueError(
+                "Train log metric name {} unknown, must be one of {}".format(
+                    metric_name, self.get_metrics()))
+        if summary_label not in summary_data.dtype.names:
+            raise ValueError(
+                "Summary metric name {} unknown, must be one of {}".format(
+                    summary_label, self.get_metrics()))
 
-    log("")
-    orga.io.print_log(lines)
+        if summary_data["Epoch"].shape == (0,):
+            # When no lines are present in the summary.txt file.
+            val_data = None
+        else:
+            val_data = [summary_data["Epoch"], summary_data[summary_label]]
+
+        if full_train_data["Batch_float"].shape == (0,):
+            # When no lines are present
+            raise ValueError("Can not make summary plot: Training log files "
+                             "contain no data!")
+        else:
+            train_data = [full_train_data["Batch_float"],
+                          full_train_data[metric_name]]
+
+        # if no validation has been done yet
+        if np.all(np.isnan(val_data)[1]):
+            val_data = None
+
+        if "y_label" not in kwargs:
+            kwargs["y_label"] = metric_name
+
+        fig = plot_history(train_data, val_data, **kwargs)
+        return fig
+
+    def plot_lr(self, **kwargs):
+        """
+        Plot the learning rate over the epochs.
+
+        Parameters
+        ----------
+        kwargs
+            Keyword arguments for the plot_history function.
+
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            The plot.
+
+        """
+        summary_data = self.get_summary_data()
+
+        epoch = summary_data["Epoch"]
+        lr = summary_data["LR"]
+        # plot learning rate like val data (connected dots)
+        val_data = (epoch, lr)
+
+        if "y_label" not in kwargs:
+            kwargs["y_label"] = "Learning rate"
+        if "legend" not in kwargs:
+            kwargs["legend"] = False
+
+        fig = plot_history(train_data=None, val_data=val_data, **kwargs)
+        return fig
+
+    def get_metrics(self):
+        """
+        Get the name of the metrics from the first line in the summary file.
+
+        This will be the actual name of the metric, i.e. "loss" and not
+        "train_loss" or "val_loss".
+
+        Returns
+        -------
+        all_metrics : List
+            A list of the metrics.
+
+        """
+        summary_data = self.get_summary_data()
+        all_metrics = []
+        for keyword in summary_data.dtype.names:
+            if keyword == "Epoch" or keyword == "LR":
+                continue
+            if "train_" in keyword:
+                keyword = keyword.split("train_")[-1]
+            else:
+                keyword = keyword.split("val_")[-1]
+            if keyword not in all_metrics:
+                all_metrics.append(keyword)
+        return all_metrics
+
+    def get_summary_data(self):
+        """
+        Read out the summary file in the output folder.
+
+        Returns
+        -------
+        summary_data : ndarray
+            Numpy structured array with the column names as datatypes.
+            Its shape is the number of lines with data.
+
+        """
+        summary_data = np.genfromtxt(self.summary_filename, names=True,
+                                     delimiter="|", autostrip=True,
+                                     comments="--")
+        if summary_data.shape == ():
+            # When only one line is present
+            summary_data = summary_data.reshape(1,)
+        return summary_data
+
+    def get_train_data(self):
+        """
+        Read out all training logfiles in the output folder.
+
+        Read out the data from the summary.txt file, and from all training
+        log files in the train_log folder, which is in the same directory
+        as the summary.txt file.
+
+        Returns
+        -------
+        summary_data : numpy.ndarray
+            Structured array containing the data from the summary.txt file.
+            Its shape is the number of lines with data.
+
+        """
+        # list of all files in the train_log folder of this model
+        files = os.listdir(self.train_log_folder)
+        train_file_data = []
+        for file in files:
+            if not (file.startswith("log_epoch_") and file.endswith(".txt")):
+                continue
+            # file is sth like "log_epoch_1_file_2.txt", extract the 1 and 2:
+            epoch, file_no = [int(file.split(".")[0].split("_")[i]) for i in [2, 4]]
+            file_data = np.genfromtxt(self.train_log_folder + "/" + file,
+                                      names=True, delimiter="\t")
+            train_file_data.append([[epoch, file_no], file_data])
+
+        # sort so that earlier epochs come first
+        train_file_data.sort()
+        full_train_data = train_file_data[0][1]
+        for [epoch, file_no], file_data in train_file_data[1:]:
+            full_train_data = np.append(full_train_data, file_data)
+
+        if full_train_data.shape == ():
+            # When only one line is present
+            full_train_data = full_train_data.reshape(1,)
+        return full_train_data
 
 
 def h5_get_number_of_rows(h5_filepath, datasets):
@@ -576,9 +707,10 @@ def h5_get_number_of_rows(h5_filepath, datasets):
 
 def use_local_tmpdir(train_files, val_files):
     """
-    Copies the test and train files to the node-local ssd scratch folder
-    and returns the new filepaths of the train and test data.
-    Speeds up I/O and reduces RRZE network load.
+    Copies the val and train files to the local temp folder.
+
+    Returns the new filepaths of the train and val data.
+    Speeds up I/O and reduces network load.
 
     Parameters
     ----------
