@@ -10,8 +10,246 @@ import toml
 import warnings
 
 from orcanet.backend import train_and_validate_model, make_model_prediction
-from orcanet.in_out import log_start_training, IOHandler
+from orcanet.in_out import IOHandler, HistoryHandler
 from orcanet.utilities.nn_utilities import load_zero_center_data, get_auto_label_modifier
+from orcanet.logging import log_start_training
+
+
+class Organizer:
+    """
+    Core class for working with networks in OrcaNet.
+
+    Attributes
+    ----------
+    cfg : Configuration
+        Contains all configurable options.
+    io : orcanet.in_out.IOHandler
+        Utility functions for accessing the info in cfg.
+    history : orcanet.in_out.HistoryHandler
+        For reading and plotting data from the log files created
+        during training.
+
+    """
+
+    def __init__(self, output_folder, list_file=None, config_file=None):
+        """
+        Set the attributes of the Configuration object.
+
+        Instead of using a config_file, the attributes of orga.cfg can
+        also be changed directly, e.g. by calling orga.cfg.batchsize.
+
+        Parameters
+        ----------
+        output_folder : str
+            Name of the folder of this model in which everything will be saved,
+            e.g., the summary.txt log file is located in here.
+            Will be used to load saved files or to save new ones.
+        list_file : str or None
+            Path to a toml list file with pathes to all the h5 files that should
+            be used for training and validation.
+            Will be used to extract of samples or labels.
+        config_file : str or None
+            Path to a toml config file with settings that are used instead of
+            the default ones.
+
+        """
+        self.cfg = Configuration(output_folder, list_file, config_file)
+        self.io = IOHandler(self.cfg)
+        self.history = HistoryHandler(self.cfg.output_folder + "summary.txt",
+                                      self.io.get_subfolder("train_log"))
+
+        self._xs_mean = None
+        self._auto_label_modifier = None
+
+    def train(self, model=None, force_model=False, epochs=None):
+        """
+        Train and validate a model.
+
+        The various settings of this process can be controlled with the
+        attributes of orca.cfg.
+        The model will be trained on the given data, saved and validated.
+        Logfiles of the training are saved in the output folder.
+        Plots showing the training and validation history, as well as
+        the weights and activations of the network are generated in
+        the plots subfolder after every validation.
+        The training can be resumed by executing this function again.
+
+        Parameters
+        ----------
+        model : ks.models.Model or None
+            Compiled keras model to use for training and validation. Required
+            only for the start of training. After the model was saved for
+            the first time, the most recent model will be loaded automatically
+            to continue the training.
+        force_model : bool
+            If true, the given model will be used to continue the training,
+            instead of loading the most recent saved one.
+        epochs : int or None
+            How many epochs should be trained by running this function.
+            None for infinite.
+
+        Returns
+        -------
+        model : ks.models.Model
+            The trained keras model.
+
+        """
+        if self.cfg.get_list_file() is None:
+            raise ValueError("No files specified. You need to load a toml "
+                             "list file with your files before training")
+
+        if self.cfg.filter_out_tf_garbage:
+            os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+
+        self.io.get_subfolder(create=True)
+
+        # the epoch of the currently existing model (or 0,0 if there is none)
+        latest_epoch = self.io.get_latest_epoch()
+        print(
+            "Set to epoch {} file {}.".format(latest_epoch[0], latest_epoch[1]))
+
+        if self.io.is_new():
+            if model is None:
+                raise ValueError("You need to provide a compiled keras model "
+                                 "for the start of the training! (You gave None)")
+            try:
+                ks.utils.plot_model(
+                    model, self.io.get_subfolder("plots") +
+                           "/model_epoch_{}_file_{}.png".format(*latest_epoch))
+            except OSError as e:
+                warnings.warn("Can not plot model: " + str(e))
+
+        elif force_model is True:
+            if model is None:
+                raise ValueError('You set "force_model" to True, but didnt '
+                                 'provide a model in "model" that should be used!')
+            print('Continuing training with user model (force_model=True)')
+        else:
+            # Load an existing model
+            if model is not None:
+                raise ValueError("You provided a model even though this is not "
+                                 "the start of the training.")
+            path_of_model = self.io.get_model_path(latest_epoch[0],
+                                                   latest_epoch[1])
+            print("Continuing training with saved model: " + path_of_model)
+            model = ks.models.load_model(path_of_model,
+                                         custom_objects=self.cfg.custom_objects)
+
+        if self.cfg.label_modifier is None:
+            self._auto_label_modifier = get_auto_label_modifier(model)
+
+        self.io.check_connections(model)
+
+        if self.cfg.use_scratch_ssd:
+            self.io.use_local_node()
+
+        # Set epoch to the next file (the one we are about to train)
+        next_epoch = self.io.get_next_epoch(latest_epoch)
+
+        log_start_training(self)
+
+        if self.cfg.zero_center_folder is not None:
+            # Make sure the xs_mean is calculated
+            self.get_xs_mean(logging=True)
+
+        trained_epochs = 0
+        while epochs is None or trained_epochs < epochs:
+            # Train on remaining files of an epoch
+            train_and_validate_model(self, model, next_epoch)
+            next_epoch = (next_epoch[0] + 1, 1)
+            trained_epochs += 1
+
+        return model
+
+    def predict(self, epoch=-1, fileno=-1):
+        """
+        Make a prediction if it does not exist yet, and return its filepath.
+
+        Load a model, let it predict on all samples of the validation set
+        in the toml list, and save this prediction together with all the
+        mc_info as a h5 file in the predictions subfolder.
+
+        Parameters
+        ----------
+        epoch : int
+            The epoch of the model to load for prediction
+            Can also give -1 to automatically load the most recent epoch
+            found in the main folder.
+        fileno : int
+            When using multiple files, define the file number for the
+            prediction, e.g. 1 for load the model trained on the first file.
+            Can also give -1 to automatically load the most recent fileno
+            from the given epoch found in the main folder.
+
+        Returns
+        -------
+        pred_filename : str
+            The path to the created prediction file.
+
+        """
+        if self.cfg.get_list_file() is None:
+            raise ValueError("No files specified. You need to load a toml list "
+                             "file before predicting or loading a prediction")
+
+        if self.cfg.filter_out_tf_garbage:
+            os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+
+        if fileno == -1:
+            epoch, fileno = self.io.get_latest_epoch(epoch)
+            print("Automatically set epoch to epoch {} file {}.".format(epoch,
+                                                                        fileno))
+
+        list_name = os.path.splitext(
+            os.path.basename(self.cfg.get_list_file()))[0]
+        pred_filename = self.io.get_pred_path(epoch, fileno, list_name)
+
+        if os.path.isfile(pred_filename):
+            print("Prediction has already been done.")
+        else:
+            if self.cfg.zero_center_folder is not None:
+                self.get_xs_mean()
+
+            if self.cfg.use_scratch_ssd:
+                self.io.use_local_node()
+
+            model = ks.models.load_model(
+                self.io.get_model_path(epoch, fileno),
+                custom_objects=self.cfg.custom_objects)
+
+            make_model_prediction(self, model, pred_filename, samples=None)
+
+        return pred_filename
+
+    def get_xs_mean(self, logging=False):
+        """
+        Set and return the zero center image for each list input.
+
+        Requires the cfg.zero_center_folder to be set. If no existing
+        image for the given input files is found in the folder, it will
+        be calculated and saved by averaging over all samples in the
+        train dataset.
+
+        Parameters
+        ----------
+        logging : bool
+            If true, the execution of this function will be logged into the
+            full summary in the output folder if called for the first time.
+
+        Returns
+        -------
+        dict
+            Dict of numpy arrays that contains the mean_image of the x dataset
+            (1 array per list input).
+            Example format:
+            { "input_A" : ndarray, "input_B" : ndarray }
+
+        """
+        if self.cfg.zero_center_folder is None:
+            raise ValueError("Can not calculate zero center: "
+                             "No zero center folder given")
+        if self._xs_mean is None:
+            self._xs_mean = load_zero_center_data(self, logging=logging)
+        return self._xs_mean
 
 
 class Configuration(object):
@@ -268,224 +506,3 @@ class Configuration(object):
     def get_defaults(self):
         """ Get the default values for all settings. """
         return self._default_values
-
-
-class Organizer:
-    """
-    Core class for working with networks in OrcaNet.
-    """
-    def __init__(self, output_folder, list_file=None, config_file=None):
-        """
-        Set the attributes of the Configuration object.
-
-        Instead of using a config_file, the attributes of orga.cfg can
-        also be changed directly, e.g. by calling orga.cfg.batchsize.
-
-        Parameters
-        ----------
-        output_folder : str
-            Name of the folder of this model in which everything will be saved,
-            e.g., the summary.txt log file is located in here.
-            Will be used to load saved files or to save new ones.
-        list_file : str or None
-            Path to a toml list file with pathes to all the h5 files that should
-            be used for training and validation.
-            Will be used to extract of samples or labels.
-        config_file : str or None
-            Path to a toml config file with settings that are used instead of
-            the default ones.
-
-        """
-        self.cfg = Configuration(output_folder, list_file, config_file)
-        self.io = IOHandler(self.cfg)
-
-        self._xs_mean = None
-        self._auto_label_modifier = None
-
-    def train(self, model=None, force_model=False, epochs=None):
-        """
-        Train and validate a model.
-
-        The various settings of this process can be controlled with the
-        attributes of orca.cfg.
-        The model will be trained on the given data, saved and validated.
-        Logfiles of the training are saved in the output folder.
-        Plots showing the training and validation history, as well as
-        the weights and activations of the network are generated in
-        the plots subfolder after every validation.
-        The training can be resumed by executing this function again.
-
-        Parameters
-        ----------
-        model : ks.models.Model or None
-            Compiled keras model to use for training and validation. Required
-            only for the start of training. After the model was saved for
-            the first time, the most recent model will be loaded automatically
-            to continue the training.
-        force_model : bool
-            If true, the given model will be used to continue the training,
-            instead of loading the most recent saved one.
-        epochs : int or None
-            How many epochs should be trained by running this function.
-            None for infinite.
-
-        Returns
-        -------
-        model : ks.models.Model
-            The trained keras model.
-
-        """
-        if self.cfg.get_list_file() is None:
-            raise ValueError("No files specified. You need to load a toml "
-                             "list file with your files before training")
-
-        if self.cfg.filter_out_tf_garbage:
-            os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-
-        self.io.get_subfolder(create=True)
-
-        # the epoch of the currently existing model (or 0,0 if there is none)
-        latest_epoch = self.io.get_latest_epoch()
-        print("Set to epoch {} file {}.".format(latest_epoch[0], latest_epoch[1]))
-
-        if self.io.is_new():
-            if model is None:
-                raise ValueError("You need to provide a compiled keras model "
-                                 "for the start of the training! (You gave None)")
-            try:
-                ks.utils.plot_model(
-                    model, self.io.get_subfolder("plots") +
-                    "/model_epoch_{}_file_{}.png".format(*latest_epoch))
-            except OSError as e:
-                warnings.warn("Can not plot model: " + str(e))
-
-        elif force_model is True:
-            if model is None:
-                raise ValueError('You set "force_model" to True, but didnt '
-                                 'provide a model in "model" that should be used!')
-            print('Continuing training with user model (force_model=True)')
-        else:
-            # Load an existing model
-            if model is not None:
-                raise ValueError("You provided a model even though this is not "
-                                 "the start of the training.")
-            path_of_model = self.io.get_model_path(latest_epoch[0], latest_epoch[1])
-            print("Continuing training with saved model: " + path_of_model)
-            model = ks.models.load_model(path_of_model,
-                                         custom_objects=self.cfg.custom_objects)
-
-        if self.cfg.label_modifier is None:
-            self._auto_label_modifier = get_auto_label_modifier(model)
-
-        self.io.check_connections(model)
-
-        if self.cfg.use_scratch_ssd:
-            self.io.use_local_node()
-
-        # Set epoch to the next file (the one we are about to train)
-        next_epoch = self.io.get_next_epoch(latest_epoch)
-
-        log_start_training(self)
-
-        if self.cfg.zero_center_folder is not None:
-            # Make sure the xs_mean is calculated
-            self.get_xs_mean(logging=True)
-
-        trained_epochs = 0
-        while epochs is None or trained_epochs < epochs:
-            # Train on remaining files of an epoch
-            train_and_validate_model(self, model, next_epoch)
-            next_epoch = (next_epoch[0]+1, 1)
-            trained_epochs += 1
-
-        return model
-
-    def predict(self, epoch=-1, fileno=-1):
-        """
-        Make a prediction if it does not exist yet, and return its filepath.
-
-        Load a model, let it predict on all samples of the validation set
-        in the toml list, and save this prediction together with all the
-        mc_info as a h5 file in the predictions subfolder.
-
-        Parameters
-        ----------
-        epoch : int
-            The epoch of the model to load for prediction
-            Can also give -1 to automatically load the most recent epoch
-            found in the main folder.
-        fileno : int
-            When using multiple files, define the file number for the
-            prediction, e.g. 1 for load the model trained on the first file.
-            Can also give -1 to automatically load the most recent fileno
-            from the given epoch found in the main folder.
-
-        Returns
-        -------
-        pred_filename : str
-            The path to the created prediction file.
-
-        """
-        if self.cfg.get_list_file() is None:
-            raise ValueError("No files specified. You need to load a toml list "
-                             "file before predicting or loading a prediction")
-
-        if self.cfg.filter_out_tf_garbage:
-            os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-
-        if fileno == -1:
-            epoch, fileno = self.io.get_latest_epoch(epoch)
-            print("Automatically set epoch to epoch {} file {}.".format(epoch,
-                                                                        fileno))
-
-        list_name = os.path.splitext(
-            os.path.basename(self.cfg.get_list_file()))[0]
-        pred_filename = self.io.get_pred_path(epoch, fileno, list_name)
-
-        if os.path.isfile(pred_filename):
-            print("Prediction has already been done.")
-        else:
-            if self.cfg.zero_center_folder is not None:
-                self.get_xs_mean()
-
-            if self.cfg.use_scratch_ssd:
-                self.io.use_local_node()
-
-            model = ks.models.load_model(
-                self.io.get_model_path(epoch, fileno),
-                custom_objects=self.cfg.custom_objects)
-
-            make_model_prediction(self, model, pred_filename, samples=None)
-
-        return pred_filename
-
-    def get_xs_mean(self, logging=False):
-        """
-        Set and return the zero center image for each list input.
-
-        Requires the cfg.zero_center_folder to be set. If no existing
-        image for the given input files is found in the folder, it will
-        be calculated and saved by averaging over all samples in the
-        train dataset.
-
-        Parameters
-        ----------
-        logging : bool
-            If true, the execution of this function will be logged into the
-            full summary in the output folder if called for the first time.
-
-        Returns
-        -------
-        dict
-            Dict of numpy arrays that contains the mean_image of the x dataset
-            (1 array per list input).
-            Example format:
-            { "input_A" : ndarray, "input_B" : ndarray }
-
-        """
-        if self.cfg.zero_center_folder is None:
-            raise ValueError("Can not calculate zero center: "
-                             "No zero center folder given")
-        if self._xs_mean is None:
-            self._xs_mean = load_zero_center_data(self, logging=logging)
-        return self._xs_mean

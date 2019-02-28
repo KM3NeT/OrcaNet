@@ -22,7 +22,22 @@ class DatasetTest(TestCase):
         dummy data in it and set up the cfg object.
 
         """
+        # Pathes
+        # Temporary output folder
         self.temp_dir = os.path.join(os.getcwd(), ".temp/")
+        self.output_folder = self.temp_dir + "model/"
+
+        # Pathes to temp dummy data that will get generated
+        train_inp = (self.temp_dir + "train1.h5", self.temp_dir + "train2.h5")
+        self.train_pathes = {"testing_input": train_inp}
+
+        val_inp = (self.temp_dir + "val1.h5", self.temp_dir + "val2.h5")
+        self.val_pathes = {"testing_input": val_inp}
+
+        # The config file to load
+        self.data_folder = os.path.join(os.path.dirname(__file__), "data")
+        config_file = os.path.join(self.data_folder, "config_test.toml")
+
         # Make sure temp dir does either not exist or is empty
         if os.path.exists(self.temp_dir):
             assert len(os.listdir(self.temp_dir)) == 0
@@ -31,19 +46,11 @@ class DatasetTest(TestCase):
 
         # Make dummy data of given shape
         self.shape = (3, 3, 3, 3)
-        train_inp = (self.temp_dir + "train1.h5", self.temp_dir + "train2.h5")
-        self.train_pathes = {"testing_input": train_inp}
-        val_inp = (self.temp_dir + "val1.h5", self.temp_dir + "val2.h5")
-        self.val_pathes = {"testing_input": val_inp}
         for path1, path2 in (train_inp, val_inp):
             make_dummy_data(path1, path2, self.shape)
 
-        # Set up the configuration object
-        config_file = os.path.join(os.path.dirname(__file__), "config_test.toml")
-        output_folder = self.temp_dir + "model/"
-
         def make_orga():
-            orga = Organizer(output_folder, config_file=config_file)
+            orga = Organizer(self.output_folder, config_file=config_file)
             orga.cfg._train_files = self.train_pathes
             orga.cfg._val_files = self.val_pathes
             orga.cfg._list_file = "test.toml"
@@ -77,7 +84,7 @@ class DatasetTest(TestCase):
         """
         orga = self.make_orga()
 
-        model_file = os.path.join(os.path.dirname(__file__), "model_test.toml")
+        model_file = os.path.join(self.data_folder, "model_test.toml")
         builder = ModelBuilder(model_file)
         initial_model = builder.build(orga)
 
@@ -99,7 +106,7 @@ class DatasetTest(TestCase):
 
     def test_model_setup_CNN_model(self):
         orga = self.make_orga()
-        model_file = os.path.join(os.path.dirname(__file__), "model_CNN.toml")
+        model_file = os.path.join(self.data_folder, "model_CNN.toml")
         builder = ModelBuilder(model_file)
         model = builder.build(orga)
 
@@ -117,7 +124,7 @@ class DatasetTest(TestCase):
             model = Model(inp, out)
             return model
 
-        model_file = os.path.join(os.path.dirname(__file__), "model_CNN.toml")
+        model_file = os.path.join(self.data_folder, "model_CNN.toml")
         builder = ModelBuilder(model_file)
         model1 = build_model("inp_A", self.shape)
         model2 = build_model("inp_B", self.shape)

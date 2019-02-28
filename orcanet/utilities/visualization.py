@@ -12,8 +12,11 @@ from matplotlib.backends.backend_pdf import PdfPages
 from orcanet.utilities.nn_utilities import get_layer_output
 
 
-def make_train_val_plot(train_data, val_data=None, color=None, title=None,
-                        y_label=None):
+def plot_history(
+        train_data, val_data=None,
+        color=None, title=None, x_label="Epoch", y_label=None, grid=True,
+        legend=True, train_label="training", val_label="validation",
+        x_lims=None, y_lims="auto", x_ticks=None):
     """
     Plot a training and optionally a validation line in a single plot.
 
@@ -24,15 +27,31 @@ def make_train_val_plot(train_data, val_data=None, color=None, title=None,
     train_data : List
         X data [0] and y data [1] of the train curve. Will be plotted as
         connected dots.
-    val_data : List or None
-        X data [0] and y data [1] of the validation curve. Will be plotted
-        as a faint solid line.
-    color : str or None
-        Colors used for the train/val line.
-    title : str or None
+    val_data : List
+        Optional X data [0] and y data [1] of the validation curve.
+        Will be plotted as a faint solid line of the same color as train.
+    color : str
+        Color used for the train/val line.
+    title : str
         Title of the plot.
-    y_label : str or None
+    x_label : str
+        X label of the plot.
+    y_label : str
         Y label of the plot.
+    grid : bool
+        If true, show a grid.
+    legend : bool
+        If true, show a legend.
+    train_label : str
+        Label for the train line in the legend.
+    val_label : str
+        Label for the validation line in the legend.
+    x_lims : List
+        X limits of the data.
+    y_lims : List or str
+        Y limits of the data. "auto" for auto-calculation.
+    x_ticks : List
+        Positions of the major x ticks.
 
     Returns
     -------
@@ -40,31 +59,47 @@ def make_train_val_plot(train_data, val_data=None, color=None, title=None,
         The plot.
 
     """
-    plt.ioff()
     fig, ax = plt.subplots()
-    train_label, val_label = 'training', 'validation'
+    if train_data is None and val_data is None:
+        raise ValueError("Can not plot when no train and val data is given.")
 
-    train_plot = plt.plot(train_data[0], train_data[1], color=color, ls='--',
-                          zorder=3, label=train_label, lw=0.6, alpha=0.5)
+    if train_data is not None:
+        train_plot = plt.plot(
+            train_data[0], train_data[1], color=color, ls='--',
+            zorder=3, label=train_label, lw=0.6, alpha=0.5)
+        train_color = train_plot[0].get_color()
+    else:
+        train_color = color
+
     if val_data is not None:
         # Skip over nan values, so that all dots are connected
         not_nan = ~np.isnan(val_data[1])
-        val_data[0] = val_data[0][not_nan]
-        val_data[1] = val_data[1][not_nan]
+        val_data = val_data[0][not_nan], val_data[1][not_nan]
         # val plot always has the same color as the train plot
-        plt.plot(val_data[0], val_data[1], color=train_plot[0].get_color(),
+        plt.plot(val_data[0], val_data[1], color=train_color,
                  marker='o', zorder=3, label=val_label)
 
-    plt.ylim(get_ylims(train_data, val_data, fraction=0.25))
-    plt.xticks(get_epoch_xticks(train_data, val_data))
+    if x_ticks is None:
+        x_ticks = get_epoch_xticks(train_data, val_data)
+    plt.xticks(x_ticks)
 
-    ax.legend(loc='upper right')
-    plt.xlabel('Epoch')
+    if x_lims is not None:
+        plt.xlim(x_lims)
+
+    if y_lims is not None:
+        if y_lims == "auto":
+            y_lims = get_ylims(train_data, val_data, fraction=0.25)
+        plt.ylim(y_lims)
+
+    if legend:
+        ax.legend(loc='upper right')
+    plt.xlabel(x_label)
     plt.ylabel(y_label)
     if title is not None:
         title = plt.title(title)
         title.set_position([.5, 1.04])
-    plt.grid(True, zorder=0, linestyle='dotted')
+    if grid:
+        plt.grid(True, zorder=0, linestyle='dotted')
 
     return fig
 
@@ -72,6 +107,12 @@ def make_train_val_plot(train_data, val_data=None, color=None, title=None,
 def get_ylims(train_data, val_data=None, fraction=0.25):
     """
     Get the y limits for the summary plot.
+
+    For the training data, limits are calculated while ignoring data points
+    which are far from the median (in terms of the median distance
+    from the median).
+    This is because there are outliers sometimes in the training data,
+    especially early on in the training.
 
     Parameters
     ----------
@@ -91,17 +132,40 @@ def get_ylims(train_data, val_data=None, fraction=0.25):
         Minimum, maximum of the data.
 
     """
-    y_train = train_data[1]
-    y_lims = np.amin(y_train), np.amax(y_train)
+    def reject_outliers(data, threshold):
+        d = np.abs(data - np.median(data))
+        mdev = np.median(d)
+        s = d / mdev if mdev else 0.
+        no_outliers = data[s < threshold]
+        lims = np.amin(no_outliers), np.amax(no_outliers)
+        return lims
+
+    mins, maxs = [], []
+    if train_data is not None:
+        y_train = train_data[1]
+        y_lims_train = reject_outliers(y_train, 5)
+        mins.append(y_lims_train[0])
+        maxs.append(y_lims_train[1])
 
     if val_data is not None:
         y_val = val_data[1]
-        y_lim_val = np.amin(y_val), np.amax(y_val)
-        y_lims = (np.amin([y_lim_val[0], y_lims[0]]),
-                  np.amax([y_lim_val[1], y_lims[1]]))
+
+        if len(y_val) == 1:
+            y_lim_val = y_val[0], y_val[0]
+        else:
+            y_lim_val = np.amin(y_val), np.amax(y_val)
+
+        mins.append(y_lim_val[0])
+        maxs.append(y_lim_val[1])
+
+    if len(mins) == 1:
+        y_lims = (mins[0], maxs[0])
+    else:
+        y_lims = np.amin(mins), np.amax(maxs)
 
     y_range = y_lims[1] - y_lims[0]
     y_lims = (y_lims[0] - fraction * y_range,  y_lims[1] + fraction * y_range)
+
     return y_lims
 
 
@@ -124,92 +188,25 @@ def get_epoch_xticks(train_data, val_data=None):
         Array containing the ticks.
 
     """
-    x_values = train_data[0]
-    if val_data is not None:
-        x_values = np.append(x_values, val_data[0])
+    x_points = np.array([])
 
-    minimum, maximum = np.amin(x_values), np.amax(x_values)
+    if train_data is not None:
+        x_points = np.append(x_points, train_data[0])
+    if val_data is not None:
+        x_points = np.append(x_points, val_data[0])
+
+    minimum, maximum = np.amin(x_points), np.amax(x_points)
     start_epoch, end_epoch = np.floor(minimum), np.ceil(maximum)
     # reduce number of x_ticks by factor of 2 if n_epochs > 20
     n_epochs = end_epoch - start_epoch
     x_ticks_stepsize = 1 + np.floor(n_epochs / 20.)
-    x_ticks_major = np.arange(start_epoch,
-                              end_epoch + x_ticks_stepsize, x_ticks_stepsize)
+    x_ticks_major = np.arange(
+        start_epoch, end_epoch + x_ticks_stepsize, x_ticks_stepsize)
 
     return x_ticks_major
 
 
-def plot_metric(summary_data, full_train_data, metric_name="loss",
-                title=None, color=None, y_label="loss"):
-    """
-    Plot and return the training and validation history of a metric over
-    the epochs in a single plot.
-
-    Parameters
-    ----------
-    summary_data : numpy.ndarray
-        Structured array containing the data from the summary.txt file.
-    full_train_data : numpy.ndarray
-        Structured array containing the data from all the training log files
-        from ./train_log/, merged into a single array.
-    metric_name : str
-        Name of the metric to be plotted over the epoch. This name is what
-        was written in the head line of the summary.txt file, except without
-        the train_ or val_ prefix.
-    title : str or None
-        Title of the plot.
-    color : None or str
-        The color of the train and val lines. If None is given, the default
-        color cycle is used.
-    y_label : str or None
-        Y label of the plot.
-
-    Returns
-    -------
-    fig : matplotlib.figure.Figure
-        The plot.
-
-    """
-    summary_label = "val_"+metric_name
-
-    assert metric_name in full_train_data.dtype.names, \
-        "Train log metric name {} unknown, must be one of {}".format(
-            metric_name, full_train_data.dtype.names)
-    assert summary_label in summary_data.dtype.names, \
-        "Summary metric name {} unknown, must be one of {}".format(
-            summary_label, summary_data.dtype.names)
-
-    if summary_data["Epoch"].shape == (0,):
-        # When no lines are present in the summary.txt file.
-        val_data = None
-    elif summary_data["Epoch"].shape == ():
-        # When only one line is present in the summary.txt file.
-        val_data = [summary_data["Epoch"].reshape(1),
-                    summary_data[summary_label].reshape(1)]
-    else:
-        val_data = [summary_data["Epoch"], summary_data[summary_label]]
-
-    if np.all(np.isnan(val_data)[1]):
-        val_data = None
-
-    if full_train_data["Batch_float"].shape == (0,):
-        # When no lines are present
-        raise ValueError("Can not make summary plot: Training log files "
-                         "contain no data!")
-    elif full_train_data["Batch_float"].shape == ():
-        # When only one line is present
-        train_data = [full_train_data["Batch_float"].reshape(1),
-                      full_train_data[metric_name].reshape(1)]
-    else:
-        train_data = [full_train_data["Batch_float"],
-                      full_train_data[metric_name]]
-
-    fig = make_train_val_plot(train_data, val_data, color=color, title=title,
-                              y_label=y_label)
-    return fig
-
-
-def plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name):
+def update_summary_plot(orga):
     """
     Plot and save all metrics of the given validation- and train-data
     into a pdf file, each metric in its own plot.
@@ -220,18 +217,15 @@ def plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name):
 
     Parameters
     ----------
-    summary_data : numpy.ndarray
-        Structured array containing the data from the summary.txt file.
-    full_train_data : numpy.ndarray
-        Structured array containing the data from all the training log files,
-        merged into a single array.
-    pdf_name : str
-        Where the pdf will get saved.
+    orga : object Organizer
+        Contains all the configurable options in the OrcaNet scripts.
 
     """
     plt.ioff()
+    pdf_name = orga.io.get_subfolder("plots", create=True) + "/summary_plot.pdf"
+
     # Extract the names of the metrics
-    all_metrics = get_all_metrics(summary_data)
+    all_metrics = orga.history.get_metrics()
     # Sort them
     all_metrics = sort_metrics(all_metrics)
     # Plot them w/ custom color cycle
@@ -244,28 +238,16 @@ def plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name):
             # If this metric is an err metric of a variable, color it the same
             if all_metrics[metric_no-1] == metric.replace("_err", ""):
                 color_counter -= 1
-            fig = plot_metric(summary_data, full_train_data,
-                              metric_name=metric, title=metric,
-                              color=colors[color_counter % len(colors)])
+            fig = orga.history.plot_metric(
+                metric, color=colors[color_counter % len(colors)])
             color_counter += 1
             pdf.savefig(fig)
             plt.close(fig)
 
-
-def get_all_metrics(summary_data):
-    """ Get the name of the metrics from the first file in the summary.txt
-    (not Epoch and LR. Also strip the train_ and val_) """
-    all_metrics = []
-    for keyword in summary_data.dtype.names:
-        if keyword == "Epoch" or keyword == "LR":
-            continue
-        if "train_" in keyword:
-            keyword = keyword.split("train_")[-1]
-        else:
-            keyword = keyword.split("val_")[-1]
-        if keyword not in all_metrics:
-            all_metrics.append(keyword)
-    return all_metrics
+        lr_fig = orga.history.plot_lr()
+        color_counter += 1
+        pdf.savefig(lr_fig)
+        plt.close(lr_fig)
 
 
 def sort_metrics(metric_names):

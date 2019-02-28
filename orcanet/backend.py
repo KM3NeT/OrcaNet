@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
 from orcanet.utilities.visualization import (
-    plot_all_metrics_to_pdf, plot_activations, plot_weights)
+    update_summary_plot, plot_activations, plot_weights)
 from orcanet.logging import SummaryLogger, BatchLogger
 
 # for debugging
@@ -413,27 +413,6 @@ def get_learning_rate(epoch, user_lr, no_train_files):
     except (ValueError, TypeError):
         raise TypeError("{} (You gave {} of type {}) ".format(
             error_msg, user_lr, type(user_lr)))
-
-
-def update_summary_plot(orga):
-    """
-    Refresh the summary plot of a model directory (plots/summary_plot.pdf).
-
-    Validation and Train-data will be read out automatically, and the loss
-    as well as every metric will be plotted in a seperate page in the pdf.
-
-    Parameters
-    ----------
-    orga : object Organizer
-        Contains all the configurable options in the OrcaNet scripts.
-
-    """
-    smry_logger = SummaryLogger(orga)
-    summary_data = smry_logger.get_summary_data()
-    full_train_data = smry_logger.get_train_data()
-
-    pdf_name = orga.io.get_subfolder("plots", create=True) + "/summary_plot.pdf"
-    plot_all_metrics_to_pdf(summary_data, full_train_data, pdf_name)
 
 
 def save_actv_wghts_plot(orga, model, epoch, samples=1):

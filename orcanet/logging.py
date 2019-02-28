@@ -1,17 +1,18 @@
 """
-Logging and keras Callback classes.
+Scripts for writing the logfiles.
 """
 
 import numpy as np
 import os
 import keras as ks
+from datetime import datetime
 
 
 class SummaryLogger:
     """
-    For managing the summary and training logfiles made during orga train.
+    For writing the summary logfile made during training.
     """
-    def __init__(self, orga, model=None):
+    def __init__(self, orga, model):
         """
         Init with the training files in orga, and metrics in the model.
 
@@ -20,11 +21,9 @@ class SummaryLogger:
         orga : object Organizer
             Contains all the configurable options in the OrcaNet scripts.
         model : ks.model.Model or None
-            Keras model containing the metrics to plot. Required for
-            writing new lines, but not for read-out.
+            Keras model containing the metrics to plot.
 
         """
-
         # Minimum width of the cells in characters.
         self.minimum_cell_width = 9
         # Precision to which floats are rounded if they appear in data.
@@ -33,50 +32,11 @@ class SummaryLogger:
         self.logfile_name = orga.cfg.output_folder + 'summary.txt'
         self.train_log_folder = orga.io.get_subfolder("train_log")
 
-        if model is not None:
-            self.metric_names = model.metrics_names
-            # calculate the fraction of samples per file compared to all files,
-            # e.g. [100, 50, 50] --> [0.5, 0.75, 1]
-            file_sizes = orga.io.get_file_sizes("train")
-            self.file_sizes_rltv = np.cumsum(file_sizes) / np.sum(file_sizes)
-        else:
-            self.metric_names = None
-            self.file_sizes_rltv = None
-
-    def _init_writing(self):
-        """
-        Get the widths of the columns, and write the head if the file is new.
-
-        The widths have the length of the metric names, but at least the
-        self.minimum_cell_width.
-
-        Returns
-        -------
-        widths : list
-            The width of every cell in characters.
-
-        """
-        if self.metric_names is None or self.file_sizes_rltv is None:
-            raise AttributeError("Can not write logfile: "
-                                 "No model given during initialization. ")
-        # content of the headline of the file
-        data = ["Epoch", "LR", ]
-        for i, metric_name in enumerate(self.metric_names):
-            data.append("train_" + str(metric_name))
-            data.append("val_" + str(metric_name))
-
-        headline, widths = self._get_line(data)
-        if not os.path.isfile(self.logfile_name) or \
-                os.stat(self.logfile_name).st_size == 0:
-            with open(self.logfile_name, 'a+') as logfile:
-                # Write the two headlines if the file is empty
-                logfile.write(headline + "\n")
-
-                vline = ["-" * width for width in widths]
-                vertical_line = self._get_line(vline, widths, seperator="-+-")
-                logfile.write(vertical_line + "\n")
-
-        return widths
+        self.metric_names = model.metrics_names
+        # calculate the fraction of samples per file compared to all files,
+        # e.g. [100, 50, 50] --> [0.5, 0.75, 1]
+        file_sizes = orga.io.get_file_sizes("train")
+        self.file_sizes_rltv = np.cumsum(file_sizes) / np.sum(file_sizes)
 
     def write_line(self, epoch, lr, history_train, history_val=None):
         """
@@ -100,22 +60,60 @@ class SummaryLogger:
 
         epoch_float = epoch[0]-1 + self.file_sizes_rltv[epoch[1]-1]
 
+        # Write the content: Epoch, LR, train_1, val_1, ...
+        data = [epoch_float, lr]
+        for i, metric_name in enumerate(self.metric_names):
+            data.append(history_train[metric_name])
+            if history_val is None:
+                data.append("nan")
+            else:
+                data.append(history_val[metric_name])
+
+        line = self._gen_line_str(data, widths)
+        self._save(line)
+
+    def _save(self, lines):
+        if isinstance(lines, str):
+            lines = [lines]
         with open(self.logfile_name, 'a+') as logfile:
-            # Write the content: Epoch, LR, train_1, val_1, ...
-            data = [epoch_float, lr]
-            for i, metric_name in enumerate(self.metric_names):
-                data.append(history_train[metric_name])
-                if history_val is None:
-                    data.append("nan")
-                else:
-                    data.append(history_val[metric_name])
+            for line in lines:
+                logfile.write(line + "\n")
 
-            line = self._get_line(data, widths)
-            logfile.write(line + '\n')
-
-    def _get_line(self, data, widths=None, seperator=" | "):
+    def _init_writing(self):
         """
-        Get a line in the proper format for the summary plot,
+        Get the widths of the columns, and write the head if the file is new.
+
+        The widths have the length of the metric names, but at least the
+        self.minimum_cell_width.
+
+        Returns
+        -------
+        widths : list
+            The width of every cell in characters.
+
+        """
+        if self.metric_names is None or self.file_sizes_rltv is None:
+            raise AttributeError("Can not write logfile: "
+                                 "No model given during initialization. ")
+        # content of the headline of the file
+        data = ["Epoch", "LR", ]
+        for i, metric_name in enumerate(self.metric_names):
+            data.append("train_" + str(metric_name))
+            data.append("val_" + str(metric_name))
+
+        headline, widths = self._gen_line_str(data)
+        if not os.path.isfile(self.logfile_name) or \
+                os.stat(self.logfile_name).st_size == 0:
+
+            vline = ["-" * width for width in widths]
+            vertical_line = self._gen_line_str(vline, widths, seperator="-+-")
+            self._save([headline, vertical_line])
+
+        return widths
+
+    def _gen_line_str(self, data, widths=None, seperator=" | "):
+        """
+        Generate a line in the proper format for the summary plot,
         consisting of multiple spaced and seperated cells.
 
         Parameters
@@ -167,53 +165,6 @@ class SummaryLogger:
             return line, new_widths
         else:
             return line
-
-    def get_summary_data(self):
-        """
-        Read out the summary file in the output folder.
-
-        Returns
-        -------
-        summary_data : ndarray
-            Numpy structured array with the column names as datatypes.
-
-        """
-        summary_data = np.genfromtxt(self.logfile_name, names=True,
-                                     delimiter="|", autostrip=True,
-                                     comments="--")
-        return summary_data
-
-    def get_train_data(self):
-        """
-        Read out all training logfiles in the output folder.
-
-        Read out the data from the summary.txt file, and from all training
-        log files in the train_log folder, which is in the same directory
-        as the summary.txt file.
-
-        Returns
-        -------
-        summary_data : numpy.ndarray
-            Structured array containing the data from the summary.txt file.
-
-        """
-        # list of all files in the train_log folder of this model
-        files = os.listdir(self.train_log_folder)
-        train_file_data = []
-        for file in files:
-            if not (file.startswith("log_epoch_") and file.endswith(".txt")):
-                continue
-            # file is sth like "log_epoch_1_file_2.txt", extract the 1 and 2:
-            epoch, file_no = [int(file.split(".")[0].split("_")[i]) for i in [2, 4]]
-            file_data = np.genfromtxt(self.train_log_folder + "/" + file,
-                                      names=True, delimiter="\t")
-            train_file_data.append([[epoch, file_no], file_data])
-
-        train_file_data.sort()
-        full_train_data = train_file_data[0][1]
-        for [epoch, file_no], file_data in train_file_data[1:]:
-            full_train_data = np.append(full_train_data, file_data)
-        return full_train_data
 
 
 class BatchLogger(ks.callbacks.Callback):
@@ -307,12 +258,12 @@ class BatchLogger(ks.callbacks.Callback):
             self.lines.append(line)
 
             flush = self.flush != -1 and self.display % self.flush == 0
-            self._write_lines(flush)
+            self._write_lines(flush=flush)
 
     def on_epoch_end(self, batch, logs=None):
         # on epoch end here means that this is called after one fit_generator
         # loop in Keras is finished, so after one file in our case.
-        self._write_lines(True)
+        self._write_lines(flush=True)
 
     def _write_lines(self, flush=False):
         """ Write lines in self.lines and empty it. """
@@ -332,6 +283,58 @@ class BatchLogger(ks.callbacks.Callback):
                 file.write(metric)
                 if i + 1 < len(self.model.metrics_names):
                     file.write('\t')
+
+
+def log_start_training(orga):
+    """
+    Whenever the orga.train function is run, this logs all the input parameters
+    in the full log file.
+
+    Parameters
+    ----------
+    orga : object Organizer
+        Contains all the configurable options in the OrcaNet scripts.
+
+    """
+    lines = []
+    log = lines.append
+
+    log('-'*60)
+    time = datetime.now().strftime('%Y-%m-%d  %H:%M:%S')
+    log('-'*19 + " {} ".format(time) + '-'*19)
+    log("New training run started with the following configuration:\n")
+
+    log("Output folder:\t" + orga.cfg.output_folder)
+    log("List file path:\t" + orga.cfg.get_list_file() + "\n")
+
+    log("Given trainfiles in the .list file:")
+    for input_name, input_files in orga.cfg.get_files("train").items():
+        log(" " + input_name + ":")
+        [log("\t" + input_file) for input_file in input_files]
+
+    log("\nGiven validation files in the .list file:")
+    for input_name, input_files in orga.cfg.get_files("val").items():
+        log(" " + input_name + ":")
+        [log("\t" + input_file) for input_file in input_files]
+
+    log("\nNon-default settings used:")
+    for key, value in vars(orga.cfg).items():
+        defaults = orga.cfg.get_defaults()
+        if key == "output_folder" or key.startswith("_") \
+                or value == defaults.get(key):
+            continue
+        log("   {}:\t{}".format(key, value))
+
+    """
+    log("\nDefault settings used:")
+    for key, value in vars(orga.cfg).items():
+        defaults = orga.cfg.get_defaults()
+        if value == defaults.get(key):
+            log("   {}:\t{}".format(key, value))
+    """
+
+    log("")
+    orga.io.print_log(lines)
 
 
 # class TensorBoardWrapper(ks.callbacks.TensorBoard):
