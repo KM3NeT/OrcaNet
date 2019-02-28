@@ -333,7 +333,7 @@ class IOHandler(object):
 
         Raises
         ------
-        AssertionError
+        ValueError
             If they dont work together.
 
         """
@@ -435,7 +435,7 @@ class IOHandler(object):
 
         err_msg = err_msg_inp + err_msg_out
         if err_msg != "":
-            raise AssertionError(err_msg)
+            raise ValueError(err_msg)
 
     def get_batch(self):
         """ For testing purposes, return a batch of samples and mc_infos. """

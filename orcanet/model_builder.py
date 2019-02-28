@@ -213,17 +213,17 @@ class ModelBuilder:
         """
         Compile a model with the optimizer settings given as the attributes.
 
-        Returns
-        -------
+        Parameters
+        ----------
         model : ks.model
-            A compile keras model.
+            A keras model.
         custom_objects : dict or None
             Maps names (strings) to custom loss functions.
 
         Returns
         -------
         model : keras model
-            The compiled keras model.
+            The compiled (or recompiled) keras model.
 
         """
         if self.optimizer == 'adam':
