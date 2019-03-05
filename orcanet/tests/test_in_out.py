@@ -10,6 +10,7 @@ class TestHistoryHandler(TestCase):
         self.output_folder = os.path.join(os.path.dirname(__file__),
                                           "data", "dummy_model")
         self.summary_filename = os.path.join(self.output_folder, "summary.txt")
+        self.summary_filename_2 = os.path.join(self.output_folder, "summary_2.txt")
         self.train_log_folder = os.path.join(self.output_folder, "train_log")
 
         self.history = HistoryHandler(self.summary_filename,
@@ -39,6 +40,24 @@ class TestHistoryHandler(TestCase):
             dtype=[('Batch', '<f8'), ('Batch_float', '<f8'),
                    ('loss', '<f8'), ('acc', '<f8')])
         assert_equal_struc_array(train_data, target)
+
+    def test_get_column_names(self):
+        column_names = self.history.get_column_names()
+        target = ('Epoch', 'LR', 'train_loss', 'val_loss', 'train_acc', 'val_acc')
+        self.assertSequenceEqual(column_names, target)
+
+    def test_get_state(self):
+        self.history = HistoryHandler(self.summary_filename_2,
+                                      self.train_log_folder)
+        state = self.history.get_state()
+        print(state)
+        target = [
+            {'epoch': 0.1, 'is_trained': True, 'is_validated': True},
+            {'epoch': 0.2, 'is_trained': False, 'is_validated': True},
+            {'epoch': 0.3, 'is_trained': True, 'is_validated': False},
+            {'epoch': 0.4, 'is_trained': False, 'is_validated': False},
+        ]
+        self.assertSequenceEqual(state, target)
 
 
 def assert_equal_struc_array(a, b):

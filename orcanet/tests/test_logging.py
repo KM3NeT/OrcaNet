@@ -1,0 +1,195 @@
+from unittest import TestCase
+from unittest.mock import MagicMock
+import os
+from keras.models import Model
+from keras.layers import Input, Dense
+import numpy as np
+import shutil
+
+from orcanet.logging import SummaryLogger, merge_arrays, BatchLogger
+from orcanet.core import Organizer
+
+
+class TestSummaryLogger(TestCase):
+    def setUp(self):
+        self.temp_dir = os.path.join(os.path.dirname(__file__), ".temp")
+        self.summary_file = os.path.join(self.temp_dir, "summary.txt")
+
+        self.orga = Organizer(self.temp_dir)
+        self.orga.io.get_file_sizes = MagicMock(return_value=[100, 100])
+        model = build_test_model()
+        self.smry = SummaryLogger(self.orga, model)
+
+        self.metrics = model.metrics_names
+
+    def test_writing_integration(self):
+        history_train_0 = dict(zip(self.metrics, [0.0, 0.5]))
+        history_train_1 = dict(zip(self.metrics, [1.0, 1.5]))
+        history_val = dict(zip(self.metrics, [2.0, 2.5]))
+
+        target = [
+            "Epoch     | LR        | train_loss | val_loss  | train_mean_absolute_error | val_mean_absolute_error\n",
+            "----------+-----------+------------+-----------+---------------------------+------------------------\n",
+            "0.5       | 0.001     | 0          | nan       | 0.5                       | nan                    \n",
+            "1         | 0.002     | 1          | nan       | 1.5                       | nan                    \n",
+        ]
+        filled_line = "1         | 0.002     | 1          | 2         | 1.5                       | 2.5                    \n"
+
+        def check_file(target_lines):
+            with open(self.summary_file) as file:
+                for i, line in enumerate(file):
+                    self.assertEqual(target_lines[i], line)
+
+        epoch = (1, 1)
+        lr = 0.001
+        self.smry.write_line(self.orga.io.get_epoch_float(*epoch), lr,
+                             history_train=history_train_0)
+        check_file(target)
+
+        epoch = (1, 2)
+        lr = 0.002
+        self.smry.write_line(self.orga.io.get_epoch_float(*epoch), lr,
+                             history_train=history_train_1)
+        check_file(target)
+
+        target[-1] = filled_line
+        self.smry.write_line(self.orga.io.get_epoch_float(*epoch), lr,
+                             history_val=history_val)
+        check_file(target)
+
+        check_file(target)
+
+    def tearDown(self):
+        os.remove(self.summary_file)
+
+
+class TestLoggingUtil(TestCase):
+    def test_merge_arrays(self):
+        a = [1, 2, np.nan, np.nan, "nan", np.nan]
+        b = [np.nan, 2, np.nan, 3, 4, "nan"]
+        target = [1, 2, np.nan, 3, 4, "nan"]
+        merged = merge_arrays(a, b)
+        self.assertSequenceEqual(merged, target)
+
+    def test_merge_arrays_error(self):
+        a = [1, 1]
+        b = [2, 1]
+        with self.assertRaises(ValueError):
+            merge_arrays(a, b)
+
+    def test_merge_arrays_exclude(self):
+        a = [1, 1]
+        b = [2, 1]
+        target = [1, 1]
+        merged = merge_arrays(a, b, 0)
+        self.assertSequenceEqual(merged, target)
+
+
+class TestBatchLogger(TestCase):
+    def setUp(self):
+        self.temp_dir = os.path.join(os.path.dirname(__file__), ".temp",
+                                     "batch_logger")
+
+        self.model = build_test_model()
+        samples_file1 = 40
+        samples_file2 = 60
+        self.data_file1 = get_test_data(samples_file1)
+        self.data_file2 = get_test_data(samples_file2)
+
+        self.orga = Organizer(self.temp_dir)
+        self.orga.io.get_file_sizes = MagicMock(return_value=[samples_file1,
+                                                              samples_file2])
+        self.orga.io.get_subfolder("train_log", create=True)
+
+        self.orga.cfg.batchsize = 10
+        self.orga.cfg.train_logger_display = 4
+
+    def tearDown(self):
+        """ Remove the .temp directory. """
+        shutil.rmtree(self.temp_dir)
+
+    def test_batch_logger_epoch_1_logfile_1(self):
+        epoch = (1, 1)
+        lines = self._make_and_get_lines(epoch)
+        print(lines)
+        target_file1 = [
+            'Batch\tBatch_float\tloss\tmean_absolute_error\n',
+            '4\t0.2\t0.25\t0.5\n',
+        ]
+        for line_no in range(len(lines)):
+            self.assertEqual(target_file1[line_no], lines[line_no])
+
+    def test_batch_logger_epoch_1_logfile_2(self):
+        epoch = (1, 2)
+        lines = self._make_and_get_lines(epoch)
+        target_file1 = [
+            'Batch\tBatch_float\tloss\tmean_absolute_error\n',
+            '4\t0.6\t0.25\t0.5\n',
+            '6\t0.8\t0.125\t0.25\n',
+        ]
+        print(lines)
+        for line_no in range(len(lines)):
+            self.assertEqual(target_file1[line_no], lines[line_no])
+
+    def test_batch_logger_epoch_2_logfile_1(self):
+        epoch = (2, 1)
+        lines = self._make_and_get_lines(epoch)
+        target_file1 = [
+            'Batch\tBatch_float\tloss\tmean_absolute_error\n',
+            '4\t1.2\t0.25\t0.5\n'
+        ]
+        print(lines)
+        for line_no in range(len(lines)):
+            self.assertEqual(target_file1[line_no], lines[line_no])
+
+    def _make_and_get_lines(self, epoch):
+        batch_logger = BatchLogger(self.orga, epoch)
+
+        if epoch[1] == 1:
+            train_file = self.data_file1
+        elif epoch[1] == 2:
+            train_file = self.data_file2
+        else:
+            raise AssertionError(epoch)
+
+        self.model.fit(train_file[0], train_file[1],
+                       batch_size=self.orga.cfg.batchsize,
+                       callbacks=[batch_logger], verbose=0)
+        logfile_path = '{}/log_epoch_{}_file_{}.txt'.format(
+            os.path.join(self.temp_dir, "train_log"),
+            epoch[0], epoch[1])
+
+        with open(logfile_path) as file:
+            lines = file.readlines()
+        return lines
+
+
+def build_test_model():
+    input_shape = (1,)
+    inp = Input(input_shape, name="inp")
+    x = Dense(1, kernel_initializer="Ones",
+              bias_initializer="Zeros", trainable=False)(inp)
+    outp = Dense(1, name="out", kernel_initializer="Ones",
+                 bias_initializer="Zeros", trainable=False)(x)
+
+    test_model = Model(inp, outp)
+    test_model.compile("sgd", loss={"out": "mse"}, metrics={"out": "mae"})
+
+    return test_model
+
+
+def get_test_data(samples):
+    """
+    Make model input data.
+
+    xs : [0.5, ]
+    ys : [1, ]
+
+    MSE: 1/4
+    MAE: 1/2
+
+    """
+    dtypes = [('inp', '<f8'), ]
+    xs = np.ones(samples,) * 0.5
+    ys = np.ones((samples, 1)).ravel().view(dtype=dtypes)
+    return xs, ys

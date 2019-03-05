@@ -7,6 +7,7 @@ Code for training and validating NN's, as well as evaluating them.
 import os
 from inspect import signature
 import keras.backend as K
+from keras.models import load_model
 import h5py
 from contextlib import ExitStack
 import numpy as np
@@ -15,14 +16,14 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 from orcanet.utilities.visualization import (
     update_summary_plot, plot_activations, plot_weights)
-from orcanet.logging import SummaryLogger, BatchLogger
+from orcanet.logging import SummaryLogger, BatchLogger, log_start_validation
 
 # for debugging
 # from tensorflow.python import debug as tf_debug
 # K.set_session(tf_debug.LocalCLIDebugWrapperSession(tf.Session()))
 
 
-def train_and_validate_model(orga, model, next_epoch):
+def train_and_validate_model(orga, model, epoch):
     """
     Train a model for one epoch, i.e. on all (remaining) train files once.
 
@@ -30,6 +31,7 @@ def train_and_validate_model(orga, model, next_epoch):
     on the provided training and validation files for one epoch. The model
     is saved with an automatically generated filename based on the epoch,
     log files are written and summary plots are made.
+    Will also make a validation for the previous fileno if missing.
 
     Parameters
     ----------
@@ -37,80 +39,48 @@ def train_and_validate_model(orga, model, next_epoch):
         Contains all the configurable options in the OrcaNet scripts.
     model : ks.Models.model
         Compiled keras model to use for training and validating.
-    next_epoch : tuple
+    epoch : tuple
         Upcoming epoch and file number, aka the epoch/fileno that will
-        be trained and saved now.
+        be trained now.
 
     """
-    smry_logger = SummaryLogger(orga, model)
     n_train_files = orga.io.get_no_of_files("train")
-    for file_no in range(next_epoch[1], n_train_files + 1):
+
+    if not (epoch[0] == 1 and epoch[1] == 1):
+        # check if the validation is missing for the previous fileno
+        prev_epoch = orga.io.get_previous_epoch(epoch)
+        prev_state = orga.history.get_state()[-1]
+
+        if prev_state["is_validated"] is False:
+            if prev_epoch[1] == n_train_files or \
+                    (orga.cfg.validate_interval is not None and
+                     prev_epoch[1] % orga.cfg.validate_interval == 0):
+                validate_model(orga, model)
+
+    for file_no in range(epoch[1], n_train_files + 1):
         # Only the file number changes during training, as this function
-        # trains only for one epoch. Both epoch and fileno start from 1!
-        curr_epoch = (next_epoch[0], file_no)
+        # trains only for one epoch.
+        train_model(orga, model)
 
-        # -------------------- TRAINING -----------------------------
-        # update lr, train, save, make history_train
-        line = "Training in epoch {} on file {}/{}".format(curr_epoch[0],
-                                                           curr_epoch[1],
-                                                           n_train_files)
-        orga.io.print_log(line)
-        orga.io.print_log("-" * len(line))
-
-        lr = get_learning_rate(curr_epoch, orga.cfg.learning_rate,
-                               orga.io.get_no_of_files("train"))
-        K.set_value(model.optimizer.lr, lr)
-        orga.io.print_log("Learning rate is at {}".format(
-            K.get_value(model.optimizer.lr)))
-
-        # Train the model on one file and save it afterwards
-        model_filename = orga.io.get_model_path(curr_epoch[0], curr_epoch[1])
-        if os.path.isfile(model_filename):
-            raise NameError("Can not train model in epoch {} file {}, "
-                            "this model has already been trained and "
-                            "saved!".format(curr_epoch[0], curr_epoch[1]))
-        history_train = train_model(orga, model, curr_epoch)
-        model.save(model_filename)
-        orga.io.print_log("Saved model to " + model_filename + "\n")
-
-        # ------------------- VALIDATION ----------------------------
-        # validate and make activation_and_weights plots
-
-        # Validate after every n-th file
-        if curr_epoch[1] == n_train_files or \
+        if file_no == n_train_files or \
                 (orga.cfg.validate_interval is not None and
-                 curr_epoch[1] % orga.cfg.validate_interval == 0):
-            line = "Validation"
-            orga.io.print_log(line)
-            orga.io.print_log("-" * len(line))
-            history_val = validate_model(orga, model)
-            save_actv_wghts_plot(orga, model, curr_epoch,
-                                 samples=orga.cfg.batchsize)
-            orga.io.print_log("")
-        else:
-            history_val = None
-
-        # ------------------- LOGGING ----------------------------
-        # write logfiles and make summary plot
-
-        smry_logger.write_line(curr_epoch, lr, history_train, history_val)
-        update_summary_plot(orga)
+                 file_no % orga.cfg.validate_interval == 0):
+            validate_model(orga, model)
 
 
-def train_model(orga, model, curr_epoch):
+def train_model(orga, model=None):
     """
-    Trains a model on one file based on the Keras fit_generator method.
+    Trains a model on the next file.
 
-    The progress of the training is also logged.
+    The progress of the training is also logged and plotted.
 
     Parameters
     ----------
     orga : object Organizer
         Contains all the configurable options in the OrcaNet scripts.
     model : ks.model.Model
-        Keras model instance of a neural network.
-    curr_epoch : tuple(int, int)
-        The number of the current epoch and the current filenumber.
+        If not None, uses this keras model instead of loading the saved one
+        from the previous fileno.
 
     Returns
     -------
@@ -119,21 +89,49 @@ def train_model(orga, model, curr_epoch):
         loss values and metrics values.
 
     """
-    assert curr_epoch[1] > 0, "fileno is {}".format(curr_epoch[1])
+    # latest epoch with saved model
+    latest_epoch = orga.io.get_latest_epoch()
+    # epoch about to be trained
+    next_epoch = orga.io.get_next_epoch(latest_epoch)
+    next_epoch_float = orga.io.get_epoch_float(*next_epoch)
 
-    files_dict = orga.io.get_file("train", curr_epoch[1] - 1)
+    model_path = orga.io.get_model_path(*next_epoch)
+    if os.path.isfile(model_path):
+        raise FileExistsError(
+            "Can not train model in epoch {} file {}, this model has "
+            "already been trained and saved!".format(*next_epoch))
+
+    if model is None:
+        latest_model_path = orga.io.get_model_path(*latest_epoch)
+        model = load_model(latest_model_path,
+                           custom_objects=orga.cfg.custom_objects)
+
+    n_train_files = orga.io.get_no_of_files("train")
+    smry_logger = SummaryLogger(orga, model)
+
     if orga.cfg.n_events is not None:
         # TODO Can throw an error if n_events is larger than the file
         f_size = orga.cfg.n_events  # for testing purposes
     else:
-        f_size = orga.io.get_file_sizes("train")[curr_epoch[1] - 1]
+        f_size = orga.io.get_file_sizes("train")[next_epoch[1] - 1]
 
+    lr = get_learning_rate(next_epoch, orga.cfg.learning_rate, n_train_files)
+    K.set_value(model.optimizer.lr, lr)
+
+    files_dict = orga.io.get_file("train", next_epoch[1] - 1)
+
+    line = "Training in epoch {} on file {}/{}".format(
+        next_epoch[0], next_epoch[1], n_train_files)
+    orga.io.print_log(line)
+    orga.io.print_log("-" * len(line))
+    orga.io.print_log("Learning rate is at {}".format(
+        K.get_value(model.optimizer.lr)))
     orga.io.print_log('Inputs and files:')
     for input_name, input_file in files_dict.items():
         orga.io.print_log("   {}: \t{}".format(input_name,
                                                os.path.basename(input_file)))
 
-    callbacks = [BatchLogger(orga, curr_epoch), ]
+    callbacks = [BatchLogger(orga, next_epoch), ]
     if orga.cfg.callback_train is not None:
         try:
             callbacks.extend(orga.cfg.callback_train)
@@ -151,32 +149,39 @@ def train_model(orga, model, curr_epoch):
         verbose=orga.cfg.verbose_train,
         max_queue_size=orga.cfg.max_queue_size,
         callbacks=callbacks,
-        initial_epoch=curr_epoch[0],
-        epochs=curr_epoch[0]+1,
+        initial_epoch=next_epoch[0],
+        epochs=next_epoch[0]+1,
     )
+    model.save(model_path)
+
     # get a dict with losses and metrics
     # only trained for one epoch, so value is list of len 1
     history = {key: value[0] for key, value in history.history.items()}
+    smry_logger.write_line(next_epoch_float, lr, history_train=history)
 
     orga.io.print_log('Training results:')
     for metric_name, loss in history.items():
         orga.io.print_log("   {}: \t{}".format(metric_name, loss))
+    orga.io.print_log("Saved model to " + model_path + "\n")
+
+    update_summary_plot(orga)
 
     return history
 
 
-def validate_model(orga, model):
+def validate_model(orga, model=None):
     """
-    Validates a model on all the validation datafiles.
+    Validates the latest saved model on all the validation datafiles.
 
-    This is usually done after a session of training has been finished.
+    Will also log the progress, as well as update the summary plot and
+    plot weights and activations of the model.
 
     Parameters
     ----------
     orga : object Organizer
         Contains all the configurable options in the OrcaNet scripts.
     model : ks.model.Model
-        Keras model instance of a neural network.
+        If not None, uses this keras model instead of loading the saved one.
 
     Returns
     -------
@@ -185,15 +190,14 @@ def validate_model(orga, model):
         loss values and metrics values.
 
     """
-    lines = ['Inputs and files:', ]
-    for input_name, input_files in orga.io.get_local_files("val").items():
-        line = "   " + input_name + ":\t"
-        for i, input_file in enumerate(input_files):
-            if i != 0:
-                line += ", "
-            line += os.path.basename(input_file)
-        lines.append(line)
-    orga.io.print_log(lines)
+    epoch = orga.io.get_latest_epoch()
+    epoch_float = orga.io.get_epoch_float(*epoch)
+    if model is None:
+        model_path = orga.io.get_model_path(*epoch)
+        model = load_model(model_path, custom_objects=orga.cfg.custom_objects)
+    smry_logger = SummaryLogger(orga, model)
+
+    log_start_validation(orga)
 
     # One history for each val file
     histories = []
@@ -227,6 +231,11 @@ def validate_model(orga, model):
     orga.io.print_log('Validation results:')
     for metric_name, loss in history_val.items():
         orga.io.print_log("   {}: \t{}".format(metric_name, loss))
+    orga.io.print_log("")
+    smry_logger.write_line(epoch_float, np.nan, history_val=history_val)
+
+    update_summary_plot(orga)
+    save_actv_wghts_plot(orga, model, epoch, samples=orga.cfg.batchsize)
 
     return history_val
 
