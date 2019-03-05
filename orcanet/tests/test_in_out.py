@@ -2,7 +2,33 @@ from unittest import TestCase
 import os
 import numpy as np
 
-from orcanet.in_out import HistoryHandler
+from orcanet.core import Configuration
+from orcanet.in_out import HistoryHandler, IOHandler
+
+
+class TestIOHandler(TestCase):
+    def setUp(self):
+        self.temp_dir = os.path.join(os.path.dirname(__file__), ".temp")
+        self.output_folder = os.path.join(os.path.dirname(__file__),
+                                          "data", "dummy_model")
+
+        output_folder = self.temp_dir
+        list_file = None
+        config_file = None
+        cfg = Configuration(output_folder, list_file, config_file)
+
+        self.io = IOHandler(cfg)
+
+    def test_get_latest_epoch(self):
+        value = self.io.get_latest_epoch()
+        target = (2, 1)
+        self.assertSequenceEqual(value, target)
+
+    def test_get_latest_epoch_epoch_1(self):
+        value = self.io.get_latest_epoch(epoch=1)
+        target = (1, 2)
+        self.assertSequenceEqual(value, target)
+
 
 
 class TestHistoryHandler(TestCase):
