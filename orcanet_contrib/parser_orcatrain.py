@@ -64,7 +64,7 @@ def orca_train(output_folder, list_file, config_file, model_file,
 
     # If this is the start of the training, a compiled model needs to be
     # handed to the orga.train function
-    if orga.io.is_new():
+    if orga.io.get_latest_epoch() is None:
         # The ModelBuilder class allows to construct models from a toml file,
         # adapted to the datasets in the orga instance. Its modifiers will
         # be taken into account for this
@@ -88,7 +88,7 @@ def orca_train(output_folder, list_file, config_file, model_file,
                                                  orga.io.get_no_of_files("train"))
 
     # start the training
-    orga.train(model=model, force_model=recompile_model)
+    orga.train_and_validate(model=model, force_model=recompile_model)
 
 
 def parse_input():

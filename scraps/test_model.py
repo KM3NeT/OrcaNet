@@ -40,7 +40,8 @@ def get_xs(model, batchsize=1):
     shapes = model.input_shape
     if len(model.input_names) == 1:
         shapes = [shapes, ]
-    xs = {model.input_names[i]: np.ones([batchsize, ] + list(shapes[i][1:])) for i in range(len(model.input_names))}
+    xs = {model.input_names[i]: np.ones([batchsize, ] + list(shapes[i][1:]))
+          for i in range(len(model.input_names))}
     return xs
 
 
@@ -52,7 +53,8 @@ def dropout_test():
         return model
 
     def get_layer_output(model, xs, which=-1):
-        l_out = K.function([model.layers[0].input, K.learning_phase()], [model.layers[which].output])
+        l_out = K.function([model.layers[0].input, K.learning_phase()],
+                           [model.layers[which].output])
         # output in train mode = 1
         layer_output = l_out([xs, 1])[0]
         return layer_output

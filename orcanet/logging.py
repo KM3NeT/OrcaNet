@@ -6,6 +6,7 @@ import numpy as np
 import os
 import keras as ks
 from datetime import datetime
+from shutil import move
 
 
 class SummaryLogger:
@@ -30,54 +31,105 @@ class SummaryLogger:
         self.float_precision = 4
 
         self.logfile_name = orga.cfg.output_folder + 'summary.txt'
-        self.train_log_folder = orga.io.get_subfolder("train_log")
+        self.temp_filepath = orga.cfg.output_folder + "/.temp_summary.txt"
+        self.orga = orga
 
         self.metric_names = model.metrics_names
-        # calculate the fraction of samples per file compared to all files,
-        # e.g. [100, 50, 50] --> [0.5, 0.75, 1]
-        file_sizes = orga.io.get_file_sizes("train")
-        self.file_sizes_rltv = np.cumsum(file_sizes) / np.sum(file_sizes)
+        self.column_names = self._get_column_names()
 
-    def write_line(self, epoch, lr, history_train, history_val=None):
+    def write_line(self, epoch_float, lr, history_train=None, history_val=None):
         """
         Write a line to the summary.txt file in every trained model folder.
 
         Parameters
         ----------
-        epoch : tuple(int, int)
-            The number of the current epoch and the current filenumber.
+        epoch_float : float
+            The current epoch and fileno as a float.
         lr : float
             The current learning rate of the model.
         history_train : dict
-            Dict containing the history of the training, averaged
-            over files.
+            Dict containing the history of the training, averaged over files.
+            Keys: Metric names, e.g. "loss", "accuracy", ...
+            Values: Value of the metric during validation as a float.
         history_val : dict or None
             Dict of validation losses for all the metrics, averaged over
             all validation files.
+            Keys: Metric names, e.g. "loss", "accuracy", ...
+            Values: Value of the metric during validation as a float.
 
         """
+        if history_val is None and history_train is None:
+            raise ValueError(
+                "Can not summary log when both train and val history are None")
+
         widths = self._init_writing()
 
-        epoch_float = epoch[0]-1 + self.file_sizes_rltv[epoch[1]-1]
-
-        # Write the content: Epoch, LR, train_1, val_1, ...
+        # Format the content: (Epoch, LR, train_1, val_1, ...)
         data = [epoch_float, lr]
         for i, metric_name in enumerate(self.metric_names):
-            data.append(history_train[metric_name])
+            if history_train is None:
+                data.append("nan")
+            else:
+                data.append(history_train[metric_name])
             if history_val is None:
                 data.append("nan")
             else:
                 data.append(history_val[metric_name])
 
-        line = self._gen_line_str(data, widths)
-        self._save(line)
+        # if the epoch is already in the file, its line will get updated
+        update_line = False
+        summary_data = self.orga.history.get_summary_data()
+        if len(summary_data) > 0:
+            last_line = summary_data[-1]
+            if last_line["Epoch"] == data[0]:
+                # merge arrays but ignore LR
+                data = merge_arrays(data, last_line, exclude=1)
+                update_line = True
 
-    def _save(self, lines):
-        if isinstance(lines, str):
-            lines = [lines]
-        with open(self.logfile_name, 'a+') as logfile:
-            for line in lines:
+        line = self._gen_line_str(data, widths)
+        self._save_line(line, update_line)
+
+    def _get_column_names(self):
+        column_names = ["Epoch", "LR", ]
+        for i, metric_name in enumerate(self.metric_names):
+            column_names.append("train_" + str(metric_name))
+            column_names.append("val_" + str(metric_name))
+        column_names = tuple(column_names)
+
+        if os.path.isfile(self.logfile_name):
+            # if summary exists already, check if model metrics match
+            file_column_names = self.orga.history.get_column_names()
+            if not set(column_names) == set(file_column_names):
+                raise NameError(
+                    "Can not log to summary: column names differ (from model: "
+                    "{}, from summary file: {}".format(column_names,
+                                                       file_column_names))
+            column_names = file_column_names
+
+        return column_names
+
+    def _save_line(self, line, update=False):
+        """ Write a line in the summary file. If update, overwrite the last line.
+        """
+        if not update:
+            with open(self.logfile_name, 'a+') as logfile:
                 logfile.write(line + "\n")
+
+        else:
+            # replace last line by rewriting whole summary file :-(
+            with open(self.logfile_name, "r") as old_file:
+                lines = old_file.readlines()
+            lines[-1] = line + "\n"
+
+            # make new summary file as a temp
+            with open(self.temp_filepath, 'w') as temp_file:
+                for i, old_line in enumerate(lines):
+                    temp_file.write(old_line)
+
+            # Remove original file
+            os.remove(self.logfile_name)
+            # Move new file
+            move(self.temp_filepath, self.logfile_name)
 
     def _init_writing(self):
         """
@@ -92,22 +144,15 @@ class SummaryLogger:
             The width of every cell in characters.
 
         """
-        if self.metric_names is None or self.file_sizes_rltv is None:
-            raise AttributeError("Can not write logfile: "
-                                 "No model given during initialization. ")
-        # content of the headline of the file
-        data = ["Epoch", "LR", ]
-        for i, metric_name in enumerate(self.metric_names):
-            data.append("train_" + str(metric_name))
-            data.append("val_" + str(metric_name))
-
-        headline, widths = self._gen_line_str(data)
+        headline, widths = self._gen_line_str(self.column_names)
         if not os.path.isfile(self.logfile_name) or \
                 os.stat(self.logfile_name).st_size == 0:
 
             vline = ["-" * width for width in widths]
             vertical_line = self._gen_line_str(vline, widths, seperator="-+-")
-            self._save([headline, vertical_line])
+            with open(self.logfile_name, 'a+') as logfile:
+                logfile.write(headline + "\n")
+                logfile.write(vertical_line + "\n")
 
         return widths
 
@@ -118,13 +163,15 @@ class SummaryLogger:
 
         Parameters
         ----------
-        data : List
-            Strings or floats of what is in each cell.
+        data : tuple
+            Strings or floats of what is in each cell. It must be in the
+            same order and have the same length as the column names.
         widths : List or None
             Optional: The width of every cell. If None, will set it
-            automatically, depending on the data. If widths is given, but
-            what is given in data is wider than the width, the cell will
-            expand without notice.
+            automatically, depending on the data.
+            If widths is given, but what is given in data is wider than
+            the width, the cell will expand without notice. Must have the
+            same length as the column names.
         seperator : str
             String that seperates two adjacent cells.
 
@@ -138,6 +185,8 @@ class SummaryLogger:
         """
         if widths is None:
             new_widths = []
+
+        assert len(data) == len(self.column_names)
 
         line = ""
         for i, entry in enumerate(data):
@@ -167,6 +216,47 @@ class SummaryLogger:
             return line
 
 
+def merge_arrays(base, supp, exclude=None):
+    """
+    Fill nans in a list with values from another list.
+
+    Parameters
+    ----------
+    base : List
+    supp : List
+    exclude : List or int
+        Which indices to ignore.
+
+    Returns
+    -------
+    np.array
+
+    """
+    try:
+        iter(exclude)
+    except TypeError:
+        exclude = [exclude]
+
+    for i in range(len(base)):
+        if exclude is not None and i in exclude:
+            continue
+
+        if base[i] == supp[i]:
+            continue
+
+        elif base[i] == "nan" or np.isnan(base[i]):
+            base[i] = supp[i]
+
+        elif supp[i] == "nan" or np.isnan(supp[i]):
+            continue
+
+        else:
+            raise ValueError(
+                "Cannot merge arrays at index {}: Base {}, supplement {}"
+                .format(i, base[i], supp[i]))
+    return base
+
+
 class BatchLogger(ks.callbacks.Callback):
     """
     Write logfiles during training.
@@ -175,7 +265,7 @@ class BatchLogger(ks.callbacks.Callback):
     and then writes that in a line in the logfile.
     The Batch_float entry in the logfiles gives the absolute position
     of the batch in the epoch (i.e. taking all files into account).
-    This is intended to be used only for one epoch (one file).
+    This class is intended to be used only for one epoch = one file.
 
     """
     def __init__(self, orga, epoch):
@@ -218,6 +308,8 @@ class BatchLogger(ks.callbacks.Callback):
         self.seen = None
         self.lines = None
         self.cum_metrics = None
+        self.file = None
+        self._stored_metrics = False
 
     def on_epoch_begin(self, epoch, logs=None):
         # no of seen batches in this epoch
@@ -228,6 +320,7 @@ class BatchLogger(ks.callbacks.Callback):
         self.cum_metrics = {}
         for metric in self.model.metrics_names:
             self.cum_metrics[metric] = 0
+        self.file = open(self.logfile_name, "w")
         self._write_head()
 
     def on_batch_end(self, batch, logs=None):
@@ -243,46 +336,50 @@ class BatchLogger(ks.callbacks.Callback):
         self.seen += 1
         for metric in self.model.metrics_names:
             self.cum_metrics[metric] += logs.get(metric)
+        if not self._stored_metrics:
+            self._stored_metrics = True
 
         if self.seen % self.display == 0:
-            # The fraction is shifted by self.display / 2., so that it is in
-            # the middle of the samples
-            batch_frctn = self.epoch_number - 1 + (
-                    self.previous_batches + self.seen
-                    - self.display / 2.) / self.total_batches
+            self._write_line()
 
-            line = '\n{0}\t{1}'.format(int(self.seen), batch_frctn)
-            for metric in self.model.metrics_names:
-                line = line + '\t' + str(self.cum_metrics[metric] / self.display)
-                self.cum_metrics[metric] = 0
-            self.lines.append(line)
-
-            flush = self.flush != -1 and self.display % self.flush == 0
-            self._write_lines(flush=flush)
+        if self.flush != -1 and self.display % self.flush == 0:
+            self._flush_file()
 
     def on_epoch_end(self, batch, logs=None):
         # on epoch end here means that this is called after one fit_generator
         # loop in Keras is finished, so after one file in our case.
-        self._write_lines(flush=True)
+        if self._stored_metrics:
+            self._write_line()
+        self.file.close()
 
-    def _write_lines(self, flush=False):
-        """ Write lines in self.lines and empty it. """
-        with open(self.logfile_name, 'a') as file:
-            for line in self.lines:
-                file.write(line)
-            if flush:
-                file.flush()
-                os.fsync(file.fileno())
-        self.lines = []
+    def _write_line(self):
+        """ Write a line with the metrics for current status and reset metrics.
+        """
+        # The fraction is shifted by self.display / 2., so that it is in
+        # the middle of the samples
+        batch_frctn = self.epoch_number - 1 + (
+                self.previous_batches + self.seen
+                - self.display / 2.) / self.total_batches
+
+        line = '{0}\t{1}'.format(int(self.seen), batch_frctn)
+        for metric in self.model.metrics_names:
+            line += '\t' + str(self.cum_metrics[metric] / self.display)
+            self.cum_metrics[metric] = 0
+        line += "\n"
+        self.file.write(line)
+        self._stored_metrics = False
+
+    def _flush_file(self):
+        self.file.flush()
+        os.fsync(self.file.fileno())
 
     def _write_head(self):
         """ write column names for all losses / metrics """
-        with open(self.logfile_name, 'w') as file:
-            file.write('Batch\tBatch_float\t')
-            for i, metric in enumerate(self.model.metrics_names):
-                file.write(metric)
-                if i + 1 < len(self.model.metrics_names):
-                    file.write('\t')
+        line = 'Batch\tBatch_float'
+        for i, metric in enumerate(self.model.metrics_names):
+            line += "\t" + str(metric)
+        line += "\n"
+        self.file.write(line)
 
 
 def log_start_training(orga):
@@ -334,6 +431,22 @@ def log_start_training(orga):
     """
 
     log("")
+    orga.io.print_log(lines)
+
+
+def log_start_validation(orga):
+    """ Log filenames used for validation. """
+    line = "Validation"
+    orga.io.print_log(line)
+    orga.io.print_log("-" * len(line))
+    lines = ['Inputs and files:', ]
+    for input_name, input_files in orga.io.get_local_files("val").items():
+        line = "   " + input_name + ":\t"
+        for i, input_file in enumerate(input_files):
+            if i != 0:
+                line += ", "
+            line += os.path.basename(input_file)
+        lines.append(line)
     orga.io.print_log(lines)
 
 
