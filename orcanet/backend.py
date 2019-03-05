@@ -118,7 +118,7 @@ def train_model(orga, model=None):
     lr = get_learning_rate(next_epoch, orga.cfg.learning_rate, n_train_files)
     K.set_value(model.optimizer.lr, lr)
 
-    files_dict = orga.io.get_file("train", next_epoch[1] - 1)
+    files_dict = orga.io.get_file("train", next_epoch[1])
 
     line = "Training in epoch {} on file {}/{}".format(
         next_epoch[0], next_epoch[1], n_train_files)

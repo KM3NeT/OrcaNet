@@ -167,9 +167,7 @@ class Organizer:
             print("Automatically set epoch to epoch {} file {}.".format(epoch,
                                                                         fileno))
 
-        list_name = os.path.splitext(
-            os.path.basename(self.cfg.get_list_file()))[0]
-        pred_filename = self.io.get_pred_path(epoch, fileno, list_name)
+        pred_filename = self.io.get_pred_path(epoch, fileno)
 
         if os.path.isfile(pred_filename):
             print("Prediction has already been done.")
@@ -420,7 +418,7 @@ class Configuration(object):
             Path to the toml list file.
 
         """
-        if self._list_file is None:
+        if self._list_file is not None:
             raise ValueError("Can not load list file: Has already been loaded! "
                              "({})".format(self._list_file))
 

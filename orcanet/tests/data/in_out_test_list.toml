@@ -1,0 +1,23 @@
+[input_A]
+train_files = [
+"input_A_train_1.h5",
+"input_A_train_2.h5",
+]
+
+validation_files = [
+"input_A_val_1.h5",
+"input_A_val_2.h5",
+"input_A_val_3.h5",
+]
+
+[input_B]
+train_files = [
+"input_B_train_1.h5",
+"input_B_train_2.h5",
+]
+
+validation_files = [
+"input_B_val_1.h5",
+"input_B_val_2.h5",
+"input_B_val_3.h5",
+]

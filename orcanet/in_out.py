@@ -43,9 +43,10 @@ class IOHandler(object):
             empty or does not exist yet.
 
         """
-        if os.path.exists(self.cfg.output_folder + "saved_models"):
+        saved_models_folder = self.cfg.output_folder + "saved_models"
+        if os.path.exists(saved_models_folder):
             files = []
-            for file in os.listdir(self.cfg.output_folder + "saved_models"):
+            for file in os.listdir(saved_models_folder):
                 if file.endswith('.h5'):
                     files.append(file)
 
@@ -83,7 +84,7 @@ class IOHandler(object):
 
         Parameters
         ----------
-        epoch : tuple
+        epoch : tuple or None
             Current epoch and file number.
 
         Returns
@@ -101,6 +102,7 @@ class IOHandler(object):
         return next_epoch
 
     def get_previous_epoch(self, epoch):
+        """ Return the previous epoch / fileno tuple. """
         if epoch[1] == 1:
             if epoch[0] == 1:
                 raise ValueError("Can not get previous epoch of epoch {} file {}".format(*epoch))
@@ -163,11 +165,15 @@ class IOHandler(object):
             + '/model_epoch_{}_file_{}.h5'.format(epoch, fileno)
         return model_filename
 
-    def get_pred_path(self, epoch, fileno, list_name):
+    def get_pred_path(self, epoch, fileno):
         """ Get the path to a saved prediction. """
+        list_name = os.path.splitext(
+            os.path.basename(self.cfg.get_list_file()))[0]
+
         pred_filename = self.get_subfolder("predictions") + \
             '/pred_model_epoch_{}_file_{}_on_{}_val_files.h5'.format(
                 epoch, fileno, list_name)
+
         return pred_filename
 
     def use_local_node(self):
@@ -301,7 +307,7 @@ class IOHandler(object):
 
     def yield_files(self, which):
         """
-        Yield a training or validation file for every input.
+        Yield a training or validation filepaths for every input.
 
         They will be yielded in the same order as they are given in the
         toml file.
@@ -326,7 +332,7 @@ class IOHandler(object):
     def get_file(self, which, file_no):
         """ Get a dict with the n-th files. """
         files = self.get_local_files(which)
-        files_dict = {key: files[key][file_no] for key in files}
+        files_dict = {key: files[key][file_no-1] for key in files}
         return files_dict
 
     def check_connections(self, model):
@@ -755,14 +761,6 @@ class HistoryHandler:
             state_dicts.append(line_state)
 
         return state_dicts
-
-
-
-
-
-
-
-        return is_val
 
 
 def h5_get_number_of_rows(h5_filepath, datasets):

@@ -6,17 +6,17 @@ from orcanet.core import Configuration
 from orcanet.in_out import HistoryHandler, IOHandler
 
 
-class TestIOHandler(TestCase):
+class TestIOHandlerNoFiles(TestCase):
+    """ For io test that dont require a h5 file. """
     def setUp(self):
         self.temp_dir = os.path.join(os.path.dirname(__file__), ".temp")
-        self.output_folder = os.path.join(os.path.dirname(__file__),
-                                          "data", "dummy_model")
+        self.data_folder = os.path.join(os.path.dirname(__file__), "data")
+        self.output_folder = self.data_folder + "/dummy_model"
 
-        output_folder = self.temp_dir
-        list_file = None
+        list_file = self.data_folder + "/in_out_test_list.toml"
         config_file = None
-        cfg = Configuration(output_folder, list_file, config_file)
 
+        cfg = Configuration(self.output_folder, list_file, config_file)
         self.io = IOHandler(cfg)
 
     def test_get_latest_epoch(self):
@@ -29,6 +29,131 @@ class TestIOHandler(TestCase):
         target = (1, 2)
         self.assertSequenceEqual(value, target)
 
+    def test_get_latest_epoch_no_files_but_epoch_given(self):
+        with self.assertRaises(ValueError):
+            self.io.get_latest_epoch(epoch=3)
+
+    def test_get_next_epoch_none(self):
+        value = self.io.get_next_epoch(None)
+        target = (1, 1)
+        self.assertSequenceEqual(value, target)
+
+    def test_get_next_epoch_1_1(self):
+        value = self.io.get_next_epoch((1, 1))
+        target = (1, 2)
+        self.assertSequenceEqual(value, target)
+
+    def test_get_next_epoch_1_2(self):
+        value = self.io.get_next_epoch((1, 2))
+        target = (2, 1)
+        self.assertSequenceEqual(value, target)
+
+    def test_get_previous_epoch_2_1(self):
+        value = self.io.get_previous_epoch((2, 1))
+        target = (1, 2)
+        self.assertSequenceEqual(value, target)
+
+    def test_get_previous_epoch_1_2(self):
+        value = self.io.get_previous_epoch((1,2))
+        target = (1, 1)
+        self.assertSequenceEqual(value, target)
+
+    def test_get_model_path(self):
+        value = self.io.get_model_path(1, 1)
+        target = self.output_folder + '/saved_models/model_epoch_1_file_1.h5'
+        self.assertEqual(value, target)
+
+    def test_get_model_path_latest(self):
+        value = self.io.get_model_path(-1, -1)
+        target = self.output_folder + '/saved_models/model_epoch_2_file_1.h5'
+        self.assertEqual(value, target)
+
+    def test_get_pred_path(self):
+        value = self.io.get_pred_path(2, 1)
+        target = self.output_folder + '/predictions/pred_model_epoch_2_file_1' \
+                                      '_on_in_out_test_list_val_files.h5'
+        self.assertEqual(value, target)
+
+    def test_get_local_files_train(self):
+        value = self.io.get_local_files("train")
+        target = {
+            'input_A': ('input_A_train_1.h5', 'input_A_train_2.h5'),
+            'input_B': ('input_B_train_1.h5', 'input_B_train_2.h5'),
+        }
+        self.assertDictEqual(value, target)
+
+    def test_get_local_files_val(self):
+        value = self.io.get_local_files("val")
+        target = {
+            'input_A': ('input_A_val_1.h5', 'input_A_val_2.h5', 'input_A_val_3.h5'),
+            'input_B': ('input_B_val_1.h5', 'input_B_val_2.h5', 'input_B_val_3.h5')
+        }
+        self.assertDictEqual(value, target)
+
+    def test_get_no_of_files_train(self):
+        value = self.io.get_no_of_files("train")
+        target = 2
+        self.assertEqual(value, target)
+
+    def test_get_no_of_files_val(self):
+        value = self.io.get_no_of_files("val")
+        target = 3
+        self.assertEqual(value, target)
+
+    def test_yield_files_train(self):
+        file_paths = self.io.yield_files("train")
+        target = (
+            {
+                'input_A': 'input_A_train_1.h5',
+                'input_B': 'input_B_train_1.h5',
+            },
+            {
+                'input_A': 'input_A_train_2.h5',
+                'input_B': 'input_B_train_2.h5',
+            },
+        )
+        for i, value in enumerate(file_paths):
+            self.assertDictEqual(value, target[i])
+
+    def test_yield_files_val(self):
+        file_paths = self.io.yield_files("val")
+        target = (
+            {
+                'input_A': 'input_A_val_1.h5',
+                'input_B': 'input_B_val_1.h5',
+            },
+            {
+                'input_A': 'input_A_val_2.h5',
+                'input_B': 'input_B_val_2.h5',
+            },
+            {
+                'input_A': 'input_A_val_3.h5',
+                'input_B': 'input_B_val_3.h5',
+            },
+        )
+        for i, value in enumerate(file_paths):
+            self.assertDictEqual(value, target[i])
+
+    def test_get_file_train(self):
+        value = self.io.get_file("train", 2)
+        target = {
+                'input_A': 'input_A_train_2.h5',
+                'input_B': 'input_B_train_2.h5',
+        }
+        self.assertDictEqual(value, target)
+
+    def test_get_file_val(self):
+        value = self.io.get_file("val", 1)
+        target = {
+                'input_A': 'input_A_val_1.h5',
+                'input_B': 'input_B_val_1.h5',
+        }
+        self.assertDictEqual(value, target)
+
+    def test_get_epoch_float(self):
+        value = self.io.get_epoch_float(1, 2)
+        target = 3
+        self.assertEqual(value, target)
 
 
 class TestHistoryHandler(TestCase):
