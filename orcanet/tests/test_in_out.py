@@ -150,11 +150,6 @@ class TestIOHandlerNoFiles(TestCase):
         }
         self.assertDictEqual(value, target)
 
-    def test_get_epoch_float(self):
-        value = self.io.get_epoch_float(1, 2)
-        target = 3
-        self.assertEqual(value, target)
-
 
 class TestHistoryHandler(TestCase):
     def setUp(self):
