@@ -327,7 +327,6 @@ def hdf5_batch_generator(orga, files_dict, f_size=None, zero_center=False,
 
         if f_size is None:
             f_size = file_lengths[0]
-        # number of batches available
         total_no_of_batches = int(np.ceil(f_size/batchsize))
         # positions of the samples in the file
         sample_pos = np.arange(total_no_of_batches) * batchsize
@@ -347,7 +346,7 @@ def hdf5_batch_generator(orga, files_dict, f_size=None, zero_center=False,
                     xs[input_key] = np.subtract(xs[input_key],
                                                 xs_mean[input_key])
             # Get labels for the nn. Since the labels are hopefully the same
-            # for all the files, use the ones from the first TODO
+            # for all the files, use the ones from the first TODO add check
             y_values = list(files.values())[0][mc_key][
                        sample_n:sample_n + batchsize]
 

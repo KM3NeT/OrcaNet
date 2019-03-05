@@ -283,11 +283,11 @@ class Configuration(object):
         If true, surpresses the tensorflow info logs which usually spam
         the terminal.
     key_samples : str
-        The name of the datagroup in your h5 input files which contains
+        The name of the datagroup in the h5 input files which contains
         the samples for the network.
     key_labels : str
-        The name of the datagroup in your h5 input files which contains
-        the labels for the network.
+        The name of the datagroup in the h5 input files which contains
+        the info for the labels.
     label_modifier : function or None
         Operation to be performed on batches of labels read from the input files
         before they are fed into the model. If None is given, all labels with
