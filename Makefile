@@ -25,6 +25,9 @@ test:
 test-cov:
 	py.test --cov ./ --cov-report term-missing --cov-report xml:reports/coverage.xml --cov-report html:reports/coverage $(ALLNAMES)
 
+test-quick:
+	py.test --cov ./ --cov-report term-missing $(ALLNAMES) --ignore orcanet/tests/test_integration_full.py
+
 test-loop:
 	py.test $(PKGNAME)
 	ptw --ext=.py,.pyx --ignore=doc $(PKGNAME)
