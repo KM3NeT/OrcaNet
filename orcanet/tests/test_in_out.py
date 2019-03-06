@@ -1,15 +1,57 @@
 from unittest import TestCase
 import os
+import h5py
 import numpy as np
 
 from orcanet.core import Configuration
 from orcanet.in_out import HistoryHandler, IOHandler
 
 
-class TestIOHandlerNoFiles(TestCase):
-    """ For io test that dont require a h5 file. """
+class TestIOHandler(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # super(TestIOHandler, cls).setUpClass()
+        cls.temp_dir = os.path.join(os.path.dirname(__file__), ".temp",
+                                    "test_in_out")
+        os.mkdir(cls.temp_dir)
+        os.chdir(cls.temp_dir)
+        # make some dummy data
+        cls.n_bins = {'input_A': (2, 3), 'input_B': (2, 3)}
+        cls.train_sizes = [30, 50]
+        cls.train_A_file_1 = {
+            "path": cls.temp_dir + "/input_A_train_1.h5",
+            "shape": cls.n_bins["input_A"],
+            "value_xs": 1.1,
+            "value_ys": 1.2,
+            "size": cls.train_sizes[0],
+        }
+        cls.train_A_file_2 = {
+            "path": cls.temp_dir + "/input_A_train_2.h5",
+            "shape": cls.n_bins["input_A"],
+            "value_xs": 1.3,
+            "value_ys": 1.4,
+            "size": cls.train_sizes[1],
+        }
+        cls.train_B_file_1 = {
+            "path": cls.temp_dir + "/input_B_train_1.h5",
+            "shape": cls.n_bins["input_B"],
+            "value_xs": 2.1,
+            "value_ys": 2.2,
+            "size": cls.train_sizes[0],
+        }
+        cls.train_B_file_2 = {
+            "path": cls.temp_dir + "/input_B_train_2.h5",
+            "shape": cls.n_bins["input_B"],
+            "value_xs": 2.3,
+            "value_ys": 2.4,
+            "size": cls.train_sizes[1],
+        }
+        cls.train_A_file_1_ctnt = save_dummy_h5py(**cls.train_A_file_1)
+        cls.train_A_file_2_ctnt = save_dummy_h5py(**cls.train_A_file_2)
+        cls.train_B_file_1_ctnt = save_dummy_h5py(**cls.train_B_file_1)
+        cls.train_B_file_2_ctnt = save_dummy_h5py(**cls.train_B_file_2)
+
     def setUp(self):
-        self.temp_dir = os.path.join(os.path.dirname(__file__), ".temp")
         self.data_folder = os.path.join(os.path.dirname(__file__), "data")
         self.output_folder = self.data_folder + "/dummy_model"
 
@@ -17,7 +59,43 @@ class TestIOHandlerNoFiles(TestCase):
         config_file = None
 
         cfg = Configuration(self.output_folder, list_file, config_file)
+        self.batchsize = 3
+        cfg.batchsize = self.batchsize
         self.io = IOHandler(cfg)
+
+    @classmethod
+    def tearDownClass(cls):
+        os.remove(cls.train_A_file_1["path"])
+        os.remove(cls.train_A_file_2["path"])
+        os.remove(cls.train_B_file_1["path"])
+        os.remove(cls.train_B_file_2["path"])
+
+        os.chdir(os.path.join(os.path.dirname(__file__), ".temp"))
+        os.rmdir(cls.temp_dir)
+
+    def test_get_n_bins(self):
+        value = self.io.get_n_bins()
+        self.assertSequenceEqual(value, self.n_bins)
+
+    def test_get_file_sizes_train(self):
+        value = self.io.get_file_sizes("train")
+        self.assertSequenceEqual(value, self.train_sizes)
+
+    def test_get_batch_xs(self):
+        value = self.io.get_batch()
+        target = {
+            "input_A": self.train_A_file_1_ctnt[0][:self.batchsize],
+            "input_B": self.train_B_file_1_ctnt[0][:self.batchsize],
+        }
+        assert_dict_arrays_equal(value[0], target)
+
+    def test_get_batch_ys(self):
+        value = self.io.get_batch()
+        target = {
+            "input_A": self.train_A_file_1_ctnt[1][:self.batchsize],
+            "input_B": self.train_B_file_1_ctnt[1][:self.batchsize],
+        }
+        assert_equal_struc_array(value[1], target["input_A"])
 
     def test_get_latest_epoch(self):
         value = self.io.get_latest_epoch()
@@ -212,3 +290,23 @@ def assert_equal_struc_array(a, b):
     np.testing.assert_array_equal(a.dtype, b.dtype)
     for name in a.dtype.names:
         np.testing.assert_almost_equal(a[name], b[name])
+
+
+def save_dummy_h5py(path, shape, value_xs=1., value_ys=1., size=50):
+    xs = np.ones((size,) + shape) * value_xs
+
+    dtypes = [('mc_A', '<f8'), ('mc_B', '<f8'), ]
+    ys = (np.ones((size, 2))*value_ys).ravel().view(dtype=dtypes)
+
+    with h5py.File(path, 'w') as h5f:
+        h5f.create_dataset('x', data=xs, dtype='<f8')
+        h5f.create_dataset('y', data=ys, dtype=dtypes)
+
+    return xs, ys
+
+
+def assert_dict_arrays_equal(a, b):
+    for key, value in a.items():
+        assert key in b
+        np.testing.assert_array_almost_equal(a[key], b[key])
+

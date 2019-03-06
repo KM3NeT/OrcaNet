@@ -232,6 +232,7 @@ class IOHandler(object):
             Toml-list input names as keys, list of the bins as values.
 
         """
+        # TODO check if bins are equal in all files?
         train_files = self.get_local_files("train")
         n_bins = {}
         for input_key in train_files:
@@ -250,7 +251,7 @@ class IOHandler(object):
 
         Returns
         -------
-        file_sizes : list
+        file_sizes : List
             Its length is equal to the number of files in each input set.
 
         Raises
@@ -455,6 +456,7 @@ class IOHandler(object):
 
     def get_batch(self):
         """ For testing purposes, return a batch of samples and mc_infos. """
+        # TODO gets mc_info only from first train file
         files_dict = next(self.yield_files("train"))
         xs = {}
         for i, inp_name in enumerate(files_dict):
