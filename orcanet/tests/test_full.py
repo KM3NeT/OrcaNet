@@ -24,14 +24,15 @@ class DatasetTest(TestCase):
         """
         # Pathes
         # Temporary output folder
-        self.temp_dir = os.path.join(os.getcwd(), ".temp/")
-        self.output_folder = self.temp_dir + "model/"
+        self.temp_dir = os.path.join(os.path.dirname(__file__),
+                                     ".temp", "full_test")
+        self.output_folder = os.path.join(self.temp_dir, "model")
 
         # Pathes to temp dummy data that will get generated
-        train_inp = (self.temp_dir + "train1.h5", self.temp_dir + "train2.h5")
+        train_inp = (self.temp_dir + "/train1.h5", self.temp_dir + "/train2.h5")
         self.train_pathes = {"testing_input": train_inp}
 
-        val_inp = (self.temp_dir + "val1.h5", self.temp_dir + "val2.h5")
+        val_inp = (self.temp_dir + "/val1.h5", self.temp_dir + "/val2.h5")
         self.val_pathes = {"testing_input": val_inp}
 
         # The config file to load
@@ -72,9 +73,11 @@ class DatasetTest(TestCase):
         target_xs_mean = np.ones(self.shape)/4
         self.assertTrue(np.allclose(xs_mean["testing_input"], target_xs_mean))
 
-        file = orga.cfg.zero_center_folder + orga.cfg._list_file + '_input_' + "testing_input" + '.npz'
+        file = orga.cfg.zero_center_folder + "/" + orga.cfg._list_file + \
+            '_input_' + "testing_input" + '.npz'
         zero_center_used_ip_files = np.load(file)['zero_center_used_ip_files']
-        self.assertTrue(np.array_equal(zero_center_used_ip_files, orga.cfg._train_files["testing_input"]))
+        self.assertTrue(np.array_equal(zero_center_used_ip_files,
+                                       orga.cfg._train_files["testing_input"]))
 
     def test_multi_input_model(self):
         """
@@ -88,7 +91,7 @@ class DatasetTest(TestCase):
         builder = ModelBuilder(model_file)
         initial_model = builder.build(orga)
 
-        orga.train(initial_model, epochs=2)
+        orga.train_and_validate(initial_model, epochs=2)
 
         def test_learning_rate(epoch, fileno):
             lr = (1 + epoch)*(1 + fileno) * 0.001
@@ -101,7 +104,7 @@ class DatasetTest(TestCase):
         orga = self.make_orga()
         orga.cfg.learning_rate = test_learning_rate
         orga.cfg.sample_modifier = test_modifier
-        orga.train(epochs=1)
+        orga.train_and_validate(epochs=1)
         orga.predict()
 
     def test_model_setup_CNN_model(self):

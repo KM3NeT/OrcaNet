@@ -38,8 +38,8 @@ class IOHandler(object):
 
         Returns
         -------
-        latest_epoch : tuple
-            The highest epoch, file_no pair. (0,0) if the folder is
+        latest_epoch : tuple or None
+            The highest epoch, file_no pair. None if the folder is
             empty or does not exist yet.
 
         """
@@ -50,7 +50,7 @@ class IOHandler(object):
                     files.append(file)
 
             if len(files) == 0:
-                latest_epoch = (0, 0)
+                latest_epoch = None
             else:
                 epochs = []
                 for file in files:
@@ -67,17 +67,13 @@ class IOHandler(object):
                                      "epoch {}: No files found!".format(epoch))
                 latest_epoch = max(epochs)
         else:
-            latest_epoch = (0, 0)
+            latest_epoch = None
 
-        if epoch != -1 and latest_epoch == (0, 0):
+        if epoch != -1 and latest_epoch is None:
             raise ValueError("Can not get most recent file for "
                              "epoch {}: No files found!".format(epoch))
 
         return latest_epoch
-
-    def is_new(self):
-        """ Is this a new training, aka no saved models exist? """
-        return self.get_latest_epoch() == (0, 0)
 
     def get_next_epoch(self, epoch):
         """
@@ -96,13 +92,25 @@ class IOHandler(object):
             Next epoch and file number.
 
         """
-        if epoch[0] == 0 and epoch[1] == 0:
+        if epoch is None:
             next_epoch = (1, 1)
         elif epoch[1] == self.get_no_of_files("train"):
             next_epoch = (epoch[0] + 1, 1)
         else:
             next_epoch = (epoch[0], epoch[1] + 1)
         return next_epoch
+
+    def get_previous_epoch(self, epoch):
+        if epoch[1] == 1:
+            if epoch[0] == 1:
+                raise ValueError("Can not get previous epoch of epoch {} file {}".format(*epoch))
+            n_train_files = self.get_no_of_files("train")
+            prev_epoch = (epoch[0]-1, n_train_files)
+
+        else:
+            prev_epoch = (epoch[0], epoch[1]-1)
+
+        return prev_epoch
 
     def get_subfolder(self, name=None, create=False):
         """
@@ -486,6 +494,16 @@ class IOHandler(object):
                     f_out.write(line + "\n")
                     print(line)
 
+    def get_epoch_float(self, epoch, fileno):
+        """ Make a float value out of epoch/fileno. """
+        # calculate the fraction of samples per file compared to all files,
+        # e.g. [100, 50, 50] --> [0.5, 0.75, 1]
+        file_sizes = self.get_file_sizes("train")
+        file_sizes_rltv = np.cumsum(file_sizes) / np.sum(file_sizes)
+
+        epoch_float = epoch - 1 + file_sizes_rltv[fileno - 1]
+        return epoch_float
+
 
 class HistoryHandler:
     """
@@ -629,6 +647,20 @@ class HistoryHandler:
             summary_data = summary_data.reshape(1,)
         return summary_data
 
+    def get_column_names(self):
+        """
+        Get the str in the first line in each column.
+
+        Returns
+        -------
+        tuple : column_names
+            The names in the same order as they appear in the summary.txt.
+
+        """
+        summary_data = self.get_summary_data()
+        column_names = summary_data.dtype.names
+        return column_names
+
     def get_train_data(self):
         """
         Read out all training logfiles in the output folder.
@@ -666,6 +698,71 @@ class HistoryHandler:
             # When only one line is present
             full_train_data = full_train_data.reshape(1,)
         return full_train_data
+
+    def get_state(self):
+        """
+        Get the state of a training.
+
+        For every line in the summary logfile, get a dict with the epoch
+        as a float, and is_trained and is_validated bools.
+
+        Returns
+        -------
+        state_dicts : List
+            List of dicts.
+
+        """
+        summary_data = self.get_summary_data()
+        state_dicts = []
+        names = summary_data.dtype.names
+
+        for line in summary_data:
+            val_losses, train_losses = {}, {}
+            for name in names:
+                if name.startswith("val_"):
+                    val_losses[name] = line[name]
+                elif name.startswith("train_"):
+                    train_losses[name] = line[name]
+                elif name not in ["Epoch", "LR"]:
+                    raise NameError(
+                        "Invalid summary file: Invalid column name {}: must be "
+                        "either Epoch, LR, or start with val_ or train_".format(name))
+
+            n_nans_val = np.count_nonzero(np.isnan(list(val_losses.values())))
+            n_nans_train = np.count_nonzero(np.isnan(list(train_losses.values())))
+
+            if n_nans_val == 0:
+                is_val = True
+            elif n_nans_val == len(val_losses):
+                is_val = False
+            else:
+                raise ValueError(
+                    "Invalid summary file: Expected val losses to be either only "
+                    "nans, or no nans (got {})".format(val_losses))
+
+            if n_nans_train == 0:
+                is_trained = True
+            elif n_nans_train == len(train_losses):
+                is_trained = False
+            else:
+                raise ValueError(
+                    "Invalid summary file: Expected train losses to be either only "
+                    "nans, or no nans (got {})".format(train_losses))
+
+            line_state = {"epoch": line["Epoch"],
+                          "is_trained": is_trained,
+                          "is_validated": is_val,}
+            state_dicts.append(line_state)
+
+        return state_dicts
+
+
+
+
+
+
+
+        return is_val
 
 
 def h5_get_number_of_rows(h5_filepath, datasets):

@@ -58,10 +58,10 @@ class Organizer:
         self.history = HistoryHandler(self.cfg.output_folder + "summary.txt",
                                       self.io.get_subfolder("train_log"))
 
-        self._xs_mean = None
+        self.xs_mean = None
         self._auto_label_modifier = None
 
-    def train(self, model=None, force_model=False, epochs=None):
+    def train_and_validate(self, model=None, force_model=False, epochs=None):
         """
         Train and validate a model.
 
@@ -94,6 +94,8 @@ class Organizer:
             The trained keras model.
 
         """
+        model, next_epoch = self._load_model(model, force_model)
+
         if self.cfg.get_list_file() is None:
             raise ValueError("No files specified. You need to load a toml "
                              "list file with your files before training")
@@ -101,39 +103,8 @@ class Organizer:
         if self.cfg.filter_out_tf_garbage:
             os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 
+        # Create folder structure
         self.io.get_subfolder(create=True)
-
-        # the epoch of the currently existing model (or 0,0 if there is none)
-        latest_epoch = self.io.get_latest_epoch()
-        print(
-            "Set to epoch {} file {}.".format(latest_epoch[0], latest_epoch[1]))
-
-        if self.io.is_new():
-            if model is None:
-                raise ValueError("You need to provide a compiled keras model "
-                                 "for the start of the training! (You gave None)")
-            try:
-                ks.utils.plot_model(
-                    model, self.io.get_subfolder("plots") +
-                           "/model_epoch_{}_file_{}.png".format(*latest_epoch))
-            except OSError as e:
-                warnings.warn("Can not plot model: " + str(e))
-
-        elif force_model is True:
-            if model is None:
-                raise ValueError('You set "force_model" to True, but didnt '
-                                 'provide a model in "model" that should be used!')
-            print('Continuing training with user model (force_model=True)')
-        else:
-            # Load an existing model
-            if model is not None:
-                raise ValueError("You provided a model even though this is not "
-                                 "the start of the training.")
-            path_of_model = self.io.get_model_path(latest_epoch[0],
-                                                   latest_epoch[1])
-            print("Continuing training with saved model: " + path_of_model)
-            model = ks.models.load_model(path_of_model,
-                                         custom_objects=self.cfg.custom_objects)
 
         if self.cfg.label_modifier is None:
             self._auto_label_modifier = get_auto_label_modifier(model)
@@ -142,9 +113,6 @@ class Organizer:
 
         if self.cfg.use_scratch_ssd:
             self.io.use_local_node()
-
-        # Set epoch to the next file (the one we are about to train)
-        next_epoch = self.io.get_next_epoch(latest_epoch)
 
         log_start_training(self)
 
@@ -244,12 +212,48 @@ class Organizer:
             { "input_A" : ndarray, "input_B" : ndarray }
 
         """
-        if self.cfg.zero_center_folder is None:
-            raise ValueError("Can not calculate zero center: "
-                             "No zero center folder given")
-        if self._xs_mean is None:
-            self._xs_mean = load_zero_center_data(self, logging=logging)
-        return self._xs_mean
+        if self.xs_mean is None:
+            if self.cfg.zero_center_folder is None:
+                raise ValueError("Can not calculate zero center: "
+                                 "No zero center folder given")
+            self.xs_mean = load_zero_center_data(self, logging=logging)
+        return self.xs_mean
+
+    def _load_model(self, model, force_model):
+        """ Load saved model / check user input for model. """
+        # the epoch of the currently existing model (or None if there is none)
+        latest_epoch = self.io.get_latest_epoch()
+
+        if latest_epoch is None:
+            if model is None:
+                raise ValueError("You need to provide a compiled keras model "
+                                 "for the start of the training! (You gave None)")
+            try:
+                ks.utils.plot_model(
+                    model, self.io.get_subfolder("plots") + "/model_plot.png")
+            except OSError as e:
+                warnings.warn("Can not plot model: " + str(e))
+
+        elif force_model is True:
+            if model is None:
+                raise ValueError('force_model is True, but no model provided.')
+            print('Continuing training with user model (force_model=True)')
+
+        else:
+            # Load an existing model
+            if model is not None:
+                raise ValueError("You provided a model even though this is not "
+                                 "the start of the training.")
+            path_of_model = self.io.get_model_path(latest_epoch[0],
+                                                   latest_epoch[1])
+            print("Continuing training with saved model: " + path_of_model)
+            model = ks.models.load_model(path_of_model,
+                                         custom_objects=self.cfg.custom_objects)
+        next_epoch = self.io.get_next_epoch(latest_epoch)
+
+        print("Set to epoch {} file {}.".format(next_epoch[0],
+                                                next_epoch[1]))
+        return model, next_epoch
 
 
 class Configuration(object):
