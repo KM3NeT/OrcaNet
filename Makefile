@@ -1,6 +1,6 @@
 PKGNAME=orcanet
 ALLNAMES = $(PKGNAME)
-# ALLNAMES += km3modules
+# ALLNAMES += orcanet_contrib
 
 default: build
 

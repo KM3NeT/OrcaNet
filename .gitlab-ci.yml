@@ -53,9 +53,11 @@ pages:
         - *virtualenv_definition
         - cd docs && make html
         - mv _build/html/ ../public/
+        - cd .. && mv reports/coverage public/coverage
     artifacts:
         paths:
             - public
+    cache: {}
     only:
         - tags
         - master
