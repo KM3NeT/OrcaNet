@@ -416,7 +416,7 @@ class Configuration(object):
             Path to the toml list file.
 
         """
-        if self._list_file is None:
+        if self._list_file is not None:
             raise ValueError("Can not load list file: Has already been loaded! "
                              "({})".format(self._list_file))
 
