@@ -4,9 +4,9 @@ source = orcanet
 [report]
 include =
     orcanet/*
-    # orcanet_contrib/*
+
 omit =
-    */tests/*
+    orcanet/tests/*
     orcanet/builder_util/multi_gpu/*
 
 exclude_lines =
