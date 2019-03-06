@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-from setuptools import setup, find_packages
-from pkg_resources import get_distribution, DistributionNotFound
+from setuptools import setup
 
 with open('requirements.txt') as fobj:
     requirements = [l.strip() for l in fobj.readlines()]
@@ -13,7 +12,9 @@ setup(
     author_email='mmoser@km3net.de, michael.m.moser@fau.de, stefan.reck@fau.de',
     license='AGPL',
     install_requires=requirements,
-    packages=find_packages(),
+    packages=[
+        "orcanet", "orcanet_contrib"
+    ],
     include_package_data=True,
 
     setup_requires=['setuptools_scm'],
