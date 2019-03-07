@@ -2,10 +2,12 @@
 source = orcanet
 
 [report]
+include =
+    orcanet/*
+    # orcanet_contrib/*
 omit =
-    */tests/*
-    */builder_util/multi_gpu/*
-
+    orcanet/tests/*
+    orcanet/builder_util/multi_gpu/*
 exclude_lines =
     pragma: no cover
     raise AssertionError

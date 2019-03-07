@@ -14,6 +14,7 @@ class TestIOHandler(TestCase):
         cls.temp_dir = os.path.join(os.path.dirname(__file__), ".temp",
                                     "test_in_out")
         os.mkdir(cls.temp_dir)
+        cls.init_dir = os.getcwd()
         os.chdir(cls.temp_dir)
         # make some dummy data
         cls.n_bins = {'input_A': (2, 3), 'input_B': (2, 3)}
@@ -70,7 +71,7 @@ class TestIOHandler(TestCase):
         os.remove(cls.train_B_file_1["path"])
         os.remove(cls.train_B_file_2["path"])
 
-        os.chdir(os.path.join(os.path.dirname(__file__), ".temp"))
+        os.chdir(cls.init_dir)
         os.rmdir(cls.temp_dir)
 
     def test_get_n_bins(self):
