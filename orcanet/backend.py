@@ -405,7 +405,7 @@ def get_learning_rate(epoch, user_lr, no_train_files):
             raise TypeError("{} (Your tuple has length {})".format(error_msg,
                                                                    len(user_lr)))
 
-        lr = lr_init * (1 - lr_decay) ** (epoch[1] + epoch[0] * no_train_files)
+        lr = lr_init * (1 - lr_decay) ** ((epoch[1]-1) + (epoch[0]-1) * no_train_files)
         return lr
     except (ValueError, TypeError):
         pass
