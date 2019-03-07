@@ -2,6 +2,8 @@ from unittest import TestCase
 import os
 import h5py
 import numpy as np
+from keras.models import Model
+from keras.layers import Dense, Input, Concatenate, Flatten
 
 from orcanet.core import Configuration
 from orcanet.in_out import HistoryHandler, IOHandler
@@ -73,6 +75,89 @@ class TestIOHandler(TestCase):
 
         os.chdir(cls.init_dir)
         os.rmdir(cls.temp_dir)
+
+    def test_check_connections_no_sample(self):
+        input_shapes = self.n_bins
+        output_shapes = {
+            "out_A": 1,
+            "out_B": 1,
+        }
+
+        self.io.cfg.label_modifier = get_dummy_label_modifier(output_shapes.keys())
+        model = build_dummy_model(input_shapes, output_shapes)
+
+        self.io.check_connections(model)
+
+    def test_check_connections_ok_sample(self):
+        input_shapes = self.n_bins
+        output_shapes = {
+            "out_A": 1,
+            "out_B": 1,
+        }
+
+        def sample_modifier(samples):
+            return {'input_A': samples["input_A"], 'input_B': samples["input_B"]}
+
+        self.io.cfg.label_modifier = get_dummy_label_modifier(
+            output_shapes.keys())
+        self.io.cfg.sample_modifier = sample_modifier
+
+        model = build_dummy_model(input_shapes, output_shapes)
+        self.io.check_connections(model)
+
+    def test_check_connections_wrong_sample(self):
+        input_shapes = self.n_bins
+        output_shapes = {
+            "out_A": 1,
+            "out_B": 1,
+        }
+
+        def sample_modifier(samples):
+            return {'input_A': samples["input_A"]}
+
+        self.io.cfg.label_modifier = get_dummy_label_modifier(
+            output_shapes.keys())
+        self.io.cfg.sample_modifier = sample_modifier
+
+        model = build_dummy_model(input_shapes, output_shapes)
+        with self.assertRaises(ValueError):
+            self.io.check_connections(model)
+
+    def test_check_connections_wrong_label(self):
+        input_shapes = self.n_bins
+        output_shapes = {
+            "out_A": 1,
+            "out_B": 1,
+        }
+
+        self.io.cfg.label_modifier = get_dummy_label_modifier(["out_A"])
+        model = build_dummy_model(input_shapes, output_shapes)
+
+        with self.assertRaises(ValueError):
+            self.io.check_connections(model)
+
+    def test_check_connections_no_label(self):
+        input_shapes = self.n_bins
+        output_shapes = {
+            "out_A": 1,
+            "out_B": 1,
+        }
+
+        model = build_dummy_model(input_shapes, output_shapes)
+
+        with self.assertRaises(ValueError):
+            self.io.check_connections(model)
+
+    def test_check_connections_auto_label(self):
+        input_shapes = self.n_bins
+        output_shapes = {
+            "mc_A": 1,
+            "mc_B": 1,
+        }
+
+        model = build_dummy_model(input_shapes, output_shapes)
+
+        self.io.check_connections(model)
 
     def test_get_n_bins(self):
         value = self.io.get_n_bins()
@@ -304,6 +389,43 @@ def save_dummy_h5py(path, shape, value_xs=1., value_ys=1., size=50):
         h5f.create_dataset('y', data=ys, dtype=dtypes)
 
     return xs, ys
+
+
+def build_dummy_model(input_shapes, output_shapes):
+    """
+
+    Parameters
+    ----------
+    input_shapes : dict
+    output_shapes : dict
+
+    Returns
+    -------
+    model : keras model
+
+    """
+    inputs = {}
+    for name, shape in input_shapes.items():
+        inputs[name] = Input(shape, name=name)
+    conc = Concatenate()(list(inputs.values()))
+    flat = Flatten()(conc)
+
+    outputs = {}
+    for name, shape in output_shapes.items():
+        outputs[name] = Dense(shape, name=name)(flat)
+
+    model = Model(list(inputs.values()), list(outputs.values()))
+    return model
+
+
+def get_dummy_label_modifier(output_names):
+    def label_modifier(mc_info):
+        particle = mc_info["mc_A"]
+        y_true = dict()
+        for output_name in output_names:
+            y_true[output_name] = particle
+        return y_true
+    return label_modifier
 
 
 def assert_dict_arrays_equal(a, b):
