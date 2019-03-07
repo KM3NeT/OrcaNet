@@ -37,9 +37,7 @@ coverage:
     stage: coverage
     script:
         - *virtualenv_definition
-        - cd orcanet
-        - "make -C ../ test-cov|grep TOTAL| awk '{printf \"COVERAGE: %.2f%%\", (1-$3/$2)*100 }'"
-        - cd ..
+        - "make test-cov|grep TOTAL| awk '{printf \"COVERAGE: %.2f%%\", (1-$3/$2)*100 }'"
     coverage: '/COVERAGE:\s*([0-9]*\.[0-9]*%)/'
     artifacts:
         paths:

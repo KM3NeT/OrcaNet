@@ -2,12 +2,9 @@
 source = orcanet
 
 [report]
-include =
-    orcanet/*
-
 omit =
-    orcanet/tests/*
-    orcanet/builder_util/multi_gpu/*
+    */tests/*
+    */builder_util/multi_gpu/*
 
 exclude_lines =
     pragma: no cover
@@ -17,3 +14,4 @@ exclude_lines =
     if __name__ == .__main__.:
     if self.debug:
     if settings.DEBUG
+
