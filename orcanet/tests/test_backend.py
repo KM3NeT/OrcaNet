@@ -1,4 +1,5 @@
 from unittest import TestCase
+from unittest.mock import MagicMock
 import os
 import h5py
 import numpy as np
@@ -93,6 +94,99 @@ class TestBatchGenerator(TestCase):
         with self.assertRaises(StopIteration):
             next(gene)
 
+    def test_batch_zero_center(self):
+        filepaths = self.filepaths_file_1
+
+        xs_mean = {name: np.ones(shape) * 0.5 for name, shape in self.n_bins.items()}
+
+        self.orga.get_xs_mean = MagicMock(return_value=xs_mean)
+        gene = hdf5_batch_generator(self.orga, filepaths, zero_center=True)
+
+        target_xs_batch_1 = {
+            "input_A": np.subtract(self.train_A_file_1_ctnt[0][:2], xs_mean["input_A"]),
+            "input_B": np.subtract(self.train_B_file_1_ctnt[0][:2], xs_mean["input_B"]),
+        }
+
+        target_ys_batch_1 = label_modifier(self.train_A_file_1_ctnt[1][:2])
+
+        target_xs_batch_2 = {
+            "input_A": np.subtract(self.train_A_file_1_ctnt[0][2:], xs_mean["input_A"]),
+            "input_B": np.subtract(self.train_B_file_1_ctnt[0][2:], xs_mean["input_B"]),
+        }
+
+        target_ys_batch_2 = label_modifier(self.train_A_file_1_ctnt[1][2:])
+
+        xs, ys = next(gene)
+        assert_dict_arrays_equal(xs, target_xs_batch_1)
+        assert_dict_arrays_equal(ys, target_ys_batch_1)
+
+        xs, ys = next(gene)
+        assert_dict_arrays_equal(xs, target_xs_batch_2)
+        assert_dict_arrays_equal(ys, target_ys_batch_2)
+
+    def test_batch_sample_modifier(self):
+        filepaths = self.filepaths_file_1
+
+        def sample_modifier(xs_in):
+            mod = {name: val*2 for name, val in xs_in.items()}
+            return mod
+
+        self.orga.cfg.sample_modifier = sample_modifier
+        gene = hdf5_batch_generator(self.orga, filepaths)
+
+        target_xs_batch_1 = {
+            "input_A": self.train_A_file_1_ctnt[0][:2]*2,
+            "input_B": self.train_B_file_1_ctnt[0][:2]*2,
+        }
+
+        target_ys_batch_1 = label_modifier(self.train_A_file_1_ctnt[1][:2])
+
+        target_xs_batch_2 = {
+            "input_A": self.train_A_file_1_ctnt[0][2:]*2,
+            "input_B": self.train_B_file_1_ctnt[0][2:]*2,
+        }
+
+        target_ys_batch_2 = label_modifier(self.train_A_file_1_ctnt[1][2:])
+
+        xs, ys = next(gene)
+        assert_dict_arrays_equal(xs, target_xs_batch_1)
+        assert_dict_arrays_equal(ys, target_ys_batch_1)
+
+        xs, ys = next(gene)
+        assert_dict_arrays_equal(xs, target_xs_batch_2)
+        assert_dict_arrays_equal(ys, target_ys_batch_2)
+
+    def test_batch_mc_infos(self):
+        filepaths = self.filepaths_file_1
+
+        gene = hdf5_batch_generator(self.orga, filepaths, yield_mc_info=True)
+
+        target_xs_batch_1 = {
+            "input_A": self.train_A_file_1_ctnt[0][:2],
+            "input_B": self.train_B_file_1_ctnt[0][:2],
+        }
+
+        target_ys_batch_1 = label_modifier(self.train_A_file_1_ctnt[1][:2])
+        target_mc_info_batch_1 = self.train_A_file_1_ctnt[1][:2]
+
+        target_xs_batch_2 = {
+            "input_A": self.train_A_file_1_ctnt[0][2:],
+            "input_B": self.train_B_file_1_ctnt[0][2:],
+        }
+
+        target_ys_batch_2 = label_modifier(self.train_A_file_1_ctnt[1][2:])
+        target_mc_info_batch_2 = self.train_A_file_1_ctnt[1][2:]
+
+        xs, ys, mc_info = next(gene)
+        assert_dict_arrays_equal(xs, target_xs_batch_1)
+        assert_dict_arrays_equal(ys, target_ys_batch_1)
+        assert_equal_struc_array(mc_info, target_mc_info_batch_1)
+
+        xs, ys, mc_info = next(gene)
+        assert_dict_arrays_equal(xs, target_xs_batch_2)
+        assert_dict_arrays_equal(ys, target_ys_batch_2)
+        assert_equal_struc_array(mc_info, target_mc_info_batch_2)
+
 
 class TestFunctions(TestCase):
     def test_get_datasets(self):
@@ -158,6 +252,13 @@ class TestFunctions(TestCase):
             lr = get_learning_rate((2, fileno + 1), user_lr, no_train_files)
             self.assertAlmostEqual(lr, rates_epoch_2[fileno])
 
+    def test_get_learning_rate_other(self):
+        user_lr = print
+        no_train_files = 3
+
+        with self.assertRaises(TypeError):
+            get_learning_rate((1, 1), user_lr, no_train_files)
+
 
 def save_dummy_h5py(path, shape, size):
     """
@@ -193,3 +294,11 @@ def assert_dict_arrays_equal(a, b):
     for key, value in a.items():
         assert key in b
         np.testing.assert_array_almost_equal(a[key], b[key])
+
+
+def assert_equal_struc_array(a, b):
+    """  np.testing.assert_array_equal does not work for arrays containing nans...
+     so test individual instead. """
+    np.testing.assert_array_equal(a.dtype, b.dtype)
+    for name in a.dtype.names:
+        np.testing.assert_almost_equal(a[name], b[name])

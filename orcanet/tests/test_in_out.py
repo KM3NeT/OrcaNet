@@ -21,38 +21,63 @@ class TestIOHandler(TestCase):
         # make some dummy data
         cls.n_bins = {'input_A': (2, 3), 'input_B': (2, 3)}
         cls.train_sizes = [30, 50]
+        cls.val_sizes = [40, ]
+        cls.file_names = (
+            "/input_A_train_1.h5",
+            "/input_A_train_2.h5",
+            "/input_B_train_1.h5",
+            "/input_B_train_2.h5",
+            "/input_A_val_1.h5",
+            "/input_B_val_1.h5",
+        )
         cls.train_A_file_1 = {
-            "path": cls.temp_dir + "/input_A_train_1.h5",
+            "path": cls.temp_dir + cls.file_names[0],
             "shape": cls.n_bins["input_A"],
             "value_xs": 1.1,
             "value_ys": 1.2,
             "size": cls.train_sizes[0],
         }
         cls.train_A_file_2 = {
-            "path": cls.temp_dir + "/input_A_train_2.h5",
+            "path": cls.temp_dir + cls.file_names[1],
             "shape": cls.n_bins["input_A"],
             "value_xs": 1.3,
             "value_ys": 1.4,
             "size": cls.train_sizes[1],
         }
         cls.train_B_file_1 = {
-            "path": cls.temp_dir + "/input_B_train_1.h5",
+            "path": cls.temp_dir + cls.file_names[2],
             "shape": cls.n_bins["input_B"],
             "value_xs": 2.1,
             "value_ys": 2.2,
             "size": cls.train_sizes[0],
         }
         cls.train_B_file_2 = {
-            "path": cls.temp_dir + "/input_B_train_2.h5",
+            "path": cls.temp_dir + cls.file_names[3],
             "shape": cls.n_bins["input_B"],
             "value_xs": 2.3,
             "value_ys": 2.4,
             "size": cls.train_sizes[1],
         }
+        cls.val_A_file_1 = {
+            "path": cls.temp_dir + cls.file_names[4],
+            "shape": cls.n_bins["input_A"],
+            "value_xs": 3.1,
+            "value_ys": 3.2,
+            "size": cls.val_sizes[0],
+        }
+        cls.val_B_file_1 = {
+            "path": cls.temp_dir + cls.file_names[5],
+            "shape": cls.n_bins["input_B"],
+            "value_xs": 4.1,
+            "value_ys": 4.2,
+            "size": cls.val_sizes[0],
+        }
         cls.train_A_file_1_ctnt = save_dummy_h5py(**cls.train_A_file_1)
         cls.train_A_file_2_ctnt = save_dummy_h5py(**cls.train_A_file_2)
         cls.train_B_file_1_ctnt = save_dummy_h5py(**cls.train_B_file_1)
         cls.train_B_file_2_ctnt = save_dummy_h5py(**cls.train_B_file_2)
+        cls.val_A_file_1_ctnt = save_dummy_h5py(**cls.val_A_file_1)
+        cls.val_B_file_1_ctnt = save_dummy_h5py(**cls.val_B_file_1)
 
     def setUp(self):
         self.data_folder = os.path.join(os.path.dirname(__file__), "data")
@@ -72,9 +97,31 @@ class TestIOHandler(TestCase):
         os.remove(cls.train_A_file_2["path"])
         os.remove(cls.train_B_file_1["path"])
         os.remove(cls.train_B_file_2["path"])
+        os.remove(cls.val_A_file_1["path"])
+        os.remove(cls.val_B_file_1["path"])
 
         os.chdir(cls.init_dir)
         os.rmdir(cls.temp_dir)
+
+    def test_use_local_node(self):
+        scratch_dir = os.environ['TMPDIR']
+
+        target_dirs_train = {
+             "input_A": (scratch_dir + self.file_names[0], scratch_dir + self.file_names[1]),
+             "input_B": (scratch_dir + self.file_names[2], scratch_dir + self.file_names[3]),
+        }
+        target_dirs_val = {
+             "input_A": (scratch_dir + self.file_names[4], ),
+             "input_B": (scratch_dir + self.file_names[5], ),
+        }
+
+        self.io.use_local_node()
+
+        value = self.io.get_local_files("train")
+        self.assertDictEqual(target_dirs_train, value)
+
+        value = self.io.get_local_files("val")
+        self.assertDictEqual(target_dirs_val, value)
 
     def test_check_connections_no_sample(self):
         input_shapes = self.n_bins
@@ -249,8 +296,8 @@ class TestIOHandler(TestCase):
     def test_get_local_files_val(self):
         value = self.io.get_local_files("val")
         target = {
-            'input_A': ('input_A_val_1.h5', 'input_A_val_2.h5', 'input_A_val_3.h5'),
-            'input_B': ('input_B_val_1.h5', 'input_B_val_2.h5', 'input_B_val_3.h5')
+            'input_A': ('input_A_val_1.h5',),
+            'input_B': ('input_B_val_1.h5',)
         }
         self.assertDictEqual(value, target)
 
@@ -261,7 +308,7 @@ class TestIOHandler(TestCase):
 
     def test_get_no_of_files_val(self):
         value = self.io.get_no_of_files("val")
-        target = 3
+        target = 1
         self.assertEqual(value, target)
 
     def test_yield_files_train(self):
@@ -285,14 +332,6 @@ class TestIOHandler(TestCase):
             {
                 'input_A': 'input_A_val_1.h5',
                 'input_B': 'input_B_val_1.h5',
-            },
-            {
-                'input_A': 'input_A_val_2.h5',
-                'input_B': 'input_B_val_2.h5',
-            },
-            {
-                'input_A': 'input_A_val_3.h5',
-                'input_B': 'input_B_val_3.h5',
             },
         )
         for i, value in enumerate(file_paths):

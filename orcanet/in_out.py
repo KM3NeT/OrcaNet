@@ -836,7 +836,7 @@ def use_local_tmpdir(train_files, val_files):
             print("Copying", f_path, "\nto", f_path_ssd)
             shutil.copy2(f_path, local_scratch_path)
             new_pathes.append(f_path_ssd)
-        train_files_ssd[input_key] = new_pathes
+        train_files_ssd[input_key] = tuple(new_pathes)
 
     for input_key in val_files:
         old_pathes = val_files[input_key]
@@ -847,7 +847,7 @@ def use_local_tmpdir(train_files, val_files):
             print("Copying", f_path, "\nto", f_path_ssd)
             shutil.copy2(f_path, local_scratch_path)
             new_pathes.append(f_path_ssd)
-        val_files_ssd[input_key] = new_pathes
+        val_files_ssd[input_key] = tuple(new_pathes)
 
     print('Finished copying the input data to the local tmpdir folder.')
     return train_files_ssd, val_files_ssd
