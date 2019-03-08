@@ -1,9 +1,11 @@
 from unittest import TestCase
+from unittest.mock import patch
 import os
 import h5py
 import numpy as np
 from keras.models import Model
 from keras.layers import Dense, Input, Concatenate, Flatten
+import shutil
 
 from orcanet.core import Configuration
 from orcanet.in_out import HistoryHandler, IOHandler
@@ -104,24 +106,39 @@ class TestIOHandler(TestCase):
         os.rmdir(cls.temp_dir)
 
     def test_use_local_node(self):
-        scratch_dir = os.environ['TMPDIR']
+        temp_temp_dir = self.temp_dir + "/scratch"
+        os.mkdir(temp_temp_dir)
+        if "TMPDIR" in os.environ:
+            tempdir_environ = os.environ["TMPDIR"]
+        else:
+            tempdir_environ = None
+        try:
+            os.environ["TMPDIR"] = temp_temp_dir
+            scratch_dir = temp_temp_dir
 
-        target_dirs_train = {
-             "input_A": (scratch_dir + self.file_names[0], scratch_dir + self.file_names[1]),
-             "input_B": (scratch_dir + self.file_names[2], scratch_dir + self.file_names[3]),
-        }
-        target_dirs_val = {
-             "input_A": (scratch_dir + self.file_names[4], ),
-             "input_B": (scratch_dir + self.file_names[5], ),
-        }
+            target_dirs_train = {
+                 "input_A": (scratch_dir + self.file_names[0], scratch_dir + self.file_names[1]),
+                 "input_B": (scratch_dir + self.file_names[2], scratch_dir + self.file_names[3]),
+            }
+            target_dirs_val = {
+                 "input_A": (scratch_dir + self.file_names[4], ),
+                 "input_B": (scratch_dir + self.file_names[5], ),
+            }
 
-        self.io.use_local_node()
+            self.io.use_local_node()
 
-        value = self.io.get_local_files("train")
-        self.assertDictEqual(target_dirs_train, value)
+            value = self.io.get_local_files("train")
+            self.assertDictEqual(target_dirs_train, value)
 
-        value = self.io.get_local_files("val")
-        self.assertDictEqual(target_dirs_val, value)
+            value = self.io.get_local_files("val")
+            self.assertDictEqual(target_dirs_val, value)
+        finally:
+            if tempdir_environ is not None:
+                os.environ["TMPDIR"] = tempdir_environ
+            else:
+                os.environ.pop("TMPDIR")
+
+            shutil.rmtree(temp_temp_dir)
 
     def test_check_connections_no_sample(self):
         input_shapes = self.n_bins
