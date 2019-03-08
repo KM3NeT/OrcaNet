@@ -94,7 +94,11 @@ class Organizer:
             The trained keras model.
 
         """
-        model, next_epoch = self._load_model(model, force_model)
+        model, latest_epoch = self._load_model(model, force_model)
+        next_epoch = self.io.get_next_epoch(latest_epoch)
+
+        print("Set to epoch {} file {}.".format(next_epoch[0],
+                                                next_epoch[1]))
 
         if self.cfg.get_list_file() is None:
             raise ValueError("No files specified. You need to load a toml "
@@ -247,11 +251,7 @@ class Organizer:
             print("Continuing training with saved model: " + path_of_model)
             model = ks.models.load_model(path_of_model,
                                          custom_objects=self.cfg.custom_objects)
-        next_epoch = self.io.get_next_epoch(latest_epoch)
-
-        print("Set to epoch {} file {}.".format(next_epoch[0],
-                                                next_epoch[1]))
-        return model, next_epoch
+        return model, latest_epoch
 
 
 class Configuration(object):
