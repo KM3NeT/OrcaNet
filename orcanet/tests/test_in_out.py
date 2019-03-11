@@ -1,5 +1,4 @@
 from unittest import TestCase
-from unittest.mock import patch
 import os
 import h5py
 import numpy as np
