@@ -50,6 +50,30 @@ class TestSequentialBuilder(TestCase):
         self.assertIsInstance(model.layers[5], Dropout)
         self.assertEqual(model.output_shape[1:], (3, 3, 2))
 
+    def test_attach_output_layers_regression_output_shape_and_names(self):
+        head_arch = "regression_error"
+        head_arch_args = {
+            "output_names": ['out_A', 'out_B'],
+        }
+
+        inp = Input((5, ))
+        builder = BlockBuilder()
+        x = builder.attach_output_layers(inp, head_arch, head_arch_args)
+        model = Model(inp, x)
+
+        target_output_shapes = {
+            'out_A': (1,),
+            'out_B': (1,),
+            'out_A_err': (2,),
+            'out_B_err': (2,),
+        }
+
+        output_shapes = {}
+        for i, output_name in enumerate(model.output_names):
+            output_shapes[output_name] = model.output_shape[i][1:]
+
+        self.assertDictEqual(output_shapes, target_output_shapes)
+
     def test_attach_layer_dense(self):
         inp = Input((3, 3, 1))
         body_defaults = {"type": "conv_block", "conv_dim": 2}

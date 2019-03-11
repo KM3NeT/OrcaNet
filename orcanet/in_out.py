@@ -43,9 +43,10 @@ class IOHandler(object):
             empty or does not exist yet.
 
         """
-        if os.path.exists(self.cfg.output_folder + "saved_models"):
+        saved_models_folder = self.cfg.output_folder + "saved_models"
+        if os.path.exists(saved_models_folder):
             files = []
-            for file in os.listdir(self.cfg.output_folder + "saved_models"):
+            for file in os.listdir(saved_models_folder):
                 if file.endswith('.h5'):
                     files.append(file)
 
@@ -83,7 +84,7 @@ class IOHandler(object):
 
         Parameters
         ----------
-        epoch : tuple
+        epoch : tuple or None
             Current epoch and file number.
 
         Returns
@@ -101,6 +102,7 @@ class IOHandler(object):
         return next_epoch
 
     def get_previous_epoch(self, epoch):
+        """ Return the previous epoch / fileno tuple. """
         if epoch[1] == 1:
             if epoch[0] == 1:
                 raise ValueError("Can not get previous epoch of epoch {} file {}".format(*epoch))
@@ -163,11 +165,15 @@ class IOHandler(object):
             + '/model_epoch_{}_file_{}.h5'.format(epoch, fileno)
         return model_filename
 
-    def get_pred_path(self, epoch, fileno, list_name):
+    def get_pred_path(self, epoch, fileno):
         """ Get the path to a saved prediction. """
+        list_name = os.path.splitext(
+            os.path.basename(self.cfg.get_list_file()))[0]
+
         pred_filename = self.get_subfolder("predictions") + \
             '/pred_model_epoch_{}_file_{}_on_{}_val_files.h5'.format(
                 epoch, fileno, list_name)
+
         return pred_filename
 
     def use_local_node(self):
@@ -226,6 +232,7 @@ class IOHandler(object):
             Toml-list input names as keys, list of the bins as values.
 
         """
+        # TODO check if bins are equal in all files?
         train_files = self.get_local_files("train")
         n_bins = {}
         for input_key in train_files:
@@ -244,7 +251,7 @@ class IOHandler(object):
 
         Returns
         -------
-        file_sizes : list
+        file_sizes : List
             Its length is equal to the number of files in each input set.
 
         Raises
@@ -301,7 +308,7 @@ class IOHandler(object):
 
     def yield_files(self, which):
         """
-        Yield a training or validation file for every input.
+        Yield a training or validation filepaths for every input.
 
         They will be yielded in the same order as they are given in the
         toml file.
@@ -326,7 +333,7 @@ class IOHandler(object):
     def get_file(self, which, file_no):
         """ Get a dict with the n-th files. """
         files = self.get_local_files(which)
-        files_dict = {key: files[key][file_no] for key in files}
+        files_dict = {key: files[key][file_no-1] for key in files}
         return files_dict
 
     def check_connections(self, model):
@@ -449,6 +456,7 @@ class IOHandler(object):
 
     def get_batch(self):
         """ For testing purposes, return a batch of samples and mc_infos. """
+        # TODO gets mc_info only from first train file
         files_dict = next(self.yield_files("train"))
         xs = {}
         for i, inp_name in enumerate(files_dict):
@@ -757,14 +765,6 @@ class HistoryHandler:
         return state_dicts
 
 
-
-
-
-
-
-        return is_val
-
-
 def h5_get_number_of_rows(h5_filepath, datasets):
     """
     Gets the total number of rows of of a .h5 file.
@@ -836,7 +836,7 @@ def use_local_tmpdir(train_files, val_files):
             print("Copying", f_path, "\nto", f_path_ssd)
             shutil.copy2(f_path, local_scratch_path)
             new_pathes.append(f_path_ssd)
-        train_files_ssd[input_key] = new_pathes
+        train_files_ssd[input_key] = tuple(new_pathes)
 
     for input_key in val_files:
         old_pathes = val_files[input_key]
@@ -847,7 +847,7 @@ def use_local_tmpdir(train_files, val_files):
             print("Copying", f_path, "\nto", f_path_ssd)
             shutil.copy2(f_path, local_scratch_path)
             new_pathes.append(f_path_ssd)
-        val_files_ssd[input_key] = new_pathes
+        val_files_ssd[input_key] = tuple(new_pathes)
 
     print('Finished copying the input data to the local tmpdir folder.')
     return train_files_ssd, val_files_ssd

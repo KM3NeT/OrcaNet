@@ -1,6 +1,6 @@
 PKGNAME=orcanet
 ALLNAMES = $(PKGNAME)
-# ALLNAMES += km3modules
+ALLNAMES += orcanet_contrib
 
 default: build
 
@@ -23,7 +23,7 @@ test:
 	py.test --junitxml=./reports/junit.xml -o junit_suite_name=$(PKGNAME) $(PKGNAME)
 
 test-cov:
-	py.test --cov ./ --cov-report term-missing --cov-report xml:reports/coverage.xml --cov-report html:reports/coverage $(ALLNAMES)
+	py.test --cov ./ --ignore orcanet/tests/test_integration_full.py --cov-report term-missing --cov-report xml:reports/coverage.xml --cov-report html:reports/coverage $(ALLNAMES)
 
 test-loop:
 	py.test $(PKGNAME)

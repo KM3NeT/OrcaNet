@@ -1,0 +1,31 @@
+[body]
+architecture = "single"
+
+# global default values for all the layers of the network
+type = "conv_block"
+conv_dim = 3
+batchnorm=true
+
+# config of every conv layer, will overwrite the default values above
+blocks = [
+          {filters=10},
+          {filters=10, pool_size=[2, 2, 2]},
+          ]
+
+
+[head]
+architecture = "categorical"
+architecture_args = {output_name="ts_output", categories=2}
+
+activation = "relu"
+
+
+[compile]
+optimizer = "adam"
+
+[compile.losses]
+ts_output = {function="categorical_crossentropy", metrics=['acc']}
+
+
+[orca_modifiers]
+label_modifier = 'track-shower'

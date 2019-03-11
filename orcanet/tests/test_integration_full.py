@@ -5,8 +5,6 @@ import numpy as np
 import h5py
 import os
 import shutil
-from keras.models import Model
-from keras.layers import Dense, Input, Flatten, Convolution3D
 from unittest import TestCase
 
 from orcanet.core import Organizer
@@ -14,8 +12,8 @@ from orcanet.model_builder import ModelBuilder
 from orcanet_contrib.custom_objects import get_custom_objects
 
 
-class DatasetTest(TestCase):
-    """ Tests which require a dataset. """
+class TestIntegration(TestCase):
+    """ Run the actual training to see if it throws any errors. """
     def setUp(self):
         """
         Make a .temp directory in the current working directory, generate
@@ -66,7 +64,7 @@ class DatasetTest(TestCase):
         """ Remove the .temp directory. """
         shutil.rmtree(self.temp_dir)
 
-    def test_zero_center(self):
+    def test_integration_zero_center(self):
         """ Calculate the zero center image and check if it works properly. """
         orga = self.make_orga()
         xs_mean = orga.get_xs_mean()
@@ -79,7 +77,7 @@ class DatasetTest(TestCase):
         self.assertTrue(np.array_equal(zero_center_used_ip_files,
                                        orga.cfg._train_files["testing_input"]))
 
-    def test_multi_input_model(self):
+    def test_integration_multi_input_model(self):
         """
         Make a model and train it with the test toml files provided to check
         if it throws an error. Also resumes training after the first epoch
@@ -106,40 +104,6 @@ class DatasetTest(TestCase):
         orga.cfg.sample_modifier = test_modifier
         orga.train_and_validate(epochs=1)
         orga.predict()
-
-    def test_model_setup_CNN_model(self):
-        orga = self.make_orga()
-        model_file = os.path.join(self.data_folder, "model_CNN.toml")
-        builder = ModelBuilder(model_file)
-        model = builder.build(orga)
-
-        self.assertEqual(model.input_shape[1:], self.shape)
-        self.assertEqual(model.output_shape[1:], (2, ))
-        self.assertEqual(len(model.layers), 14)
-
-    def test_merge_models(self):
-        def build_model(inp_layer_name, inp_shape):
-            inp = Input(inp_shape, name=inp_layer_name)
-            x = Convolution3D(3, 3)(inp)
-            x = Flatten()(x)
-            out = Dense(1, name="out_0")(x)
-
-            model = Model(inp, out)
-            return model
-
-        model_file = os.path.join(self.data_folder, "model_CNN.toml")
-        builder = ModelBuilder(model_file)
-        model1 = build_model("inp_A", self.shape)
-        model2 = build_model("inp_B", self.shape)
-        merged_model = builder.merge_models([model1, model2])
-
-        for layer in model1.layers + model2.layers:
-            if isinstance(layer, Dense):
-                continue
-            merged_layer = merged_model.get_layer(layer.name)
-            for i in range(len(layer.get_weights())):
-                self.assertTrue(np.array_equal(layer.get_weights()[i],
-                                               merged_layer.get_weights()[i]))
 
 
 def make_dummy_data(filepath1, filepath2, shape):
@@ -183,12 +147,3 @@ def label_modifier(y_values):
     for key_label in ys:
         ys[key_label] = ys[key_label].astype(np.float32)
     return ys
-
-
-def make_dummy_model(shape):
-    inp = Input(shape=shape)
-    x = Flatten()(inp)
-    x = Dense(5)(x)
-    model = Model(inp, x)
-    model.compile("sgd", loss="mse")
-    return model

@@ -2,13 +2,18 @@ Modifiers in OrcaNet
 ====================
 .. contents:: :local:
 
-Modifiers are used to preprocess data from the input files, before handing them to the network.
+Modifiers are used to preprocess data from the input files, before handing them
+to the network.
 They are functions which are applied to both the samples, as well as the labels.
-They require the input and output layers of the network, as well as ever input set in the toml list file to be named.
-This makes it easy to assure that the right data is fed into the right layer of the network, especially if you have multiple inputs or outputs.
+They require the input and output layers of the network, as well as ever input
+set in the toml list file to be named.
+This makes it easy to assure that the right data is fed into the right layer of
+the network, especially if there are multiple inputs or outputs.
 
-**Hint:** If you have developed a new modifier, it might be smart to test if it actually does what it should with your data.
-You can get a batch of samples ``xs`` and ``mc_info`` data from your toml list file like this:
+**Hint:** If you have developed a new modifier, it might be smart to test if it
+actually does what it should with the data.
+You can get a batch of samples ``xs`` and ``mc_info`` data from your toml
+list file like this:
 
 .. code-block:: python
 
@@ -17,11 +22,14 @@ You can get a batch of samples ``xs`` and ``mc_info`` data from your toml list f
     orga = Organizer(output_folder, list_file)
     xs, mc_info = orga.io.get_batch()
 
-You can then apply your modifiers on them.
+The modifiers can then be applied to them.
 
 Label modifier
 --------------
-The label modifier is used to generate the labels for the model from the mc_info of the h5 input files.
+The label modifier is used to generate the labels for the model from the
+``mc_info`` data of the h5 input files. Unless the label for the model
+is directly stored in the h5py files, the definition of a label modifier
+is mandatory.
 It must be of the following form:
 
 .. code-block:: python
@@ -30,9 +38,11 @@ It must be of the following form:
         ...
         return y_true
 
-``mc_info``: ``numpy structured array``
-    One batch of mc_info data read from the h5 input files.
-    Contains all the info for each sample in the batch with the name of each property as a dtype name.
+``mc_info``: ``numpy array``
+    One batch of data read from the ``key_labels`` datagroup in the h5 input
+    files.
+    If the content of the datagroup is a structured array, this will
+    also be a structured array.
 ``y_true``: ``dict``
     Keys: The names of the output layers of the model.
 
@@ -44,7 +54,8 @@ It can be set via
 
     orga.cfg.label_modifier = label_modifier
 
-**Hint:** If the names of the dtypes in the toml list file contain the names of the output layers, no sample modifier is required!
+**Hint:** If the names of the output layers of the model are also the
+names of dtypes in the ``mc_info`` data, no label modifier is required!
 
 Example
 ^^^^^^^
@@ -64,9 +75,13 @@ A simple classification model with one output.
         example_model = Model((inp_1, inp_2), output)
         return example_model
 
-The output will be either [1,0] or [0,1] (one hot encoding), depending on whether the event is a neutrino or not.
-Suppose that in the structured array mc_info of the input file, one of the fields has the name ``particle``, which is an int and 1 for neutrinos, or some other number for non-neutrinos.
-We need to convert this to the categorical output of the model with a label modifier:
+The output will be either [1,0] or [0,1] (one hot encoding), depending on
+whether the event is a neutrino or not.
+Suppose that in the structured array mc_info of the input file, one of the
+fields has the name ``particle``, which is an int and 1 for neutrinos, or
+some other number for non-neutrinos.
+We need to convert this to the categorical output of the model with a label
+modifier:
 
 .. code-block:: python
 
@@ -84,19 +99,29 @@ We need to convert this to the categorical output of the model with a label modi
 
 Sample modifier
 ---------------
-The sample modifiers is used to distribute the samples read from the h5 input file to the right input layer in the network.
+The sample modifier is used to lead the samples read from the h5 input
+file to the input layers of the network.
 It must be of the following form:
 
 .. code-block:: python
 
-    def sample_modifier(xs_list):
+    def sample_modifier(xs_files):
         ...
         return xs_layer
 
-``xs_list``: ``dict``
-    Toml list input set names as keys, one batch of data as values.
+``xs_files``: ``dict``
+    One batch of data read from the ``key_samples`` datagroup in the h5 input
+    files.
+
+    Keys: Input set names from the toml list file.
+
+    Values: Numpy array with samples from the respective file.
 ``xs_layer``: ``dict``
-    Model input layer names as keys, one batch of data as values.
+    One batch of data on which the model will be trained on.
+
+    Keys: Name of an input layer of the network.
+
+    Values: Numpy array with samples.
 
 It can be set via
 
@@ -104,15 +129,15 @@ It can be set via
 
     orga.cfg.sample_modifier = sample_modifier
 
-**Hint:** If the names of the input sets in the toml list file and the names of the input layers match, no sample modifier is required!
+**Hint:** If the names of the input sets in the toml list file and the names of
+the input layers match, no sample modifier is required!
 
 
 Example
 ^^^^^^^
-Using the example classification model from above.
-We have xy and yz projections in the input files, but want to feed the network xy and zy data.
-
-Content of the toml list file::
+Using the example classification model from above, assume that we have
+input files with data in XY- and in YZ-projections.
+In that case, the content of the toml list file could like this::
 
     [xy]
     train_files = [
@@ -132,7 +157,9 @@ Content of the toml list file::
     "data/yz_val.h5"
     ]
 
-The following sample modifier is required:
+Let's say we want to feed the network XY- and ZY-projections instead, i.e. the
+axes of the YZ-projection need to be swapped.
+The following sample modifier will perform this operation:
 
 .. code-block:: python
 
@@ -145,8 +172,10 @@ The following sample modifier is required:
 
 Dataset modifier
 ----------------
-The dataset modifiers is only used when a model is evaluated with ``orga.predict``.
-It will determine what is written in which dataset in the resulting evaluation h5 file.
+The dataset modifiers is only used when a model is evaluated with
+``organizer.predict``.
+It will determine what is written in the resulting
+prediction h5 file.
 It must be of the following form:
 
 .. code-block:: python
@@ -156,20 +185,30 @@ It must be of the following form:
         return datasets
 
 ``mc_info``: ``numpy structured array``
-    One batch of mc_info data read from the h5 input files.
-    Contains all the info for each sample in the batch with the name of each property as a dtype name.
+    One batch of data read from the ``key_labels`` datagroup in the h5 input
+    files.
+    If the content of the datagroup is a structured array, this will
+    also be a structured array.
 ``y_true``: ``dict``
+    The labels given to the model.
+
     Keys: The names of the output layers of the model.
 
     Values: One batch of labels as a numpy array.
 ``y_pred``: ``dict``
+    The predictions of the model.
+
     Keys: The names of the output layers of the model.
 
-    Values: One batch of predictions from the respective output layer of the model as a numpy array.
+    Values: One batch of predictions from the respective output layer of the
+    model as a numpy array.
 ``datasets``: ``dict``
-    Keys: Names of the datasets which will be created in the resulting h5 evaluation file.
+    The datasets which will be created in the resulting h5
+    prediction file.
 
-    Values: The content of the datasets as a numpy array (or structured arrray).
+    Keys: Names of the datasets.
+
+    Values: The content of each dataset as a numpy array.
 
 It can be set via
 
@@ -177,4 +216,5 @@ It can be set via
 
     orga.cfg.dataset_modifier = dataset_modifier
 
-**Hint:** If no dataset modifier is given, the following datasets will be created: mc_info, and two sets for every output layer (label and pred).
+**Hint:** If no dataset modifier is given, the following datasets will be
+created: mc_info, and two sets for every output layer (label and pred).

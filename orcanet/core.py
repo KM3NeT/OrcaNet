@@ -94,7 +94,11 @@ class Organizer:
             The trained keras model.
 
         """
-        model, next_epoch = self._load_model(model, force_model)
+        model, latest_epoch = self._load_model(model, force_model)
+        next_epoch = self.io.get_next_epoch(latest_epoch)
+
+        print("Set to epoch {} file {}.".format(next_epoch[0],
+                                                next_epoch[1]))
 
         if self.cfg.get_list_file() is None:
             raise ValueError("No files specified. You need to load a toml "
@@ -167,9 +171,7 @@ class Organizer:
             print("Automatically set epoch to epoch {} file {}.".format(epoch,
                                                                         fileno))
 
-        list_name = os.path.splitext(
-            os.path.basename(self.cfg.get_list_file()))[0]
-        pred_filename = self.io.get_pred_path(epoch, fileno, list_name)
+        pred_filename = self.io.get_pred_path(epoch, fileno)
 
         if os.path.isfile(pred_filename):
             print("Prediction has already been done.")
@@ -249,11 +251,7 @@ class Organizer:
             print("Continuing training with saved model: " + path_of_model)
             model = ks.models.load_model(path_of_model,
                                          custom_objects=self.cfg.custom_objects)
-        next_epoch = self.io.get_next_epoch(latest_epoch)
-
-        print("Set to epoch {} file {}.".format(next_epoch[0],
-                                                next_epoch[1]))
-        return model, next_epoch
+        return model, latest_epoch
 
 
 class Configuration(object):
@@ -283,11 +281,11 @@ class Configuration(object):
         If true, surpresses the tensorflow info logs which usually spam
         the terminal.
     key_samples : str
-        The name of the datagroup in your h5 input files which contains
+        The name of the datagroup in the h5 input files which contains
         the samples for the network.
     key_labels : str
-        The name of the datagroup in your h5 input files which contains
-        the labels for the network.
+        The name of the datagroup in the h5 input files which contains
+        the info for the labels.
     label_modifier : function or None
         Operation to be performed on batches of labels read from the input files
         before they are fed into the model. If None is given, all labels with

@@ -132,6 +132,9 @@ def get_ylims(train_data, val_data=None, fraction=0.25):
         Minimum, maximum of the data.
 
     """
+    assert not (train_data is None and
+                val_data is None), "train and val data are None"
+
     def reject_outliers(data, threshold):
         d = np.abs(data - np.median(data))
         mdev = np.median(d)
@@ -163,8 +166,13 @@ def get_ylims(train_data, val_data=None, fraction=0.25):
     else:
         y_lims = np.amin(mins), np.amax(maxs)
 
-    y_range = y_lims[1] - y_lims[0]
-    y_lims = (y_lims[0] - fraction * y_range,  y_lims[1] + fraction * y_range)
+    if y_lims[0] == y_lims[1]:
+        y_range = 0.1 * y_lims[0]
+    else:
+        y_range = y_lims[1] - y_lims[0]
+
+    if fraction != 0:
+        y_lims = (y_lims[0] - fraction * y_range,  y_lims[1] + fraction * y_range)
 
     return y_lims
 
@@ -172,6 +180,8 @@ def get_ylims(train_data, val_data=None, fraction=0.25):
 def get_epoch_xticks(train_data, val_data=None):
     """
     Calculates the xticks for the train and validation summary plot.
+
+    One tick per poch. Less the larger #epochs is.
 
     Parameters
     ----------
@@ -188,6 +198,8 @@ def get_epoch_xticks(train_data, val_data=None):
         Array containing the ticks.
 
     """
+    assert not (train_data is None and
+                val_data is None), "train and val data are None"
     x_points = np.array([])
 
     if train_data is not None:
@@ -286,11 +298,11 @@ def sort_metrics(metric_names):
         if err_loss in metric_names:
             sorted_metrics[counter] = err_loss
             counter += 1
-    if 0 in sorted_metrics:
-        print("Warning: Something went wrong with the sorting of metrics!"
-              "Given was {}, output was {}. Using unsorted metrics "
-              "instead.".format(metric_names, sorted_metrics))
-        sorted_metrics = metric_names
+
+    assert 0 not in sorted_metrics, "Something went wrong with the sorting of " \
+                                    "metrics! Given was {}, output was " \
+                                    "{}. ".format(metric_names, sorted_metrics)
+
     return sorted_metrics
 
 
