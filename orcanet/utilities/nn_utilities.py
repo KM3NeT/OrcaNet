@@ -14,8 +14,8 @@ def get_auto_label_modifier(model):
     """
     Get a label_modifier for when none is specified by the user.
 
-    Only works if there is a label in the mc info with the same name
-    as each loss of the compiled model.
+    Will simply assume that for every output of the model,
+    there is a column in the mc_info with the same name.
 
     Parameters
     ----------
@@ -27,11 +27,7 @@ def get_auto_label_modifier(model):
     label_modifier : function
 
     """
-    if not isinstance(model.loss, dict):
-        raise TypeError("Model was not compiled with a dict of losses "
-                        "(Use a dict, so that it is clear which labels from "
-                        "the data files belong to which output layer)")
-    names = tuple(model.loss.keys())
+    names = model.output_names
 
     def label_modifier(y_values):
         ys = {name: y_values[name] for name in names}
@@ -222,7 +218,7 @@ def get_xs_mean_path(zero_center_folder, train_filepaths):
     return xs_mean_path
 
 
-def make_xs_mean(filepaths, key_samples):
+def make_xs_mean(filepaths, key_samples, total_memory=4e9):
     """
     Calculates the zero center image of a dataset.
 
@@ -237,6 +233,10 @@ def make_xs_mean(filepaths, key_samples):
     key_samples : str
         The name of the datagroup in your h5 input files which contains
         the samples to the network.
+    total_memory : int
+        check available memory and divide the mean calculation in steps
+        total_memory = 4e9  # * n_gpu # In bytes.
+        Take max. 1/2 of what is available per GPU (16G), just to make sure.
 
     Returns
     -------
@@ -244,10 +244,6 @@ def make_xs_mean(filepaths, key_samples):
         The zero center image.
 
     """
-    # check available memory and divide the mean calculation in steps
-    total_memory = 4e9  # * n_gpu # In bytes.
-    # Take max. 1/2 of what is available per GPU (16G), just to make sure.
-
     xs_means = []
     file_sizes = []
 

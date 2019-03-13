@@ -79,9 +79,14 @@ class TestIntegration(TestCase):
 
     def test_integration_multi_input_model(self):
         """
-        Make a model and train it with the test toml files provided to check
-        if it throws an error. Also resumes training after the first epoch
-        with a custom lr to check if that works.
+        Run whole script on dummy data to see if it throws an error.
+
+        Build a model with the ModelBuilder.
+        Train for 2 epochs.
+        Reset organizer.
+        Resume for 1 epoch with different lr and sample modifier.
+        Predict.
+
         """
         orga = self.make_orga()
 
@@ -92,11 +97,11 @@ class TestIntegration(TestCase):
         orga.train_and_validate(initial_model, epochs=2)
 
         def test_learning_rate(epoch, fileno):
-            lr = (1 + epoch)*(1 + fileno) * 0.001
+            lr = 0.001 * (epoch + 0.1*fileno)
             return lr
 
         def test_modifier(xs):
-            xs = {key: xs[key] * 2 for key in xs}
+            xs = {key: xs[key] for key in xs}
             return xs
 
         orga = self.make_orga()

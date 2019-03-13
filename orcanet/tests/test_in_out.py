@@ -1,4 +1,5 @@
 from unittest import TestCase
+from unittest.mock import patch
 import os
 import h5py
 import numpy as np
@@ -226,6 +227,17 @@ class TestIOHandler(TestCase):
         value = self.io.get_n_bins()
         self.assertSequenceEqual(value, self.n_bins)
 
+    def test_get_input_shape(self):
+        value = self.io.get_input_shapes()
+        self.assertSequenceEqual(value, self.n_bins)
+
+        def sample_modifier(samples):
+            return {'input_A': samples["input_A"], }
+        self.io.cfg.sample_modifier = sample_modifier
+
+        value = self.io.get_input_shapes()
+        self.assertEqual(value, {"input_A": self.n_bins["input_A"]})
+
     def test_get_file_sizes_train(self):
         value = self.io.get_file_sizes("train")
         self.assertSequenceEqual(value, self.train_sizes)
@@ -397,11 +409,12 @@ class TestHistoryHandler(TestCase):
 
     def test_get_train_data(self):
         train_data = self.history.get_train_data()
+        print(train_data)
         target = np.array(
-            [(250., 0.00018755, 0.48725819, 0.7566875),
-             (500., 0.00056265, 0.29166106, 0.8741875),
-             (250., 0.03506906, 0.05898428, 0.9779375),
-             (500., 0.03544416, 0.05545885, 0.980375)],
+            [(250., 0.00018755, 0.487258, 0.756687),
+             (500., 0.00056265, 0.291661, 0.874188),
+             (250., 0.0350691, 0.0589843, 0.977938),
+             (500., 0.0354442, 0.0554589, 0.980375)],
             dtype=[('Batch', '<f8'), ('Batch_float', '<f8'),
                    ('loss', '<f8'), ('acc', '<f8')])
         assert_equal_struc_array(train_data, target)
@@ -423,6 +436,79 @@ class TestHistoryHandler(TestCase):
             {'epoch': 0.4, 'is_trained': False, 'is_validated': False},
         ]
         self.assertSequenceEqual(state, target)
+
+    def test_plot_metric_onknown_metric(self):
+        with self.assertRaises(ValueError):
+            self.history.plot_metric("test")
+
+    @patch('orcanet.in_out.plot_history')
+    def test_plot_metric_loss(self, mock_plot_history):
+        def plot_history(train_data, val_data, **kwargs):
+            return train_data, val_data, kwargs
+        mock_plot_history.side_effect = plot_history
+
+        value_train, value_val, value_kwargs = self.history.plot_metric("loss")
+
+        target_train = [
+            np.array([0.000187551, 0.000562653, 0.0350691, 0.0354442]),
+            np.array([0.487258, 0.291661, 0.0589843, 0.0554589]),
+        ]
+
+        target_val = [
+            np.array([0.03488, 0.06971]),
+            np.array([0.05562, np.nan]),
+        ]
+        target_kwargs = {'y_label': 'loss'}
+
+        np.testing.assert_array_almost_equal(target_train, value_train)
+        np.testing.assert_array_almost_equal(target_val, value_val)
+        self.assertDictEqual(target_kwargs, value_kwargs)
+
+    @patch('orcanet.in_out.plot_history')
+    def test_plot_metric_acc(self, mock_plot_history):
+        def plot_history(train_data, val_data, **kwargs):
+            return train_data, val_data, kwargs
+        mock_plot_history.side_effect = plot_history
+
+        value_train, value_val, value_kwargs = self.history.plot_metric("acc")
+
+        target_train = [
+            np.array([0.000187551, 0.000562653, 0.0350691, 0.0354442]),
+            np.array([0.756687, 0.874188, 0.977938, 0.980375]),
+        ]
+
+        target_val = [
+            np.array([0.03488, 0.06971]),
+            np.array([0.9808, np.nan]),
+        ]
+        target_kwargs = {'y_label': 'acc'}
+
+        np.testing.assert_array_almost_equal(target_train, value_train)
+        np.testing.assert_array_almost_equal(target_val, value_val)
+        self.assertDictEqual(target_kwargs, value_kwargs)
+
+    @patch('orcanet.in_out.plot_history')
+    def test_plot_lr(self, mock_plot_history):
+        def plot_history(train_data, val_data, **kwargs):
+            return train_data, val_data, kwargs
+        mock_plot_history.side_effect = plot_history
+
+        value_train, value_val, value_kwargs = self.history.plot_lr()
+
+        target_train = None
+
+        target_val = [
+            np.array([0.03488, 0.06971]),
+            np.array([0.005, 0.00465])
+        ]
+        target_kwargs = {
+            'y_label': 'Learning rate',
+            'legend': False
+        }
+
+        self.assertEqual(target_train, value_train)
+        np.testing.assert_array_almost_equal(target_val, value_val)
+        self.assertDictEqual(target_kwargs, value_kwargs)
 
 
 def assert_equal_struc_array(a, b):

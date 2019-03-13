@@ -3,9 +3,13 @@ from unittest.mock import MagicMock
 import os
 import h5py
 import numpy as np
+from keras.models import Model
+from keras.layers import Dense, Input, Concatenate, Flatten
+from keras.callbacks import LambdaCallback
 
 from orcanet.core import Organizer
-from orcanet.backend import hdf5_batch_generator, get_datasets, get_learning_rate
+from orcanet.backend import hdf5_batch_generator, get_datasets, get_learning_rate, train_model, validate_model, make_model_prediction
+from orcanet.utilities.nn_utilities import get_auto_label_modifier
 
 
 class TestBatchGenerator(TestCase):
@@ -260,26 +264,163 @@ class TestFunctions(TestCase):
             get_learning_rate((1, 1), user_lr, no_train_files)
 
 
-def save_dummy_h5py(path, shape, size):
+class TestTrainValidatePredict(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.temp_dir = os.path.join(os.path.dirname(__file__), ".temp",
+                                    "test_backend")
+        os.mkdir(cls.temp_dir)
+        cls.file_sizes = [500, ]
+        # make some dummy data
+        cls.inp_A_file = {
+            "path": cls.temp_dir + "/input_A_file.h5",
+            "shape": (2, 3),
+            "size": cls.file_sizes[0],
+        }
+
+        cls.inp_B_file = {
+            "path": cls.temp_dir + "/input_B_file.h5",
+            "shape": (3, 4),
+            "size": cls.file_sizes[0],
+        }
+
+        cls.filepaths = {
+            "input_A": (cls.inp_A_file["path"],),
+            "input_B": (cls.inp_B_file["path"],),
+        }
+
+        cls.input_shapes = {
+            "input_A": cls.inp_A_file["shape"],
+            "input_B": cls.inp_B_file["shape"],
+        }
+
+        cls.output_shapes = {
+            "mc_A": 1,
+            "mc_B": 1,
+        }
+
+        cls.train_A_file_1_ctnt = save_dummy_h5py(**cls.inp_A_file, mode="half")
+        cls.train_B_file_1_ctnt = save_dummy_h5py(**cls.inp_B_file, mode="half")
+
+    def setUp(self):
+        self.orga = Organizer("./")
+        self.orga.cfg.batchsize = 9
+
+        self.orga.io.get_local_files = MagicMock(return_value=self.filepaths)
+        self.orga.io.get_file_sizes = MagicMock(return_value=self.file_sizes)
+
+        self.model = build_dummy_model(self.input_shapes, self.output_shapes)
+        self.model.compile(loss="mse", optimizer="sgd")
+        self.orga._auto_label_modifier = get_auto_label_modifier(self.model)
+
+    @classmethod
+    def tearDownClass(cls):
+        os.remove(cls.inp_A_file["path"])
+        os.remove(cls.inp_B_file["path"])
+        os.rmdir(cls.temp_dir)
+
+    def test_train(self):
+        epoch = (1, 1)
+        batch_nos = []
+        batch_print_callback = LambdaCallback(
+            on_batch_begin=lambda batch, logs: batch_nos.append(batch))
+        self.orga.cfg.callback_train = batch_print_callback
+
+        history = train_model(self.orga, self.model, epoch, batch_logger=False)
+        target = {
+            'loss': 18.105026489263054,
+            'mc_A_loss': 9.569378078221458,
+            'mc_B_loss': 8.535648400507155,
+        }
+        self.assertDictEqual(history, target)
+        self.assertSequenceEqual(batch_nos, list(range(int(self.file_sizes[0]/self.orga.cfg.batchsize))))
+
+    def test_validate(self):
+        history = validate_model(self.orga, self.model)
+        # input to model is ones
+        # --> after concatenate: 18 ones
+        # Output of each output layer = 18
+        # labels: 0 and 1
+        # --> loss (18-0)^2 and (18-1)^2
+        target = {
+            'loss': 18**2 + 17**2,
+            'mc_A_loss': 18**2,
+            'mc_B_loss': 17**2,
+        }
+        self.model.summary()
+        self.assertDictEqual(history, target)
+
+    def test_predict(self):
+        eval_filename = self.temp_dir + "/pred.h5"
+        try:
+            make_model_prediction(self.orga, self.model, eval_filename)
+            file_cntn = {}
+            with h5py.File(eval_filename) as file:
+                for key in file.keys():
+                    file_cntn[key] = np.array(file[key])
+        finally:
+            os.remove(eval_filename)
+
+        target_datasets = [
+            'label_mc_A', 'label_mc_B', 'mc_info', 'pred_mc_A', 'pred_mc_B'
+        ]
+        target_shapes = [
+            (500,), (500,), (500,), (500, 1), (500, 1),
+        ]
+        target_contents = [
+            np.zeros(target_shapes[0]),
+            np.ones(target_shapes[1]),
+            self.train_A_file_1_ctnt[1],
+            np.ones(target_shapes[3]) * 18,
+            np.ones(target_shapes[4]) * 18,
+        ]
+        target_mc_names = ('mc_A', 'mc_B')
+
+        datasets = list(file_cntn.keys())
+        shapes = [file_cntn[key].shape for key in datasets]
+        mc_dtype_names = file_cntn["mc_info"].dtype.names
+
+        self.assertSequenceEqual(datasets, target_datasets)
+        self.assertSequenceEqual(shapes, target_shapes)
+        self.assertSequenceEqual(mc_dtype_names, target_mc_names)
+        for i, key in enumerate(target_datasets):
+            value = file_cntn[key]
+            target = target_contents[i]
+            np.testing.assert_array_equal(value, target)
+
+
+def save_dummy_h5py(path, shape, size, mode="asc"):
     """
-    xs[0] is np.zeros, xs[1] is np.ones, etc
-    ys[0] is ndarray with 0.5s, ys[1] with 1.5s etc
+    if mode == asc:
+        xs[0] is np.zeros, xs[1] is np.ones, etc
+        ys[0] is ndarray with 0.5s, ys[1] with 1.5s etc
+
+    if mode == half:
+        xs is ones,
+        ys[:, 0] is 0, ys[:, 1] is 1
+
     """
     xs = np.ones((size,) + shape)
-    for sample_no in range(len(xs)):
-        xs[sample_no, ...] = sample_no
 
     dtypes = [('mc_A', '<f8'), ('mc_B', '<f8'), ]
     ys = np.ones((size, 2))
-    for sample_no in range(len(xs)):
-        ys[sample_no, ...] = sample_no + 0.5
+
+    if mode == "asc":
+        for sample_no in range(len(xs)):
+            xs[sample_no, ...] = sample_no
+            ys[sample_no, ...] = sample_no + 0.5
+
+    elif mode == "half":
+        ys[:, 0] = 0.
+
+    else:
+        raise AssertionError
 
     ys = ys.ravel().view(dtype=dtypes)
 
     with h5py.File(path, 'w') as h5f:
         h5f.create_dataset('x', data=xs, dtype='<f8')
         h5f.create_dataset('y', data=ys, dtype=dtypes)
-
     return xs, ys
 
 
@@ -302,3 +443,34 @@ def assert_equal_struc_array(a, b):
     np.testing.assert_array_equal(a.dtype, b.dtype)
     for name in a.dtype.names:
         np.testing.assert_almost_equal(a[name], b[name])
+
+
+def build_dummy_model(input_shapes, output_shapes):
+    """
+
+    Parameters
+    ----------
+    input_shapes : dict
+    output_shapes : dict
+
+    Returns
+    -------
+    model : keras model
+
+    """
+    inputs, flattend = [], []
+    for name, shape in input_shapes.items():
+        inp = Input(shape, name=name)
+        flat = Flatten()(inp)
+        inputs.append(inp)
+        flattend.append(flat)
+
+    conc = Concatenate()(flattend)
+
+    outputs = []
+    for name, shape in output_shapes.items():
+        outputs.append(Dense(shape, name=name, kernel_initializer="Ones",
+                             bias_initializer="Zeros")(conc))
+
+    model = Model(inputs, outputs)
+    return model
