@@ -304,53 +304,53 @@ def change_dropout_rate(model, before_concat, after_concat=None):
     return clone
 
 
-def _parallelize_model(model, n_gpu, batchsize, mode="avolkov"):
-    """
-    Parallelizes the nn-model to multiple gpu's.
-
-    Currently, up to 4 GPU's at Tiny-GPU are supported.
-
-    Parameters
-    ----------
-    model : ks.model.Model
-        Keras model of a neural network.
-    n_gpu : int
-        Number of gpu's that the model should be parallelized to.
-    batchsize : int
-        Batchsize that is used for the training / inferencing of the cnn.
-    mode : str
-        Avolkov or keras.
-
-    Returns
-    -------
-    model : ks.models.Model
-        The parallelized Keras nn instance (multi_gpu_model).
-    batchsize : int
-        The new batchsize scaled by the number of used gpu's.
-
-    """
-    assert n_gpu > 1 and isinstance(n_gpu, int), 'n_gpu must be an int with n_gpu >= 1!'
-
-    if mode == "avolkov":
-        from orcanet.builder_util.multi_gpu.multi_gpu import (
-            get_available_gpus, make_parallel, print_mgpu_modelsummary)
-
-        gpus_list = get_available_gpus(n_gpu)
-        ngpus = len(gpus_list)
-        print('Using GPUs: {}'.format(', '.join(gpus_list)))
-
-        # Data-Parallelize the model via function
-        model = make_parallel(model, gpus_list, usenccl=False, initsync=True,
-                              syncopt=False, enqueue=False)
-        print_mgpu_modelsummary(model)
-        batchsize = batchsize * ngpus
-
-    elif mode == "keras":
-        # For keras, one has to save the original model, not the saved one...
-        model = ks.utils.multi_gpu_model(model, n_gpu)
-        batchsize *= n_gpu
-
-    else:
-        raise NameError("Unknown mode", mode)
-
-    return model, batchsize
+# def parallelize_model(model, n_gpu, batchsize, mode="avolkov"):
+#     """
+#     Parallelizes the nn-model to multiple gpu's.
+#
+#     Currently, up to 4 GPU's at Tiny-GPU are supported.
+#
+#     Parameters
+#     ----------
+#     model : ks.model.Model
+#         Keras model of a neural network.
+#     n_gpu : int
+#         Number of gpu's that the model should be parallelized to.
+#     batchsize : int
+#         Batchsize that is used for the training / inferencing of the cnn.
+#     mode : str
+#         Avolkov or keras.
+#
+#     Returns
+#     -------
+#     model : ks.models.Model
+#         The parallelized Keras nn instance (multi_gpu_model).
+#     batchsize : int
+#         The new batchsize scaled by the number of used gpu's.
+#
+#     """
+#     assert n_gpu > 1 and isinstance(n_gpu, int), 'n_gpu must be an int with n_gpu >= 1!'
+#
+#     if mode == "avolkov":
+#         from orcanet.builder_util.multi_gpu.multi_gpu import (
+#             get_available_gpus, make_parallel, print_mgpu_modelsummary)
+#
+#         gpus_list = get_available_gpus(n_gpu)
+#         ngpus = len(gpus_list)
+#         print('Using GPUs: {}'.format(', '.join(gpus_list)))
+#
+#         # Data-Parallelize the model via function
+#         model = make_parallel(model, gpus_list, usenccl=False, initsync=True,
+#                               syncopt=False, enqueue=False)
+#         print_mgpu_modelsummary(model)
+#         batchsize = batchsize * ngpus
+#
+#     elif mode == "keras":
+#         # For keras, one has to save the original model, not the saved one...
+#         model = ks.utils.multi_gpu_model(model, n_gpu)
+#         batchsize *= n_gpu
+#
+#     else:
+#         raise NameError("Unknown mode", mode)
+#
+#     return model, batchsize

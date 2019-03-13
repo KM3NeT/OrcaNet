@@ -2,14 +2,15 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
-
 import os
 import shutil
 import h5py
 from unittest import TestCase
+from keras.models import Model
+from keras.layers import Dense, Input, Concatenate
 
 from orcanet.core import Organizer
-from orcanet.utilities.nn_utilities import load_zero_center_data
+from orcanet.utilities.nn_utilities import load_zero_center_data, get_layer_output
 
 
 class TetstZeroCenter(TestCase):
@@ -30,14 +31,23 @@ class TetstZeroCenter(TestCase):
             os.makedirs(self.temp_dir)
 
         # Make dummy data
-        self.train_inp = (
-            self.temp_dir + "/train1.h5",
-            self.temp_dir + "/train2.h5"
+        self.train_inp_A = (
+            self.temp_dir + "/train1_A.h5",
+            self.temp_dir + "/train2_A.h5"
         )
-        self.train_pathes = {"testing_input": self.train_inp}
-        self.shape = (3, 3, 3, 3)
+        self.train_inp_B = (
+            self.temp_dir + "/train1_B.h5",
+            self.temp_dir + "/train2_B.h5",
+        )
 
-        make_dummy_data(self.train_inp[0], self.train_inp[1], self.shape)
+        self.train_pathes = {
+            "testing_input_A": self.train_inp_A,
+            "testing_input_B": self.train_inp_B,
+        }
+        self.shape = (3, 3, 3)
+
+        make_dummy_data(self.train_inp_A[0], self.train_inp_A[1], self.shape, mode=1)
+        make_dummy_data(self.train_inp_B[0], self.train_inp_B[1], self.shape, mode=2)
 
         orga = Organizer(self.output_folder, config_file=config_file)
         orga.cfg._train_files = self.train_pathes
@@ -55,18 +65,93 @@ class TetstZeroCenter(TestCase):
         orga = self.orga
         xs_mean = load_zero_center_data(orga, logging=False)
 
-        target = np.ones(self.shape)/4
-        self.assertTrue(np.allclose(xs_mean["testing_input"], target))
+        target = {
+            "testing_input_A": np.ones(self.shape) * 0.25,
+            "testing_input_B": np.ones(self.shape) * 0.75,
+        }
 
-        file = orga.cfg.zero_center_folder + "/" + orga.cfg._list_file + \
-            '_input_' + "testing_input" + '.npz'
-        used_files = np.load(file)['zero_center_used_ip_files']
-        self.assertTrue(np.array_equal(used_files, self.train_inp))
+        self._check_dict_ndarray(xs_mean, target)
+
+        file_A = orga.cfg.zero_center_folder + "/" + orga.cfg._list_file + \
+            '_input_testing_input_A.npz'
+        file_B = orga.cfg.zero_center_folder + "/" + orga.cfg._list_file + \
+            '_input_testing_input_B.npz'
+        used_files_A = np.load(file_A)['zero_center_used_ip_files']
+        used_files_B = np.load(file_B)['zero_center_used_ip_files']
+        self.assertTrue(np.array_equal(used_files_A, self.train_inp_A))
+        self.assertTrue(np.array_equal(used_files_B, self.train_inp_B))
+
+        # test loading of saved xs_mean
+        os.remove(file_B)
+        xs_mean = load_zero_center_data(orga, logging=False)
+
+        self._check_dict_ndarray(xs_mean, target)
+        used_files_A = np.load(file_A)['zero_center_used_ip_files']
+        used_files_B = np.load(file_B)['zero_center_used_ip_files']
+        self.assertTrue(np.array_equal(used_files_A, self.train_inp_A))
+        self.assertTrue(np.array_equal(used_files_B, self.train_inp_B))
+
+    def _check_dict_ndarray(self, val, target):
+        self.assertSetEqual(set(val.keys()), set(target.keys()))
+        for key in val.keys():
+            np.testing.assert_array_almost_equal(val[key], target[key])
 
 
-def make_dummy_data(filepath1, filepath2, shape):
+class TestModel(TestCase):
+    def setUp(self):
+        self.layer_names = ["inp1", "inp2", "mid", "outp"]
+
+        inp1 = Input(shape=(2, ), name=self.layer_names[0])
+        inp2 = Input(shape=(3, ), name=self.layer_names[1])
+
+        conc = Concatenate()([inp1, inp2])
+
+        intermed = Dense(2,
+                         name=self.layer_names[2],
+                         bias_initializer="Ones",
+                         kernel_initializer="Ones")(conc)
+        outp = Dense(1, name=self.layer_names[3])(intermed)
+
+        self.model = Model([inp1, inp2], outp)
+
+    def test_get_layer_output_list_input(self):
+        samples = [np.ones((2, 2)), np.ones((2, 3))]
+
+        args = {
+            "model": self.model,
+            "samples": samples,
+            "layer_name": self.layer_names[2],
+            "mode": "test",
+        }
+        value = get_layer_output(**args)
+        target = [[6., 6.], [6., 6.]]
+        np.testing.assert_array_equal(value, target)
+
+    def test_get_layer_output_dict_input(self):
+        samples = {self.layer_names[0]: np.ones((2, 2)),
+                   self.layer_names[1]: np.ones((2, 3))}
+
+        args = {
+            "model": self.model,
+            "samples": samples,
+            "layer_name": self.layer_names[2],
+            "mode": "test",
+        }
+        value = get_layer_output(**args)
+        target = [[6., 6.], [6., 6.]]
+        np.testing.assert_array_equal(value, target)
+
+
+def make_dummy_data(filepath1, filepath2, shape, mode=1):
     """
-    Make a total of 100 ones vs 300 zeroes of dummy data over two files.
+    Make two dummy data files.
+
+    mode 1:
+      Make a total of 100 ones vs 300 zeroes of dummy data over two files.
+      -- > xs_mean = 0.25
+    mode 2:
+      Make a total of 300 ones vs 100 zeroes of dummy data over two files.
+      -- > xs_mean = 0.75
 
     Parameters
     ----------
@@ -78,8 +163,18 @@ def make_dummy_data(filepath1, filepath2, shape):
         Shape of the data, not including sample dimension.
 
     """
-    xs1 = np.concatenate([np.ones((75,) + shape), np.zeros((75,) + shape)])
-    xs2 = np.concatenate([np.ones((25,) + shape), np.zeros((225,) + shape)])
+    xs1 = np.ones((150,) + shape)
+    xs2 = np.ones((250,) + shape)
+
+    if mode == 1:
+        xs1[100:, ...] = 0
+        xs2[:, ...] = 0
+
+    elif mode == 2:
+        xs2[-100:, ...] = 0
+
+    else:
+        raise AssertionError
 
     dtypes = [('event_id', '<f8'), ('particle_type', '<f8'), ('energy', '<f8'),
               ('is_cc', '<f8'), ('bjorkeny', '<f8'), ('dir_x', '<f8'),

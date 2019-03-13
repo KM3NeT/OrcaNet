@@ -88,7 +88,7 @@ def orca_train(output_folder, list_file, config_file, model_file,
                                                  orga.io.get_no_of_files("train"))
 
     # start the training
-    orga.train_and_validate(model=model, force_model=recompile_model)
+    orga.train_and_validate(model=model)
 
 
 def parse_input():

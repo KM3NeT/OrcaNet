@@ -29,6 +29,8 @@ class ConvBlock:
         the regularization.
     batchnorm : bool
         Adds a batch normalization layer.
+    kernel_initializer : string
+        Initializer for the kernel weights.
 
     """
     def __init__(self, conv_dim,
@@ -38,7 +40,8 @@ class ConvBlock:
                  dropout=None,
                  activation='relu',
                  kernel_reg=None,
-                 batchnorm=False):
+                 batchnorm=False,
+                 kernel_initializer="he_normal"):
         self.conv_dim = conv_dim
         self.filters = filters
         self.kernel_size = kernel_size
@@ -47,6 +50,7 @@ class ConvBlock:
         self.activation = activation
         self.kernel_reg = kernel_reg
         self.batchnorm = batchnorm
+        self.kernel_initializer = kernel_initializer
 
     def __call__(self, inputs):
         if self.conv_dim == 2:
@@ -61,7 +65,7 @@ class ConvBlock:
         x = convolution_nd(self.filters,
                            self.kernel_size,
                            padding='same',
-                           kernel_initializer='he_normal',
+                           kernel_initializer=self.kernel_initializer,
                            use_bias=False,
                            kernel_regularizer=self.kernel_reg)(inputs)
 
@@ -102,15 +106,17 @@ class DenseBlock:
                  dropout=None,
                  activation='relu',
                  kernel_reg=None,
-                 batchnorm=False):
+                 batchnorm=False,
+                 kernel_initializer="he_normal"):
         self.units = units
         self.dropout = dropout
         self.activation = activation
         self.kernel_reg = kernel_reg
         self.batchnorm = batchnorm
+        self.kernel_initializer = kernel_initializer
 
     def __call__(self, inputs):
-        x = Dense(self.units, kernel_initializer='he_normal',
+        x = Dense(self.units, kernel_initializer=self.kernel_initializer,
                   kernel_regularizer=self.kernel_reg)(inputs)
         if self.batchnorm:
             channel_axis = 1 if K.image_data_format() == "channels_first" else -1

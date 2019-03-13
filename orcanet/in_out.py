@@ -20,6 +20,7 @@ class IOHandler(object):
     def __init__(self, cfg):
         self.cfg = cfg
 
+        self._used_ssd = False
         self._tmpdir_train_files = None
         self._tmpdir_val_files = None
 
@@ -167,8 +168,11 @@ class IOHandler(object):
 
     def get_pred_path(self, epoch, fileno):
         """ Get the path to a saved prediction. """
-        list_name = os.path.splitext(
-            os.path.basename(self.cfg.get_list_file()))[0]
+        list_file = self.cfg.get_list_file()
+        if list_file is None:
+            raise ValueError("No tom list file specified. Can not look up "
+                             "saved prediction")
+        list_name = os.path.splitext(os.path.basename(list_file))[0]
 
         pred_filename = self.get_subfolder("predictions") + \
             '/pred_model_epoch_{}_file_{}_on_{}_val_files.h5'.format(
@@ -182,10 +186,12 @@ class IOHandler(object):
         and sets the new filepaths of the train and val data.
         Speeds up I/O and reduces RRZE network load.
         """
-        train_files_ssd, val_files_ssd = use_local_tmpdir(
-            self.cfg.get_files("train"), self.cfg.get_files("val"))
-        self._tmpdir_train_files = train_files_ssd
-        self._tmpdir_val_files = val_files_ssd
+        if not self._used_ssd:
+            train_files_ssd, val_files_ssd = use_local_tmpdir(
+                self.cfg.get_files("train"), self.cfg.get_files("val"))
+            self._tmpdir_train_files = train_files_ssd
+            self._tmpdir_val_files = val_files_ssd
+            self._used_ssd = True
 
     def get_local_files(self, which):
         """
@@ -207,13 +213,13 @@ class IOHandler(object):
 
         """
         if which == "train":
-            if self._tmpdir_train_files is None:
+            if not self._used_ssd:
                 return self.cfg.get_files("train")
             else:
                 return self._tmpdir_train_files
 
         elif which == "val":
-            if self._tmpdir_val_files is None:
+            if not self._used_ssd:
                 return self.cfg.get_files("val")
             else:
                 return self._tmpdir_val_files
@@ -693,7 +699,10 @@ class HistoryHandler:
             # file is sth like "log_epoch_1_file_2.txt", extract the 1 and 2:
             epoch, file_no = [int(file.split(".")[0].split("_")[i]) for i in [2, 4]]
             file_data = np.genfromtxt(self.train_log_folder + "/" + file,
-                                      names=True, delimiter="\t")
+                                      names=True,
+                                      delimiter="|",
+                                      autostrip=True,
+                                      comments="--")
             train_file_data.append([[epoch, file_no], file_data])
 
         # sort so that earlier epochs come first

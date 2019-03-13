@@ -5,14 +5,18 @@ Core scripts for the OrcaNet package.
 """
 
 import os
-import keras as ks
 import toml
 import warnings
+import numpy as np
+from keras.models import load_model
+from keras.utils import plot_model
+import keras.backend as kb
 
-from orcanet.backend import train_and_validate_model, make_model_prediction
+from orcanet.backend import make_model_prediction, save_actv_wghts_plot, get_learning_rate, train_model, validate_model
+from orcanet.utilities.visualization import update_summary_plot
 from orcanet.in_out import IOHandler, HistoryHandler
 from orcanet.utilities.nn_utilities import load_zero_center_data, get_auto_label_modifier
-from orcanet.logging import log_start_training
+from orcanet.logging import log_start_training, SummaryLogger, log_start_validation
 
 
 class Organizer:
@@ -60,10 +64,11 @@ class Organizer:
 
         self.xs_mean = None
         self._auto_label_modifier = None
+        self._stored_model = None
 
-    def train_and_validate(self, model=None, force_model=False, epochs=None):
+    def train_and_validate(self, model=None, epochs=None):
         """
-        Train and validate a model.
+        Train a model and validate according to schedule.
 
         The various settings of this process can be controlled with the
         attributes of orca.cfg.
@@ -78,12 +83,9 @@ class Organizer:
         ----------
         model : ks.models.Model or None
             Compiled keras model to use for training and validation. Required
-            only for the start of training. After the model was saved for
-            the first time, the most recent model will be loaded automatically
-            to continue the training.
-        force_model : bool
-            If true, the given model will be used to continue the training,
-            instead of loading the most recent saved one.
+            for the first epoch (the start of training).
+            Afterwards, if model is None, the most recent model will be
+            loaded automatically to continue the training.
         epochs : int or None
             How many epochs should be trained by running this function.
             None for infinite.
@@ -94,44 +96,154 @@ class Organizer:
             The trained keras model.
 
         """
-        model, latest_epoch = self._load_model(model, force_model)
+        latest_epoch = self.io.get_latest_epoch()
+
+        model = self._get_model(model, logging=True)
+        self._stored_model = model
+
+        # check if the validation is missing for the latest fileno
+        if latest_epoch is not None:
+            state = self.history.get_state()[-1]
+            if state["is_validated"] is False and self._val_is_due(latest_epoch):
+                    self.validate()
+
         next_epoch = self.io.get_next_epoch(latest_epoch)
-
-        print("Set to epoch {} file {}.".format(next_epoch[0],
-                                                next_epoch[1]))
-
-        if self.cfg.get_list_file() is None:
-            raise ValueError("No files specified. You need to load a toml "
-                             "list file with your files before training")
-
-        if self.cfg.filter_out_tf_garbage:
-            os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-
-        # Create folder structure
-        self.io.get_subfolder(create=True)
-
-        if self.cfg.label_modifier is None:
-            self._auto_label_modifier = get_auto_label_modifier(model)
-
-        self.io.check_connections(model)
-
-        if self.cfg.use_scratch_ssd:
-            self.io.use_local_node()
-
-        log_start_training(self)
-
-        if self.cfg.zero_center_folder is not None:
-            # Make sure the xs_mean is calculated
-            self.get_xs_mean(logging=True)
+        n_train_files = self.io.get_no_of_files("train")
 
         trained_epochs = 0
         while epochs is None or trained_epochs < epochs:
-            # Train on remaining files of an epoch
-            train_and_validate_model(self, model, next_epoch)
+            # Train on remaining files
+            for file_no in range(next_epoch[1], n_train_files + 1):
+                curr_epoch = (next_epoch[0], file_no)
+                self.train(model)
+                if self._val_is_due(curr_epoch):
+                    self.validate()
+
             next_epoch = (next_epoch[0] + 1, 1)
             trained_epochs += 1
 
+        self._stored_model = None
         return model
+
+    def train(self, model=None):
+        """
+        Trains a model on the next file.
+
+        The progress of the training is also logged and plotted.
+
+        Parameters
+        ----------
+        model : ks.models.Model or None
+            Compiled keras model to use for training. Required for the first
+            epoch (the start of training).
+            Afterwards, if model is None, the most recent model will be
+            loaded automatically to continue the training.
+
+        Returns
+        -------
+        history : dict
+            The history of the training on this file. A record of training
+            loss values and metrics values.
+
+        """
+        # Create folder structure
+        self.io.get_subfolder(create=True)
+        latest_epoch = self.io.get_latest_epoch()
+
+        model = self._get_model(model, logging=True)
+
+        self._set_up(model, logging=True)
+
+        # epoch about to be trained
+        next_epoch = self.io.get_next_epoch(latest_epoch)
+        next_epoch_float = self.io.get_epoch_float(*next_epoch)
+
+        if latest_epoch is None:
+            self.io.check_connections(model)
+            log_start_training(self)
+
+        model_path = self.io.get_model_path(*next_epoch)
+        if os.path.isfile(model_path):
+            raise FileExistsError(
+                "Can not train model in epoch {} file {}, this model has "
+                "already been saved!".format(*next_epoch))
+
+        smry_logger = SummaryLogger(self, model)
+
+        n_train_files = self.io.get_no_of_files("train")
+        lr = get_learning_rate(next_epoch, self.cfg.learning_rate,
+                               n_train_files)
+        kb.set_value(model.optimizer.lr, lr)
+
+        files_dict = self.io.get_file("train", next_epoch[1])
+
+        line = "Training in epoch {} on file {}/{}".format(
+            next_epoch[0], next_epoch[1], n_train_files)
+        self.io.print_log(line)
+        self.io.print_log("-" * len(line))
+        self.io.print_log("Learning rate is at {}".format(
+            kb.get_value(model.optimizer.lr)))
+        self.io.print_log('Inputs and files:')
+        for input_name, input_file in files_dict.items():
+            self.io.print_log("   {}: \t{}".format(input_name,
+                                                   os.path.basename(
+                                                       input_file)))
+
+        history = train_model(self, model, next_epoch, batch_logger=True)
+
+        model.save(model_path)
+        smry_logger.write_line(next_epoch_float, lr, history_train=history)
+
+        self.io.print_log('Training results:')
+        for metric_name, loss in history.items():
+            self.io.print_log("   {}: \t{}".format(metric_name, loss))
+        self.io.print_log("Saved model to " + model_path + "\n")
+
+        update_summary_plot(self)
+
+        return history
+
+    def validate(self):
+        """
+        Validate the most recent saved model on all validation files.
+
+        Will also log the progress, as well as update the summary plot and
+        plot weights and activations of the model.
+
+        Returns
+        -------
+        history : dict
+            The history of the validation on all files. A record of validation
+            loss values and metrics values.
+
+        """
+        latest_epoch = self.io.get_latest_epoch()
+        if latest_epoch is None:
+            raise ValueError("Can not validate: No saved model found")
+        if self._stored_model is None:
+            model = self.load_saved_model(*latest_epoch)
+        else:
+            model = self._stored_model
+
+        self._set_up(model, logging=True)
+
+        epoch_float = self.io.get_epoch_float(*latest_epoch)
+        smry_logger = SummaryLogger(self, model)
+
+        log_start_validation(self)
+
+        history = validate_model(self, model)
+
+        self.io.print_log('Validation results:')
+        for metric_name, loss in history.items():
+            self.io.print_log("   {}: \t{}".format(metric_name, loss))
+        self.io.print_log("")
+        smry_logger.write_line(epoch_float, np.nan, history_val=history)
+
+        update_summary_plot(self)
+        save_actv_wghts_plot(self, model, latest_epoch, samples=self.cfg.batchsize)
+
+        return history
 
     def predict(self, epoch=-1, fileno=-1):
         """
@@ -159,13 +271,6 @@ class Organizer:
             The path to the created prediction file.
 
         """
-        if self.cfg.get_list_file() is None:
-            raise ValueError("No files specified. You need to load a toml list "
-                             "file before predicting or loading a prediction")
-
-        if self.cfg.filter_out_tf_garbage:
-            os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-
         if fileno == -1:
             epoch, fileno = self.io.get_latest_epoch(epoch)
             print("Automatically set epoch to epoch {} file {}.".format(epoch,
@@ -176,15 +281,8 @@ class Organizer:
         if os.path.isfile(pred_filename):
             print("Prediction has already been done.")
         else:
-            if self.cfg.zero_center_folder is not None:
-                self.get_xs_mean()
-
-            if self.cfg.use_scratch_ssd:
-                self.io.use_local_node()
-
-            model = ks.models.load_model(
-                self.io.get_model_path(epoch, fileno),
-                custom_objects=self.cfg.custom_objects)
+            model = self.load_saved_model(epoch, fileno, logging=False)
+            self._set_up(model)
 
             make_model_prediction(self, model, pred_filename, samples=None)
 
@@ -221,9 +319,31 @@ class Organizer:
             self.xs_mean = load_zero_center_data(self, logging=logging)
         return self.xs_mean
 
-    def _load_model(self, model, force_model):
-        """ Load saved model / check user input for model. """
-        # the epoch of the currently existing model (or None if there is none)
+    def load_saved_model(self, epoch, fileno, logging=False):
+        """
+        Load a saved model.
+
+        Parameters
+        ----------
+        epoch : int
+            Epoch of the saved model.
+        fileno : int
+            Fileno of the saved model.
+        logging : bool
+            If True, will log this function call into the log.txt file.
+
+        Returns
+        -------
+        model : keras model
+
+        """
+        path_of_model = self.io.get_model_path(epoch, fileno)
+        self.io.print_log("Loading saved model: " + path_of_model, logging=logging)
+        model = load_model(path_of_model, custom_objects=self.cfg.custom_objects)
+        return model
+
+    def _get_model(self, model, logging=False):
+        """ Load most recent saved model or use user model. """
         latest_epoch = self.io.get_latest_epoch()
 
         if latest_epoch is None:
@@ -231,27 +351,42 @@ class Organizer:
                 raise ValueError("You need to provide a compiled keras model "
                                  "for the start of the training! (You gave None)")
             try:
-                ks.utils.plot_model(
-                    model, self.io.get_subfolder("plots") + "/model_plot.png")
+                plot_model(model,
+                           self.io.get_subfolder("plots") + "/model_plot.png")
             except OSError as e:
                 warnings.warn("Can not plot model: " + str(e))
 
-        elif force_model is True:
-            if model is None:
-                raise ValueError('force_model is True, but no model provided.')
-            print('Continuing training with user model (force_model=True)')
-
         else:
-            # Load an existing model
-            if model is not None:
-                raise ValueError("You provided a model even though this is not "
-                                 "the start of the training.")
-            path_of_model = self.io.get_model_path(latest_epoch[0],
-                                                   latest_epoch[1])
-            print("Continuing training with saved model: " + path_of_model)
-            model = ks.models.load_model(path_of_model,
-                                         custom_objects=self.cfg.custom_objects)
-        return model, latest_epoch
+            if model is None:
+                model = self.load_saved_model(*latest_epoch, logging=logging)
+
+        return model
+
+    def _set_up(self, model, logging=False):
+        """ Necessary setup for training, validating and predicting. """
+        if self.cfg.filter_out_tf_garbage:
+            os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+
+        if self.cfg.get_list_file() is None:
+            raise ValueError("No files specified. You need to load a toml "
+                             "list file with your files before training")
+
+        if self.cfg.label_modifier is None:
+            self._auto_label_modifier = get_auto_label_modifier(model)
+
+        if self.cfg.use_scratch_ssd:
+            self.io.use_local_node()
+
+        if self.cfg.zero_center_folder is not None:
+            self.get_xs_mean(logging)
+
+    def _val_is_due(self, epoch):
+        """ True if validation is due on given epoch according to schedule. """
+        n_train_files = self.io.get_no_of_files("train")
+        val_sched = (epoch[1] == n_train_files) or \
+                    (self.cfg.validate_interval is not None and
+                     epoch[1] % self.cfg.validate_interval == 0)
+        return val_sched
 
 
 class Configuration(object):
@@ -429,8 +564,8 @@ class Configuration(object):
         n_train, n_val = [], []
         for input_key, input_values in file_content.items():
             if not len(input_values.keys()) == 2:
-                raise NameError("Wrong input format in toml list file (input {}:"
-                                " {})".format(input_key, input_values))
+                raise ValueError("Wrong input format in toml list file (input {}:"
+                                 " {})".format(input_key, input_values))
             if "train_files" not in input_values.keys():
                 raise NameError("No train files specified in toml list file")
             if "validation_files" not in input_values.keys():
@@ -505,6 +640,7 @@ class Configuration(object):
         else:
             raise NameError("Unknown fileset name ", which)
 
-    def get_defaults(self):
-        """ Get the default values for all settings. """
+    @property
+    def default_values(self):
+        """ The default values for all settings. """
         return self._default_values

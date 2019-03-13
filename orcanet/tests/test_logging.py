@@ -6,7 +6,7 @@ from keras.layers import Input, Dense
 import numpy as np
 import shutil
 
-from orcanet.logging import SummaryLogger, merge_arrays, BatchLogger
+from orcanet.logging import SummaryLogger, merge_arrays, BatchLogger, gen_line_str
 from orcanet.core import Organizer
 
 
@@ -53,6 +53,7 @@ class TestSummaryLogger(TestCase):
         check_file(target)
 
         target[-1] = filled_line
+        lr = np.nan
         self.smry.write_line(self.orga.io.get_epoch_float(*epoch), lr,
                              history_val=history_val)
         check_file(target)
@@ -85,6 +86,31 @@ class TestLoggingUtil(TestCase):
         self.assertSequenceEqual(merged, target)
 
 
+class TestGenLineStr(TestCase):
+    def setUp(self):
+        self.widths = [9, 9]
+        self.long = [1.23456789e-9, 2.0]
+        self.short = ["blub", 2]
+
+        self.kwargs = {
+            "seperator": " | ",
+            "float_precision": 4,
+            "minimum_cell_width": 9,
+        }
+
+    def test_ok(self):
+        line_l, widths_l = gen_line_str(self.long, self.widths, **self.kwargs)
+        line_s, widths_s = gen_line_str(self.short, self.widths, **self.kwargs)
+
+        #          "1---5---9_|_1---5---9"
+        target_s = "blub      | 2        "
+        target_l = "1.235e-09 | 2        "
+        self.assertEqual(line_l, target_l)
+        self.assertEqual(line_s, target_s)
+        self.assertSequenceEqual(self.widths, widths_l)
+        self.assertSequenceEqual(self.widths, widths_s)
+
+
 class TestBatchLogger(TestCase):
     def setUp(self):
         self.temp_dir = os.path.join(os.path.dirname(__file__), ".temp",
@@ -111,10 +137,10 @@ class TestBatchLogger(TestCase):
     def test_batch_logger_epoch_1_logfile_1(self):
         epoch = (1, 1)
         lines = self._make_and_get_lines(epoch)
-        print(lines)
         target_file1 = [
-            'Batch\tBatch_float\tloss\tmean_absolute_error\n',
-            '4\t0.2\t0.25\t0.5\n',
+            'Batch       | Batch_float | loss        | mean_absolute_error\n',
+            '------------+-------------+-------------+--------------------\n',
+            '4           | 0.2         | 0.25        | 0.5                \n',
         ]
         for line_no in range(len(lines)):
             self.assertEqual(target_file1[line_no], lines[line_no])
@@ -123,11 +149,11 @@ class TestBatchLogger(TestCase):
         epoch = (1, 2)
         lines = self._make_and_get_lines(epoch)
         target_file1 = [
-            'Batch\tBatch_float\tloss\tmean_absolute_error\n',
-            '4\t0.6\t0.25\t0.5\n',
-            '6\t0.8\t0.125\t0.25\n',
+            'Batch       | Batch_float | loss        | mean_absolute_error\n',
+            '------------+-------------+-------------+--------------------\n',
+            '4           | 0.6         | 0.25        | 0.5                \n',
+            '6           | 0.8         | 0.125       | 0.25               \n',
         ]
-        print(lines)
         for line_no in range(len(lines)):
             self.assertEqual(target_file1[line_no], lines[line_no])
 
@@ -135,14 +161,15 @@ class TestBatchLogger(TestCase):
         epoch = (2, 1)
         lines = self._make_and_get_lines(epoch)
         target_file1 = [
-            'Batch\tBatch_float\tloss\tmean_absolute_error\n',
-            '4\t1.2\t0.25\t0.5\n'
+            'Batch       | Batch_float | loss        | mean_absolute_error\n',
+            '------------+-------------+-------------+--------------------\n',
+            '4           | 1.2         | 0.25        | 0.5                \n',
         ]
-        print(lines)
         for line_no in range(len(lines)):
             self.assertEqual(target_file1[line_no], lines[line_no])
 
     def _make_and_get_lines(self, epoch):
+        """ Create some train log file with the batch logger. """
         batch_logger = BatchLogger(self.orga, epoch)
 
         if epoch[1] == 1:

@@ -4,6 +4,7 @@ architecture = "single"
 # default values for all the layers of the network
 type = "conv_block"
 conv_dim = 3
+kernel_initializer = "Zeros"
 
 # config of every layer block, will overwrite the default values above
 blocks = [
@@ -13,12 +14,13 @@ blocks = [
 
 
 [head]
+kernel_initializer = "Zeros"
 architecture = "regression_error"
 architecture_args = {output_names=['dx', ]}
 
 
 [compile]
-optimizer = "adam"
+optimizer = "sgd"
 
 [compile.losses]
 dx = {function="mse", weight=10}

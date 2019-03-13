@@ -9,6 +9,134 @@ from datetime import datetime
 from shutil import move
 
 
+class TrainfileLogger:
+    def __init__(self, log_file, column_names):
+        """
+        For writing the training log file in a nice format.
+
+        Parameters
+        ----------
+        log_file : opened file
+            The logfile.
+        column_names : List
+            A list of column names for the file.
+
+        """
+        # Minimum width of the cells in characters.
+        self.minimum_cell_width = 11
+        # Precision to which floats are rounded if they appear in data.
+        self.float_precision = 6
+
+        self.log_file = log_file
+        self.column_names = column_names
+        self._widths = None
+
+    def level_file(self):
+        """
+        Make file with only the head lines.
+
+        Existing file will be overwritten.
+        """
+        headline, widths = self._gen_line_str(self.column_names)
+        vline = ["-" * width for width in widths]
+        vertical_line = self._gen_line_str(vline, widths, seperator="-+-")[0]
+        self.log_file.write(headline + "\n")
+        self.log_file.write(vertical_line + "\n")
+
+        self._widths = widths
+
+    def write_line(self, values):
+        """
+        Write a line with data to the file.
+
+        Parameters
+        ----------
+        values : List
+            The data, in the same order as the column names.
+
+        """
+        if self._widths is None:
+            raise ValueError("Can not log: .level_file has to be called first")
+        if len(values) != len(self.column_names):
+            raise ValueError("Can not log: Expected {} values, but got "
+                             "{}".format(len(self.column_names), len(values)))
+
+        line = self._gen_line_str(values, self._widths)[0]
+        self.log_file.write(line + "\n")
+
+    def _gen_line_str(self, data, widths=None, seperator=" | "):
+        line, widths = gen_line_str(data,
+                                    widths=widths,
+                                    seperator=seperator,
+                                    float_precision=self.float_precision,
+                                    minimum_cell_width=self.minimum_cell_width)
+        return line, widths
+
+
+def gen_line_str(data, widths=None, seperator=" | ", float_precision=4, minimum_cell_width=9):
+    """
+    Generate a line in nice human readable format,
+    consisting of multiple spaced and seperated cells.
+
+    Parameters
+    ----------
+    data : tuple
+        Strings or floats of what is in each cell. It must be in the
+        same order and have the same length as the column names.
+    widths : List or None
+        Optional: The width of every cell. If None, will set it
+        automatically, depending on the data.
+        If widths is given, but what is given in data is wider than
+        the width, the cell will expand without notice. Must have the
+        same length as the column names.
+    seperator : str
+        String that seperates two adjacent cells.
+    float_precision : int
+        Precision to which floats are rounded if they appear in data.
+        The length of the resulting numbercan be up to 5 characters longer
+        than this value (due to . and e-09)
+
+    minimum_cell_width : int
+        Minimum width of the cells in characters.
+
+    Returns
+    -------
+    line : str
+        The line.
+    new_widths : List
+        The widths of the cells.
+
+    """
+    if widths is None:
+        new_widths = []
+    else:
+        new_widths = widths
+
+    line = ""
+    for i, entry in enumerate(data):
+        # no seperator before the first entry
+        if i == 0:
+            sep = ""
+        else:
+            sep = seperator
+
+        # If entry is a number, round to given precision and make it a string
+        if not isinstance(entry, str):
+            entry = format(float(entry), "."+str(float_precision)+"g")
+
+        if widths is None:
+            cell_width = max(minimum_cell_width, len(entry))
+            new_widths.append(cell_width)
+        else:
+            cell_width = widths[i]
+
+        cell_cont = format(entry, "<"+str(cell_width))
+
+        line += "{seperator}{entry}".format(seperator=sep, entry=cell_cont,)
+
+    return line, new_widths
+
+
 class SummaryLogger:
     """
     For writing the summary logfile made during training.
@@ -83,10 +211,10 @@ class SummaryLogger:
             last_line = summary_data[-1]
             if last_line["Epoch"] == data[0]:
                 # merge arrays but ignore LR
-                data = merge_arrays(data, last_line, exclude=1)
+                data = merge_arrays(last_line, data, exclude=1)
                 update_line = True
 
-        line = self._gen_line_str(data, widths)
+        line = self._gen_line_str(data, widths)[0]
         self._save_line(line, update_line)
 
     def _get_column_names(self):
@@ -149,7 +277,7 @@ class SummaryLogger:
                 os.stat(self.logfile_name).st_size == 0:
 
             vline = ["-" * width for width in widths]
-            vertical_line = self._gen_line_str(vline, widths, seperator="-+-")
+            vertical_line = self._gen_line_str(vline, widths, seperator="-+-")[0]
             with open(self.logfile_name, 'a+') as logfile:
                 logfile.write(headline + "\n")
                 logfile.write(vertical_line + "\n")
@@ -157,63 +285,12 @@ class SummaryLogger:
         return widths
 
     def _gen_line_str(self, data, widths=None, seperator=" | "):
-        """
-        Generate a line in the proper format for the summary plot,
-        consisting of multiple spaced and seperated cells.
-
-        Parameters
-        ----------
-        data : tuple
-            Strings or floats of what is in each cell. It must be in the
-            same order and have the same length as the column names.
-        widths : List or None
-            Optional: The width of every cell. If None, will set it
-            automatically, depending on the data.
-            If widths is given, but what is given in data is wider than
-            the width, the cell will expand without notice. Must have the
-            same length as the column names.
-        seperator : str
-            String that seperates two adjacent cells.
-
-        Returns
-        -------
-        line : str
-            The line.
-        new_widths : List
-            Optional: If the input widths were None: The widths of the cells .
-
-        """
-        if widths is None:
-            new_widths = []
-
-        assert len(data) == len(self.column_names)
-
-        line = ""
-        for i, entry in enumerate(data):
-            # no seperator before the first entry
-            if i == 0:
-                sep = ""
-            else:
-                sep = seperator
-
-            # If entry is a number, round to given precision and make it a string
-            if not isinstance(entry, str):
-                entry = format(float(entry), "."+str(self.float_precision)+"g")
-
-            if widths is None:
-                cell_width = max(self.minimum_cell_width, len(entry))
-                new_widths.append(cell_width)
-            else:
-                cell_width = widths[i]
-
-            cell_cont = format(entry, "<"+str(cell_width))
-
-            line += "{seperator}{entry}".format(seperator=sep, entry=cell_cont,)
-
-        if widths is None:
-            return line, new_widths
-        else:
-            return line
+        line, widths = gen_line_str(data,
+                                    widths=widths,
+                                    seperator=seperator,
+                                    float_precision=self.float_precision,
+                                    minimum_cell_width=self.minimum_cell_width)
+        return line, widths
 
 
 def merge_arrays(base, supp, exclude=None):
@@ -310,6 +387,7 @@ class BatchLogger(ks.callbacks.Callback):
         self.cum_metrics = None
         self.file = None
         self._stored_metrics = False
+        self._logger = None
 
     def on_epoch_begin(self, epoch, logs=None):
         # no of seen batches in this epoch
@@ -361,12 +439,11 @@ class BatchLogger(ks.callbacks.Callback):
                 self.previous_batches + self.seen
                 - self.display / 2.) / self.total_batches
 
-        line = '{0}\t{1}'.format(int(self.seen), batch_frctn)
+        line_data = [self.seen, batch_frctn]
         for metric in self.model.metrics_names:
-            line += '\t' + str(self.cum_metrics[metric] / self.display)
+            line_data.append(self.cum_metrics[metric] / self.display)
             self.cum_metrics[metric] = 0
-        line += "\n"
-        self.file.write(line)
+        self._logger.write_line(line_data)
         self._stored_metrics = False
 
     def _flush_file(self):
@@ -375,11 +452,11 @@ class BatchLogger(ks.callbacks.Callback):
 
     def _write_head(self):
         """ write column names for all losses / metrics """
-        line = 'Batch\tBatch_float'
+        column_names = ['Batch','Batch_float']
         for i, metric in enumerate(self.model.metrics_names):
-            line += "\t" + str(metric)
-        line += "\n"
-        self.file.write(line)
+            column_names.append(metric)
+        self._logger = TrainfileLogger(self.file, column_names)
+        self._logger.level_file()
 
 
 def log_start_training(orga):
@@ -416,9 +493,8 @@ def log_start_training(orga):
 
     log("\nNon-default settings used:")
     for key, value in vars(orga.cfg).items():
-        defaults = orga.cfg.get_defaults()
         if key == "output_folder" or key.startswith("_") \
-                or value == defaults.get(key):
+                or value == orga.cfg.default_values.get(key):
             continue
         log("   {}:\t{}".format(key, value))
 
