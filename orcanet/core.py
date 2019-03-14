@@ -11,6 +11,8 @@ import numpy as np
 from keras.models import load_model
 from keras.utils import plot_model
 import keras.backend as kb
+import time
+from datetime import timedelta
 
 from orcanet.backend import make_model_prediction, save_actv_wghts_plot, get_learning_rate, train_model, validate_model
 from orcanet.utilities.visualization import update_summary_plot
@@ -163,6 +165,7 @@ class Organizer:
             log_start_training(self)
 
         model_path = self.io.get_model_path(*next_epoch)
+        model_path_local = self.io.get_model_path(*next_epoch, local=True)
         if os.path.isfile(model_path):
             raise FileExistsError(
                 "Can not train model in epoch {} file {}, this model has "
@@ -189,7 +192,9 @@ class Organizer:
                                                    os.path.basename(
                                                        input_file)))
 
+        start_time = time.time()
         history = train_model(self, model, next_epoch, batch_logger=True)
+        elapsed_s = int(time.time() - start_time)
 
         model.save(model_path)
         smry_logger.write_line(next_epoch_float, lr, history_train=history)
@@ -197,7 +202,8 @@ class Organizer:
         self.io.print_log('Training results:')
         for metric_name, loss in history.items():
             self.io.print_log("   {}: \t{}".format(metric_name, loss))
-        self.io.print_log("Saved model to " + model_path + "\n")
+        self.io.print_log("Elapsed time: {}".format(timedelta(seconds=elapsed_s)))
+        self.io.print_log("Saved model to: {}\n".format(model_path_local))
 
         update_summary_plot(self)
 
@@ -220,6 +226,10 @@ class Organizer:
         latest_epoch = self.io.get_latest_epoch()
         if latest_epoch is None:
             raise ValueError("Can not validate: No saved model found")
+        if self.history.get_state()[-1]["is_validated"] is True:
+            raise ValueError("Can not validate in epoch {} file {}: "
+                             "Has already been validated".format(*latest_epoch))
+
         if self._stored_model is None:
             model = self.load_saved_model(*latest_epoch)
         else:
@@ -232,12 +242,14 @@ class Organizer:
 
         log_start_validation(self)
 
+        start_time = time.time()
         history = validate_model(self, model)
+        elapsed_s = int(time.time() - start_time)
 
         self.io.print_log('Validation results:')
         for metric_name, loss in history.items():
             self.io.print_log("   {}: \t{}".format(metric_name, loss))
-        self.io.print_log("")
+        self.io.print_log("Elapsed time: {}\n".format(timedelta(seconds=elapsed_s)))
         smry_logger.write_line(epoch_float, np.nan, history_val=history)
 
         update_summary_plot(self)
@@ -253,17 +265,15 @@ class Organizer:
         in the toml list, and save this prediction together with all the
         mc_info as a h5 file in the predictions subfolder.
 
+        Setting epoch, fileno = -1, -1 will load the most recent epoch
+        found in the main folder.
+
         Parameters
         ----------
         epoch : int
             The epoch of the model to load for prediction
-            Can also give -1 to automatically load the most recent epoch
-            found in the main folder.
         fileno : int
-            When using multiple files, define the file number for the
-            prediction, e.g. 1 for load the model trained on the first file.
-            Can also give -1 to automatically load the most recent fileno
-            from the given epoch found in the main folder.
+            The file number of the model to load for prediction.
 
         Returns
         -------
@@ -271,8 +281,8 @@ class Organizer:
             The path to the created prediction file.
 
         """
-        if fileno == -1:
-            epoch, fileno = self.io.get_latest_epoch(epoch)
+        if fileno == -1 and epoch == -1:
+            epoch, fileno = self.io.get_latest_epoch()
             print("Automatically set epoch to epoch {} file {}.".format(epoch,
                                                                         fileno))
 
@@ -284,7 +294,10 @@ class Organizer:
             model = self.load_saved_model(epoch, fileno, logging=False)
             self._set_up(model)
 
+            start_time = time.time()
             make_model_prediction(self, model, pred_filename, samples=None)
+            elapsed_s = int(time.time() - start_time)
+            print("Elapsed time: {}\n".format(timedelta(seconds=elapsed_s)))
 
         return pred_filename
 
@@ -338,7 +351,8 @@ class Organizer:
 
         """
         path_of_model = self.io.get_model_path(epoch, fileno)
-        self.io.print_log("Loading saved model: " + path_of_model, logging=logging)
+        path_loc = self.io.get_model_path(epoch, fileno, local=True)
+        self.io.print_log("Loading saved model: " + path_loc, logging=logging)
         model = load_model(path_of_model, custom_objects=self.cfg.custom_objects)
         return model
 
@@ -418,7 +432,7 @@ class Configuration(object):
     key_samples : str
         The name of the datagroup in the h5 input files which contains
         the samples for the network.
-    key_labels : str
+    key_mc_info : str
         The name of the datagroup in the h5 input files which contains
         the info for the labels.
     label_modifier : function or None
@@ -508,7 +522,7 @@ class Configuration(object):
         self.label_modifier = None
 
         self.key_samples = "x"
-        self.key_labels = "y"
+        self.key_mc_info = "y"
         self.custom_objects = None
         self.shuffle_train = False
 

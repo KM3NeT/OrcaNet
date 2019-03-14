@@ -178,7 +178,7 @@ def hdf5_batch_generator(orga, files_dict, f_size=None, zero_center=False,
     batchsize = orga.cfg.batchsize
     # name of the datagroups in the file
     samples_key = orga.cfg.key_samples
-    mc_key = orga.cfg.key_labels
+    mc_key = orga.cfg.key_mc_info
 
     # If the batchsize is larger than the f_size, make batchsize smaller
     # or nothing would be yielded

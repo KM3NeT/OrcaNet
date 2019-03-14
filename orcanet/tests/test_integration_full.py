@@ -85,6 +85,7 @@ class TestIntegration(TestCase):
         Train for 2 epochs.
         Reset organizer.
         Resume for 1 epoch with different lr and sample modifier.
+        Use orga.train and validate once each.
         Predict.
 
         """
@@ -108,6 +109,8 @@ class TestIntegration(TestCase):
         orga.cfg.learning_rate = test_learning_rate
         orga.cfg.sample_modifier = test_modifier
         orga.train_and_validate(epochs=1)
+        orga.train()
+        orga.validate()
         orga.predict()
 
 

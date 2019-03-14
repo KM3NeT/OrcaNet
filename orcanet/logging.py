@@ -461,8 +461,8 @@ class BatchLogger(ks.callbacks.Callback):
 
 def log_start_training(orga):
     """
-    Whenever the orga.train function is run, this logs all the input parameters
-    in the full log file.
+    When a training is started for the first time, this logs all the
+    input parameters in the log.txt file.
 
     Parameters
     ----------
@@ -476,7 +476,7 @@ def log_start_training(orga):
     log('-'*60)
     time = datetime.now().strftime('%Y-%m-%d  %H:%M:%S')
     log('-'*19 + " {} ".format(time) + '-'*19)
-    log("New training run started with the following configuration:\n")
+    log("Training run started with the following configuration:\n")
 
     log("Output folder:\t" + orga.cfg.output_folder)
     log("List file path:\t" + orga.cfg.get_list_file() + "\n")
@@ -497,14 +497,6 @@ def log_start_training(orga):
                 or value == orga.cfg.default_values.get(key):
             continue
         log("   {}:\t{}".format(key, value))
-
-    """
-    log("\nDefault settings used:")
-    for key, value in vars(orga.cfg).items():
-        defaults = orga.cfg.get_defaults()
-        if value == defaults.get(key):
-            log("   {}:\t{}".format(key, value))
-    """
 
     log("")
     orga.io.print_log(lines)

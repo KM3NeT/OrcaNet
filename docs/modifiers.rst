@@ -39,7 +39,7 @@ It must be of the following form:
         return y_true
 
 ``mc_info``: ``numpy array``
-    One batch of data read from the ``key_labels`` datagroup in the h5 input
+    One batch of data read from the ``key_mc_info`` datagroup in the h5 input
     files.
     If the content of the datagroup is a structured array, this will
     also be a structured array.
@@ -185,7 +185,7 @@ It must be of the following form:
         return datasets
 
 ``mc_info``: ``numpy structured array``
-    One batch of data read from the ``key_labels`` datagroup in the h5 input
+    One batch of data read from the ``key_mc_info`` datagroup in the h5 input
     files.
     If the content of the datagroup is a structured array, this will
     also be a structured array.

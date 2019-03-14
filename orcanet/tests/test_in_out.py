@@ -258,19 +258,22 @@ class TestIOHandler(TestCase):
         }
         assert_equal_struc_array(value[1], target["input_A"])
 
+    def test_get_all_epochs(self):
+        epochs = self.io.get_all_epochs()
+        target = [
+            (1, 1), (1, 2), (2, 1),
+        ]
+        self.assertSequenceEqual(epochs, target)
+
     def test_get_latest_epoch(self):
         value = self.io.get_latest_epoch()
         target = (2, 1)
         self.assertSequenceEqual(value, target)
 
-    def test_get_latest_epoch_epoch_1(self):
-        value = self.io.get_latest_epoch(epoch=1)
-        target = (1, 2)
-        self.assertSequenceEqual(value, target)
-
-    def test_get_latest_epoch_no_files_but_epoch_given(self):
-        with self.assertRaises(ValueError):
-            self.io.get_latest_epoch(epoch=3)
+    def test_get_latest_epoch_no_epochs(self):
+        self.io.cfg.output_folder = "./missing/"
+        value = self.io.get_latest_epoch()
+        self.assertEqual(value, None)
 
     def test_get_next_epoch_none(self):
         value = self.io.get_next_epoch(None)
@@ -302,10 +305,22 @@ class TestIOHandler(TestCase):
         target = self.output_folder + '/saved_models/model_epoch_1_file_1.h5'
         self.assertEqual(value, target)
 
+    def test_get_model_path_local(self):
+        value = self.io.get_model_path(1, 1, local=True)
+        target = 'saved_models/model_epoch_1_file_1.h5'
+        self.assertEqual(value, target)
+
     def test_get_model_path_latest(self):
         value = self.io.get_model_path(-1, -1)
         target = self.output_folder + '/saved_models/model_epoch_2_file_1.h5'
         self.assertEqual(value, target)
+
+    def test_get_model_path_latest_invalid(self):
+        with self.assertRaises(ValueError):
+            self.io.get_model_path(1, -1)
+
+        with self.assertRaises(ValueError):
+            self.io.get_model_path(-1, 1)
 
     def test_get_pred_path(self):
         value = self.io.get_pred_path(2, 1)

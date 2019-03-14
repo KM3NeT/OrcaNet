@@ -64,7 +64,7 @@ def generate_batches_from_hdf5_file_tweak(cfg, files_dict, f_size=None, zero_cen
     batchsize = cfg.batchsize
     # name of the datagroups in the file
     samples_key = cfg.key_samples
-    mc_key = cfg.key_labels
+    mc_key = cfg.key_mc_info
 
     # If the batchsize is larger than the f_size, make batchsize smaller or nothing would be yielded
     if f_size is not None:

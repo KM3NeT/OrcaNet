@@ -24,18 +24,9 @@ class IOHandler(object):
         self._tmpdir_train_files = None
         self._tmpdir_val_files = None
 
-    def get_latest_epoch(self, epoch=-1):
+    def get_latest_epoch(self):
         """
-        Check all saved models in the ./saved_models folder and return the
-        highest epoch / file_no pair.
-
-        Will only consider files that end with .h5 as models.
-
-        Parameters
-        ----------
-        epoch : int
-            Return the highest filenumber for this epoch. -1 for the most
-            recent epoch.
+        Return the highest epoch/fileno pair of any saved model.
 
         Returns
         -------
@@ -44,38 +35,41 @@ class IOHandler(object):
             empty or does not exist yet.
 
         """
+        epochs = self.get_all_epochs()
+        if len(epochs) == 0:
+            latest_epoch = None
+        else:
+            latest_epoch = epochs[-1]
+
+        return latest_epoch
+
+    def get_all_epochs(self):
+        """
+        Get a sorted list of all existing epoch/fileno pairs.
+
+        Returns
+        -------
+        epochs : List
+            The (epoch, fileno) tuples. List is empty if none can be found.
+        """
         saved_models_folder = self.cfg.output_folder + "saved_models"
+        epochs = []
+
         if os.path.exists(saved_models_folder):
             files = []
             for file in os.listdir(saved_models_folder):
-                if file.endswith('.h5'):
+                if file.startswith("model_epoch_") and file.endswith('.h5'):
                     files.append(file)
 
-            if len(files) == 0:
-                latest_epoch = None
-            else:
-                epochs = []
-                for file in files:
-                    # model_epoch_XX_file_YY
-                    file_base = os.path.splitext(file)[0]
-                    f_epoch, file_no = file_base.split(
-                        "model_epoch_")[-1].split("_file_")
+            for file in files:
+                # model_epoch_XX_file_YY
+                file_base = os.path.splitext(file)[0]
+                f_epoch, file_no = file_base.split(
+                    "model_epoch_")[-1].split("_file_")
+                epochs.append((int(f_epoch), int(file_no)))
+            epochs.sort()
 
-                    if epoch == -1 or int(f_epoch) == epoch:
-                        epochs.append((int(f_epoch), int(file_no)))
-
-                if len(epochs) == 0:
-                    raise ValueError("Can not get most recent file for "
-                                     "epoch {}: No files found!".format(epoch))
-                latest_epoch = max(epochs)
-        else:
-            latest_epoch = None
-
-        if epoch != -1 and latest_epoch is None:
-            raise ValueError("Can not get most recent file for "
-                             "epoch {}: No files found!".format(epoch))
-
-        return latest_epoch
+        return epochs
 
     def get_next_epoch(self, epoch):
         """
@@ -154,17 +148,41 @@ class IOHandler(object):
             subfolder = get(name)
         return subfolder
 
-    def get_model_path(self, epoch, fileno):
-        """ Get the path to a model (which might not exist yet). """
+    def get_model_path(self, epoch, fileno, local=False):
+        """
+        Get the path to a model (which might not exist yet).
+
+        Parameters
+        ----------
+        epoch : int
+            Its epoch.
+        fileno : int
+            Its file number.
+        local : bool
+            If True, will only return the path inside the output_folder,
+            i.e. models/models_epochXX_file_YY.h5.
+
+        Returns
+        -------
+        model_path : str
+            The path to the model.
+        """
+        """ 
+        
+        """
         if epoch == -1 and fileno == -1:
             epoch, fileno = self.get_latest_epoch()
         if epoch < 1 or fileno < 1:
             raise ValueError("Invalid epoch/file number {}, {}: Must be "
-                             "either (-1, -1) or both >1".format(epoch, fileno))
+                             "either (-1, -1) or both >0".format(epoch, fileno))
 
-        model_filename = self.get_subfolder("saved_models") \
-            + '/model_epoch_{}_file_{}.h5'.format(epoch, fileno)
-        return model_filename
+        subfolder = self.get_subfolder("saved_models")
+        if local:
+            subfolder = subfolder.split("/")[-1]
+        file_name = 'model_epoch_{}_file_{}.h5'.format(epoch, fileno)
+
+        model_path = subfolder + "/" + file_name
+        return model_path
 
     def get_pred_path(self, epoch, fileno):
         """ Get the path to a saved prediction. """
@@ -271,7 +289,7 @@ class IOHandler(object):
         for n, file_no_set in enumerate(self.yield_files(which)):
             # the number of samples in the n-th file of all inputs
             file_sizes_full[n] = [h5_get_number_of_rows(
-                file, datasets=[self.cfg.key_labels, self.cfg.key_samples])
+                file, datasets=[self.cfg.key_mc_info, self.cfg.key_samples])
                 for file in file_no_set.values()]
             if not file_sizes_full[n].count(file_sizes_full[n][0]) == \
                     len(file_sizes_full[n]):
@@ -469,7 +487,7 @@ class IOHandler(object):
             with h5py.File(files_dict[inp_name], "r") as f:
                 xs[inp_name] = f[self.cfg.key_samples][:self.cfg.batchsize]
                 if i == 0:
-                    mc_info = f[self.cfg.key_labels][:self.cfg.batchsize]
+                    mc_info = f[self.cfg.key_mc_info][:self.cfg.batchsize]
         return xs, mc_info
 
     def get_input_shapes(self):
