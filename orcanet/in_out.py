@@ -554,6 +554,7 @@ class IOHandler(object):
 class HistoryHandler:
     """
     For reading and plotting data from summary and train log files.
+
     """
     def __init__(self, summary_file, train_log_folder):
         self.summary_filename = summary_file
@@ -685,9 +686,7 @@ class HistoryHandler:
             Its shape is the number of lines with data.
 
         """
-        summary_data = np.genfromtxt(self.summary_filename, names=True,
-                                     delimiter="|", autostrip=True,
-                                     comments="--")
+        summary_data = self._load_txt(self.summary_filename)
         if summary_data.shape == ():
             # When only one line is present
             summary_data = summary_data.reshape(1,)
@@ -730,11 +729,7 @@ class HistoryHandler:
                 continue
             # file is sth like "log_epoch_1_file_2.txt", extract the 1 and 2:
             epoch, file_no = [int(file.split(".")[0].split("_")[i]) for i in [2, 4]]
-            file_data = np.genfromtxt(self.train_log_folder + "/" + file,
-                                      names=True,
-                                      delimiter="|",
-                                      autostrip=True,
-                                      comments="--")
+            file_data = self._load_txt(self.train_log_folder + "/" + file)
             train_file_data.append([[epoch, file_no], file_data])
 
         # sort so that earlier epochs come first
@@ -804,6 +799,19 @@ class HistoryHandler:
             state_dicts.append(line_state)
 
         return state_dicts
+
+    @staticmethod
+    def _load_txt(filepath):
+        file_data = np.genfromtxt(
+            filepath,
+            names=True,
+            delimiter="|",
+            autostrip=True,
+            comments="--",
+            missing_values="n/a",
+            filling_values=np.nan
+        )
+        return file_data
 
 
 def h5_get_number_of_rows(h5_filepath, datasets):

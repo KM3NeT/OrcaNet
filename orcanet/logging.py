@@ -196,11 +196,11 @@ class SummaryLogger:
         data = [epoch_float, lr]
         for i, metric_name in enumerate(self.metric_names):
             if history_train is None:
-                data.append("nan")
+                data.append("n/a")
             else:
                 data.append(history_train[metric_name])
             if history_val is None:
-                data.append("nan")
+                data.append("n/a")
             else:
                 data.append(history_val[metric_name])
 
@@ -321,10 +321,10 @@ def merge_arrays(base, supp, exclude=None):
         if base[i] == supp[i]:
             continue
 
-        elif base[i] == "nan" or np.isnan(base[i]):
+        elif base[i] == "n/a" or np.isnan(base[i]):
             base[i] = supp[i]
 
-        elif supp[i] == "nan" or np.isnan(supp[i]):
+        elif supp[i] == "n/a" or np.isnan(supp[i]):
             continue
 
         else:

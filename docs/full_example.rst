@@ -2,6 +2,7 @@ Working example
 ===============
 
 This page shows how to use orcanet by applying it on dummy data.
+The full scripts can be found in examples/full_example.
 
 The data
 --------
