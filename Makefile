@@ -1,6 +1,7 @@
 PKGNAME=orcanet
 ALLNAMES = $(PKGNAME)
 ALLNAMES += orcanet_contrib
+ALLNAMES += examples
 
 default: build
 

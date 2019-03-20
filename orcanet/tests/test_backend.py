@@ -8,7 +8,7 @@ from keras.layers import Dense, Input, Concatenate, Flatten
 from keras.callbacks import LambdaCallback
 
 from orcanet.core import Organizer
-from orcanet.backend import hdf5_batch_generator, get_datasets, get_learning_rate, train_model, validate_model, make_model_prediction
+from orcanet.backend import hdf5_batch_generator, get_datasets, get_learning_rate, train_model, validate_model, make_model_prediction, weighted_average
 from orcanet.utilities.nn_utilities import get_auto_label_modifier
 
 
@@ -262,6 +262,78 @@ class TestFunctions(TestCase):
 
         with self.assertRaises(TypeError):
             get_learning_rate((1, 1), user_lr, no_train_files)
+
+    def test_weighted_average(self):
+        # metrics [A, B, C]
+        histories = [
+            [0, 1, 2],  # file 1
+            [3, 4, 5],  # file 2
+        ]
+
+        file_sizes = [
+            1,
+            3,
+        ]
+
+        target = [
+            (0*1 + 3*3)/4, (1*1 + 4*3)/4, (2*1 + 5*3)/4,
+        ]
+        averaged_histories = weighted_average(histories, file_sizes)
+
+        self.assertSequenceEqual(averaged_histories, target)
+
+    def test_weighted_average_one_file(self):
+        # metrics [A, B, C]
+        histories = [
+            [0, 1, 2],  # file 1
+        ]
+
+        file_sizes = [
+            1,
+        ]
+
+        target = [
+            0, 1, 2
+        ]
+        averaged_histories = weighted_average(histories, file_sizes)
+
+        self.assertSequenceEqual(averaged_histories, target)
+
+    def test_weighted_average_one_metric(self):
+        # metrics [A, ]
+        histories = [
+            [0, ],  # file 1
+            [3, ],  # file 2
+        ]
+
+        file_sizes = [
+            1,
+            3,
+        ]
+
+        target = [
+            (0*1 + 3*3)/4,
+        ]
+        averaged_histories = weighted_average(histories, file_sizes)
+
+        self.assertSequenceEqual(averaged_histories, target)
+
+    def test_weighted_average_one_metric_one_file(self):
+        # metrics [A, ]
+        histories = [
+            [1, ],  # file 1
+        ]
+
+        file_sizes = [
+            1,
+        ]
+
+        target = [
+            1,
+        ]
+        averaged_histories = weighted_average(histories, file_sizes)
+
+        self.assertSequenceEqual(averaged_histories, target)
 
 
 class TestTrainValidatePredict(TestCase):

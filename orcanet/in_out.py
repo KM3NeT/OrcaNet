@@ -479,7 +479,21 @@ class IOHandler(object):
             raise ValueError(err_msg)
 
     def get_batch(self):
-        """ For testing purposes, return a batch of samples and mc_infos. """
+        """
+        For testing purposes, return a batch of samples and mc_infos.
+
+        This will always be the first batchsize samples and mc_info from
+        the first file, before any modifiers have been applied.
+
+        Returns
+        -------
+        xs : dict
+            Keys: Names of the input datasets from the list toml file.
+            Values: ndarray, a batch of samples.
+        mc_info : ndarray
+            From the mc_info datagroup of the input files.
+
+        """
         # TODO gets mc_info only from first train file
         files_dict = next(self.yield_files("train"))
         xs = {}

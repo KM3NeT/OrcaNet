@@ -1,0 +1,9 @@
+[random_numbers]
+
+train_files = [
+    "output/example_train.h5",
+]
+
+validation_files = [
+    "output/example_val.h5",
+]

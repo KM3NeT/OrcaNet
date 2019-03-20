@@ -116,18 +116,47 @@ def validate_model(orga, model):
             steps=int(f_size / orga.cfg.batchsize),
             max_queue_size=orga.cfg.max_queue_size,
             verbose=orga.cfg.verbose_val)
-
+        if not isinstance(history_file, list):
+            history_file = [history_file, ]
         histories.append(history_file)
 
-    # average over all val files if necessary
-    history = [sum(col) / float(len(col)) for col in zip(*histories)] \
-        if len(histories) > 1 else histories[0]
+    # average over all val files
+    history = weighted_average(histories, f_sizes)
 
     # This history is just a list, not a dict like with fit_generator
     # so transform to dict
     history = dict(zip(model.metrics_names, history))
 
     return history
+
+
+def weighted_average(histories, f_sizes):
+    """
+    Average multiple histories, weighted with the file size.
+
+    Each history can have multiple metrics, which are averaged seperatly.
+
+    Parameters
+    ----------
+    histories : List
+        List of histories, one for each file. Each history is also
+        a list: each entry is a different loss or metric.
+    f_sizes : List
+        List of the file sizes, in the same order as the histories, i.e.
+        the file of histories[0] has the length f_sizes[0].
+
+    Returns
+    -------
+    wgtd_average : List
+        The weighted averaged history. Has the same length as each
+        history in the histories List, i.e. one entry per loss or metric.
+
+    """
+    assert len(histories) == len(f_sizes)
+    rltv_fsizes = [f_size/sum(f_sizes) for f_size in f_sizes]
+    wgtd_average = np.dot(np.transpose(histories), rltv_fsizes)
+
+    return wgtd_average.tolist()
 
 
 def hdf5_batch_generator(orga, files_dict, f_size=None, zero_center=False,

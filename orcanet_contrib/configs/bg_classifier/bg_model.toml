@@ -3,7 +3,7 @@
 [body]
 architecture = "single"
 
-# default values for the trunk layers of the network:
+# default values:
 type = "conv_block"
 conv_dim = 3
 kernel_size = 3

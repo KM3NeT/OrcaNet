@@ -4,6 +4,7 @@
 import numpy as np
 import h5py
 import os
+import sys
 import shutil
 from unittest import TestCase
 
@@ -114,6 +115,24 @@ class TestIntegration(TestCase):
         orga.predict()
 
 
+class TestFullExample(TestCase):
+    """
+    Test the full example in the examples folder, as it is used on the docs.
+    Must go thorugh without any errors.
+    """
+    def test_full_example(self):
+        init_dir = os.getcwd()
+
+        example_dir = os.path.join(os.path.dirname(__file__), "../../examples/full_example")
+        os.chdir(example_dir)
+        sys.path.append(example_dir)
+
+        import full_example
+
+        shutil.rmtree(example_dir+"/output")
+        os.chdir(init_dir)
+
+
 def make_dummy_data(filepath1, filepath2, shape):
     """
     Make a total of 100 ones vs 300 zeroes of dummy data over two files.
@@ -131,14 +150,9 @@ def make_dummy_data(filepath1, filepath2, shape):
     xs1 = np.concatenate([np.ones((75,) + shape), np.zeros((75,) + shape)])
     xs2 = np.concatenate([np.ones((25,) + shape), np.zeros((225,) + shape)])
 
-    dtypes = [('event_id', '<f8'), ('particle_type', '<f8'), ('energy', '<f8'),
-              ('is_cc', '<f8'), ('bjorkeny', '<f8'), ('dir_x', '<f8'),
-              ('dir_y', '<f8'), ('dir_z', '<f8'), ('time_interaction', '<f8'),
-              ('run_id', '<f8'), ('vertex_pos_x', '<f8'), ('vertex_pos_y', '<f8'),
-              ('vertex_pos_z', '<f8'), ('time_residual_vertex', '<f8'),
-              ('prod_ident', '<f8'), ('group_id', '<i8')]
-    ys1 = np.ones((150, 16)).ravel().view(dtype=dtypes)
-    ys2 = np.ones((250, 16)).ravel().view(dtype=dtypes)
+    dtypes = [('dir_x', '<f8'),]
+    ys1 = np.ones((150, len(dtypes))).ravel().view(dtype=dtypes)
+    ys2 = np.ones((250, len(dtypes))).ravel().view(dtype=dtypes)
 
     for xs, ys, filepath in ((xs1, ys1, filepath1), (xs2, ys2, filepath2)):
         h5f = h5py.File(filepath, 'w')

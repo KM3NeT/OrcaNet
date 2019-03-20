@@ -1,0 +1,16 @@
+# Example configuration file for OrcaNet
+#
+# These options define the various configurable setting of the Organizer.
+# Possible options, together with their default values, are listed in the
+# doc of orcanet.core.Configuration.
+#
+# Here are a few examples
+#
+[config]
+# change the batchsize for training, valiating and predicting to 32
+batchsize=32
+# the learning rate which is used during training
+learning_rate=0.002
+# Define a folder where zero center images are stored. A zero center image
+# will be calculated automatically and saved if it is not found here
+zero_center_folder = "/home/woody/capn/mppi033h/orcanet_test/zero_center_folder/"
