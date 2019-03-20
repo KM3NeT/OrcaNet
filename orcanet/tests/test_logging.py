@@ -30,8 +30,8 @@ class TestSummaryLogger(TestCase):
         target = [
             "Epoch     | LR        | train_loss | val_loss  | train_mean_absolute_error | val_mean_absolute_error\n",
             "----------+-----------+------------+-----------+---------------------------+------------------------\n",
-            "0.5       | 0.001     | 0          | nan       | 0.5                       | nan                    \n",
-            "1         | 0.002     | 1          | nan       | 1.5                       | nan                    \n",
+            "0.5       | 0.001     | 0          | n/a       | 0.5                       | n/a                    \n",
+            "1         | 0.002     | 1          | n/a       | 1.5                       | n/a                    \n",
         ]
         filled_line = "1         | 0.002     | 1          | 2         | 1.5                       | 2.5                    \n"
 
@@ -66,9 +66,9 @@ class TestSummaryLogger(TestCase):
 
 class TestLoggingUtil(TestCase):
     def test_merge_arrays(self):
-        a = [1, 2, np.nan, np.nan, "nan", np.nan]
-        b = [np.nan, 2, np.nan, 3, 4, "nan"]
-        target = [1, 2, np.nan, 3, 4, "nan"]
+        a = [1, 2, np.nan, np.nan, "n/a", np.nan]
+        b = [np.nan, 2, np.nan, 3, 4, "n/a"]
+        target = [1, 2, np.nan, 3, 4, "n/a"]
         merged = merge_arrays(a, b)
         self.assertSequenceEqual(merged, target)
 
