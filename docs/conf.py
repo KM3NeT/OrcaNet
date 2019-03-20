@@ -212,10 +212,17 @@ epub_exclude_files = ['search.html']
 
 
 # -- Extension configuration -------------------------------------------------
+def skip(app, what, name, obj, would_skip, options):
+    if name == "__init__":
+        return False
+    return would_skip
+
 
 # -- Options for todo extension ----------------------------------------------
-
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = True
+
+
 def setup(app):
     app.add_stylesheet('_static/style.css')
+    app.connect("autodoc-skip-member", skip)

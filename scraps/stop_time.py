@@ -144,7 +144,7 @@ def test_generators(batches, intermediate_log, functions, func_kwargs):
 
     list_file = "/home/woody/capn/mppi013h/Code/OrcaNet/test/time_test_list.toml"
     zero_center_folder = "/home/woody/capn/mppi013h/Code/work/zero_center_folder/"
-    modelfile = "/home/woody/capn/mppi013h/Code/OrcaNet/examples/settings_files/example_model.toml"
+    modelfile = "/home/woody/capn/mppi013h/Code/OrcaNet/examples/settings_files/model_file.toml"
 
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
     orca = Organizer("./test/", list_file)

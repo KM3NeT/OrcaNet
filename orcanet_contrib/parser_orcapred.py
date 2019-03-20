@@ -10,12 +10,12 @@ Arguments:
             summary.txt, the plots, the trained models, etc.
     LIST    A .toml file which contains the pathes of the training and
             validation files. An example can be found in
-            examples/example_list.toml
+            examples/list_file.toml
     CONFIG  A .toml file which sets up the training. An example can be
-            found in examples/example_config.toml. The possible parameters
+            found in examples/config_file.toml. The possible parameters
             are listed in core.py in the class Configuration.
     MODEL   Path to a .toml file with infos about a model.
-            An example can be found in examples/example_model.toml.
+            An example can be found in examples/model_file.toml.
 
 Options:
     -h --help                       Show this screen.

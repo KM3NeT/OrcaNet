@@ -1,0 +1,33 @@
+# Defines the input files of the network.
+
+
+# Name of this input set. If this is the name of an input layer of the
+# model, it will get data from this set.
+[input_A]
+
+# A list of files used during training
+train_files = [
+"path/to/train_file_1_input_A.h5",
+"path/to/train_file_2_input_A.h5",
+]
+
+# A list of files used during valdation
+validation_files = [
+"path/to/val_file_1_input_A.h5",
+]
+
+# Another input set for a second input layer of the model.
+[input_B]
+train_files = [
+"path/to/train_file_1_input_B.h5",
+"path/to/train_file_2_input_B.h5",
+]
+
+validation_files = [
+"path/to/val_file_1_input_B.h5",
+]
+
+
+
+
+

@@ -2,5 +2,8 @@ __pycache__
 *.egg-info
 docs/_build
 orcanet/version.txt
+.coverage
+.eggs/
+reports/
 
 
