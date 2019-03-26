@@ -23,14 +23,13 @@ astroparticle physics, like huge datasets.
 OrcaNet is a part of the Deep Learning efforts for the neutrino telescope KM3NeT.
 Find more information about KM3NeT on http://www.km3net.org
 
-
-The github repository can be found at https://git.km3net.de/ml/OrcaNet.git
+The github repository can be found at https://github.com/ViaFerrata/OrcaNet
 
 OrcaNet can be installed via pip by running::
 
     pip install orcanet
 
-Per default, orcanet will install tensorflow (the cpu version).
+By default, orcanet will install tensorflow (the cpu version).
 For training with graphics cards, tensorflow-gpu is required, which needs
 to be installed manually via::
 

@@ -5,7 +5,7 @@
 source activate /home/hpc/capn/mppi033h/.virtualenv/python_3_env
 # required:
 module use -a /home/vault/capn/shared/apps/U16/modules
-module load cudnn/7.2.1-cuda9.2
+module load cudnn/7.4.2-cuda10.0
 # obtaining software from the outside world requires a working proxy to be set
 #export https_proxy=https://pi4060.physik.uni-erlangen.de:8888
 #export http_proxy=http://pi4060.physik.uni-erlangen.de:8888
