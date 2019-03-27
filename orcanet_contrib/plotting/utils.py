@@ -28,7 +28,7 @@ def select_track_shower(ptype, is_cc):
 
     """
     abs_particle_type = np.abs(ptype)
-    is_track = np.logical_and(abs_particle_type == 14, is_cc is True)
+    is_track = np.logical_and(abs_particle_type == 14, is_cc == 1)
     is_shower = np.logical_or(abs_particle_type == 16, abs_particle_type == 12)
 
     return is_track, is_shower

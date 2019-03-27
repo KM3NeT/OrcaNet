@@ -20,11 +20,13 @@ which is split over multiple files.
 
 In this sense, it tackles many challenges that are usually found in 
 astroparticle physics, like huge datasets.
+
 OrcaNet is a part of the Deep Learning efforts for the neutrino telescope KM3NeT.
 Find more information about KM3NeT on http://www.km3net.org
 
 OrcaNet is currently being developed at the official KM3NeT gitlab (https://git.km3net.de/ml/OrcaNet).
-However, there's also a github mirror that can be found at https://github.com/ViaFerrata/OrcaNet
+
+However, there's also a github mirror that can be found at https://github.com/ViaFerrata/OrcaNet.
 
 OrcaNet can be installed via pip by running::
 
