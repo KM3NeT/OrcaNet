@@ -282,7 +282,11 @@ class Organizer:
 
         """
         if fileno == -1 and epoch == -1:
-            epoch, fileno = self.io.get_latest_epoch()
+            latest_epoch = self.io.get_latest_epoch()
+            if latest_epoch is None:
+                raise FileNotFoundError("Can not look up most recent model: "
+                                        "No models found for {}".format(self.cfg.output_folder))
+            epoch, fileno = latest_epoch
             print("Automatically set epoch to epoch {} file {}.".format(epoch,
                                                                         fileno))
 
