@@ -55,15 +55,15 @@ def orca_pred(output_folder, list_file, config_file, model_file):
     # When predicting with a orga model, the right modifiers and custom
     # objects need to be given
     update_objects(orga, model_file)
-    # TODO suboptimal:
-    label_modifier = toml.load(model_file)["orca_modifiers"]["label_modifier"]
 
     # Per default, a prediction will be done for the model with the
     # highest epoch and filenumber.
     pred_filename = orga.predict(epoch=-1, fileno=-1)
 
+    # make performance plots
     plots_folder = orga.io.get_subfolder(name='plots')
-    make_performance_plots(pred_filename, label_modifier, plots_folder)
+    dataset_modifier = toml.load(model_file)["orca_modifiers"]["dataset_modifier"]
+    make_performance_plots(pred_filename, dataset_modifier, plots_folder)
 
 
 def parse_input():

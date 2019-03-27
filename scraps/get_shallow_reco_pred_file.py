@@ -33,14 +33,13 @@ def cut_summary_file():
                      'gandalf_loose_is_selected', 'muon_score', 'track_score', 'noise_score')
 
     usecols = [col_names[col_name] for col_name in selected_cols]
-    #TODO fix doesnt work, wrong col naming and assignment
+    usecols.sort()
 
     print('Loading the summary file content')
-    dtype = {}
+    dtype = dict()
     dtype['names'] = selected_cols
     dtype['formats'] = (np.float64, ) * len(selected_cols)
-    summary_file_arr = np.loadtxt(meta_filepath, delimiter=' ', usecols=usecols.sort(), dtype=dtype)
-    # summary_file_arr = np.loadtxt(meta_filepath, delimiter=' ', usecols=usecols.sort(), names=cols_list)  # a lot slower and uses tons more memory
+    summary_file_arr = np.loadtxt(meta_filepath, delimiter=' ', usecols=usecols, dtype=dtype)
 
     f = h5py.File(savepath, 'w')
     print('Saving the summary file content')
@@ -70,7 +69,6 @@ def make_pred_file():
 
     # ts classifier
     print('Making files for ts classifier')
-    print(f_in['summary_array']['is_neutrino'])
     is_neutrino = f_in['summary_array']['is_neutrino'] == 1
 
     s = f_in['summary_array'][is_neutrino]
@@ -94,8 +92,7 @@ def make_pred_file():
     selection_regr = np.logical_or(dusj_is_selected, gandalf_is_selected)
 
     mc_info_sel_regr = get_mc_info(s, selection=selection_regr)
-    save_surviving_evt_info_to_npy(mc_info_sel_ts,
-                                   '/home/saturn/capn/mppi033h/Data/event_selections/evt_selection_regression.npy')
+    save_surviving_evt_info_to_npy(mc_info_sel_regr, '/home/saturn/capn/mppi033h/Data/event_selections/evt_selection_regression.npy')
 
     pred_regr = get_pred(s, 'regression_e_dir_vtx_by', selection=selection_regr)
     save_dsets_to_h5_file(mc_info_sel_regr, pred_regr,

@@ -9,7 +9,7 @@ import numpy as np
 from orcanet_contrib.plotting.utils import get_event_selection_mask
 
 
-def make_prob_hists_bg_classifier(pred_file, savefolder, cuts=None):
+def make_prob_hists_bg_classifier(pred_file, savefolder, cuts=None, savename_prefix=None):
     """
     Function that makes plots for the reco probability distributions of the background classifier.
 
@@ -24,9 +24,11 @@ def make_prob_hists_bg_classifier(pred_file, savefolder, cuts=None):
     cuts : None/str
         Specifies, if cuts should be used for the plot. Either None or a str, that is available in the
         load_event_selection_file() function.
+    savename_prefix : None/str
+        Optional string prefix for the savename of the plot.
 
     """
-    def configure_and_save_plot(bg_class, savefolder):
+    def configure_and_save_plot(bg_class, savefolder, savename_prefix):
         """
         Configure and save a mpl plot with GridLines, Logscale etc. for the background classifier probability plots.
         Parameters
@@ -35,6 +37,8 @@ def make_prob_hists_bg_classifier(pred_file, savefolder, cuts=None):
             A string which specifies the probability class: (muon, random_noise, neutrino).
         savefolder : str
             Path to the directory, where the plot should be saved.
+        savename_prefix : None/str
+            Optional string prefix for the savename of the plot.
 
         """
         axes.legend(loc='upper center', ncol=1)
@@ -50,12 +54,13 @@ def make_prob_hists_bg_classifier(pred_file, savefolder, cuts=None):
         title = plt.title('Probability to be classified as ' + bg_class)
         title.set_position([.5, 1.04])
 
-        plt.savefig(savefolder + '/prob_' + bg_class + '.pdf')
-        plt.savefig(savefolder + '/prob_' + bg_class + '.png', dpi=600)
+        savename = 'prob_' + bg_class if savename_prefix is None else savename_prefix + '_prob_' + bg_class
+        plt.savefig(savefolder + '/' + savename + '.pdf')
+        plt.savefig(savefolder + '/' + savename + '.png', dpi=600)
 
     fig, axes = plt.subplots()
 
-    #bg_classes = ['muon', 'random_noise', 'neutrino']
+    # bg_classes = ['muon', 'random_noise', 'neutrino']
     bg_classes = ['not_neutrino', 'neutrino']
     for bg_class in bg_classes:
         prob_class = pred_file['pred']['prob_' + bg_class]
@@ -68,7 +73,7 @@ def make_prob_hists_bg_classifier(pred_file, savefolder, cuts=None):
             ptype, is_cc = ptype[evt_sel_mask], is_cc[evt_sel_mask]
 
         make_prob_hists_for_class(prob_class, ptype, is_cc, axes)
-        configure_and_save_plot(bg_class, savefolder)
+        configure_and_save_plot(bg_class, savefolder, savename_prefix)
         plt.cla()
 
 

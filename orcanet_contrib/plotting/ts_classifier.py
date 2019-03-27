@@ -384,7 +384,7 @@ def plot_ts_separability(pred_file, savefolder, pred_file_2=None, cuts=None):
         H5py file instance, which stores the track-shower classification predictions of a nn model.
     savefolder : str
         Path of the directory, where the plots should be saved to.
-    pred_file_2 : h5py.File
+    pred_file_2 : None/h5py.File
         H5py file instance of the predictions of a second classifier, that should be plotted
         into the same plot, e.g. a shallow learning classifier as comparison.
     cuts : None/str

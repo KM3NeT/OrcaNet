@@ -417,7 +417,12 @@ def orca_dataset_modifiers(name):
             pred = np.empty(n_evts, dtype=dtypes_pred)
 
             for tpl in pred_labels_and_nn_output_names:
-                pred[tpl[0]] = y_pred[tpl[1]]
+                if 'err' in tpl[1]:
+                    # the err outputs have shape (bs, 2) with 2 (pred_label, pred_label_err)
+                    # we only want to select the pred_label_err output
+                    pred[tpl[0]] = y_pred[tpl[1]][:, 1]
+                else:
+                    pred[tpl[0]] = np.squeeze(y_pred[tpl[1]], axis=1)  # reshape (bs, 1) to (bs)
 
             datasets['pred'] = pred
 
@@ -438,6 +443,8 @@ def orca_dataset_modifiers(name):
                 true[tpl[0]] = y_true[tpl[1]]
 
             datasets['true'] = true
+
+            return datasets
 
     else:
         raise ValueError('Unknown dataset modifier: ' + str(name))

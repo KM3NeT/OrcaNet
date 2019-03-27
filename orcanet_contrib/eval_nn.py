@@ -40,9 +40,12 @@ def make_performance_plots(pred_filepath, dataset_modifier, plots_folder):
         make_plots_subfolders(main_perf_plots_path, dataset_modifier)
         make_prob_hists_bg_classifier(pred_file, main_perf_plots_path + '/1d', cuts=cuts)
 
+        pred_file_2 = h5py.File('/home/saturn/capn/mppi033h/Data/standard_reco_files/pred_file_bg_classifier_2_class.h5', 'r')
+        make_prob_hists_bg_classifier(pred_file_2, main_perf_plots_path + '/1d', savename_prefix='standard_reco', cuts=cuts)
+
     elif dataset_modifier == 'ts_classifier':
         cuts = 'neutrino_ts'
-        pred_file_2 = None
+        pred_file_2 = h5py.File('/home/saturn/capn/mppi033h/Data/standard_reco_files/pred_file_ts_classifier.h5', 'r')
 
         make_plots_subfolders(main_perf_plots_path, dataset_modifier)
         make_e_to_acc_plot_ts(pred_file, 'Classified as track', main_perf_plots_path + '/1d', cuts=cuts, prob_threshold_shower=0.5)
