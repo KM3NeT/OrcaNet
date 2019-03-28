@@ -126,7 +126,7 @@ def correct_reco_energy(mc_info, energy_pred_array, metric='median'):
 
 # --------------------------- Code for making cuts --------------------------- #
 
-def get_event_selection_mask(mc_info, invert=False, cut_name='1-5GeV_and_3-100GeV_prod'):
+def get_event_selection_mask(mc_info, invert=False, cut_name='neutrino_regr'):
     """
     Function that checks, which events in the mc_info input array are also in the event selection file,
     specified by the cut_name parameter.
@@ -146,14 +146,17 @@ def get_event_selection_mask(mc_info, invert=False, cut_name='1-5GeV_and_3-100Ge
         the cut_name parameter.
 
     """
-    # load array with run_id, event_id, prod_id, particle_type and is_cc info (in that column order!)
+    # load array with run_id, event_id, prod_ident, particle_type and is_cc info (in that column order!)
     arr_sel_events = load_event_selection_file(cut_name)
 
     # select the same information from the input mc_info
-    ax = np.newaxis()
+    ax = np.newaxis
     mc_info_necessary_info = np.concatenate([mc_info['run_id'][:, ax], mc_info['event_id'][:, ax],
-                                             mc_info['prod_id'][:, ax], mc_info['particle_type'][:, ax],
+                                             mc_info['prod_ident'][:, ax], mc_info['particle_type'][:, ax],
                                              mc_info['is_cc'][:, ax]], axis=1)
+
+    mc_info_necessary_info = np.abs(mc_info_necessary_info)
+    arr_sel_events = np.abs(arr_sel_events)
 
     bool_evt_selected = in_nd(mc_info_necessary_info, arr_sel_events)
 
@@ -178,19 +181,19 @@ def load_event_selection_file(cut_name, dirpath='/home/saturn/capn/mppi033h/Data
     Returns
     -------
     selected_events_array : ndarray(ndim=2)
-        Array with the run_id, event_id, prod_id, particle_type and is_cc info of the selected events.
+        Array with the run_id, event_id, prod_ident, particle_type and is_cc info of the selected events.
 
     """
     if cut_name == 'neutrino_regr':
-        # contains run_id, event_id, prod_id, particle_type and is_cc
+        # contains run_id, event_id, prod_ident, particle_type and is_cc
         selected_events_array = np.load(dirpath + '/evt_selection_regression.npy')
 
     elif cut_name == 'neutrino_ts':
-        # contains run_id, event_id, prod_id, particle_type and is_cc
+        # contains run_id, event_id, prod_ident, particle_type and is_cc
         selected_events_array = np.load(dirpath + '/evt_selection_ts_classifier.npy')
 
     elif cut_name == 'bg_classifier':
-        # contains run_id, event_id, prod_id, particle_type and is_cc
+        # contains run_id, event_id, prod_ident, particle_type and is_cc
         selected_events_array = np.load(dirpath + '/evt_selection_bg_classifier.npy')
 
     else:
@@ -249,7 +252,6 @@ def test_in_nd():
     c = in_nd(a, b)
     it_works = np.all(c == [True, False, False])
     return it_works
-
 
 
 # --------------------------- Code for making cuts --------------------------- #

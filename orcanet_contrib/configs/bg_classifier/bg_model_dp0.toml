@@ -37,7 +37,7 @@ architecture_args = {output_name='bg_output', categories=3}
 optimizer = "adam"
 
 [compile.losses]
-bg_output = {"categorical_crossentropy", metrics=['acc']}
+bg_output = {function="categorical_crossentropy", metrics=['acc']}
 
 # ----------------------------------------------------------------------
 [orca_modifiers]

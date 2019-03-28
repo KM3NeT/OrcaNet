@@ -34,7 +34,7 @@ def make_performance_plots(pred_filepath, dataset_modifier, plots_folder):
     pred_file = h5py.File(pred_filepath, 'r')
     main_perf_plots_path = plots_folder + '/pred_performance'
 
-    if dataset_modifier == 'bg_classifier':
+    if 'bg_classifier' in dataset_modifier:
         cuts = 'bg_classifier'
 
         make_plots_subfolders(main_perf_plots_path, dataset_modifier)

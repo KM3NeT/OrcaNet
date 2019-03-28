@@ -138,9 +138,10 @@ def get_nn_pred_correct_info(y_pred, y_true, prob_threshold_shower=0.5):
                          'binary categorization problems and not for problems with more than two classes!')
 
     is_shower_pred = (y_pred['prob_shower'] > prob_threshold_shower)
-    is_shower_true = (y_true['is_shower'] > 0)
+    is_shower_true = (y_true['cat_shower'] > 0)
 
-    nn_pred_correct = np.logical_and(is_shower_pred, is_shower_true)
+    # True: if True, True (correct pred for shower) or False, False (correct pred for track)
+    nn_pred_correct = is_shower_pred == is_shower_true
 
     return nn_pred_correct
 
@@ -162,7 +163,7 @@ def print_accuracy(nn_pred_correct, print_text='Accuracy of the T/S classifier: 
     n_total = nn_pred_correct.shape[0]
     accuracy = n_correct / float(n_total)
 
-    print(print_text, '\n', str(accuracy * 100), ', based on ', n_total, ' events')
+    print(print_text + '\n' + str(accuracy * 100) + ', based on ' + str(n_total) + ' events')
 
 
 def select_class(class_name, ptype, is_cc):
@@ -393,7 +394,7 @@ def plot_ts_separability(pred_file, savefolder, pred_file_2=None, cuts=None):
 
     """
     mc_info = pred_file['mc_info']
-    prob_track = pred_file['prob_track']
+    prob_track = pred_file['pred']['prob_track']
 
     if cuts is not None:
         assert isinstance(cuts, str)
@@ -410,13 +411,13 @@ def plot_ts_separability(pred_file, savefolder, pred_file_2=None, cuts=None):
 
     if pred_file_2 is not None:
         mc_info_2 = pred_file_2['mc_info']
-        prob_track_2 = pred_file_2['prob_track']
+        prob_track_2 = pred_file_2['pred']['prob_track']
 
         if cuts is not None:
             assert isinstance(cuts, str)
             evt_sel_mask_2 = get_event_selection_mask(mc_info_2, cut_name=cuts)
             mc_info_2 = mc_info_2[evt_sel_mask_2]
-            prob_track_2 = prob_track[evt_sel_mask_2]
+            prob_track_2 = prob_track_2[evt_sel_mask_2]
 
         separabilities_2 = calculcate_separability(mc_info_2, prob_track_2)
         plt.plot(separabilities_2[:, 1], separabilities_2[:, 0], 'r', marker='o', lw=0.5,
@@ -458,7 +459,7 @@ def calculcate_separability(mc_info, prob_track, bins=40, e_cut_range=np.logspac
 
     """
     mc_energy = mc_info['energy']
-    particle_type, is_cc = mc_info['particle_type']['is_cc']
+    particle_type, is_cc = mc_info['particle_type'], mc_info['is_cc']
     is_muon_cc = select_ic(particle_type, is_cc, 'muon-CC')
     is_elec_cc = select_ic(particle_type, is_cc, 'elec-CC')
 

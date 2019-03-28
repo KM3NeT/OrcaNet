@@ -1,0 +1,75 @@
+# Define the files for network training and validation in the toml format.
+#
+# For each set of files, give a name and an array of train files and validation files.
+# Networks are directly fed from these files, if they have an input layer with the same name.
+#
+# Example format:
+# -----------------------------
+# [input_A]
+# train_files = [
+# "path/to/train_file_1_inputx.h5",
+# "path/to/train_file_2_inputx.h5",
+# ]
+#
+# validation_files = [
+# "path/to/val_file_1_inputx.h5",
+# ]
+#
+# [input_B]
+# train_files = [
+# "path/to/train_file_1_inputy.h5",
+# "path/to/train_file_2_inputy.h5",
+# ]
+#
+# validation_files = [
+# "path/to/val_file_1_inputy.h5",
+# ]
+# -----------------------------
+
+[xyz-t]
+train_files = [
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzt/data_split/xyzt_tight_1_60b_regression_dataset_train_0_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzt/data_split/xyzt_tight_1_60b_regression_dataset_train_1_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzt/data_split/xyzt_tight_1_60b_regression_dataset_train_2_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzt/data_split/xyzt_tight_1_60b_regression_dataset_train_3_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzt/data_split/xyzt_tight_1_60b_regression_dataset_train_4_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzt/data_split/xyzt_tight_1_60b_regression_dataset_train_5_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzt/data_split/xyzt_tight_1_60b_regression_dataset_train_6_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzt/data_split/xyzt_tight_1_60b_regression_dataset_train_7_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzt/data_split/xyzt_tight_1_60b_regression_dataset_train_8_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzt/data_split/xyzt_tight_1_60b_regression_dataset_train_9_shuffled.h5",
+]
+
+validation_files = [
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzt/data_split/xyzt_tight_1_60b_regression_dataset_validate_0_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzt/data_split/xyzt_tight_1_60b_regression_dataset_validate_1_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzt/data_split/xyzt_tight_1_60b_regression_dataset_validate_2_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzt/data_split/xyzt_tight_1_60b_regression_dataset_validate_3_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzt/data_split/xyzt_tight_1_60b_regression_dataset_validate_4_shuffled.h5",
+]
+
+[xyz-c]
+train_files = [
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzc/data_split/xyzc_tight_1_60b_regression_dataset_train_0_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzc/data_split/xyzc_tight_1_60b_regression_dataset_train_1_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzc/data_split/xyzc_tight_1_60b_regression_dataset_train_2_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzc/data_split/xyzc_tight_1_60b_regression_dataset_train_3_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzc/data_split/xyzc_tight_1_60b_regression_dataset_train_4_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzc/data_split/xyzc_tight_1_60b_regression_dataset_train_5_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzc/data_split/xyzc_tight_1_60b_regression_dataset_train_6_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzc/data_split/xyzc_tight_1_60b_regression_dataset_train_7_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzc/data_split/xyzc_tight_1_60b_regression_dataset_train_8_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzc/data_split/xyzc_tight_1_60b_regression_dataset_train_9_shuffled.h5",
+]
+
+validation_files = [
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzc/data_split/xyzc_tight_1_60b_regression_dataset_validate_0_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzc/data_split/xyzc_tight_1_60b_regression_dataset_validate_1_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzc/data_split/xyzc_tight_1_60b_regression_dataset_validate_2_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzc/data_split/xyzc_tight_1_60b_regression_dataset_validate_3_shuffled.h5",
+"/home/saturn/capn/mppi033h/Data/input_images/ORCA_2016_115l/tight_1_60b_regression_classifier/data_splits/xyzc/data_split/xyzc_tight_1_60b_regression_dataset_validate_4_shuffled.h5",
+]
+
+
+
+

@@ -119,7 +119,7 @@ def get_mc_info(s, selection=None):
     if selection is not None:
         s = s[selection]
 
-    cols_s_out = [('event_id', 'event_id'), ('type', 'particle_type'), ('energy', 'energy'),
+    cols_s_out = [('frame_index', 'event_id'), ('type', 'particle_type'), ('energy', 'energy'),
                   ('is_cc', 'is_cc'), ('bjorkeny', 'bjorkeny'), ('dir_x', 'dir_x'),
                   ('dir_y', 'dir_y'), ('dir_z', 'dir_z'), ('time', 'time_interaction'),
                   ('run_id', 'run_id'), ('pos_x', 'vertex_pos_x'), ('pos_y', 'vertex_pos_y'),
@@ -133,8 +133,10 @@ def get_mc_info(s, selection=None):
     is_mupage = select_class('mupage', s['type'], s['is_cc'])
     is_random_noise = select_class('random_noise', s['type'], s['is_cc'])
     is_neutrino = np.invert(np.logical_or(is_mupage, is_random_noise))
-    is_neutrino_low_e = np.logical_and(s['Erange_min'], is_neutrino)
+    is_neutrino_low_e = np.logical_and(s['Erange_min'] == 1, is_neutrino)
     is_neutrino_high_e = np.logical_and(np.invert(is_neutrino_low_e), is_neutrino)
+
+    assert np.count_nonzero(is_neutrino) == np.count_nonzero(is_neutrino_low_e) + np.count_nonzero(is_neutrino_high_e)
 
     prod_ident[is_mupage] = 3
     prod_ident[is_random_noise] = 4
@@ -142,14 +144,14 @@ def get_mc_info(s, selection=None):
     prod_ident[is_neutrino_high_e] = 1
     assert np.count_nonzero(prod_ident == 0) == 0
 
-    cols_s_out.append((None, 'prod_id'))
-    dtypes.append(('prod_id', np.float64))
+    cols_s_out.append((None, 'prod_ident'))
+    dtypes.append(('prod_ident', np.float64))
 
     n_evts = s['energy'].shape[0]
     mc_info = np.empty(n_evts, dtype=dtypes)
     for tpl in cols_s_out:
-        if tpl[1] == 'prod_id':
-            mc_info['prod_id'] = prod_ident
+        if tpl[1] == 'prod_ident':
+            mc_info['prod_ident'] = prod_ident
         else:
             mc_info[tpl[1]] = s[tpl[0]]
 
@@ -167,7 +169,7 @@ def save_surviving_evt_info_to_npy(mc_info, savepath):
     """
     ax = np.newaxis
     arr = np.concatenate([mc_info['run_id'][:, ax], mc_info['event_id'][:, ax],
-                          mc_info['prod_id'][:, ax], mc_info['particle_type'][:, ax],
+                          mc_info['prod_ident'][:, ax], mc_info['particle_type'][:, ax],
                           mc_info['is_cc'][:, ax]], axis=1)
 
     np.save(savepath, arr)

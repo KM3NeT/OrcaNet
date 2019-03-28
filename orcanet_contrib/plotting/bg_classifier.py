@@ -60,17 +60,20 @@ def make_prob_hists_bg_classifier(pred_file, savefolder, cuts=None, savename_pre
 
     fig, axes = plt.subplots()
 
-    # bg_classes = ['muon', 'random_noise', 'neutrino']
-    bg_classes = ['not_neutrino', 'neutrino']
+    ptype, is_cc = pred_file['mc_info']['particle_type'], pred_file['mc_info']['is_cc']
+    if cuts is not None:
+        assert isinstance(cuts, str)
+        print('Event number before selection: ' + str(ptype.shape))
+        evt_sel_mask = get_event_selection_mask(pred_file['mc_info'], cut_name=cuts)
+        ptype, is_cc = ptype[evt_sel_mask], is_cc[evt_sel_mask]
+        print('Event number after selection: ' + str(ptype.shape))
+
+    bg_classes = ['muon', 'random_noise', 'neutrino']
+    # bg_classes = ['not_neutrino', 'neutrino']
     for bg_class in bg_classes:
         prob_class = pred_file['pred']['prob_' + bg_class]
-        ptype, is_cc = pred_file['mc_info']['particle_type'], pred_file['mc_info']['is_cc']
-
         if cuts is not None:
-            assert isinstance(cuts, str)
-            evt_sel_mask = get_event_selection_mask(pred_file['mc_info'], cut_name=cuts)
             prob_class = prob_class[evt_sel_mask]
-            ptype, is_cc = ptype[evt_sel_mask], is_cc[evt_sel_mask]
 
         make_prob_hists_for_class(prob_class, ptype, is_cc, axes)
         configure_and_save_plot(bg_class, savefolder, savename_prefix)
