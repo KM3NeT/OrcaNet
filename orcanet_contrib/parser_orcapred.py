@@ -23,10 +23,13 @@ Options:
 """
 from docopt import docopt
 import toml
+from matplotlib import use
 
 from orcanet.core import Organizer
 from orcanet_contrib.eval_nn import make_performance_plots
 from orcanet_contrib.orca_handler_util import update_objects
+
+use('Agg')
 
 
 def orca_pred(output_folder, list_file, config_file, model_file):

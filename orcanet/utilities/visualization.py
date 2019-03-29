@@ -59,7 +59,6 @@ def plot_history(
         The plot.
 
     """
-    plt.ioff()
     fig, ax = plt.subplots()
     if train_data is None and val_data is None:
         raise ValueError("Can not plot when no train and val data is given.")

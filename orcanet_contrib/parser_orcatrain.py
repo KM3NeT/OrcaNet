@@ -25,10 +25,13 @@ Options:
 """
 from docopt import docopt
 import keras as ks
+from matplotlib import use
 
 from orcanet.core import Organizer
 from model_builder import ModelBuilder
 from orcanet_contrib.orca_handler_util import orca_learning_rates, update_objects
+
+use('Agg')
 
 
 def orca_train(output_folder, list_file, config_file, model_file,
