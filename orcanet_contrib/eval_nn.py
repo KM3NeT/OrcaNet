@@ -5,16 +5,16 @@ Code for making performance plots based on nn model predictions.
 """
 
 import os
-import matplotlib as mpl
-mpl.use('Agg')
+from matplotlib import use
 import h5py
-from orcanet_contrib.plotting.bg_classifier import make_prob_hists_bg_classifier
+from orcanet_contrib.plotting.bg_classifier import make_prob_hists_bg_classifier, make_contamination_to_neutrino_efficiency_plot
 from orcanet_contrib.plotting.ts_classifier import make_e_to_acc_plot_ts, make_ts_prob_hists, plot_ts_separability
 from orcanet_contrib.plotting.regression import (make_2d_prop_to_prop_plot,
                                                  make_1d_property_errors_metric_over_energy,
                                                  make_1d_reco_err_div_by_std_dev_plot,
                                                  make_1d_reco_err_to_reco_residual_plot,
                                                  make_2d_true_reco_plot_different_sigmas)
+use('Agg')
 
 
 def make_performance_plots(pred_filepath, dataset_modifier, plots_folder):
@@ -42,6 +42,7 @@ def make_performance_plots(pred_filepath, dataset_modifier, plots_folder):
 
         pred_file_2 = h5py.File('/home/saturn/capn/mppi033h/Data/standard_reco_files/pred_file_bg_classifier_2_class.h5', 'r')
         make_prob_hists_bg_classifier(pred_file_2, main_perf_plots_path + '/1d', savename_prefix='standard_reco', cuts=cuts)
+        make_contamination_to_neutrino_efficiency_plot(pred_file, pred_file_2, dataset_modifier, main_perf_plots_path + '/1d')
 
     elif dataset_modifier == 'ts_classifier':
         cuts = 'neutrino_ts'

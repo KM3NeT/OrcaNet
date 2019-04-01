@@ -6,7 +6,7 @@ Code for making plots for background classifiers (muon/random_noise/neutrinos).
 
 from matplotlib import pyplot as plt
 import numpy as np
-from orcanet_contrib.plotting.utils import get_event_selection_mask
+from orcanet_contrib.plotting.utils import get_event_selection_mask, in_nd
 
 
 def make_prob_hists_bg_classifier(pred_file, savefolder, cuts=None, savename_prefix=None):
@@ -68,8 +68,8 @@ def make_prob_hists_bg_classifier(pred_file, savefolder, cuts=None, savename_pre
         ptype, is_cc = ptype[evt_sel_mask], is_cc[evt_sel_mask]
         print('Event number after selection: ' + str(ptype.shape))
 
-    bg_classes = ['muon', 'random_noise', 'neutrino']
-    # bg_classes = ['not_neutrino', 'neutrino']
+    # bg_classes = ['muon', 'random_noise', 'neutrino']
+    bg_classes = ['not_neutrino', 'neutrino']
     for bg_class in bg_classes:
         prob_class = pred_file['pred']['prob_' + bg_class]
         if cuts is not None:
@@ -141,3 +141,77 @@ def make_prob_hists_for_class(prob_class, ptype, is_cc, axes):
     axes.hist(prob_class[is_mupage], density=True, bins=40, range=(0, 1), color='b', label='mupage', histtype='step', linestyle='-', zorder=3)
     axes.hist(prob_class[is_random_noise], density=True, bins=40, range=(0, 1), color='r', label='random_noise', histtype='step', linestyle='-', zorder=3)
     axes.hist(prob_class[is_neutrino], density=True, bins=40, range=(0, 1), color='saddlebrown', label='neutrino', histtype='step', linestyle='-', zorder=3)
+
+
+def make_contamination_to_neutrino_efficiency_plot(pred_file, pred_file_std_reco, dataset_modifier, savefolder):
+
+    # select pred_file evts that are in the std reco summary files
+    evt_sel_mask_dl_in_std = get_event_selection_mask(pred_file['mc_info'], cut_name='bg_classifier')
+    mc_info = pred_file['mc_info'][evt_sel_mask_dl_in_std]
+    pred = pred_file['pred'][evt_sel_mask_dl_in_std]
+
+    # select pred_file_std_reco events that are in the already cut pred_file
+    mc_info_std = pred_file_std_reco['mc_info']
+    ax = np.newaxis
+
+    mc_info_dl_reco = np.concatenate([mc_info['run_id'][:, ax], mc_info['event_id'][:, ax],
+                                      mc_info['prod_ident'][:, ax], mc_info['particle_type'][:, ax],
+                                      mc_info['is_cc'][:, ax]], axis=1)
+
+    mc_info_std_reco_selection = np.concatenate([mc_info_std['run_id'][:, ax], mc_info_std['event_id'][:, ax],
+                                                 mc_info_std['prod_ident'][:, ax], mc_info_std['particle_type'][:, ax],
+                                                 mc_info_std['is_cc'][:, ax]], axis=1)
+
+    evt_sel_mask_std_in_dl = in_nd(mc_info_std_reco_selection, mc_info_dl_reco)
+    mc_info_std = pred_file_std_reco['mc_info'][evt_sel_mask_std_in_dl]
+    pred_std = pred_file_std_reco['pred'][evt_sel_mask_std_in_dl]
+
+    # assert np.count_nonzero(mc_info_std) == mc_info.shape[0]  # dl and std should have same number of events now TODO actually not, but only 100 of 400k
+
+    # get plot data
+    ptype_dl, is_cc_dl = mc_info['particle_type'], mc_info['is_cc']
+    ptype_std, is_cc_std = mc_info_std['particle_type'], mc_info_std['is_cc']
+
+    if dataset_modifier == 'bg_classifier_2_class':
+        is_neutrino_dl, is_neutrino_std = select_class('neutrino', ptype_dl, is_cc_dl), select_class('neutrino', ptype_std, is_cc_std)
+        is_mupage_dl, is_mupage_std = select_class('mupage', ptype_dl, is_cc_dl), select_class('mupage', ptype_std, is_cc_std)
+
+        n_neutrinos_total = np.count_nonzero(is_neutrino_dl)  # dl or std doesnt matter for n_neutrinos_total
+
+        prob_not_neutrino = pred['prob_not_neutrino']
+        muon_score_std = pred_std['prob_muon']
+
+        cuts = np.linspace(0, 1, 5000)
+        x_contamination_mupage_dl, y_neutrino_efficiency_dl = [], []
+        x_contamination_mupage_std, y_neutrino_efficiency_std = [], []
+        for i in range(len(cuts)):
+
+            # how many events are left for dl?
+            n_neutrino_dl = np.count_nonzero(prob_not_neutrino[is_neutrino_dl] < cuts[i])
+            n_muons_dl = np.count_nonzero(prob_not_neutrino[is_mupage_dl] < cuts[i])
+
+            if n_muons_dl != 0 and n_neutrino_dl != 0:
+                x_contamination_mupage_dl.append((n_muons_dl / n_neutrino_dl) * 100)
+                y_neutrino_efficiency_dl.append((n_neutrino_dl / n_neutrinos_total) * 100)
+
+            # how many events are left for std reco?
+            n_neutrino_std = np.count_nonzero(muon_score_std[is_neutrino_std] < cuts[i])
+            n_muons_std = np.count_nonzero(muon_score_std[is_mupage_std] < cuts[i])
+
+            if n_muons_std != 0 and n_neutrino_std != 0:
+                x_contamination_mupage_std.append((n_muons_std / n_neutrino_std) * 100)
+                y_neutrino_efficiency_std.append((n_neutrino_std / n_neutrinos_total) * 100)
+
+        fig, ax = plt.subplots()
+        ax.plot(np.array(x_contamination_mupage_dl), np.array(y_neutrino_efficiency_dl), label='OrcaNet')
+        ax.plot(np.array(x_contamination_mupage_std), np.array(y_neutrino_efficiency_std), label='Std Reco')
+
+        #ax.set_xscale('log')
+        ax.set_xlim(left=0, right=0.01)
+        ax.set_ylim(bottom=90, top=101)
+        ax.set_xlabel('Muon contamination in %'), ax.set_ylabel('Neutrino efficiency in %')
+        ax.grid(True)
+        ax.legend(loc='upper right')
+
+        plt.savefig(savefolder + '/muon_contamination_to_neutr_efficiency.pdf')
+        plt.savefig(savefolder + '/muon_contamination_to_neutr_efficiency.png', dpi=600)

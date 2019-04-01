@@ -155,9 +155,6 @@ def get_event_selection_mask(mc_info, invert=False, cut_name='neutrino_regr'):
                                              mc_info['prod_ident'][:, ax], mc_info['particle_type'][:, ax],
                                              mc_info['is_cc'][:, ax]], axis=1)
 
-    mc_info_necessary_info = np.abs(mc_info_necessary_info)
-    arr_sel_events = np.abs(arr_sel_events)
-
     bool_evt_selected = in_nd(mc_info_necessary_info, arr_sel_events)
 
     if invert is True:

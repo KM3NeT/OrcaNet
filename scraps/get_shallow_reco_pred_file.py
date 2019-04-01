@@ -4,6 +4,7 @@
 
 import os
 import numpy as np
+import numpy.lib.recfunctions
 import h5py
 from orcanet_contrib.plotting.bg_classifier import select_class
 from orcanet_contrib.plotting.utils import select_track_shower
@@ -40,6 +41,10 @@ def cut_summary_file():
     dtype['names'] = selected_cols
     dtype['formats'] = (np.float64, ) * len(selected_cols)
     summary_file_arr = np.loadtxt(meta_filepath, delimiter=' ', usecols=usecols, dtype=dtype)
+
+    # add weight_1_year_col
+    w = np.load('/home/saturn/capn/mppi033h/Data/standard_reco_files/weight_1_year_col.npy')
+    summary_file_arr = np.lib.recfunctions.append_fields(summary_file_arr, 'oscillated_weight_one_year', w, dtypes=[np.float64], usemask=False)
 
     f = h5py.File(savepath, 'w')
     print('Saving the summary file content')
@@ -123,7 +128,7 @@ def get_mc_info(s, selection=None):
                   ('is_cc', 'is_cc'), ('bjorkeny', 'bjorkeny'), ('dir_x', 'dir_x'),
                   ('dir_y', 'dir_y'), ('dir_z', 'dir_z'), ('time', 'time_interaction'),
                   ('run_id', 'run_id'), ('pos_x', 'vertex_pos_x'), ('pos_y', 'vertex_pos_y'),
-                  ('pos_z', 'vertex_pos_z')]
+                  ('pos_z', 'vertex_pos_z'), ('oscillated_weight_one_year', 'oscillated_weight_one_year')]
 
     dtypes = [(tpl[1], s[tpl[0]].dtype) for tpl in cols_s_out]
 
@@ -199,15 +204,24 @@ def get_pred(s, mode, selection=None):
     elif mode == 'bg_classifier_2_class':
         # need 2 values, prob neutrino, prob not neutrino
 
-        prob_not_neutrino = s['noise_score']
-        prob_neutrino = 1 - prob_not_neutrino
+        muon_score, noise_score = s['muon_score'], s['noise_score']
 
-        dtypes_pred = [('prob_not_neutrino', np.float64), ('prob_neutrino', np.float64)]
-        n_evts = prob_not_neutrino.shape[0]
+        dtypes_pred = [('prob_muon', np.float64), ('prob_noise', np.float64)]
+        n_evts = muon_score.shape[0]
         pred = np.empty(n_evts, dtype=dtypes_pred)
 
-        pred['prob_neutrino'] = prob_neutrino
-        pred['prob_not_neutrino'] = prob_not_neutrino
+        pred['prob_muon'] = muon_score
+        pred['prob_noise'] = noise_score
+
+        # prob_not_neutrino = s['noise_score']
+        # prob_neutrino = 1 - prob_not_neutrino
+        #
+        # dtypes_pred = [('prob_not_neutrino', np.float64), ('prob_neutrino', np.float64)]
+        # n_evts = prob_not_neutrino.shape[0]
+        # pred = np.empty(n_evts, dtype=dtypes_pred)
+        #
+        # pred['prob_neutrino'] = prob_neutrino
+        # pred['prob_not_neutrino'] = prob_not_neutrino
 
     elif mode == 'ts_classifier':
         # need 2 values, prob shower, prob track
