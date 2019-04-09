@@ -35,16 +35,20 @@ def make_performance_plots(pred_filepath, dataset_modifier, plots_folder):
     main_perf_plots_path = plots_folder + '/pred_performance'
 
     if 'bg_classifier' in dataset_modifier:
+        print('Generating plots for background classifier performance investigations')
+
         cuts = 'bg_classifier'
 
         make_plots_subfolders(main_perf_plots_path, dataset_modifier)
         make_prob_hists_bg_classifier(pred_file, main_perf_plots_path + '/1d', cuts=cuts)
 
         pred_file_2 = h5py.File('/home/saturn/capn/mppi033h/Data/standard_reco_files/pred_file_bg_classifier_2_class.h5', 'r')
-        make_prob_hists_bg_classifier(pred_file_2, main_perf_plots_path + '/1d', savename_prefix='standard_reco', cuts=cuts)
+        make_prob_hists_bg_classifier(pred_file_2, main_perf_plots_path + '/1d', bg_classes=['prob_muon'], savename_prefix='standard_reco', cuts=cuts)
         make_contamination_to_neutrino_efficiency_plot(pred_file, pred_file_2, dataset_modifier, main_perf_plots_path + '/1d')
 
     elif dataset_modifier == 'ts_classifier':
+        print('Generating plots for track-shower performance investigations')
+
         cuts = 'neutrino_ts'
         pred_file_2 = h5py.File('/home/saturn/capn/mppi033h/Data/standard_reco_files/pred_file_ts_classifier.h5', 'r')
 
@@ -57,17 +61,18 @@ def make_performance_plots(pred_filepath, dataset_modifier, plots_folder):
         make_plots_subfolders(main_perf_plots_path, dataset_modifier)
         cuts = 'neutrino_regr'
         reco_energy_correction = 'median'
-        pred_file_2nd_reco = None
+        pred_file_2nd_reco = h5py.File('/home/saturn/capn/mppi033h/Data/standard_reco_files/pred_file_regression.h5', 'r')
 
         if 'energy' in dataset_modifier:
             print('Generating plots for energy performance investigations')
             make_2d_prop_to_prop_plot(pred_file, 'energy_true', 'energy_reco', main_perf_plots_path + '/2d',
-                                      'e_true_to_e_reco', cuts=cuts, title_prefix='OrcaNet: ')
+                                      'e_true_to_e_reco', reco_energy_correction=None,
+                                      cuts=None, title_prefix='OrcaNet: ')
             if pred_file_2nd_reco is not None:
                 make_2d_prop_to_prop_plot(pred_file_2nd_reco, 'energy_true', 'energy_reco', main_perf_plots_path + '/2d',
                                           'standard_reco_e_true_to_e_reco', cuts=cuts, title_prefix='Standard Reco: ')
 
-            make_1d_property_errors_metric_over_energy(pred_file, 'energy', (None, 'median'), main_perf_plots_path + '/1d',
+            make_1d_property_errors_metric_over_energy(pred_file, 'energy', (None, 'median_relative'), main_perf_plots_path + '/1d',
                                                        'e_true_to_median_error_energy', reco_energy_correction=reco_energy_correction,
                                                        cuts=cuts, compare_2nd_reco=pred_file_2nd_reco)
             make_1d_property_errors_metric_over_energy(pred_file, 'energy', ('rel_std_div', None), main_perf_plots_path + '/1d',
@@ -94,7 +99,7 @@ def make_performance_plots(pred_filepath, dataset_modifier, plots_folder):
                                                        'e_true_to_median_error_dirs_spherical', cuts=cuts,
                                                        compare_2nd_reco=pred_file_2nd_reco)
 
-        if 'bjorkeny' in dataset_modifier:
+        if 'bjorken' in dataset_modifier:
             print('Generating plots for bjorkeny performance investigations')
             make_2d_prop_to_prop_plot(pred_file, 'bjorkeny_true', 'bjorkeny_reco', main_perf_plots_path + '/2d',
                                       'bjorkeny_true_to_bjorkeny_reco', cuts=cuts, title_prefix='OrcaNet: ')
@@ -108,13 +113,13 @@ def make_performance_plots(pred_filepath, dataset_modifier, plots_folder):
 
         if 'vtx' in dataset_modifier:
             print('Generating plots for vertex performance investigations')
-            vtx_tuples = [('vtx_x_true', 'vtx_x_reco'), ('vtx_y_true', 'vtx_y_reco'), ('vtx_y_true', 'vtx_y_reco')]
+            vtx_tuples = [('vtx_x_true', 'vtx_x_reco'), ('vtx_y_true', 'vtx_y_reco'), ('vtx_z_true', 'vtx_z_reco')]
 
             for vtx_tpl in vtx_tuples:
-                make_2d_prop_to_prop_plot(pred_file, vtx_tpl[0], vtx_tpl[0], main_perf_plots_path + '/2d',
+                make_2d_prop_to_prop_plot(pred_file, vtx_tpl[0], vtx_tpl[1], main_perf_plots_path + '/2d',
                                           vtx_tpl[0] + '_to_' + vtx_tpl[1], cuts=cuts, title_prefix='OrcaNet: ')
                 if pred_file_2nd_reco is not None:
-                    make_2d_prop_to_prop_plot(pred_file_2nd_reco, vtx_tpl[0], vtx_tpl[0], main_perf_plots_path + '/2d',
+                    make_2d_prop_to_prop_plot(pred_file_2nd_reco, vtx_tpl[0], vtx_tpl[1], main_perf_plots_path + '/2d',
                                               'standard_reco_' + vtx_tpl[0] + '_to_' + vtx_tpl[1],
                                               cuts=cuts, title_prefix='Standard Reco: ')
 

@@ -81,7 +81,7 @@ def correct_reco_energy(mc_info, energy_pred_array, metric='median'):
 
     Returns
     -------
-    energy_pred : ndarray(ndim=1)
+    energy_pred_corrected : ndarray(ndim=1)
         Array containing the corrected prediction energies.
 
     """
@@ -90,7 +90,7 @@ def correct_reco_energy(mc_info, energy_pred_array, metric='median'):
     is_track, is_shower = select_track_shower(particle_type, is_cc)
     is_ic = select_ic(particle_type, is_cc, 'elec-CC')
 
-    energy_mc, energy_pred = mc_info['energy'][is_ic], np.copy(energy_pred_array[is_ic])  # TODO test if this works or is actually necessary
+    energy_mc_e_cc, energy_pred_e_cc = mc_info['energy'][is_ic], energy_pred_array[is_ic]
 
     correction_factors_x, correction_factors_y = [], []
 
@@ -100,9 +100,9 @@ def correct_reco_energy(mc_info, energy_pred_array, metric='median'):
         e_range_low, e_range_high = e_range[i], e_range[i+1]
         e_range_mean = (e_range_high + e_range_low) / float(2)
 
-        e_mc_cut_boolean = np.logical_and(e_range_low < energy_mc, energy_mc <= e_range_high)
-        e_mc_cut = energy_mc[e_mc_cut_boolean]
-        e_pred_cut = energy_pred[e_mc_cut_boolean]
+        e_mc_cut_boolean = np.logical_and(e_range_low < energy_mc_e_cc, energy_mc_e_cc <= e_range_high)
+        e_mc_cut = energy_mc_e_cc[e_mc_cut_boolean]
+        e_pred_cut = energy_pred_e_cc[e_mc_cut_boolean]
 
         if metric == 'median':
             correction_factor = np.median((e_pred_cut - e_mc_cut) / e_pred_cut)
@@ -119,9 +119,11 @@ def correct_reco_energy(mc_info, energy_pred_array, metric='median'):
     correction_factor_en_pred = np.interp(energy_pred_orig_shower, correction_factors_x, correction_factors_y)
 
     # apply correction to ALL shower ic's (including all taus atm)
-    energy_pred[is_shower] = energy_pred_orig_shower + (- correction_factor_en_pred) * energy_pred_orig_shower
+    # need to make a copy of the array, we dont want to make changes in the original array
+    energy_pred_corrected = np.copy(energy_pred_array)
+    energy_pred_corrected[is_shower] = energy_pred_orig_shower + (- correction_factor_en_pred) * energy_pred_orig_shower
 
-    return energy_pred
+    return energy_pred_corrected
 
 
 # --------------------------- Code for making cuts --------------------------- #

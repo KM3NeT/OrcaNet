@@ -26,7 +26,7 @@ def cut_summary_file():
         col_names[col] = i
 
     selected_cols = ('bjorkeny', 'dir_x', 'dir_y', 'dir_z', 'energy', 'event_id', 'frame_index', 'is_cc', 'is_neutrino', 'n_files_gen',
-                     'pos_x', 'pos_y', 'pos_z', 'run_id', 'time', 'type', 'Erange_min', 'dusj_best_DusjOrcaUsingProbabilitiesFinalFit_BjorkenY',
+                     'pos_x', 'pos_y', 'pos_z', 'run_id', 'time', 'trigger_counter', 'type', 'Erange_min', 'dusj_best_DusjOrcaUsingProbabilitiesFinalFit_BjorkenY',
                      'dusj_dir_x', 'dusj_dir_y', 'dusj_dir_z', 'dusj_pos_x', 'dusj_pos_y', 'dusj_pos_z', 'dusj_time',
                      'dusj_is_good', 'dusj_energy_corrected', 'gandalf_dir_x',
                      'gandalf_dir_y', 'gandalf_dir_z', 'gandalf_pos_x', 'gandalf_pos_y', 'gandalf_pos_z', 'gandalf_time',
@@ -124,7 +124,7 @@ def get_mc_info(s, selection=None):
     if selection is not None:
         s = s[selection]
 
-    cols_s_out = [('frame_index', 'event_id'), ('type', 'particle_type'), ('energy', 'energy'),
+    cols_s_out = [('type', 'particle_type'), ('energy', 'energy'),
                   ('is_cc', 'is_cc'), ('bjorkeny', 'bjorkeny'), ('dir_x', 'dir_x'),
                   ('dir_y', 'dir_y'), ('dir_z', 'dir_z'), ('time', 'time_interaction'),
                   ('run_id', 'run_id'), ('pos_x', 'vertex_pos_x'), ('pos_y', 'vertex_pos_y'),
@@ -152,11 +152,20 @@ def get_mc_info(s, selection=None):
     cols_s_out.append((None, 'prod_ident'))
     dtypes.append(('prod_ident', np.float64))
 
+    # for random noise files, we need to take the trigger_counter as event_id, not the frame_index!
+    event_id = np.zeros(s['run_id'].shape[0], dtype=np.float64)
+    event_id[is_random_noise] = s['trigger_counter'][is_random_noise]
+    event_id[np.invert(is_random_noise)] = s['frame_index'][np.invert(is_random_noise)]
+    cols_s_out.append((None, 'event_id'))
+    dtypes.append(('event_id', np.float64))
+
     n_evts = s['energy'].shape[0]
     mc_info = np.empty(n_evts, dtype=dtypes)
     for tpl in cols_s_out:
         if tpl[1] == 'prod_ident':
             mc_info['prod_ident'] = prod_ident
+        elif tpl[1] == 'event_id':
+            mc_info['event_id'] = event_id
         else:
             mc_info[tpl[1]] = s[tpl[0]]
 
@@ -241,29 +250,26 @@ def get_pred(s, mode, selection=None):
         s_shower, s_track = s[is_shower], s[is_track]
 
         # energy
-        energy_shower, energy_track = s_shower['dusj_energy_corrected'], s_track['gandalf_energy_corrected']
-        energy = np.concatenate([energy_shower, energy_track], axis=0)
+        energy = np.empty(s.shape[0], dtype=np.float64)
+        energy[is_shower], energy[is_track] = s_shower['dusj_energy_corrected'], s_track['gandalf_energy_corrected']
+        assert np.all(np.logical_or(is_shower, is_track)) == True
 
         # bjorkeny
-        bjorkeny_shower = s_shower['dusj_best_DusjOrcaUsingProbabilitiesFinalFit_BjorkenY']
-        bjorkeny_track = np.full(s_track.shape, 0.360366)  # not available for gandalf, use median of by_true of training dataset
-        bjorkeny = np.concatenate([bjorkeny_shower, bjorkeny_track], axis=0)
+        bjorkeny = np.empty(s.shape[0], dtype=np.float64)
+        bjorkeny[is_shower] = s_shower['dusj_best_DusjOrcaUsingProbabilitiesFinalFit_BjorkenY']
+        bjorkeny[is_track] = np.full(s_track.shape, 0.360366)  # not available for gandalf, use median of by_true of training dataset
 
         # dir and vtx
-        labels_shower = ['dusj_dir_x', 'dusj_dir_y', 'dusj_dir_z', 'dusj_pos_x', 'dusj_pos_y', 'dusj_pos_z', 'dusj_time']
-        labels_track = ['gandalf_dir_x', 'gandalf_dir_y', 'gandalf_dir_z', 'gandalf_pos_x', 'gandalf_pos_y', 'gandalf_pos_z', 'gandalf_time']
-        dir_vtx_shower, dir_vtx_track = {}, {}
-
-        for i, label in enumerate(labels_shower):
-            dir_vtx_shower[i] = s_shower[label]
-
-        for i, label in enumerate(labels_track):
-            dir_vtx_track[i] = s_track[label]
-
+        labels_show_track = (('dusj_dir_x', 'gandalf_dir_x'), ('dusj_dir_y', 'gandalf_dir_y'), ('dusj_dir_z', 'gandalf_dir_z'),
+                             ('dusj_pos_x', 'gandalf_pos_x'), ('dusj_pos_y', 'gandalf_pos_y'), ('dusj_pos_z', 'gandalf_pos_z'),
+                             ('dusj_time', 'gandalf_time'))
         dir_vtx = {}
-        for i in range(len(dir_vtx_shower)):
-            dir_vtx[i] = np.concatenate([dir_vtx_shower[i], dir_vtx_track[i]], axis=0)
+        for i, label_tpl in enumerate(labels_show_track):
+            dir_vtx[i] = np.empty(s.shape[0], dtype=np.float64)
+            dir_vtx[i][is_shower] = s_shower[label_tpl[0]]
+            dir_vtx[i][is_track] = s_track[label_tpl[1]]
 
+        # save everything to a new pred dset
         labels_pred_dset = ['pred_energy', 'pred_dir_x', 'pred_dir_y', 'pred_dir_z', 'pred_bjorkeny', 'pred_vtx_x',
                             'pred_vtx_y', 'pred_vtx_z', 'pred_vtx_t']
 

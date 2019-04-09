@@ -5,11 +5,12 @@ Code for making plots for background classifiers (muon/random_noise/neutrinos).
 """
 
 from matplotlib import pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
 from orcanet_contrib.plotting.utils import get_event_selection_mask, in_nd
 
 
-def make_prob_hists_bg_classifier(pred_file, savefolder, cuts=None, savename_prefix=None):
+def make_prob_hists_bg_classifier(pred_file, savefolder, bg_classes = ['not_neutrino', 'neutrino'], cuts=None, savename_prefix=None):
     """
     Function that makes plots for the reco probability distributions of the background classifier.
 
@@ -75,7 +76,8 @@ def make_prob_hists_bg_classifier(pred_file, savefolder, cuts=None, savename_pre
         if cuts is not None:
             prob_class = prob_class[evt_sel_mask]
 
-        make_prob_hists_for_class(prob_class, ptype, is_cc, axes)
+        make_prob_hists_for_class(prob_class, ptype, is_cc, axes, range=(0, 1))
+        make_prob_hists_for_class(prob_class, ptype, is_cc, axes, range=(0.95, 1))
         configure_and_save_plot(bg_class, savefolder, savename_prefix)
         plt.cla()
 
@@ -116,7 +118,7 @@ def select_class(class_name, ptype, is_cc):
     return is_class
 
 
-def make_prob_hists_for_class(prob_class, ptype, is_cc, axes):
+def make_prob_hists_for_class(prob_class, ptype, is_cc, axes, range=(0, 1)):
     """
     Makes a mpl hist plot of the probabilities for a certain probability class (either muon, random_noise or neutrino).
 
@@ -138,12 +140,25 @@ def make_prob_hists_for_class(prob_class, ptype, is_cc, axes):
     is_random_noise = select_class('random_noise', ptype, is_cc)
     is_neutrino = select_class('neutrino', ptype, is_cc)
 
-    axes.hist(prob_class[is_mupage], density=True, bins=40, range=(0, 1), color='b', label='mupage', histtype='step', linestyle='-', zorder=3)
-    axes.hist(prob_class[is_random_noise], density=True, bins=40, range=(0, 1), color='r', label='random_noise', histtype='step', linestyle='-', zorder=3)
-    axes.hist(prob_class[is_neutrino], density=True, bins=40, range=(0, 1), color='saddlebrown', label='neutrino', histtype='step', linestyle='-', zorder=3)
+    axes.hist(prob_class[is_mupage], density=True, bins=100, range=range, color='b', label='mupage', histtype='step', linestyle='-', zorder=3)
+    axes.hist(prob_class[is_random_noise], density=True, bins=100, range=range, color='r', label='random_noise', histtype='step', linestyle='-', zorder=3)
+    axes.hist(prob_class[is_neutrino], density=True, bins=100, range=range, color='saddlebrown', label='neutrino', histtype='step', linestyle='-', zorder=3)
 
 
 def make_contamination_to_neutrino_efficiency_plot(pred_file, pred_file_std_reco, dataset_modifier, savefolder):
+    """
+
+    Parameters
+    ----------
+    pred_file
+    pred_file_std_reco
+    dataset_modifier
+    savefolder
+
+    Returns
+    -------
+
+    """
 
     # select pred_file evts that are in the std reco summary files
     evt_sel_mask_dl_in_std = get_event_selection_mask(pred_file['mc_info'], cut_name='bg_classifier')
@@ -166,6 +181,12 @@ def make_contamination_to_neutrino_efficiency_plot(pred_file, pred_file_std_reco
     mc_info_std = pred_file_std_reco['mc_info'][evt_sel_mask_std_in_dl]
     pred_std = pred_file_std_reco['pred'][evt_sel_mask_std_in_dl]
 
+    print(mc_info.shape)
+    print(mc_info_std.shape)
+    u, c = np.unique(mc_info_std, return_counts=True)
+    dup = u[c > 1]
+    np.save('/home/woody/capn/mppi033h/duplicates.npy', dup)
+    print(dup)
     # assert np.count_nonzero(mc_info_std) == mc_info.shape[0]  # dl and std should have same number of events now TODO actually not, but only 100 of 400k
 
     # get plot data
@@ -173,45 +194,91 @@ def make_contamination_to_neutrino_efficiency_plot(pred_file, pred_file_std_reco
     ptype_std, is_cc_std = mc_info_std['particle_type'], mc_info_std['is_cc']
 
     if dataset_modifier == 'bg_classifier_2_class':
-        is_neutrino_dl, is_neutrino_std = select_class('neutrino', ptype_dl, is_cc_dl), select_class('neutrino', ptype_std, is_cc_std)
-        is_mupage_dl, is_mupage_std = select_class('mupage', ptype_dl, is_cc_dl), select_class('mupage', ptype_std, is_cc_std)
+        # plot some info about the dataset
+        is_neutrino, is_neutrino_std = select_class('neutrino', ptype_dl, is_cc_dl), select_class('neutrino', ptype_std, is_cc_std)
+        is_mupage, is_mupage_std = select_class('mupage', ptype_dl, is_cc_dl), select_class('mupage', ptype_std, is_cc_std)
 
-        n_neutrinos_total = np.count_nonzero(is_neutrino_dl)  # dl or std doesnt matter for n_neutrinos_total
+        n_neutrinos_total = np.count_nonzero(is_neutrino)  # dl or std doesnt matter for n_neutrinos_total
+        n_muons_total = np.count_nonzero(is_mupage)
 
-        prob_not_neutrino = pred['prob_not_neutrino']
-        muon_score_std = pred_std['prob_muon']
+        print('Total number of neutrinos: ' + str(n_neutrinos_total))
+        print('Total number of mupage muons: ' + str(n_muons_total))
 
-        cuts = np.linspace(0, 1, 5000)
-        x_contamination_mupage_dl, y_neutrino_efficiency_dl = [], []
+        pdf_plots = PdfPages(savefolder + '/muon_contamination_to_neutr_efficiency.pdf')
+        plot_contamination_to_neutr_eff_multi_e_cut(mc_info, mc_info_std, pred, pred_std, is_neutrino, is_neutrino_std,
+                                                    is_mupage, is_mupage_std, n_muons_total, pdf_plots)
+
+        plt.close()
+        pdf_plots.close()
+
+
+def plot_contamination_to_neutr_eff_multi_e_cut(mc_info, mc_info_std, pred, pred_std, is_neutrino, is_neutrino_std,
+                                                is_mupage, is_mupage_std, n_muons_total, pdf_plots):
+    """
+
+    Parameters
+    ----------
+    mc_info
+    mc_info_std
+    pred
+    pred_std
+    is_neutrino
+    is_neutrino_std
+    is_mupage
+    is_mupage_std
+    n_muons_total
+    pdf_plots
+
+    Returns
+    -------
+
+    """
+    e_cuts = ((1, 100), (1, 5), (5, 10), (10, 20), (20, 100))
+    cuts = np.linspace(0, 1, 5000)
+    prob_not_neutrino = pred['prob_not_neutrino']
+    muon_score_std = pred_std['prob_muon']
+
+    for tpl in e_cuts:
+        e_low, e_high = tpl[0], tpl[1]
+        e_cut_mask = np.logical_and(mc_info['energy'] >= e_low, mc_info['energy'] < e_high)
+        e_cut_mask_std = np.logical_and(mc_info_std['energy'] >= e_low, mc_info_std['energy'] < e_high)
+
+        # make energy cuts on neutrinos only
+        is_neutrino_e_cut = np.logical_and(e_cut_mask, is_neutrino)
+        is_neutrino_e_cut_std = np.logical_and(e_cut_mask_std, is_neutrino_std)
+
+        n_neutrinos_total_e_cut = np.count_nonzero(is_neutrino_e_cut)  # should be same for both dl and std
+
+        x_contamination_mupage, y_neutrino_efficiency = [], []
         x_contamination_mupage_std, y_neutrino_efficiency_std = [], []
         for i in range(len(cuts)):
+            # how many events are left for the first (dl) pred array?
+            n_neutrino = np.count_nonzero(prob_not_neutrino[is_neutrino_e_cut] < cuts[i])
+            n_muons = np.count_nonzero(prob_not_neutrino[is_mupage] < cuts[i])
 
-            # how many events are left for dl?
-            n_neutrino_dl = np.count_nonzero(prob_not_neutrino[is_neutrino_dl] < cuts[i])
-            n_muons_dl = np.count_nonzero(prob_not_neutrino[is_mupage_dl] < cuts[i])
-
-            if n_muons_dl != 0 and n_neutrino_dl != 0:
-                x_contamination_mupage_dl.append((n_muons_dl / n_neutrino_dl) * 100)
-                y_neutrino_efficiency_dl.append((n_neutrino_dl / n_neutrinos_total) * 100)
+            if n_muons != 0 and n_neutrino != 0:
+                x_contamination_mupage.append((n_muons / n_neutrino) * 100)
+                y_neutrino_efficiency.append((n_neutrino / n_neutrinos_total_e_cut) * 100)
 
             # how many events are left for std reco?
-            n_neutrino_std = np.count_nonzero(muon_score_std[is_neutrino_std] < cuts[i])
+            n_neutrino_std = np.count_nonzero(muon_score_std[is_neutrino_e_cut_std] < cuts[i])
             n_muons_std = np.count_nonzero(muon_score_std[is_mupage_std] < cuts[i])
 
             if n_muons_std != 0 and n_neutrino_std != 0:
                 x_contamination_mupage_std.append((n_muons_std / n_neutrino_std) * 100)
-                y_neutrino_efficiency_std.append((n_neutrino_std / n_neutrinos_total) * 100)
+                y_neutrino_efficiency_std.append((n_neutrino_std / n_neutrinos_total_e_cut) * 100)
 
         fig, ax = plt.subplots()
-        ax.plot(np.array(x_contamination_mupage_dl), np.array(y_neutrino_efficiency_dl), label='OrcaNet')
+        ax.plot(np.array(x_contamination_mupage), np.array(y_neutrino_efficiency), label='OrcaNet')
         ax.plot(np.array(x_contamination_mupage_std), np.array(y_neutrino_efficiency_std), label='Std Reco')
 
-        #ax.set_xscale('log')
-        ax.set_xlim(left=0, right=0.01)
-        ax.set_ylim(bottom=90, top=101)
-        ax.set_xlabel('Muon contamination in %'), ax.set_ylabel('Neutrino efficiency in %')
+        # ax.set_xscale('log')
+        ax.set_xlim(left=0, right=0.02)
+        ax.set_ylim(bottom=90, top=100.5)
+        ax.set_xlabel('Fraction of muons in dataset [%]'), ax.set_ylabel('Percentage of surviving neutrinos [%]')
         ax.grid(True)
         ax.legend(loc='upper right')
+        plt.title('E-range:' + str(tpl) + ', N_muon: ' + str(n_muons_total) + ', N_neutrinos: ' + str(n_neutrinos_total_e_cut))
 
-        plt.savefig(savefolder + '/muon_contamination_to_neutr_efficiency.pdf')
-        plt.savefig(savefolder + '/muon_contamination_to_neutr_efficiency.png', dpi=600)
+        pdf_plots.savefig(fig)
+        ax.cla()

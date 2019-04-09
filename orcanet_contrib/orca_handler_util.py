@@ -191,23 +191,24 @@ def orca_label_modifiers(name):
                                               is_cc == 0)
 
             # correct energy to visible energy
-            visible_energy = y_values[elec_nc_bool_idx]['energy'] * \
-                y_values[elec_nc_bool_idx]['bjorkeny']
+            visible_energy = y_values[elec_nc_bool_idx]['energy'] * y_values[elec_nc_bool_idx]['bjorkeny']
+            # make a copy of the y_values array, since we modify it now
+            y_values_copy = np.copy(y_values)
             # fix energy to visible energy
-            np.place(y_values['energy'], elec_nc_bool_idx, visible_energy)
+            np.place(y_values_copy['energy'], elec_nc_bool_idx, visible_energy)
             # set bjorkeny label of nc events to 1
-            np.place(y_values['bjorkeny'], elec_nc_bool_idx, 1)
+            np.place(y_values_copy['bjorkeny'], elec_nc_bool_idx, 1)
 
-            ys['dx'], ys['dx_err'] = y_values['dir_x'], y_values['dir_x']
-            ys['dy'], ys['dy_err'] = y_values['dir_y'], y_values['dir_y']
-            ys['dz'], ys['dz_err'] = y_values['dir_z'], y_values['dir_z']
-            ys['e'], ys['e_err'] = y_values['energy'], y_values['energy']
-            ys['by'], ys['by_err'] = y_values['bjorkeny'], y_values['bjorkeny']
+            ys['dx'], ys['dx_err'] = y_values_copy['dir_x'], y_values_copy['dir_x']
+            ys['dy'], ys['dy_err'] = y_values_copy['dir_y'], y_values_copy['dir_y']
+            ys['dz'], ys['dz_err'] = y_values_copy['dir_z'], y_values_copy['dir_z']
+            ys['e'], ys['e_err'] = y_values_copy['energy'], y_values_copy['energy']
+            ys['by'], ys['by_err'] = y_values_copy['bjorkeny'], y_values_copy['bjorkeny']
 
-            ys['vx'], ys['vx_err'] = y_values['vertex_pos_x'], y_values['vertex_pos_x']
-            ys['vy'], ys['vy_err'] = y_values['vertex_pos_y'], y_values['vertex_pos_y']
-            ys['vz'], ys['vz_err'] = y_values['vertex_pos_z'], y_values['vertex_pos_z']
-            ys['vt'], ys['vt_err'] = y_values['time_residual_vertex'], y_values['time_residual_vertex']
+            ys['vx'], ys['vx_err'] = y_values_copy['vertex_pos_x'], y_values_copy['vertex_pos_x']
+            ys['vy'], ys['vy_err'] = y_values_copy['vertex_pos_y'], y_values_copy['vertex_pos_y']
+            ys['vz'], ys['vz_err'] = y_values_copy['vertex_pos_z'], y_values_copy['vertex_pos_z']
+            ys['vt'], ys['vt_err'] = y_values_copy['time_residual_vertex'], y_values_copy['time_residual_vertex']
 
             for key_label in ys:
                 ys[key_label] = ys[key_label].astype(np.float32)
