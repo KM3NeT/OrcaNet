@@ -341,7 +341,11 @@ class TestTrainValidatePredict(TestCase):
     def setUpClass(cls):
         cls.temp_dir = os.path.join(os.path.dirname(__file__), ".temp",
                                     "test_backend")
+        cls.pred_dir = os.path.join(os.path.dirname(__file__), ".temp",
+                                    "predictions")
         os.mkdir(cls.temp_dir)
+        os.mkdir(cls.pred_dir)
+        cls.pred_filepath = cls.pred_dir + '/pred_model_epoch_1_file_3_on_listfilename_val_file_0.h5'
         cls.file_sizes = [500, ]
         # make some dummy data
         cls.inp_A_file = {
@@ -375,11 +379,13 @@ class TestTrainValidatePredict(TestCase):
         cls.train_B_file_1_ctnt = save_dummy_h5py(**cls.inp_B_file, mode="half")
 
     def setUp(self):
-        self.orga = Organizer("./")
+        self.orga = Organizer("./.temp")
         self.orga.cfg.batchsize = 9
 
         self.orga.io.get_local_files = MagicMock(return_value=self.filepaths)
         self.orga.io.get_file_sizes = MagicMock(return_value=self.file_sizes)
+        self.orga.cfg.get_list_file = MagicMock(return_value='/path/to/a/listfilename.toml')
+        self.orga.io.get_next_pred_path = MagicMock(return_value=self.pred_filepath)
 
         self.model = build_dummy_model(self.input_shapes, self.output_shapes)
         self.model.compile(loss="mse", optimizer="sgd")
@@ -390,6 +396,7 @@ class TestTrainValidatePredict(TestCase):
         os.remove(cls.inp_A_file["path"])
         os.remove(cls.inp_B_file["path"])
         os.rmdir(cls.temp_dir)
+        os.rmdir(cls.pred_dir)
 
     def test_train(self):
         epoch = (1, 1)
@@ -423,15 +430,20 @@ class TestTrainValidatePredict(TestCase):
         self.assertDictEqual(history, target)
 
     def test_predict(self):
-        eval_filename = self.temp_dir + "/pred.h5"
+        # dummy values
+        epoch, fileno = 1, 3
+        # mock get_latest_prediction_file_no
+        self.orga.io.get_latest_prediction_file_no = MagicMock(return_value=None)
+
         try:
-            make_model_prediction(self.orga, self.model, eval_filename)
+            make_model_prediction(self.orga, self.model, epoch, fileno)
+
             file_cntn = {}
-            with h5py.File(eval_filename) as file:
+            with h5py.File(self.pred_filepath, 'r') as file:
                 for key in file.keys():
                     file_cntn[key] = np.array(file[key])
         finally:
-            os.remove(eval_filename)
+            os.remove(self.pred_filepath)
 
         target_datasets = [
             'label_mc_A', 'label_mc_B', 'mc_info', 'pred_mc_A', 'pred_mc_B'
