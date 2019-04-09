@@ -5,6 +5,8 @@ Code for training and validating NN's, as well as evaluating them.
 """
 
 from inspect import signature
+import os
+import sys
 import h5py
 from contextlib import ExitStack
 import numpy as np
@@ -388,7 +390,7 @@ def save_actv_wghts_plot(orga, model, epoch, samples=1):
                 plt.close(fig)
 
 
-def make_model_prediction(orga, model, eval_filename, samples=None):
+def make_model_prediction(orga, model, epoch, fileno, samples=None):
     """
     Let a model predict on all validation samples, and save it as a h5 file.
 
@@ -403,8 +405,10 @@ def make_model_prediction(orga, model, eval_filename, samples=None):
         Contains all the configurable options in the OrcaNet scripts.
     model : ks.model.Model
         Trained Keras model of a neural network.
-    eval_filename : str
-        Name and path of the h5 file.
+    epoch : int
+        Epoch of the last model training step in the epoch, file_no tuple.
+    fileno : int
+        File number of the last model training step in the epoch, file_no tuple.
     samples : int or None
         Number of events that should be predicted.
         If samples=None, the whole file will be used.
@@ -413,62 +417,77 @@ def make_model_prediction(orga, model, eval_filename, samples=None):
     batchsize = orga.cfg.batchsize
     compression = ("gzip", 1)
     file_sizes = orga.io.get_file_sizes("val")
-    total_file_size = sum(file_sizes)
-    datagroups_created = False
 
-    with h5py.File(eval_filename, 'w') as h5_file:
-        # For every val file set (one set can have multiple files if
-        # the model has multiple inputs):
-        for f_number, files_dict in enumerate(orga.io.yield_files("val")):
-            file_size = file_sizes[f_number]
-            generator = hdf5_batch_generator(
-                orga, files_dict,
-                zero_center=orga.cfg.zero_center_folder is not None,
-                yield_mc_info=True)
+    latest_pred_file_no = orga.io.get_latest_prediction_file_no()
+    if latest_pred_file_no is None:
+        latest_pred_file_no = -1
 
-            if samples is None:
-                steps = int(file_size / batchsize)
-                if file_size % batchsize != 0:
-                    # add a smaller step in the end
-                    steps += 1
-            else:
-                steps = int(samples / batchsize)
+    i = 0
+    # For every val file set (one set can have multiple files if
+    # the model has multiple inputs):
+    for f_number, files_dict in enumerate(orga.io.yield_files("val")):
+        if f_number <= latest_pred_file_no:
+            continue
 
-            for s in range(steps):
-                if s % 100 == 0:
-                    print('Predicting in step {} on file {}'.format(s, f_number))
-                # y_true is a dict of ndarrays, mc_info is a structured
-                # array, y_pred is a list of ndarrays
-                xs, y_true, mc_info = next(generator)
+        pred_filepath = orga.io.get_next_pred_path(epoch, fileno, latest_pred_file_no + i)
+        try:
+            with h5py.File(pred_filepath, 'w') as h5_file:
 
-                y_pred = model.predict_on_batch(xs)
-                if not isinstance(y_pred, list):
-                    # if only one output, transform to a list
-                    y_pred = [y_pred]
-                # transform y_pred to dict
-                y_pred = {out: y_pred[i] for i, out in enumerate(model.output_names)}
+                file_size = file_sizes[f_number]
+                generator = hdf5_batch_generator(
+                    orga, files_dict,
+                    zero_center=orga.cfg.zero_center_folder is not None,
+                    yield_mc_info=True)
 
-                if orga.cfg.dataset_modifier is None:
-                    datasets = get_datasets(mc_info, y_true, y_pred)
+                if samples is None:
+                    steps = int(file_size / batchsize)
+                    if file_size % batchsize != 0:
+                        # add a smaller step in the end
+                        steps += 1
                 else:
-                    datasets = orga.cfg.dataset_modifier(mc_info, y_true, y_pred)
+                    steps = int(samples / batchsize)
 
-                # TODO maybe add attr to data, like used files or orcanet version number?
-                if not datagroups_created:
-                    for dataset_name, data in datasets.items():
-                        maxshape = (total_file_size,) + data.shape[1:]
-                        chunks = True  # (batchsize,) + data.shape[1:]
-                        h5_file.create_dataset(
-                            dataset_name, data=data, maxshape=maxshape,
-                            chunks=chunks, compression=compression[0],
-                            compression_opts=compression[1])
-                        datagroups_created = True
-                else:
-                    for dataset_name, data in datasets.items():
-                        # append data at the end of the dataset
-                        h5_file[dataset_name].resize(
-                            h5_file[dataset_name].shape[0] + data.shape[0], axis=0)
-                        h5_file[dataset_name][-data.shape[0]:] = data
+                for s in range(steps):
+                    if s % 100 == 0:
+                        print('Predicting in step {} on file {}'.format(s, f_number))
+                    # y_true is a dict of ndarrays, mc_info is a structured
+                    # array, y_pred is a list of ndarrays
+                    xs, y_true, mc_info = next(generator)
+
+                    y_pred = model.predict_on_batch(xs)
+                    if not isinstance(y_pred, list):
+                        # if only one output, transform to a list
+                        y_pred = [y_pred]
+                    # transform y_pred to dict
+                    y_pred = {out: y_pred[i] for i, out in enumerate(model.output_names)}
+
+                    if orga.cfg.dataset_modifier is None:
+                        datasets = get_datasets(mc_info, y_true, y_pred)
+                    else:
+                        datasets = orga.cfg.dataset_modifier(mc_info, y_true, y_pred)
+
+                    # TODO maybe add attr to data, like used files or orcanet version number?
+                    if s == 0:  # create datasets in the first step
+                        for dataset_name, data in datasets.items():
+                            maxshape = (file_size,) + data.shape[1:]
+                            chunks = True  # (batchsize,) + data.shape[1:]
+                            h5_file.create_dataset(
+                                dataset_name, data=data, maxshape=maxshape,
+                                chunks=chunks, compression=compression[0],
+                                compression_opts=compression[1])
+
+                    else:
+                        for dataset_name, data in datasets.items():
+                            # append data at the end of the dataset
+                            h5_file[dataset_name].resize(
+                                h5_file[dataset_name].shape[0] + data.shape[0], axis=0)
+                            h5_file[dataset_name][-data.shape[0]:] = data
+
+            i += 1
+
+        except BaseException as exception:
+            os.remove(pred_filepath)
+            raise exception
 
 
 def get_datasets(mc_info, y_true, y_pred):

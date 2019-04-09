@@ -1,11 +1,12 @@
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 import os
 import h5py
 import numpy as np
 from keras.models import Model
 from keras.layers import Dense, Input, Concatenate, Flatten
 import shutil
+from pathlib import Path
 
 from orcanet.core import Configuration
 from orcanet.in_out import HistoryHandler, IOHandler
@@ -17,20 +18,33 @@ class TestIOHandler(TestCase):
         # super(TestIOHandler, cls).setUpClass()
         cls.temp_dir = os.path.join(os.path.dirname(__file__), ".temp",
                                     "test_in_out")
+        cls.pred_dir = os.path.join(os.path.dirname(__file__), ".temp",
+                                    "test_in_out", "predictions")
         os.mkdir(cls.temp_dir)
+        os.mkdir(cls.pred_dir)
+
+        # make dummy pred files
+        Path(cls.pred_dir + '/pred_model_epoch_2_file_2_on_listname_val_file_0.h5').touch()
+        Path(cls.pred_dir + '/pred_model_epoch_2_file_2_on_listname_val_file_1.h5').touch()
+
+        cls.pred_filepaths = [cls.pred_dir + '/pred_model_epoch_2_file_2_on_listname_val_file_0.h5',
+                              cls.pred_dir + '/pred_model_epoch_2_file_2_on_listname_val_file_1.h5']
+
         cls.init_dir = os.getcwd()
         os.chdir(cls.temp_dir)
         # make some dummy data
         cls.n_bins = {'input_A': (2, 3), 'input_B': (2, 3)}
         cls.train_sizes = [30, 50]
-        cls.val_sizes = [40, ]
+        cls.val_sizes = [40, 60]
         cls.file_names = (
             "/input_A_train_1.h5",
             "/input_A_train_2.h5",
             "/input_B_train_1.h5",
             "/input_B_train_2.h5",
             "/input_A_val_1.h5",
+            "/input_A_val_2.h5",
             "/input_B_val_1.h5",
+            "/input_B_val_2.h5",
         )
         cls.train_A_file_1 = {
             "path": cls.temp_dir + cls.file_names[0],
@@ -67,19 +81,35 @@ class TestIOHandler(TestCase):
             "value_ys": 3.2,
             "size": cls.val_sizes[0],
         }
-        cls.val_B_file_1 = {
+        cls.val_A_file_2 = {
             "path": cls.temp_dir + cls.file_names[5],
+            "shape": cls.n_bins["input_A"],
+            "value_xs": 3.1,
+            "value_ys": 3.2,
+            "size": cls.val_sizes[0],
+        }
+        cls.val_B_file_1 = {
+            "path": cls.temp_dir + cls.file_names[6],
             "shape": cls.n_bins["input_B"],
             "value_xs": 4.1,
             "value_ys": 4.2,
-            "size": cls.val_sizes[0],
+            "size": cls.val_sizes[1],
+        }
+        cls.val_B_file_2 = {
+            "path": cls.temp_dir + cls.file_names[7],
+            "shape": cls.n_bins["input_B"],
+            "value_xs": 4.1,
+            "value_ys": 4.2,
+            "size": cls.val_sizes[1],
         }
         cls.train_A_file_1_ctnt = save_dummy_h5py(**cls.train_A_file_1)
         cls.train_A_file_2_ctnt = save_dummy_h5py(**cls.train_A_file_2)
         cls.train_B_file_1_ctnt = save_dummy_h5py(**cls.train_B_file_1)
         cls.train_B_file_2_ctnt = save_dummy_h5py(**cls.train_B_file_2)
         cls.val_A_file_1_ctnt = save_dummy_h5py(**cls.val_A_file_1)
+        cls.val_A_file_2_ctnt = save_dummy_h5py(**cls.val_A_file_2)
         cls.val_B_file_1_ctnt = save_dummy_h5py(**cls.val_B_file_1)
+        cls.val_B_file_2_ctnt = save_dummy_h5py(**cls.val_B_file_2)
 
     def setUp(self):
         self.data_folder = os.path.join(os.path.dirname(__file__), "data")
@@ -93,6 +123,18 @@ class TestIOHandler(TestCase):
         cfg.batchsize = self.batchsize
         self.io = IOHandler(cfg)
 
+        # mock get_subfolder, but only in case of predictions argument
+        original_get_subfolder = self.io.get_subfolder
+        mocked_result = self.pred_dir
+
+        def side_effect(key):
+            if key == 'predictions':
+                return mocked_result
+            else:
+                return original_get_subfolder(key)
+
+        self.io.get_subfolder = MagicMock(side_effect=side_effect)
+
     @classmethod
     def tearDownClass(cls):
         os.remove(cls.train_A_file_1["path"])
@@ -100,10 +142,12 @@ class TestIOHandler(TestCase):
         os.remove(cls.train_B_file_1["path"])
         os.remove(cls.train_B_file_2["path"])
         os.remove(cls.val_A_file_1["path"])
+        os.remove(cls.val_A_file_2["path"])
         os.remove(cls.val_B_file_1["path"])
+        os.remove(cls.val_B_file_2["path"])
 
         os.chdir(cls.init_dir)
-        os.rmdir(cls.temp_dir)
+        shutil.rmtree(cls.temp_dir)
 
     def test_use_local_node(self):
         temp_temp_dir = self.temp_dir + "/scratch"
@@ -121,8 +165,8 @@ class TestIOHandler(TestCase):
                  "input_B": (scratch_dir + self.file_names[2], scratch_dir + self.file_names[3]),
             }
             target_dirs_val = {
-                 "input_A": (scratch_dir + self.file_names[4], ),
-                 "input_B": (scratch_dir + self.file_names[5], ),
+                 "input_A": (scratch_dir + self.file_names[4], scratch_dir + self.file_names[5], ),
+                 "input_B": (scratch_dir + self.file_names[6], scratch_dir + self.file_names[7], ),
             }
 
             self.io.use_local_node()
@@ -322,10 +366,29 @@ class TestIOHandler(TestCase):
         with self.assertRaises(ValueError):
             self.io.get_model_path(-1, 1)
 
-    def test_get_pred_path(self):
-        value = self.io.get_pred_path(2, 1)
-        target = self.output_folder + '/predictions/pred_model_epoch_2_file_1' \
-                                      '_on_in_out_test_list_val_files.h5'
+    def test_get_pred_files_list(self):
+        value = self.io.get_pred_files_list()
+        target = self.pred_filepaths
+        self.assertEqual(value, target)
+
+    def test_get_latest_prediction_file_no(self):
+        value = self.io.get_latest_prediction_file_no()
+        target = 1
+        self.assertEqual(value, target)
+
+    def test_get_next_pred_path(self):
+        epoch, fileno = 1, 2  # dummy values
+        value = self.io.get_next_pred_path(epoch, fileno, None)
+        target = self.io.get_subfolder("predictions") + '/pred_model_epoch_1_file_2_on_in_out_test_list_val_file_0.h5'
+        self.assertEqual(value, target)
+        value = self.io.get_next_pred_path(epoch, fileno, 3)
+        target = self.io.get_subfolder("predictions") + '/pred_model_epoch_1_file_2_on_in_out_test_list_val_file_4.h5'
+        self.assertEqual(value, target)
+
+    def test_get_cumulative_number_of_rows(self):
+        h5_file_list = [self.train_A_file_1["path"], self.train_A_file_2["path"]]
+        value = self.io.get_cumulative_number_of_rows(h5_file_list)
+        target = [0, self.train_sizes[0], self.train_sizes[0] + self.train_sizes[1]]
         self.assertEqual(value, target)
 
     def test_get_local_files_train(self):
@@ -339,8 +402,8 @@ class TestIOHandler(TestCase):
     def test_get_local_files_val(self):
         value = self.io.get_local_files("val")
         target = {
-            'input_A': ('input_A_val_1.h5',),
-            'input_B': ('input_B_val_1.h5',)
+            'input_A': ('input_A_val_1.h5', 'input_A_val_2.h5',),
+            'input_B': ('input_B_val_1.h5', 'input_B_val_2.h5',)
         }
         self.assertDictEqual(value, target)
 
@@ -351,7 +414,7 @@ class TestIOHandler(TestCase):
 
     def test_get_no_of_files_val(self):
         value = self.io.get_no_of_files("val")
-        target = 1
+        target = 2
         self.assertEqual(value, target)
 
     def test_yield_files_train(self):
@@ -375,6 +438,10 @@ class TestIOHandler(TestCase):
             {
                 'input_A': 'input_A_val_1.h5',
                 'input_B': 'input_B_val_1.h5',
+            },
+            {
+                'input_A': 'input_A_val_2.h5',
+                'input_B': 'input_B_val_2.h5',
             },
         )
         for i, value in enumerate(file_paths):

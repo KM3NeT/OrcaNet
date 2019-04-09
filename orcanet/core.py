@@ -257,7 +257,7 @@ class Organizer:
 
         return history
 
-    def predict(self, epoch=-1, fileno=-1):
+    def predict(self, epoch=-1, fileno=-1, concatenate=False):
         """
         Make a prediction if it does not exist yet, and return its filepath.
 
@@ -274,11 +274,15 @@ class Organizer:
             The epoch of the model to load for prediction
         fileno : int
             The file number of the model to load for prediction.
+        concatenate : bool
+            Whether the prediction files should also be concatenated.
 
         Returns
         -------
-        pred_filename : str
-            The path to the created prediction file.
+        pred_filename : list
+            List to the paths of all created prediction file.
+            If concatenate = True, the list only contains the
+            path to the concatenated prediction file.
 
         """
         if fileno == -1 and epoch == -1:
@@ -287,23 +291,60 @@ class Organizer:
                 raise FileNotFoundError("Can not look up most recent model: "
                                         "No models found for {}".format(self.cfg.output_folder))
             epoch, fileno = latest_epoch
-            print("Automatically set epoch to epoch {} file {}.".format(epoch,
-                                                                        fileno))
+            print("Automatically set epoch to epoch {} file {}.".format(epoch, fileno))
 
-        pred_filename = self.io.get_pred_path(epoch, fileno)
-
-        if os.path.isfile(pred_filename):
+        pred_done = self._check_if_pred_already_done()
+        if pred_done:
             print("Prediction has already been done.")
+            pred_filepaths = self.io.get_pred_files_list()
+
         else:
             model = self.load_saved_model(epoch, fileno, logging=False)
             self._set_up(model)
 
             start_time = time.time()
-            make_model_prediction(self, model, pred_filename, samples=None)
+            make_model_prediction(self, model, epoch, fileno, samples=None)
             elapsed_s = int(time.time() - start_time)
+            print('Finished predicting on all validation files.')
             print("Elapsed time: {}\n".format(timedelta(seconds=elapsed_s)))
 
-        return pred_filename
+            pred_filepaths = self.io.get_pred_files_list()
+
+        # concatenate all prediction files if wished
+        concatenated_folder = self.io.get_subfolder("predictions") + '/concatenated'
+        if concatenate is True:
+            if not os.path.isdir(concatenated_folder):
+                print('Concatenating all prediction files to a single one.')
+                pred_filename_conc = self.io.concatenate_pred_files(concatenated_folder)
+                pred_filepaths = [pred_filename_conc]
+            else:
+                pred_filepaths = [concatenated_folder + '/' + os.listdir(concatenated_folder)[0]]
+
+        return pred_filepaths
+
+    def _check_if_pred_already_done(self):
+        """
+        Checks if the prediction has already been done before.
+        (-> predicted on all validation files)
+
+        Returns
+        -------
+        pred_done : bool
+            Boolean flag to specify if the prediction has
+            already been fully done or not.
+
+        """
+        latest_pred_file_no = self.io.get_latest_prediction_file_no()
+        total_no_of_val_files = self.io.get_no_of_files('val')
+
+        if latest_pred_file_no is None:
+            pred_done = False
+        elif latest_pred_file_no == total_no_of_val_files - 1:  # val_file_nos start with 0
+            return True
+        else:
+            pred_done = False
+
+        return pred_done
 
     def get_xs_mean(self, logging=False):
         """

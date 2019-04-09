@@ -167,9 +167,6 @@ class IOHandler(object):
         model_path : str
             The path to the model.
         """
-        """ 
-        
-        """
         if epoch == -1 and fileno == -1:
             epoch, fileno = self.get_latest_epoch()
         if epoch < 1 or fileno < 1:
@@ -184,19 +181,170 @@ class IOHandler(object):
         model_path = subfolder + "/" + file_name
         return model_path
 
-    def get_pred_path(self, epoch, fileno):
-        """ Get the path to a saved prediction. """
+    def get_latest_prediction_file_no(self):
+        """
+        Returns the file number of the latest currently predicted val file.
+
+        Returns
+        -------
+        latest_predicted_val_file_no : int
+            File number of the prediction file with the highest val index.
+
+        """
+        prediction_folder = self.get_subfolder("predictions")
+
+        if os.listdir(prediction_folder):
+            val_file_nos = []
+            for file in os.listdir(prediction_folder):
+                if os.path.isfile(os.path.join(prediction_folder, file)):  # omit directories
+
+                    # model_epoch_XX_file_YY_on_fnamelist_val_file_ZZ
+                    file_base = os.path.splitext(file)[0]
+                    val_file_no = file_base.split("_val_file_")[-1]
+                    val_file_nos.append(int(val_file_no))
+
+            val_file_nos.sort()
+            latest_predicted_val_file_no = max(val_file_nos)
+
+        else:  # no prediction done yet
+            latest_predicted_val_file_no = None
+
+        return latest_predicted_val_file_no
+
+    def get_next_pred_path(self, epoch, fileno, latest_pred_file_no):
+        """
+        Gets the path for the next prediction file in the
+        make_model_prediction function found in backend.py.
+
+        Parameters
+        ----------
+        epoch : int
+            Epoch of an already trained nn model.
+            The (epoch, fileno) tuple fully describes the training start of an OrcaNet nn model.
+        fileno : int
+            File number train step of an already trained nn model.
+            The (epoch, fileno) tuple fully describes the training start of an OrcaNet nn model.
+        latest_pred_file_no : int/None
+            Highest val index of the prediction files that are found in the prediction folder.
+            If None, it is expected that no prediction has been done yet.
+
+        Returns
+        -------
+        pred_filepath : str
+            Filepath for the next prediction file in the make_model_prediction loop
+            over the single val files.
+
+        """
         list_file = self.cfg.get_list_file()
         if list_file is None:
-            raise ValueError("No tom list file specified. Can not look up "
+            raise ValueError("No toml list file specified. Can not look up "
                              "saved prediction")
         list_name = os.path.splitext(os.path.basename(list_file))[0]
 
-        pred_filename = self.get_subfolder("predictions") + \
-            '/pred_model_epoch_{}_file_{}_on_{}_val_files.h5'.format(
-                epoch, fileno, list_name)
+        if latest_pred_file_no is not None:
+            next_pred_file_no = latest_pred_file_no + 1
+        else:
+            next_pred_file_no = 0
 
-        return pred_filename
+        pred_filepath = self.get_subfolder("predictions") + \
+            '/pred_model_epoch_{}_file_{}_on_{}_val_file_{}.h5'.format(
+                epoch, fileno, list_name, next_pred_file_no)
+
+        return pred_filepath
+
+    def get_pred_files_list(self):
+        """
+        Returns a list with all files in the prediction folder.
+
+        Returns
+        -------
+        pred_files_list : list
+            List with the full filepaths of all prediction results files.
+
+        """
+        prediction_folder = self.get_subfolder("predictions")
+
+        pred_files_list = list((prediction_folder + '/' + file for file in os.listdir(prediction_folder)
+                                if os.path.isfile(os.path.join(prediction_folder, file))))
+
+        pred_files_list.sort()  # sort predicted val files from 0 ... n
+        return pred_files_list
+
+    @staticmethod
+    def get_cumulative_number_of_rows(file_list):
+        """
+        Returns the cumulative number of rows (axis_0) in a list
+        based on the specified input .h5 files.
+
+        The folders in each file are expected to have the same number of rows,
+        such that the info can be taken from the first folder.
+
+        Parameters
+        ----------
+        file_list : list
+            List that contains the filepaths of the h5 files.
+
+        Returns
+        -------
+        cum_number_of_rows : list
+            List that contains the cumulative number of rows (i.e. [0,100,200,300,...] if each file has 100 rows).
+
+        """
+        total_number_of_rows = 0
+        cum_number_of_rows = [0]
+
+        for file_name in file_list:
+            f = h5py.File(file_name, 'r')
+
+            # get number of rows from the first folder of the file -> each folder needs to have the same number of rows
+            f_keys = list(f.keys())
+            total_number_of_rows += f[f_keys[0]].shape[0]
+            cum_number_of_rows.append(total_number_of_rows)
+
+            f.close()
+
+        return cum_number_of_rows
+
+    def concatenate_pred_files(self, concatenated_folder):
+        """ Concatenates prediction files to a single one. """
+        if not os.path.isdir(concatenated_folder):
+            os.mkdir(concatenated_folder)
+
+        pred_files_list = self.get_pred_files_list()
+
+        # get cumulative number of rows in the pred files
+        cum_number_of_rows = self.get_cumulative_number_of_rows(pred_files_list)
+
+        basename = os.path.basename(pred_files_list[-1])  # take one pred filepath, doesnt matter which one so use -1
+        pred_filepath_conc = concatenated_folder + '/' + basename.split('_val_file_')[0] + '_all_val_files.h5'
+
+        f_conc = h5py.File(pred_filepath_conc, 'w')
+        for i, pred_file in enumerate(pred_files_list):
+            print('Concatenating file ' + str(i) + ' of ' + str(len(pred_files_list)))
+
+            f = h5py.File(pred_file, 'r')
+            for folder_name in f:
+                folder_data = f[folder_name]
+
+                if i == 0:
+                    # first file; create the dataset with no max shape
+                    maxshape = (None,) + folder_data.shape[1:]  # change shape of axis zero to None
+                    chunks = True
+                    compression, compression_opts = folder_data.compression, folder_data.compression_opts
+
+                    output_dataset = f_conc.create_dataset(folder_name, data=folder_data, maxshape=maxshape, chunks=chunks,
+                                                           compression=compression, compression_opts=compression_opts)
+
+                    output_dataset.resize(cum_number_of_rows[-1], axis=0)
+
+                else:
+                    f_conc[folder_name][cum_number_of_rows[i]:cum_number_of_rows[i + 1]] = folder_data
+
+            f_conc.flush()
+
+        f_conc.close()
+
+        return pred_filepath_conc
 
     def use_local_node(self):
         """
@@ -814,7 +962,7 @@ class HistoryHandler:
         return file_data
 
 
-def h5_get_number_of_rows(h5_filepath, datasets):
+def h5_get_number_of_rows(h5_filepath, datasets=None):
     """
     Gets the total number of rows of of a .h5 file.
 
@@ -826,7 +974,7 @@ def h5_get_number_of_rows(h5_filepath, datasets):
     h5_filepath : str
         filepath of the .h5 file.
     datasets : list
-        The names of datasets in the file to check.
+        Optional, The names of datasets in the file to check.
 
     Returns
     -------
@@ -840,6 +988,9 @@ def h5_get_number_of_rows(h5_filepath, datasets):
 
     """
     with h5py.File(h5_filepath, 'r') as f:
+        if datasets is None:
+            datasets = [x for x in list(f.keys())]
+
         number_of_rows = [f[dataset].shape[0] for dataset in datasets]
     if not number_of_rows.count(number_of_rows[0]) == len(number_of_rows):
         err_msg = "Datasets do not have the same number of samples " \
