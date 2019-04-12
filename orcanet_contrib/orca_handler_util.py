@@ -281,6 +281,23 @@ def orca_label_modifiers(name):
             ys['bg_output'] = categorical_bg.astype(np.float32)
             return ys
 
+    elif name == "muon_multi":
+        def label_modifier(y_values):
+            # [1, 0, 0] for 1 muon
+            # [0, 1, 0] for 2 muons
+            # [0, 0, 1] for 3+ muons
+            n_muons = y_values['n_muons']
+            batchsize = y_values.shape[0]
+
+            n_muon_cat = np.zeros((batchsize, 3))
+            n_muon_cat[:, 0] = n_muons == 1
+            n_muon_cat[:, 1] = n_muons == 2
+            n_muon_cat[:, 2] = n_muons > 2
+
+            ys = dict()
+            ys['n_muon_cat'] = n_muon_cat.astype(np.float32)
+            return ys
+
     else:
         raise ValueError("Unknown output_type: " + str(name))
 

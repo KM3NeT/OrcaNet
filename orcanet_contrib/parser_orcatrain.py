@@ -23,15 +23,15 @@ Options:
                  are changed during the training.
 
 """
+from matplotlib import use
+use('Agg')
+
 from docopt import docopt
 import keras as ks
-from matplotlib import use
 
 from orcanet.core import Organizer
-from model_builder import ModelBuilder
+from orcanet.model_builder import ModelBuilder
 from orcanet_contrib.orca_handler_util import orca_learning_rates, update_objects
-
-use('Agg')
 
 
 def orca_train(output_folder, list_file, config_file, model_file,
@@ -86,15 +86,19 @@ def orca_train(output_folder, list_file, config_file, model_file,
     else:
         model = None
 
-    # Use a custom LR schedule
-    orga.cfg.learning_rate = orca_learning_rates("triple_decay",
-                                                 orga.io.get_no_of_files("train"))
+    try:
+        # Use a custom LR schedule
+        user_lr = orga.cfg.learning_rate
+        lr = orca_learning_rates(user_lr, orga.io.get_no_of_files("train"))
+        orga.cfg.learning_rate = lr
+    except NameError:
+        pass
 
     # start the training
     orga.train_and_validate(model=model)
 
 
-def parse_input():
+def main():
     """ Run the orca_train function with a parser. """
     args = docopt(__doc__)
     output_folder = args['FOLDER']
@@ -107,4 +111,4 @@ def parse_input():
 
 
 if __name__ == '__main__':
-    parse_input()
+    main()

@@ -535,7 +535,7 @@ class IOHandler(object):
                             for key in layer_inputs}
         list_inp_shapes = self.get_n_bins()
 
-        print("The inputs in your toml list file have the following "
+        print("The data in the files of the toml list have the following "
               "names and shapes:")
         for list_key in list_inp_shapes:
             print("\t{}\t{}".format(list_key, list_inp_shapes[list_key]))
@@ -572,7 +572,7 @@ class IOHandler(object):
         else:
             print("\nInput check failed!")
             if len(err_inp_names) != 0:
-                err_msg_inp += "No matching input name from the list file " \
+                err_msg_inp += "No matching input name from the input files " \
                                "for input layer(s): " + (
                                 ", ".join(str(e) for e in err_inp_names) + "\n")
             if len(err_inp_shapes) != 0:
@@ -585,8 +585,8 @@ class IOHandler(object):
         print("\nOutput check\n------------")
         # tuple of strings
         mc_names = y_values.dtype.names
-        print("The following {} label names are in your toml list file:".format(
-            len(mc_names)))
+        print("The following {} label names are in the first file of the "
+              "toml list:".format(len(mc_names)))
         print("\t" + ", ".join(str(name) for name in mc_names), end="\n\n")
 
         if self.cfg.label_modifier is not None:
@@ -617,7 +617,7 @@ class IOHandler(object):
         else:
             print("Output check failed!")
             if len(err_out_names) != 0:
-                err_msg_out += "No matching label name from the list file " \
+                err_msg_out += "No matching label name from the input files " \
                                "for output layer(s): " + (
                                 ", ".join(str(e) for e in err_out_names) + "\n")
             print("Error:", err_msg_out)

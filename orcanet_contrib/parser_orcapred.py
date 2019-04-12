@@ -21,15 +21,15 @@ Options:
     -h --help                       Show this screen.
 
 """
+from matplotlib import use
+use('Agg')
+
 from docopt import docopt
 import toml
-from matplotlib import use
 
 from orcanet.core import Organizer
 from orcanet_contrib.eval_nn import make_performance_plots
 from orcanet_contrib.orca_handler_util import update_objects
-
-use('Agg')
 
 
 def orca_pred(output_folder, list_file, config_file, model_file):
@@ -69,7 +69,7 @@ def orca_pred(output_folder, list_file, config_file, model_file):
     make_performance_plots(pred_filepath_conc, dataset_modifier, plots_folder)
 
 
-def parse_input():
+def main():
     """ Run the orca_pred function with a parser. """
     args = docopt(__doc__)
     output_folder = args['FOLDER']
@@ -80,4 +80,4 @@ def parse_input():
 
 
 if __name__ == '__main__':
-    parse_input()
+    main()
