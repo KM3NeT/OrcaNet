@@ -65,7 +65,7 @@ def plot_history(
 
     if train_data is not None:
         train_plot = plt.plot(
-            train_data[0], train_data[1], color=color, ls='--',
+            train_data[0], train_data[1], color=color, ls='-',
             zorder=3, label=train_label, lw=0.6, alpha=0.5)
         train_color = train_plot[0].get_color()
     else:

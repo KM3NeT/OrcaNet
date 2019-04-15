@@ -293,8 +293,8 @@ class Organizer:
             epoch, fileno = latest_epoch
             print("Automatically set epoch to epoch {} file {}.".format(epoch, fileno))
 
-        pred_done = self._check_if_pred_already_done()
-        if pred_done:
+        is_pred_done = self._check_if_pred_already_done()
+        if is_pred_done:
             print("Prediction has already been done.")
             pred_filepaths = self.io.get_pred_files_list()
 
@@ -312,7 +312,8 @@ class Organizer:
 
         # concatenate all prediction files if wished
         concatenated_folder = self.io.get_subfolder("predictions") + '/concatenated'
-        if concatenate is True:
+        n_val_files = self.io.get_no_of_files("val")
+        if concatenate is True and n_val_files > 1:
             if not os.path.isdir(concatenated_folder):
                 print('Concatenating all prediction files to a single one.')
                 pred_filename_conc = self.io.concatenate_pred_files(concatenated_folder)
@@ -467,7 +468,7 @@ class Configuration(object):
         Optional dictionary mapping names (strings) to custom classes or
         functions to be considered by keras during deserialization of models.
     dataset_modifier : function or None
-        For orga.pred: Function that determines which datasets get created
+        For orga.predict: Function that determines which datasets get created
         in the resulting h5 file. If none, every output layer will get one
         dataset each for both the label and the prediction, and one dataset
         containing the mc_info from the validation files.
@@ -675,6 +676,11 @@ class Configuration(object):
     def get_files(self, which):
         """
         Get the training or validation file paths for each list input set.
+
+        Parameters
+        ----------
+        which : str
+            Either "train" or "val".
 
         Returns
         -------

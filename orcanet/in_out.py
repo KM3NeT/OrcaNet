@@ -196,8 +196,8 @@ class IOHandler(object):
         if os.listdir(prediction_folder):
             val_file_nos = []
             for file in os.listdir(prediction_folder):
-                if os.path.isfile(os.path.join(prediction_folder, file)):  # omit directories
 
+                if os.path.isfile(os.path.join(prediction_folder, file)):
                     # model_epoch_XX_file_YY_on_fnamelist_val_file_ZZ
                     file_base = os.path.splitext(file)[0]
                     val_file_no = file_base.split("_val_file_")[-1]
@@ -248,7 +248,7 @@ class IOHandler(object):
 
         pred_filepath = self.get_subfolder("predictions") + \
             '/pred_model_epoch_{}_file_{}_on_{}_val_file_{}.h5'.format(
-                epoch, fileno, list_name, next_pred_file_no)
+                epoch, fileno, list_name, next_pred_file_no + 1)
 
         return pred_filepath
 
@@ -365,6 +365,11 @@ class IOHandler(object):
 
         Returns the path to the copy of the file on the local tmpdir, if
         it has been made.
+
+        Parameters
+        ----------
+        which : str
+            Either "train" or "val".
 
         Returns
         -------
