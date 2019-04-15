@@ -345,7 +345,7 @@ class TestTrainValidatePredict(TestCase):
                                     "predictions")
         os.mkdir(cls.temp_dir)
         os.mkdir(cls.pred_dir)
-        cls.pred_filepath = cls.pred_dir + '/pred_model_epoch_1_file_3_on_listfilename_val_file_0.h5'
+        cls.pred_filepath = cls.pred_dir + '/pred_model_epoch_1_file_3_on_listfilename_val_file_1.h5'
         cls.file_sizes = [500, ]
         # make some dummy data
         cls.inp_A_file = {

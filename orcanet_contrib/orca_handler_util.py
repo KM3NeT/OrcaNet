@@ -464,10 +464,53 @@ def orca_dataset_modifiers(name):
 
             return datasets
 
+    elif name == 'muon_multi':
+        # Muon multiplicity categorizer
+        # output: 3 categories
+        def dataset_modifier(mc_info, y_true, y_pred):
+            # y_pred and y_true are dicts with keys for each output
+            # we only have 1 output here (n_muon_cat)
+            y_pred = y_pred['n_muon_cat']
+            y_true = y_true['n_muon_cat']
+
+            datasets = dict()
+            datasets['mc_info'] = mc_info  # is already a structured array
+            datasets["pred"] = convert_to_rec_array(y_pred, "n_muon_cat")
+            datasets["true"] = convert_to_rec_array(y_true, "n_muon_cat")
+
+            return datasets
+
     else:
         raise ValueError('Unknown dataset modifier: ' + str(name))
 
     return dataset_modifier
+
+
+def convert_to_rec_array(ndarray, name):
+    """
+    Convert a 2d np array to a rec array with dtype names from given name.
+
+    E.g. when name is "category", dtype names will be "category_1",
+    "category_2", ...
+
+    Parameters
+    ----------
+    ndarray : ndarray
+        A 2d numpy array.
+    name : str
+        Base str for the names of the dtypes.
+
+    Returns
+    -------
+    recarray : ndarray
+        The numpy rec array.
+
+    """
+    rows, cols = ndarray.shape
+
+    names = ",".join([name+"_"+str(i) for i in range(1, cols + 1)])
+    recarray = np.core.records.fromrecords(ndarray, names=names)
+    return recarray
 
 
 def orca_learning_rates(name, total_file_no):

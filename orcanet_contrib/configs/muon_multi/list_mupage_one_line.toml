@@ -7,10 +7,10 @@
 [zt-c]
 train_files = [
 # "/home/saturn/capn/mppi013h/storage/one_line_2017/mc_ztc_conc_proc/mcv5.1_r3.mupage_10G.km3_AAv1.jterbr00002425_to_3078.root_hist_shuffled_reb.h5",
-"/home/saturn/capn/mppi013h/storage/one_line_2017/mc_ztc/mcv5.1_r3.mupage_10G.km3_AAv1.jterbr00002426.2451.root_hist.h5",
+"/home/saturn/capn/mppi013h/storage/one_line_2017/mc_ztc_conc_proc/mcv5.1_r3.mupage_10G.km3_AAv1.jterbr00002425_to_3078.root_hist.h5",
 ]
 
 validation_files = [
 # "/home/saturn/capn/mppi013h/storage/one_line_2017/mc_ztc_conc_proc/mcv5.1_r3.mupage_10G.km3_AAv1.jterbr00003078_to_3250.root_hist_reb.h5",
-"/home/saturn/capn/mppi013h/storage/one_line_2017/mc_ztc/mcv5.1_r3.mupage_10G.km3_AAv1.jterbr00002426.2450.root_hist.h5",
+"/home/saturn/capn/mppi013h/storage/one_line_2017/mc_ztc_conc_proc/mcv5.1_r3.mupage_10G.km3_AAv1.jterbr00003078_to_3250.root_hist.h5",
 ]
