@@ -65,10 +65,12 @@ def orca_pred(output_folder, list_file, config_file, model_file):
 
     # make performance plots
     plots_folder = orga.io.get_subfolder(name='plots')
-    dataset_modifier = toml.load(model_file)["orca_modifiers"]["dataset_modifier"]
+
     try:
+        dataset_modifier = toml.load(model_file)["orca_modifiers"][
+            "dataset_modifier"]
         make_performance_plots(pred_filepath_conc, dataset_modifier, plots_folder)
-    except NameError:
+    except (NameError, KeyError):
         pass
 
 

@@ -426,8 +426,11 @@ class BatchLogger(ks.callbacks.Callback):
     def on_epoch_end(self, batch, logs=None):
         # on epoch end here means that this is called after one fit_generator
         # loop in Keras is finished, so after one file in our case.
+        """
         if self._stored_metrics:
+            # write stats of remaining batches
             self._write_line()
+        """
         self.file.close()
 
     def _write_line(self):
