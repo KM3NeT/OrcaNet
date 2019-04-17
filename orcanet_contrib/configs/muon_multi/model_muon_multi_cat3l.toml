@@ -1,0 +1,43 @@
+# Info for building an OrcaNet model.
+
+[body]
+architecture = "single"
+
+# default values:
+type = "conv_block"
+conv_dim = 2
+kernel_size = 3
+dropout = 0.1
+activation = 'relu'
+batchnorm=true
+
+# config of every layer block, will overwrite the default values above
+blocks = [
+          {filters=64},
+          {filters=64, pool_size=[1, 2]},
+          {filters=64},
+          {filters=64, pool_size=[1, 2]},
+          {filters=128},
+          {filters=128, pool_size=[2, 2]},
+          {filters=128},
+          {filters=128, pool_size=[2, 2]},
+          {filters=128},
+          ]
+
+# ----------------------------------------------------------------------
+[head]
+architecture = "categorical"
+architecture_args = {output_name="n_muon_cat", categories=3}
+
+# ----------------------------------------------------------------------
+[compile]
+optimizer = "adam"
+
+[compile.losses]
+n_muon_cat = {function="categorical_crossentropy", metrics=['acc']}
+
+# ----------------------------------------------------------------------
+[orca_modifiers]
+# sample_modifier = 'xyz-t_and_xyz-c_single_input'
+label_modifier = 'muon_multi'
+dataset_modifier = 'muon_multi'

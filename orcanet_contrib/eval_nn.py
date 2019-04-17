@@ -137,7 +137,7 @@ def make_performance_plots(pred_filepath, dataset_modifier, plots_folder):
             make_2d_true_reco_plot_different_sigmas(pred_file, main_perf_plots_path + '/2d', 'true_reco_plot_different_sigmas', cuts=cuts)
 
     else:
-        raise ValueError('The dataset_modifier ' + str(dataset_modifier) + ' is not known.')
+        raise NameError('The dataset_modifier ' + str(dataset_modifier) + ' is not known.')
 
     pred_file.close()
 

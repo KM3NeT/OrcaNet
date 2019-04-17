@@ -448,8 +448,9 @@ def make_model_prediction(orga, model, epoch, fileno, samples=None):
                     steps = int(samples / batchsize)
 
                 for s in range(steps):
-                    if s % 100 == 0:
-                        print('Predicting in step {} on file {}'.format(s, f_number))
+                    if s % 1000 == 0:
+                        print('Predicting in step {}/{} on '
+                              'file {}'.format(s, steps, f_number + 1))
                     # y_true is a dict of ndarrays, mc_info is a structured
                     # array, y_pred is a list of ndarrays
                     xs, y_true, mc_info = next(generator)

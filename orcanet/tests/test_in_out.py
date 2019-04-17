@@ -378,11 +378,13 @@ class TestIOHandler(TestCase):
 
     def test_get_next_pred_path(self):
         epoch, fileno = 1, 2  # dummy values
+
         value = self.io.get_next_pred_path(epoch, fileno, None)
-        target = self.io.get_subfolder("predictions") + '/pred_model_epoch_1_file_2_on_in_out_test_list_val_file_0.h5'
+        target = self.io.get_subfolder("predictions") + '/pred_model_epoch_1_file_2_on_in_out_test_list_val_file_1.h5'
         self.assertEqual(value, target)
+
         value = self.io.get_next_pred_path(epoch, fileno, 3)
-        target = self.io.get_subfolder("predictions") + '/pred_model_epoch_1_file_2_on_in_out_test_list_val_file_4.h5'
+        target = self.io.get_subfolder("predictions") + '/pred_model_epoch_1_file_2_on_in_out_test_list_val_file_5.h5'
         self.assertEqual(value, target)
 
     def test_get_cumulative_number_of_rows(self):

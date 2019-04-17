@@ -196,8 +196,8 @@ class IOHandler(object):
         if os.listdir(prediction_folder):
             val_file_nos = []
             for file in os.listdir(prediction_folder):
-                if os.path.isfile(os.path.join(prediction_folder, file)):  # omit directories
 
+                if os.path.isfile(os.path.join(prediction_folder, file)):
                     # model_epoch_XX_file_YY_on_fnamelist_val_file_ZZ
                     file_base = os.path.splitext(file)[0]
                     val_file_no = file_base.split("_val_file_")[-1]
@@ -248,7 +248,7 @@ class IOHandler(object):
 
         pred_filepath = self.get_subfolder("predictions") + \
             '/pred_model_epoch_{}_file_{}_on_{}_val_file_{}.h5'.format(
-                epoch, fileno, list_name, next_pred_file_no)
+                epoch, fileno, list_name, next_pred_file_no + 1)
 
         return pred_filepath
 
@@ -365,6 +365,11 @@ class IOHandler(object):
 
         Returns the path to the copy of the file on the local tmpdir, if
         it has been made.
+
+        Parameters
+        ----------
+        which : str
+            Either "train" or "val".
 
         Returns
         -------
@@ -535,7 +540,7 @@ class IOHandler(object):
                             for key in layer_inputs}
         list_inp_shapes = self.get_n_bins()
 
-        print("The inputs in your toml list file have the following "
+        print("The data in the files of the toml list have the following "
               "names and shapes:")
         for list_key in list_inp_shapes:
             print("\t{}\t{}".format(list_key, list_inp_shapes[list_key]))
@@ -572,7 +577,7 @@ class IOHandler(object):
         else:
             print("\nInput check failed!")
             if len(err_inp_names) != 0:
-                err_msg_inp += "No matching input name from the list file " \
+                err_msg_inp += "No matching input name from the input files " \
                                "for input layer(s): " + (
                                 ", ".join(str(e) for e in err_inp_names) + "\n")
             if len(err_inp_shapes) != 0:
@@ -585,8 +590,8 @@ class IOHandler(object):
         print("\nOutput check\n------------")
         # tuple of strings
         mc_names = y_values.dtype.names
-        print("The following {} label names are in your toml list file:".format(
-            len(mc_names)))
+        print("The following {} label names are in the first file of the "
+              "toml list:".format(len(mc_names)))
         print("\t" + ", ".join(str(name) for name in mc_names), end="\n\n")
 
         if self.cfg.label_modifier is not None:
@@ -617,7 +622,7 @@ class IOHandler(object):
         else:
             print("Output check failed!")
             if len(err_out_names) != 0:
-                err_msg_out += "No matching label name from the list file " \
+                err_msg_out += "No matching label name from the input files " \
                                "for output layer(s): " + (
                                 ", ".join(str(e) for e in err_out_names) + "\n")
             print("Error:", err_msg_out)
