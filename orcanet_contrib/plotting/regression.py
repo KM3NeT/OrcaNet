@@ -46,8 +46,31 @@ def make_2d_prop_to_prop_plot(pred_file, prop_1_name, prop_2_name, savefolder, s
         String that is used as a prefix for the title of the plot.
 
     """
+    def apply_plot_options_and_save_to_pdf():
+        """ Apply some plotting options and save the plot to a pdf file. """
+
+        title_name_prop_1, title_name_prop_2 = properties[prop_1_name]['title_name'], properties[prop_2_name]['title_name']
+
+        if 'lim' in properties[prop_1_name]:
+            ax.set_xlim(properties[prop_1_name]['lim'][0], properties[prop_1_name]['lim'][1])
+        if 'lim' in properties[prop_2_name]:
+            ax.set_ylim(properties[prop_2_name]['lim'][0], properties[prop_2_name]['lim'][1])
+
+        plot_line_through_the_origin(prop_1_name, prop_2_name)
+        title = plt.title(title_prefix + ic_list[ic]['title'] + ', ' + title_name_prop_1 + ' vs. ' + title_name_prop_2)
+        title.set_position([.5, 1.04])
+        cbar = fig.colorbar(pcm_prop_1_prop_2, ax=ax)
+        cbar.ax.set_ylabel('Number of events')
+        x_label, y_label = properties[prop_1_name]['ax_label'], properties[prop_2_name]['ax_label']
+        ax.set_xlabel(x_label), ax.set_ylabel(y_label)
+        plt.tight_layout()
+
+        pdf_plots.savefig(fig)
+        cbar.remove()
+        ax.cla()
+
     properties = get_make_2d_energy_resolution_plot_properties_dict()
-    if reco_energy_correction is True:
+    if reco_energy_correction is not None:
         properties['energy_reco']['ax_label'] = 'Corrected reconstructed energy (GeV)'  # add corrected info in str
 
     mc_info = pred_file['mc_info']
@@ -66,7 +89,7 @@ def make_2d_prop_to_prop_plot(pred_file, prop_1_name, prop_2_name, savefolder, s
 
     ic_list = {'muon-CC': {'title': 'Track like (' + r'$\nu_{\mu}-CC$)'},
                'elec-CC': {'title': 'Shower like (' + r'$\nu_{e}-CC$)'},
-               'elec-NC': {'title': 'Track like (' + r'$\nu_{e}-NC$)'},
+               'elec-NC': {'title': 'Shower like (' + r'$\nu_{e}-NC$)'},
                'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
 
     fig, ax = plt.subplots()
@@ -74,6 +97,11 @@ def make_2d_prop_to_prop_plot(pred_file, prop_1_name, prop_2_name, savefolder, s
 
     for ic in ic_list.keys():
         is_ic = select_ic(mc_info['particle_type'], mc_info['is_cc'], ic)
+
+        # TODO
+        print(ic)
+        print(np.count_nonzero(is_ic))
+
         if bool(np.any(is_ic, axis=0)) is False:
             continue
 
@@ -87,20 +115,7 @@ def make_2d_prop_to_prop_plot(pred_file, prop_1_name, prop_2_name, savefolder, s
         pcm_prop_1_prop_2 = ax.pcolormesh(bin_edges_prop_1, bin_edges_prop_2, hist_2d_prop_1_prop_2[0].T,
                                           norm=mpl.colors.LogNorm(vmin=1, vmax=hist_2d_prop_1_prop_2[0].T.max()))
 
-        title_name_prop_1, title_name_prop_2 = properties[prop_1_name]['title_name'], properties[prop_2_name]['title_name']
-
-        plot_line_through_the_origin(prop_1_name, prop_2_name)
-        title = plt.title(title_prefix + ic_list[ic]['title'] + ', ' + title_name_prop_1 + ' vs. ' + title_name_prop_2)
-        title.set_position([.5, 1.04])
-        cbar = fig.colorbar(pcm_prop_1_prop_2, ax=ax)
-        cbar.ax.set_ylabel('Number of events')
-        x_label, y_label = properties[prop_1_name]['ax_label'], properties[prop_2_name]['ax_label']
-        ax.set_xlabel(x_label), ax.set_ylabel(y_label)
-        plt.tight_layout()
-
-        pdf_plots.savefig(fig)
-        cbar.remove()  # TODO still necessary?
-        ax.cla()
+        apply_plot_options_and_save_to_pdf()
 
     pdf_plots.close()
     plt.close()
@@ -120,21 +135,22 @@ def get_make_2d_energy_resolution_plot_properties_dict():
     """
     properties = {
                   'energy_reco': {'dset_key': 'pred', 'col_name': 'pred_energy', 'bins': np.arange(1, 101, 1),
-                                  'title_name': 'reco energy', 'ax_label': 'Reconstructed energy (GeV)'},
+                                  'title_name': 'reco energy', 'ax_label': 'Reconstructed energy (GeV)',
+                                  'lim': (1, 100)},
                   'energy_true': {'dset_key': 'mc_info', 'col_name': 'energy', 'bins': np.arange(1, 101, 1),
-                                  'title_name': 'true energy', 'ax_label': 'True energy (GeV)'},
+                                  'title_name': 'true energy', 'ax_label': 'True energy (GeV)', 'lim': (1, 100)},
                   'dir_x_reco': {'dset_key': 'pred', 'col_name': 'pred_dir_x', 'bins': np.linspace(-1, 1, 100),
-                                 'title_name': 'reco dir-x', 'ax_label': 'Reconstructed dir-x'},
+                                 'title_name': 'reco dir-x', 'ax_label': 'Reconstructed dir-x', 'lim': (-1, 1)},
                   'dir_y_reco': {'dset_key': 'pred', 'col_name': 'pred_dir_y', 'bins': np.linspace(-1, 1, 100),
-                                 'title_name': 'reco dir-y', 'ax_label': 'Reconstructed dir-y'},
+                                 'title_name': 'reco dir-y', 'ax_label': 'Reconstructed dir-y', 'lim': (-1, 1)},
                   'dir_z_reco': {'dset_key': 'pred', 'col_name': 'pred_dir_z', 'bins': np.linspace(-1, 1, 100),
-                                 'title_name': 'reco dir-z', 'ax_label': 'Reconstructed dir-z'},
+                                 'title_name': 'reco dir-z', 'ax_label': 'Reconstructed dir-z', 'lim': (-1, 1)},
                   'dir_x_true': {'dset_key': 'mc_info', 'col_name': 'dir_x', 'bins': np.linspace(-1, 1, 100),
-                                 'title_name': 'true dir-x', 'ax_label': 'True dir-x'},
+                                 'title_name': 'true dir-x', 'ax_label': 'True dir-x', 'lim': (-1, 1)},
                   'dir_y_true': {'dset_key': 'mc_info', 'col_name': 'dir_y', 'bins': np.linspace(-1, 1, 100),
-                                 'title_name': 'true dir-y', 'ax_label': 'True dir-y'},
+                                 'title_name': 'true dir-y', 'ax_label': 'True dir-y', 'lim': (-1, 1)},
                   'dir_z_true': {'dset_key': 'mc_info', 'col_name': 'dir_z', 'bins': np.linspace(-1, 1, 100),
-                                 'title_name': 'true dir-z', 'ax_label': 'True dir-z'},
+                                 'title_name': 'true dir-z', 'ax_label': 'True dir-z', 'lim': (-1, 1)},
                   'azimuth_reco': {'dset_key': 'pred', 'bins': np.linspace(-math.pi, math.pi, 100),
                                    'title_name': 'reco azimuth', 'ax_label': 'Reconstructed azimuth (rad)'},
                   'azimuth_true': {'dset_key': 'mc_info', 'bins': np.linspace(-math.pi, math.pi, 100),
@@ -153,11 +169,11 @@ def get_make_2d_energy_resolution_plot_properties_dict():
                                  'title_name': 'reco vtx-y', 'ax_label': 'Reconstructed vtx-y'},
                   'vtx_z_reco': {'dset_key': 'pred', 'col_name': 'pred_vtx_z', 'bins': 50,
                                  'title_name': 'reco vtx-z', 'ax_label': 'Reconstructed vtx-z'},
-                  'vtx_x_true': {'dset_key': 'mc_info', 'col_name': 'vtx_x', 'bins': 50,
+                  'vtx_x_true': {'dset_key': 'mc_info', 'col_name': 'vertex_pos_x', 'bins': 50,
                                  'title_name': 'true vtx-x', 'ax_label': 'True vtx-x'},
-                  'vtx_y_true': {'dset_key': 'mc_info', 'col_name': 'vtx_y', 'bins': 50,
+                  'vtx_y_true': {'dset_key': 'mc_info', 'col_name': 'vertex_pos_y', 'bins': 50,
                                  'title_name': 'true vtx-y', 'ax_label': 'True vtx-y'},
-                  'vtx_z_true': {'dset_key': 'mc_info', 'col_name': 'vtx_z', 'bins': 50,
+                  'vtx_z_true': {'dset_key': 'mc_info', 'col_name': 'vertex_pos_z', 'bins': 50,
                                  'title_name': 'true vtx-z', 'ax_label': 'True vtx-z'}
                   }
 
@@ -266,7 +282,7 @@ def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, s
         The description of this parameter can be found above in the docs of the main function.
         If mode[0] != 'rel_std_div', mode[1] must be one of "mae", "median", "mean_relative" or "median_relative".
         In this case, what is given in mode[0] doesn't matter at all.
-        Likewise, if mode[0] == 'rel_std_div', what is specified in mode[1] doesn't matter.
+        Likewise, if mode[0] == 'rel_std_div', what is specified in mode[1] doesn't matter. # TODO tuple unnecessary?
     savefolder : str
         Path of the directory, where the plots should be saved to.
     savename : str
@@ -297,7 +313,7 @@ def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, s
 
     ic_list = {'muon-CC': {'title': 'Track like (' + r'$\nu_{\mu}-CC$)'},
                'elec-CC': {'title': 'Shower like (' + r'$\nu_{e}-CC$)'},
-               'elec-NC': {'title': 'Track like (' + r'$\nu_{e}-NC$)'},
+               'elec-NC': {'title': 'Shower like (' + r'$\nu_{e}-NC$)'},
                'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
 
     mc_info, pred = get_mc_info_and_pred_datasets(pred_file, 'mc_info', 'pred', cuts)
@@ -308,20 +324,23 @@ def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, s
     sub_props_list = properties[property_name]['sub_props']
     for ic in ic_list.keys():
         is_ic = select_ic(mc_info['particle_type'], mc_info['is_cc'], ic)
+        print(ic)
+        print(np.count_nonzero(is_ic))
         if bool(np.any(is_ic, axis=0)) is False:
             continue
 
         for sub_prop in sub_props_list:
-            plot_data = calc_plot_data_of_energy_dependent_label(mc_info, pred, sub_prop, mode,
+            plot_data = calc_plot_data_of_energy_dependent_label(mc_info, pred, sub_prop, mode, selection=is_ic,
                                                                  energy_bins=energy_bins,
-                                                                 reco_energy_correction=reco_energy_correction,)
+                                                                 reco_energy_correction=reco_energy_correction)
 
             bins, perf = plot_data[0], plot_data[1]
             ax.step(bins, perf, linestyle="-", where='post', label='DL ' + sub_prop)
 
             if compare_2nd_reco is not None:
+                is_ic_2 = select_ic(mc_info_2['particle_type'], mc_info_2['is_cc'], ic)
                 # no energy correction for the 2nd file, typically some standard reco
-                plot_data_2 = calc_plot_data_of_energy_dependent_label(mc_info_2, pred_2, sub_prop, mode,
+                plot_data_2 = calc_plot_data_of_energy_dependent_label(mc_info_2, pred_2, sub_prop, mode, selection=is_ic_2,
                                                                        reco_energy_correction=None,
                                                                        energy_bins=energy_bins)
 
@@ -379,8 +398,8 @@ def get_mc_info_and_pred_datasets(pred_file, mc_info_key, pred_key, cuts):
     return mc_info, pred
 
 
-def calc_plot_data_of_energy_dependent_label(mc_info, pred, prop_name, mode,
-                                             energy_bins=np.linspace(1, 100, 20), reco_energy_correction=None):
+def calc_plot_data_of_energy_dependent_label(mc_info, pred, prop_name, mode, selection=None,
+                                             energy_bins=np.linspace(1, 100, 32), reco_energy_correction=None):
     """
     Returns two different kind of performance metrics vs energy, dependent on the mode parameter:
 
@@ -404,6 +423,8 @@ def calc_plot_data_of_energy_dependent_label(mc_info, pred, prop_name, mode,
         If mode[0] != 'rel_std_div', mode[1] must be one of "mae", "median", "mean_relative" or "median_relative".
         In this case, what is given in mode[0] doesn't matter at all.
         Likewise, if mode[0] == 'rel_std_div', what is specified in mode[1] doesn't matter.
+    selection : None/ndarray(ndim=1)
+        1D Boolean array, if only a subset of the events in the mc_info and pred dataset should be used.
     energy_bins : ndarray(ndim=1)
         Energy bins that should be used for the binning.
     reco_energy_correction : None/str
@@ -413,7 +434,7 @@ def calc_plot_data_of_energy_dependent_label(mc_info, pred, prop_name, mode,
 
     Returns
     -------
-    energy_to_property_performance_plot_data_ic : tuple(ndarray, ndarray, optional(ndarray))
+    energy_to_property_performance_plot_data : tuple(ndarray, ndarray, optional(ndarray))
         If mode[0] == 'rel_std_div':
             Tuple containing 2 arrays:
             1) energy_bins array from the input.
@@ -425,53 +446,65 @@ def calc_plot_data_of_energy_dependent_label(mc_info, pred, prop_name, mode,
             3) hist_energy_variance array, same as 2 but this time the variance.
 
     """
+    # correct reco energy if we want to get the plot data of the energy variable
+    if 'energy' in prop_name and reco_energy_correction is not None:
+        energy_pred_corr_no_sel = correct_reco_energy(mc_info, pred['pred_energy'], metric=reco_energy_correction)
+
+    # apply cuts
+    if selection is not None:
+        mc_info = mc_info[selection]
+        pred = pred[selection]
+
+    # get prop_pred and prop_true dependent on the prop_name
     if 'azimuth' in prop_name:
         # atan2(y,x)
         azimuth_pred = convert_vectorial_to_spherical_dir(pred, 'azimuth', 'pred_')
-        azimuth_true = convert_vectorial_to_spherical_dir(mc_info, 'azimuth', 'pred_')
+        azimuth_true = convert_vectorial_to_spherical_dir(mc_info, 'azimuth', '')
 
         prop_pred, prop_true = azimuth_pred, azimuth_true
 
     elif 'zenith' in prop_name:
         # atan2(z, sqrt(x**2 + y**2))
         zenith_pred = convert_vectorial_to_spherical_dir(pred, 'zenith', 'pred_')
-        zenith_true = convert_vectorial_to_spherical_dir(mc_info, 'zenith', 'pred_')
+        zenith_true = convert_vectorial_to_spherical_dir(mc_info, 'zenith', '')
 
         prop_pred, prop_true = zenith_pred, zenith_true
 
     elif 'energy' in prop_name:
         if reco_energy_correction is not None:
-            energy_pred_array = pred['pred_energy']
-            energy_pred = correct_reco_energy(mc_info, energy_pred_array, metric=reco_energy_correction)
+            energy_pred_corr_sel = energy_pred_corr_no_sel[selection]
             energy_true = mc_info[prop_name]
-            prop_pred, prop_true = energy_pred, energy_true
+            prop_pred, prop_true = energy_pred_corr_sel, energy_true
         else:
             prop_pred, prop_true = pred['pred_' + prop_name], mc_info[prop_name]
 
     elif 'bjorkeny' in prop_name:
-        # correct by to 1 for e-NC events
+        # correct by true to 1 for e-NC events
         abs_particle_type, is_cc = np.abs(mc_info['particle_type']), mc_info['is_cc']
         is_e_nc = np.logical_and(abs_particle_type == 12, is_cc == 0)
 
-        bjorkeny_pred = np.copy(pred['pred_bjorkeny'])  # TODO test if this really works
-        bjorkeny_pred[is_e_nc] = 1
+        bjorkeny_true = np.copy(mc_info['bjorkeny'])  # TODO test if this really works
+        bjorkeny_true[is_e_nc] = 1
 
-        bjorkeny_true = mc_info['bjorkeny']
+        bjorkeny_pred = pred['pred_bjorkeny']
 
         prop_pred, prop_true = bjorkeny_pred, bjorkeny_true
+
+    elif 'vtx' in prop_name:
+        prop_pred, prop_true = pred['pred_' + prop_name], mc_info['vertex_pos_' + prop_name[-1]]
 
     else:
         prop_pred, prop_true = pred['pred_' + prop_name], mc_info[prop_name]
 
     energy_true = mc_info['energy']
     if mode[0] == 'rel_std_div':
-        energy_to_property_performance_plot_data_ic = get_rel_std_div_plot_data(prop_pred, energy_true, energy_bins)
+        energy_to_property_performance_plot_data = get_rel_std_div_plot_data(prop_pred, energy_true, energy_bins)
     else:
         metric = mode[1]
         err = np.abs(prop_pred - prop_true)
-        energy_to_property_performance_plot_data_ic = bin_error_in_energy_bins(err, energy_true, energy_bins, metric=metric)
+        energy_to_property_performance_plot_data = bin_error_in_energy_bins(err, energy_true, energy_bins, metric=metric)
 
-    return energy_to_property_performance_plot_data_ic
+    return energy_to_property_performance_plot_data
 
 
 def get_rel_std_div_plot_data(prop_pred, energy_true, energy_bins):
@@ -611,10 +644,10 @@ def make_1d_reco_err_div_by_std_dev_plot(pred_file, savefolder, savename, cuts=N
                   'dir_x': {'col_name_pred': 'pred_dir_x', 'col_name_pred_err': 'pred_err_dir_x', 'col_name_true': 'true_dir_x'},
                   'dir_y': {'col_name_pred': 'pred_dir_y', 'col_name_pred_err': 'pred_err_dir_y', 'col_name_true': 'true_dir_y'},
                   'dir_z': {'col_name_pred': 'pred_dir_z', 'col_name_pred_err': 'pred_err_dir_z', 'col_name_true': 'true_dir_z'},
-                  'vtx_x': {'col_name_pred': 'pred_vtx_x', 'col_name_pred_err': 'pred_err_vtx_x', 'col_name_true': 'true_vxt_x'},
-                  'vtx_y': {'col_name_pred': 'pred_vtx_y', 'col_name_pred_err': 'pred_err_vtx_y', 'col_name_true': 'true_vxt_y'},
-                  'vtx_z': {'col_name_pred': 'pred_vtx_z', 'col_name_pred_err': 'pred_err_vtx_z', 'col_name_true': 'true_vxt_z'},
-                  'vtx_t': {'col_name_pred': 'pred_vtx_t', 'col_name_pred_err': 'pred_err_vtx_t', 'col_name_true': 'true_vxt_t'}}
+                  'vtx_x': {'col_name_pred': 'pred_vtx_x', 'col_name_pred_err': 'pred_err_vtx_x', 'col_name_true': 'true_vtx_x'},
+                  'vtx_y': {'col_name_pred': 'pred_vtx_y', 'col_name_pred_err': 'pred_err_vtx_y', 'col_name_true': 'true_vtx_y'},
+                  'vtx_z': {'col_name_pred': 'pred_vtx_z', 'col_name_pred_err': 'pred_err_vtx_z', 'col_name_true': 'true_vtx_z'},
+                  'vtx_t': {'col_name_pred': 'pred_vtx_t', 'col_name_pred_err': 'pred_err_vtx_t', 'col_name_true': 'true_vtx_t'}}
 
     mc_info = pred_file['mc_info']
     for prop in prop_names:
@@ -699,7 +732,7 @@ def make_1d_reco_err_to_reco_residual_plot(pred_file, savefolder, savename, cuts
 
     ic_list = {'muon-CC': {'title': 'Track like (' + r'$\nu_{\mu}-CC$)'},
                'elec-CC': {'title': 'Shower like (' + r'$\nu_{e}-CC$)'},
-               'elec-NC': {'title': 'Track like (' + r'$\nu_{e}-NC$)'},
+               'elec-NC': {'title': 'Shower like (' + r'$\nu_{e}-NC$)'},
                'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
 
     properties = {'energy': {'col_name_pred': 'pred_energy', 'col_name_true': 'true_energy', 'col_name_pred_err': 'pred_err_energy', 'unit': '[GeV]'},
@@ -734,7 +767,7 @@ def make_1d_reco_err_to_reco_residual_plot(pred_file, savefolder, savename, cuts
                                                                                          properties, prop_name)
 
             n_x_bins = 50
-            title = plt.title(ic_list[ic]['title'] + ': ' + prop_name)
+            title = ic_list[ic]['title'] + ': ' + prop_name
             unit = properties[prop_name]['unit']
 
             plot_1d_reco_err_to_reco_residual_for_prop(prop_true, prop_pred, prop_pred_err, n_x_bins, fig,
@@ -788,7 +821,7 @@ def get_prop_true_pred_and_prop_pred_sigma(pred, true, mc_info, properties, prop
 
         correction = 1.253  # convert mse error to standard deviation with the magic number sqrt(pi/2)
         if prop_name == 'azimuth':
-            azimuth_true = convert_vectorial_to_spherical_dir(true, 'azimuth', col_name_prefix='')
+            azimuth_true = convert_vectorial_to_spherical_dir(true, 'azimuth', col_name_prefix='true_')
             azimuth_pred = convert_vectorial_to_spherical_dir(pred, 'azimuth', col_name_prefix='pred_')
 
             # clip std prediction to 0 (maybe not really necessary) and apply correction
@@ -800,7 +833,7 @@ def get_prop_true_pred_and_prop_pred_sigma(pred, true, mc_info, properties, prop
                                        (-dy_pred / (dx_pred ** 2 + dy_pred ** 2)) ** 2 * dx_pred_err ** 2)
 
             # clip every predicted standard deviation to pi if larger than pi
-            n = azimuth_pred_err > math.pi
+            n = np.count_nonzero(azimuth_pred_err > math.pi)
             percentage_true = np.sum(n) / float(azimuth_pred_err.shape[0]) * 100
             print('Clipped ' + str(n) + ' predicted azimuth standard deviations to pi ('
                   + str(percentage_true) + '% of all events)')
@@ -820,11 +853,12 @@ def get_prop_true_pred_and_prop_pred_sigma(pred, true, mc_info, properties, prop
             prop_true, prop_pred, prop_pred_err = azimuth_true, azimuth_pred, azimuth_pred_err
 
         else:  # zenith
-            zenith_true = convert_vectorial_to_spherical_dir(true, 'zenith', col_name_prefix='')
+            zenith_true = convert_vectorial_to_spherical_dir(true, 'zenith', col_name_prefix='true_')
             zenith_pred = convert_vectorial_to_spherical_dir(pred, 'zenith', col_name_prefix='pred_')
 
             # clip std prediction to 0 (maybe not really necessary) and apply correction
             dz_pred_err = np.clip(np.copy(dz_pred_err), 0, None) * correction
+            dz_pred = np.clip(dz_pred, -0.999, 0.999)
 
             # error propagation with correlations neglected (covariance term = 0)
             zenith_pred_err = np.sqrt((-1 / np.sqrt((1 - dz_pred ** 2))) ** 2 * dz_pred_err ** 2)  # zen = arccos(z/norm(r))
@@ -849,8 +883,8 @@ def get_prop_true_pred_and_prop_pred_sigma(pred, true, mc_info, properties, prop
         else:
             prop_true = true[properties[prop_name]['col_name_true']]
 
-        prop_pred = true[properties[prop_name]['col_name_pred']]
-        prop_pred_err = true[properties[prop_name]['col_name_pred_err']]
+        prop_pred = pred[properties[prop_name]['col_name_pred']]
+        prop_pred_err = pred[properties[prop_name]['col_name_pred_err']]
 
         prop_pred_err = prop_pred_err * 1.253  # sqrt(pi/2) magic number correction with mse training
         prop_pred_err = np.abs(prop_pred_err)  # TODO necessary? -> rather set to zero, regarding the loss function?
@@ -950,12 +984,30 @@ def make_2d_true_reco_plot_different_sigmas(pred_file, savefolder, savename, cut
 
     ic_list = {'muon-CC': {'title': 'Track like (' + r'$\nu_{\mu}-CC$)'},
                'elec-CC': {'title': 'Shower like (' + r'$\nu_{e}-CC$)'},
-               'elec-NC': {'title': 'Track like (' + r'$\nu_{e}-NC$)'},
+               'elec-NC': {'title': 'Shower like (' + r'$\nu_{e}-NC$)'},
                'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
 
-    properties = {'energy': {'bins': np.linspace(1, 100, 100), 'axis_prop_info': ('energy', 'GeV')},
-                  'azimuth': {'bins': np.linspace(-math.pi, math.pi, 100), 'axis_prop_info': ('azimuth', 'rad')},
-                  'zenith': {'bins': np.linspace(-math.pi/float(2), math.pi/float(2), 100), 'axis_prop_info': ('azimuth', 'rad')}}
+    properties = {'energy': {'bins': np.linspace(1, 100, 100), 'axis_prop_info': ('energy', 'GeV'),
+                             'col_name_pred': 'pred_energy', 'col_name_true': 'true_energy', 'col_name_pred_err': 'pred_err_energy',},
+                  'azimuth': {'bins': np.linspace(-math.pi, math.pi, 100), 'axis_prop_info': ('azimuth', 'rad'),
+                              'col_name_pred': None, 'col_name_true': None, 'col_name_pred_err': None},
+                  'zenith': {'bins': np.linspace(-math.pi/float(2), math.pi/float(2), 100), 'axis_prop_info': ('azimuth', 'rad'),
+                             'col_name_pred': None, 'col_name_true': None, 'col_name_pred_err': None},
+                  'dir_x': {'col_name_pred': 'pred_dir_x', 'col_name_true': 'true_dir_x',
+                            'col_name_pred_err': 'pred_err_dir_x', 'unit': '[rad]'},
+                  'dir_y': {'col_name_pred': 'pred_dir_y', 'col_name_true': 'true_dir_y',
+                            'col_name_pred_err': 'pred_err_dir_y', 'unit': '[rad]'},
+                  'dir_z': {'col_name_pred': 'pred_dir_z', 'col_name_true': 'true_dir_z',
+                            'col_name_pred_err': 'pred_err_dir_z', 'unit': '[rad]'},
+                  'vtx_x': {'col_name_pred': 'pred_vtx_x', 'col_name_true': 'true_vtx_x',
+                            'col_name_pred_err': 'pred_err_vtx_x', 'unit': '[rad]'},
+                  'vtx_y': {'col_name_pred': 'pred_vtx_y', 'col_name_true': 'true_vtx_y',
+                            'col_name_pred_err': 'pred_err_vtx_y', 'unit': '[rad]'},
+                  'vtx_z': {'col_name_pred': 'pred_vtx_z', 'col_name_true': 'true_vtx_z',
+                            'col_name_pred_err': 'pred_err_vtx_z', 'unit': '[rad]'},
+                  'vtx_t': {'col_name_pred': 'pred_vtx_t', 'col_name_true': 'true_vtx_t',
+                            'col_name_pred_err': 'pred_err_vtx_t', 'unit': '[rad]'}
+                  }
 
     mc_info, pred, true = pred_file['mc_info'], pred_file['pred'], pred_file['true']
     if cuts is not None:
@@ -966,6 +1018,9 @@ def make_2d_true_reco_plot_different_sigmas(pred_file, savefolder, savename, cut
         true = true[evt_sel_mask]
 
     for prop_name in properties:
+        if prop_name not in ['energy', 'zenith', 'azimuth']:
+            continue
+
         for ic in ic_list:
             is_ic = select_ic(mc_info['particle_type'], mc_info['is_cc'], ic)
             if bool(np.any(is_ic, axis=0)) is False:
@@ -1043,8 +1098,8 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, prop_pred_err
 
         plot_line_through_the_origin(prop_name, prop_name)
 
-        title = plt.title('OrcaNet: ' + title + ', ' + str(int(percentage * 100)) + '% of total events')
-        title.set_position([.5, 1.04])
+        title_plot = plt.title('OrcaNet: ' + title + ', ' + str(int(percentage * 100)) + '% of total events')
+        title_plot.set_position([.5, 1.04])
         cbar = fig.colorbar(prop_true_to_reco, ax=ax)
         cbar.ax.set_ylabel('Number of events')
 
@@ -1083,8 +1138,8 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, prop_pred_err
             cbar_2 = fig.colorbar(corr_all_div_leftover, ax=ax)
             cbar_2.ax.set_ylabel('Fraction of leftover events')
 
-            title = plt.title('OrcaNet: ' + title + ', ' + str(int(percentage * 100)) + '% of total events')
-            title.set_position([.5, 1.04])
+            title_plot = plt.title('OrcaNet: ' + title + ', ' + str(int(percentage * 100)) + '% of total events')
+            title_plot.set_position([.5, 1.04])
             ax.set_xlabel('True ' + axis_prop_info[0] + ' [' + axis_prop_info[1] + ']')
             ax.set_ylabel('Reconstructed ' + axis_prop_info[0] + ' [' + axis_prop_info[1] + ']')
 

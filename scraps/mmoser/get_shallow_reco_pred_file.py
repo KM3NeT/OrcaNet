@@ -15,9 +15,13 @@ def cut_summary_file():
 
     """
     col_names = {}
-    fpath_col_names = '/home/saturn/capn/mppi033h/Data/standard_reco_files/pid_result_shiftedVertexEventSelection_withDeepLearningTrackScore_column_names.txt'
-    meta_filepath = '/home/saturn/capn/mppi033h/Data/standard_reco_files/pid_result_shiftedVertexEventSelection_withDeepLearningTrackScore.meta'
-    savepath = '/home/saturn/capn/mppi033h/Data/standard_reco_files/summary_file_cut.h5'
+    # fpath_col_names = '/home/saturn/capn/mppi033h/Data/standard_reco_files/pid_result_shiftedVertexEventSelection_withDeepLearningTrackScore_column_names.txt'
+    # meta_filepath = '/home/saturn/capn/mppi033h/Data/standard_reco_files/pid_result_shiftedVertexEventSelection_withDeepLearningTrackScore.meta'
+    # savepath = '/home/saturn/capn/mppi033h/Data/standard_reco_files/summary_file_cut.h5'
+
+    fpath_col_names = '/home/saturn/capn/mppi033h/Data/standard_reco_files/new_04_18/pid_result_shiftedVertexEventSelection_column_names.txt'
+    meta_filepath = '/home/saturn/capn/mppi033h/Data/standard_reco_files/new_04_18/pid_result_shiftedVertexEventSelection_w_osc_w_1_y.meta'
+    savepath = '/home/saturn/capn/mppi033h/Data/standard_reco_files/new_04_18/summary_file_cut.h5'
 
     with open(fpath_col_names) as f_col_names:
         cols_list = f_col_names.read().splitlines()
@@ -31,7 +35,7 @@ def cut_summary_file():
                      'dusj_is_good', 'dusj_energy_corrected', 'gandalf_dir_x',
                      'gandalf_dir_y', 'gandalf_dir_z', 'gandalf_pos_x', 'gandalf_pos_y', 'gandalf_pos_z', 'gandalf_time',
                      'gandalf_is_good', 'gandalf_energy_corrected', 'dusj_is_selected', 'gandalf_is_selected',
-                     'gandalf_loose_is_selected', 'muon_score', 'track_score', 'noise_score')
+                     'gandalf_loose_is_selected', 'muon_score', 'track_score', 'noise_score', 'oscillated_weight_one_year')
 
     usecols = [col_names[col_name] for col_name in selected_cols]
     usecols.sort()
@@ -42,9 +46,9 @@ def cut_summary_file():
     dtype['formats'] = (np.float64, ) * len(selected_cols)
     summary_file_arr = np.loadtxt(meta_filepath, delimiter=' ', usecols=usecols, dtype=dtype)
 
-    # add weight_1_year_col
-    w = np.load('/home/saturn/capn/mppi033h/Data/standard_reco_files/weight_1_year_col.npy')
-    summary_file_arr = np.lib.recfunctions.append_fields(summary_file_arr, 'oscillated_weight_one_year', w, dtypes=[np.float64], usemask=False)
+    # # add weight_1_year_col
+    # w = np.load('/home/saturn/capn/mppi033h/Data/standard_reco_files/weight_1_year_col.npy')
+    # summary_file_arr = np.lib.recfunctions.append_fields(summary_file_arr, 'oscillated_weight_one_year', w, dtypes=[np.float64], usemask=False)
 
     f = h5py.File(savepath, 'w')
     print('Saving the summary file content')
@@ -56,7 +60,7 @@ def make_pred_file():
     """
 
     """
-    f_in = h5py.File('/home/saturn/capn/mppi033h/Data/standard_reco_files/summary_file_cut.h5', 'r')
+    f_in = h5py.File('/home/saturn/capn/mppi033h/Data/standard_reco_files/new_04_18/summary_file_cut.h5', 'r')
 
     # bg classifier selections
     print('Making files for bg classifier')
@@ -70,7 +74,7 @@ def make_pred_file():
 
     pred_bg = get_pred(s, 'bg_classifier_2_class', selection=selection_classifier_bg)
     save_dsets_to_h5_file(mc_info_sel_bg, pred_bg,
-                          '/home/saturn/capn/mppi033h/Data/standard_reco_files/pred_file_bg_classifier_2_class.h5')
+                          '/home/saturn/capn/mppi033h/Data/standard_reco_files/new_04_18/pred_file_bg_classifier_2_class.h5')
 
     # ts classifier
     print('Making files for ts classifier')
@@ -86,7 +90,7 @@ def make_pred_file():
 
     pred_ts = get_pred(s, 'ts_classifier', selection=selection_classifier_ts)
     save_dsets_to_h5_file(mc_info_sel_ts, pred_ts,
-                          '/home/saturn/capn/mppi033h/Data/standard_reco_files/pred_file_ts_classifier.h5')
+                          '/home/saturn/capn/mppi033h/Data/standard_reco_files/new_04_18/pred_file_ts_classifier.h5')
 
     # regression
     print('Making files for regression')
@@ -101,7 +105,7 @@ def make_pred_file():
 
     pred_regr = get_pred(s, 'regression_e_dir_vtx_by', selection=selection_regr)
     save_dsets_to_h5_file(mc_info_sel_regr, pred_regr,
-                          '/home/saturn/capn/mppi033h/Data/standard_reco_files/pred_file_regression.h5')
+                          '/home/saturn/capn/mppi033h/Data/standard_reco_files/new_04_18/pred_file_regression.h5')
 
     f_in.close()
 
@@ -302,7 +306,7 @@ def save_dsets_to_h5_file(mc_info, pred, savepath):
 
 
 if __name__ == '__main__':
-    if os.path.exists('/home/saturn/capn/mppi033h/Data/standard_reco_files/summary_file_cut.h5') is False:
+    if os.path.exists('/home/saturn/capn/mppi033h/Data/standard_reco_files/new_04_18/summary_file_cut.h5') is False:
         cut_summary_file()  # do on tinyfat or woody with 32g, qsub -I -l nodes=1:ppn=4:sl32g,walltime=05:00:00
 
     make_pred_file()

@@ -40,17 +40,19 @@ def make_performance_plots(pred_filepath, dataset_modifier, plots_folder):
         cuts = 'bg_classifier'
 
         make_plots_subfolders(main_perf_plots_path, dataset_modifier)
-        make_prob_hists_bg_classifier(pred_file, main_perf_plots_path + '/1d', cuts=cuts)
+        make_prob_hists_bg_classifier(pred_file, main_perf_plots_path + '/1d', savename_prefix='without_cut', cuts=None, x_ranges=((0, 1), (0.99, 1)))
+        make_prob_hists_bg_classifier(pred_file, main_perf_plots_path + '/1d', savename_prefix='with_cut', cuts=cuts, x_ranges=((0, 1), (0.99, 1)))
 
-        pred_file_2 = h5py.File('/home/saturn/capn/mppi033h/Data/standard_reco_files/pred_file_bg_classifier_2_class.h5', 'r')
-        make_prob_hists_bg_classifier(pred_file_2, main_perf_plots_path + '/1d', bg_classes=['prob_muon'], savename_prefix='standard_reco', cuts=cuts)
+        pred_file_2 = h5py.File('/home/saturn/capn/mppi033h/Data/standard_reco_files/new_04_18/pred_file_bg_classifier_2_class.h5', 'r')
+        make_prob_hists_bg_classifier(pred_file_2, main_perf_plots_path + '/1d', bg_classes=['muon'],
+                                      savename_prefix='standard_reco', cuts=cuts, x_ranges=((0, 1), (0, 0.1)), xlabel_prefix='Standard reco')
         make_contamination_to_neutrino_efficiency_plot(pred_file, pred_file_2, dataset_modifier, main_perf_plots_path + '/1d')
 
     elif dataset_modifier == 'ts_classifier':
         print('Generating plots for track-shower performance investigations')
 
         cuts = 'neutrino_ts'
-        pred_file_2 = h5py.File('/home/saturn/capn/mppi033h/Data/standard_reco_files/pred_file_ts_classifier.h5', 'r')
+        pred_file_2 = h5py.File('/home/saturn/capn/mppi033h/Data/standard_reco_files/new_04_18/pred_file_ts_classifier.h5', 'r')
 
         make_plots_subfolders(main_perf_plots_path, dataset_modifier)
         make_e_to_acc_plot_ts(pred_file, 'Classified as track', main_perf_plots_path + '/1d', cuts=cuts, prob_threshold_shower=0.5)
@@ -61,7 +63,7 @@ def make_performance_plots(pred_filepath, dataset_modifier, plots_folder):
         make_plots_subfolders(main_perf_plots_path, dataset_modifier)
         cuts = 'neutrino_regr'
         reco_energy_correction = 'median'
-        pred_file_2nd_reco = h5py.File('/home/saturn/capn/mppi033h/Data/standard_reco_files/pred_file_regression.h5', 'r')
+        pred_file_2nd_reco = h5py.File('/home/saturn/capn/mppi033h/Data/standard_reco_files/new_04_18/pred_file_regression.h5', 'r')
 
         if 'energy' in dataset_modifier:
             print('Generating plots for energy performance investigations')

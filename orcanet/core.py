@@ -318,7 +318,10 @@ class Organizer:
                 pred_filename_conc = self.io.concatenate_pred_files(concatenated_folder)
                 pred_filepaths = [pred_filename_conc]
             else:
-                pred_filepaths = [concatenated_folder + '/' + os.listdir(concatenated_folder)[0]]
+                # omit directories if there are any in the concatenated folder
+                fname_conc_file_list = list(file for file in os.listdir(concatenated_folder)
+                                        if os.path.isfile(os.path.join(concatenated_folder, file)))
+                pred_filepaths = [concatenated_folder + '/' + fname_conc_file_list[0]]
 
         return pred_filepaths
 
