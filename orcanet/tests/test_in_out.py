@@ -9,7 +9,7 @@ import shutil
 from pathlib import Path
 
 from orcanet.core import Configuration
-from orcanet.in_out import HistoryHandler, IOHandler
+from orcanet.in_out import HistoryHandler, IOHandler, split_name_of_predfile
 
 
 class TestIOHandler(TestCase):
@@ -372,8 +372,8 @@ class TestIOHandler(TestCase):
         self.assertEqual(value, target)
 
     def test_get_latest_prediction_file_no(self):
-        value = self.io.get_latest_prediction_file_no()
-        target = 1
+        value = self.io.get_latest_prediction_file_no(2, 2)
+        target = 0
         self.assertEqual(value, target)
 
     def test_get_next_pred_path(self):
@@ -593,6 +593,14 @@ class TestHistoryHandler(TestCase):
         self.assertEqual(target_train, value_train)
         np.testing.assert_array_almost_equal(target_val, value_val)
         self.assertDictEqual(target_kwargs, value_kwargs)
+
+
+class TestFunctions(TestCase):
+    def test_split_name_of_predfile(self):
+        filename = "pred_model_epoch_1_file_2_on_list_val_file_3.h5"
+        target = (1, 2, 3)
+
+        self.assertSequenceEqual(split_name_of_predfile(filename), target)
 
 
 def assert_equal_struc_array(a, b):

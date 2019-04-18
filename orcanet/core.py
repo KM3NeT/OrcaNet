@@ -293,7 +293,7 @@ class Organizer:
             epoch, fileno = latest_epoch
             print("Automatically set epoch to epoch {} file {}.".format(epoch, fileno))
 
-        is_pred_done = self._check_if_pred_already_done()
+        is_pred_done = self._check_if_pred_already_done(epoch, fileno)
         if is_pred_done:
             print("Prediction has already been done.")
             pred_filepaths = self.io.get_pred_files_list()
@@ -326,7 +326,7 @@ class Organizer:
 
         return pred_filepaths
 
-    def _check_if_pred_already_done(self):
+    def _check_if_pred_already_done(self, epoch, fileno):
         """
         Checks if the prediction has already been done before.
         (-> predicted on all validation files)
@@ -338,7 +338,7 @@ class Organizer:
             already been fully done or not.
 
         """
-        latest_pred_file_no = self.io.get_latest_prediction_file_no()
+        latest_pred_file_no = self.io.get_latest_prediction_file_no(epoch, fileno)
         total_no_of_val_files = self.io.get_no_of_files('val')
 
         if latest_pred_file_no is None:

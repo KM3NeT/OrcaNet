@@ -181,35 +181,42 @@ class IOHandler(object):
         model_path = subfolder + "/" + file_name
         return model_path
 
-    def get_latest_prediction_file_no(self):
+    def get_latest_prediction_file_no(self, epoch, fileno):
         """
         Returns the file number of the latest currently predicted val file.
 
+        Parameters
+        ----------
+        epoch : int
+            Epoch of the model that has predicted.
+        fileno : int
+            Fileno of the model that has predicted.
+
         Returns
         -------
-        latest_predicted_val_file_no : int
-            File number of the prediction file with the highest val index.
+        latest_val_file_no : int or None
+            File number of the prediction file with the highest val index,
+            starting from 0. None if there is none.
 
         """
         prediction_folder = self.get_subfolder("predictions")
 
-        if os.listdir(prediction_folder):
-            val_file_nos = []
-            for file in os.listdir(prediction_folder):
+        val_file_nos = []
 
-                if os.path.isfile(os.path.join(prediction_folder, file)):
-                    # model_epoch_XX_file_YY_on_fnamelist_val_file_ZZ
-                    file_base = os.path.splitext(file)[0]
-                    val_file_no = file_base.split("_val_file_")[-1]
-                    val_file_nos.append(int(val_file_no))
+        for file in os.listdir(prediction_folder):
+            if not file.endswith(".h5"):
+                continue
 
-            val_file_nos.sort()
-            latest_predicted_val_file_no = max(val_file_nos)
+            f_epoch, f_fileno, val_file_no = split_name_of_predfile(file)
+            if f_epoch == epoch and f_fileno == fileno:
+                val_file_nos.append(int(val_file_no) - 1)
 
-        else:  # no prediction done yet
-            latest_predicted_val_file_no = None
+        if len(val_file_nos) == 0:
+            latest_val_file_no = None
+        else:
+            latest_val_file_no = max(val_file_nos)
 
-        return latest_predicted_val_file_no
+        return latest_val_file_no
 
     def get_next_pred_path(self, epoch, fileno, latest_pred_file_no):
         """
@@ -702,6 +709,29 @@ class IOHandler(object):
 
         epoch_float = epoch - 1 + file_sizes_rltv[fileno - 1]
         return epoch_float
+
+
+def split_name_of_predfile(file):
+    """
+    Get epoch, fileno, cal fileno from the name of a predfile.
+
+    Parameters
+    ----------
+    file : str
+        Like this: model_epoch_XX_file_YY_on_USERLIST_val_file_ZZ.h5
+
+    Returns
+    -------
+    epoch , file_no, val_file_no : tuple(int)
+        As integers.
+
+    """
+    file_base = os.path.splitext(file)[0]
+    rest, val_file_no = file_base.split("_val_file_")
+    rest, file_no = rest.split("_on_")[0].split("_file_")
+    epoch = rest.split("_epoch_")[-1]
+
+    return epoch, file_no, val_file_no
 
 
 class HistoryHandler:

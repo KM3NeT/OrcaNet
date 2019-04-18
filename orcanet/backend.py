@@ -418,7 +418,7 @@ def make_model_prediction(orga, model, epoch, fileno, samples=None):
     compression = ("gzip", 1)
     file_sizes = orga.io.get_file_sizes("val")
 
-    latest_pred_file_no = orga.io.get_latest_prediction_file_no()
+    latest_pred_file_no = orga.io.get_latest_prediction_file_no(epoch, fileno)
     if latest_pred_file_no is None:
         latest_pred_file_no = -1
 
