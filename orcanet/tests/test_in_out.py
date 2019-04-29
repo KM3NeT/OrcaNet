@@ -24,11 +24,11 @@ class TestIOHandler(TestCase):
         os.mkdir(cls.pred_dir)
 
         # make dummy pred files
-        Path(cls.pred_dir + '/pred_model_epoch_2_file_2_on_listname_val_file_0.h5').touch()
         Path(cls.pred_dir + '/pred_model_epoch_2_file_2_on_listname_val_file_1.h5').touch()
+        Path(cls.pred_dir + '/pred_model_epoch_2_file_2_on_listname_val_file_2.h5').touch()
 
-        cls.pred_filepaths = [cls.pred_dir + '/pred_model_epoch_2_file_2_on_listname_val_file_0.h5',
-                              cls.pred_dir + '/pred_model_epoch_2_file_2_on_listname_val_file_1.h5']
+        cls.pred_filepaths = [cls.pred_dir + '/pred_model_epoch_2_file_2_on_listname_val_file_1.h5',
+                              cls.pred_dir + '/pred_model_epoch_2_file_2_on_listname_val_file_2.h5']
 
         cls.init_dir = os.getcwd()
         os.chdir(cls.temp_dir)
@@ -373,7 +373,7 @@ class TestIOHandler(TestCase):
 
     def test_get_latest_prediction_file_no(self):
         value = self.io.get_latest_prediction_file_no(2, 2)
-        target = 0
+        target = 1
         self.assertEqual(value, target)
 
     def test_get_next_pred_path(self):

@@ -72,11 +72,12 @@ class TestOrganizer(TestCase):
             self.assertEqual(value, target)
 
     def test_check_if_pred_already_done(self):
+        epoch, fileno = 1, 1  # these dont matter
         # latest_prediction_file_no = None, total_files = 5 -> pred_done = False
         self.orga.io.get_latest_prediction_file_no = MagicMock(return_value=None)
         self.orga.io.get_no_of_files = MagicMock(return_value=5)
 
-        value = self.orga._check_if_pred_already_done()
+        value = self.orga._check_if_pred_already_done(epoch, fileno)
         target = False
         self.assertEqual(value, target)
 
@@ -84,7 +85,7 @@ class TestOrganizer(TestCase):
         self.orga.io.get_latest_prediction_file_no = MagicMock(return_value=2)
         self.orga.io.get_no_of_files = MagicMock(return_value=5)
 
-        value = self.orga._check_if_pred_already_done()
+        value = self.orga._check_if_pred_already_done(epoch, fileno)
         target = False
         self.assertEqual(value, target)
 
@@ -92,7 +93,7 @@ class TestOrganizer(TestCase):
         self.orga.io.get_latest_prediction_file_no = MagicMock(return_value=2)
         self.orga.io.get_no_of_files = MagicMock(return_value=5)
 
-        value = self.orga._check_if_pred_already_done()
+        value = self.orga._check_if_pred_already_done(epoch, fileno)
         target = False
         self.assertEqual(value, target)
 

@@ -195,8 +195,9 @@ class IOHandler(object):
         Returns
         -------
         latest_val_file_no : int or None
-            File number of the prediction file with the highest val index,
-            starting from 0. None if there is none.
+            File number of the prediction file with the highest val index.
+            STARTS FROM 0, so this is not whats in the file name.
+            None if there is none.
 
         """
         prediction_folder = self.get_subfolder("predictions")
@@ -209,7 +210,7 @@ class IOHandler(object):
 
             f_epoch, f_fileno, val_file_no = split_name_of_predfile(file)
             if f_epoch == epoch and f_fileno == fileno:
-                val_file_nos.append(int(val_file_no) - 1)
+                val_file_nos.append(val_file_no - 1)
 
         if len(val_file_nos) == 0:
             latest_val_file_no = None
@@ -730,6 +731,8 @@ def split_name_of_predfile(file):
     rest, val_file_no = file_base.split("_val_file_")
     rest, file_no = rest.split("_on_")[0].split("_file_")
     epoch = rest.split("_epoch_")[-1]
+
+    epoch, file_no, val_file_no = map(int, [epoch, file_no, val_file_no])
 
     return epoch, file_no, val_file_no
 
