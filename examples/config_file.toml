@@ -4,13 +4,76 @@
 # Possible options, together with their default values, are listed in the
 # doc of orcanet.core.Configuration.
 #
-# Here are a few examples
-#
+
 [config]
-# change the batchsize for training, valiating and predicting to 32
+# batchsize : int
+#   Batchsize that will be used for the training and validation of
+#   the network.
 batchsize=32
-# the learning rate which is used during training
+
+# filter_out_tf_garbage : bool
+#   If true, surpresses the tensorflow info logs which usually spam
+#   the terminal.
+
+# key_samples : str
+#   The name of the datagroup in the h5 input files which contains
+#   the samples for the network.
+
+# key_mc_info : str
+#   The name of the datagroup in the h5 input files which contains
+#   the info for the labels.
+
+# learning_rate : float or tuple or function
+#   The learning rate for the training.
+#   If it is a float, the learning rate will be constantly this value.
+#   If it is a tuple of two floats, the first float gives the learning rate
+#   in epoch 1 file 1, and the second float gives the decrease of the
+#   learning rate per file (e.g. 0.1 for 10% decrease per file).
+#   You can also give a function, which takes as an input the epoch and the
+#   file number (in this order), and returns the learning rate.
 learning_rate=0.002
-# Define a folder where zero center images are stored. A zero center image
-# will be calculated automatically and saved if it is not found here
+
+# max_queue_size : int
+#   max_queue_size option of the keras training and evaluation generator
+#   methods. How many batches get preloaded
+#   from the generator.
+
+# n_events : None or int
+#   For testing purposes. If not the whole .h5 file should be used for
+#   training, define the number of samples.
+
+# shuffle_train : bool
+#   If true, the order in which batches are read out from the files during
+#   training are randomized each time they are read out.
+
+# train_logger_display : int
+#   How many batches should be averaged for one line in the training log files.
+
+# train_logger_flush : int
+#   After how many lines the training log file should be flushed (updated on
+#   the disk). -1 for flush at the end of the file only.
+
+# use_scratch_ssd : bool
+#   Only working at HPC Erlangen: Declares if the input files should be
+#   copied to the node-local SSD scratch space.
+
+# validate_interval : int or None
+#   Validate the model after this many training files have been trained on
+#   in an epoch. There will always be a validation at the end of an epoch.
+#   None for only validate at the end of an epoch.
+#   Example: validate_interval=3 --> Validate after file 3, 6, 9, ...
+
+# verbose_train : int
+#   verbose option of keras.model.fit_generator.
+#   0 = silent, 1 = progress bar, 2 = one line per epoch.
+
+# verbose_val : int
+#   verbose option of evaluate_generator.
+#   0 = silent, 1 = progress bar.
+
+# zero_center_folder : None or str
+#   Path to a folder in which zero centering images are stored.
+#   If this path is set, zero centering images for the given dataset will
+#   either be calculated and saved automatically at the start of the
+#   training, or loaded if they have been saved before.
 zero_center_folder = "/home/woody/capn/mppi033h/orcanet_test/zero_center_folder/"

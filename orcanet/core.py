@@ -414,8 +414,8 @@ class Organizer:
                 raise ValueError("You need to provide a compiled keras model "
                                  "for the start of the training! (You gave None)")
             try:
-                plot_model(model,
-                           self.io.get_subfolder("plots") + "/model_plot.png")
+                plots_folder = self.io.get_subfolder("plots", create=True)
+                plot_model(model, plots_folder + "/model_plot.png")
             except OSError as e:
                 warnings.warn("Can not plot model: " + str(e))
 
@@ -463,7 +463,7 @@ class Configuration(object):
     Attributes
     ----------
     batchsize : int
-        Batchsize that should be used for the training and validation of
+        Batchsize that will be used for the training and validation of
         the network.
     callback_train : keras callback or list or None
         Callback or list of callbacks to use during training.

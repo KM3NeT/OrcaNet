@@ -298,6 +298,36 @@ def orca_label_modifiers(name):
             ys['n_muon_cat'] = n_muon_cat.astype(np.float32)
             return ys
 
+    elif name == "muon_multi_2":
+        def label_modifier(y_values):
+            # [1, 0] for 1 muon
+            # [0, 1] for 2+ muons
+            n_muons = y_values['n_muons']
+            batchsize = y_values.shape[0]
+
+            n_muon_cat = np.zeros((batchsize, 2))
+            n_muon_cat[:, 0] = n_muons == 1
+            n_muon_cat[:, 1] = n_muons > 1
+
+            ys = dict()
+            ys['n_muon_cat'] = n_muon_cat.astype(np.float32)
+            return ys
+
+    elif name == "muon_multi_two_ctg_10_mchits":
+        def label_modifier(y_values):
+            # [1, 0] for 1 muon
+            # [0, 1] for 2+ muons
+            n_muons = y_values['n_muons_10_mchits']
+            batchsize = y_values.shape[0]
+
+            n_muon_cat = np.zeros((batchsize, 2))
+            n_muon_cat[:, 0] = n_muons == 1
+            n_muon_cat[:, 1] = n_muons > 1
+
+            ys = dict()
+            ys['n_muon_cat'] = n_muon_cat.astype(np.float32)
+            return ys
+
     else:
         raise ValueError("Unknown output_type: " + str(name))
 
@@ -466,7 +496,8 @@ def orca_dataset_modifiers(name):
 
     elif name == 'muon_multi':
         # Muon multiplicity categorizer
-        # output: 3 categories
+        # convert the output into a struct. array, with dtype names
+        # e.g. n_muon_cat_1, n_muon_cat_2, ...
         def dataset_modifier(mc_info, y_true, y_pred):
             # y_pred and y_true are dicts with keys for each output
             # we only have 1 output here (n_muon_cat)
