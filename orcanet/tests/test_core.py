@@ -12,7 +12,12 @@ class TestOrganizer(TestCase):
         self.orga = Organizer("./")
         self.temp_dir = os.path.join(os.path.dirname(__file__), ".temp", "core")
 
-    def test_load_model_new_training(self):
+    @patch('orcanet.core.plot_model')
+    def test_load_model_new_training(self, mock_plot_model):
+        def plot_history(model, folder):
+            pass
+        mock_plot_model.side_effect = plot_history
+
         # latest epoch is None aka no model has been trained
         latest_epoch = None
         self.orga.io.get_latest_epoch = MagicMock(return_value=latest_epoch)

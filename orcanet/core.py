@@ -250,7 +250,7 @@ class Organizer:
         for metric_name, loss in history.items():
             self.io.print_log("   {}: \t{}".format(metric_name, loss))
         self.io.print_log("Elapsed time: {}\n".format(timedelta(seconds=elapsed_s)))
-        smry_logger.write_line(epoch_float, np.nan, history_val=history)
+        smry_logger.write_line(epoch_float, "n/a", history_val=history)
 
         update_summary_plot(self)
         save_actv_wghts_plot(self, model, latest_epoch, samples=self.cfg.batchsize)

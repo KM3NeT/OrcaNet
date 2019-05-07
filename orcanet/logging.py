@@ -167,7 +167,9 @@ class SummaryLogger:
 
     def write_line(self, epoch_float, lr, history_train=None, history_val=None):
         """
-        Write a line to the summary.txt file in every trained model folder.
+        Write a line to the summary.txt file in the trained model folder.
+
+        Will update an existing line if possible.
 
         Parameters
         ----------
@@ -209,6 +211,9 @@ class SummaryLogger:
         summary_data = self.orga.history.get_summary_data()
         if len(summary_data) > 0:
             last_line = summary_data[-1]
+            # round epoch to same precision as it appears in file
+            data[0] = round(data[0], self.float_precision)
+
             if last_line["Epoch"] == data[0]:
                 # merge arrays but ignore LR
                 data = merge_arrays(last_line, data, exclude=1)

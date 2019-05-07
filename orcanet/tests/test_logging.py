@@ -16,7 +16,7 @@ class TestSummaryLogger(TestCase):
         self.summary_file = os.path.join(self.temp_dir, "summary.txt")
 
         self.orga = Organizer(self.temp_dir)
-        self.orga.io.get_file_sizes = MagicMock(return_value=[100, 100])
+        self.orga.io.get_file_sizes = MagicMock(return_value=[100, 66])
         model = build_test_model()
         self.smry = SummaryLogger(self.orga, model)
 
@@ -30,7 +30,7 @@ class TestSummaryLogger(TestCase):
         target = [
             "Epoch     | LR        | train_loss | val_loss  | train_mean_absolute_error | val_mean_absolute_error\n",
             "----------+-----------+------------+-----------+---------------------------+------------------------\n",
-            "0.5       | 0.001     | 0          | n/a       | 0.5                       | n/a                    \n",
+            "0.6024    | 0.001     | 0          | n/a       | 0.5                       | n/a                    \n",
             "1         | 0.002     | 1          | n/a       | 1.5                       | n/a                    \n",
         ]
         filled_line = "1         | 0.002     | 1          | 2         | 1.5                       | 2.5                    \n"
@@ -56,8 +56,6 @@ class TestSummaryLogger(TestCase):
         lr = np.nan
         self.smry.write_line(self.orga.io.get_epoch_float(*epoch), lr,
                              history_val=history_val)
-        check_file(target)
-
         check_file(target)
 
     def tearDown(self):
