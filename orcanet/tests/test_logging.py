@@ -11,18 +11,35 @@ from orcanet.core import Organizer
 
 
 class TestSummaryLogger(TestCase):
+    """
+    Test writing of the SummaryLogger by generating a summary file into
+    a temp directory. Will then check if its contents match the given target.
+
+    """
     def setUp(self):
+        # Size of train files. No actual files get generated (they are mocked).
+        file_sizes = [100, 66]
+
         self.temp_dir = os.path.join(os.path.dirname(__file__), ".temp")
         self.summary_file = os.path.join(self.temp_dir, "summary.txt")
 
         self.orga = Organizer(self.temp_dir)
-        self.orga.io.get_file_sizes = MagicMock(return_value=[100, 66])
+        self.orga.io.get_file_sizes = MagicMock(return_value=file_sizes)
         model = build_test_model()
         self.smry = SummaryLogger(self.orga, model)
 
         self.metrics = model.metrics_names
 
-    def test_writing_integration(self):
+        def check_file(target_lines, verbose=False):
+            with open(self.summary_file) as file:
+                for i, line in enumerate(file):
+                    if verbose:
+                        print([line])
+                        print([target_lines[i]])
+                    self.assertEqual(line, target_lines[i])
+        self.check_file = check_file
+
+    def test_writing_summary_file_update_epoch_1(self):
         history_train_0 = dict(zip(self.metrics, [0.0, 0.5]))
         history_train_1 = dict(zip(self.metrics, [1.0, 1.5]))
         history_val = dict(zip(self.metrics, [2.0, 2.5]))
@@ -35,28 +52,54 @@ class TestSummaryLogger(TestCase):
         ]
         filled_line = "1         | 0.002     | 1          | 2         | 1.5                       | 2.5                    \n"
 
-        def check_file(target_lines):
-            with open(self.summary_file) as file:
-                for i, line in enumerate(file):
-                    self.assertEqual(target_lines[i], line)
-
         epoch = (1, 1)
         lr = 0.001
         self.smry.write_line(self.orga.io.get_epoch_float(*epoch), lr,
                              history_train=history_train_0)
-        check_file(target)
+        self.check_file(target)
 
         epoch = (1, 2)
         lr = 0.002
         self.smry.write_line(self.orga.io.get_epoch_float(*epoch), lr,
                              history_train=history_train_1)
-        check_file(target)
+        self.check_file(target)
 
         target[-1] = filled_line
         lr = np.nan
         self.smry.write_line(self.orga.io.get_epoch_float(*epoch), lr,
                              history_val=history_val)
-        check_file(target)
+        self.check_file(target)
+
+    def test_writing_summary_file_update_epoch_2(self):
+        history_train_0 = dict(zip(self.metrics, [0.0, 0.5]))
+        history_train_1 = dict(zip(self.metrics, [1.0, 1.5]))
+        history_val = dict(zip(self.metrics, [2.0, 2.5]))
+
+        target = [
+            "Epoch     | LR        | train_loss | val_loss  | train_mean_absolute_error | val_mean_absolute_error\n",
+            "----------+-----------+------------+-----------+---------------------------+------------------------\n",
+            "1.602     | 0.001     | 0          | n/a       | 0.5                       | n/a                    \n",
+            "2         | 0.002     | 1          | n/a       | 1.5                       | n/a                    \n",
+        ]
+        filled_line = "1.602     | 0.001     | 0          | 2         | 0.5                       | 2.5                    \n"
+
+        epoch = (2, 1)
+        lr = 0.001
+        self.smry.write_line(self.orga.io.get_epoch_float(*epoch), lr,
+                             history_train=history_train_0)
+        self.check_file(target)
+
+        target[2] = filled_line
+        lr = "n/a"
+        self.smry.write_line(self.orga.io.get_epoch_float(*epoch), lr,
+                             history_val=history_val)
+        self.check_file(target)
+
+        epoch = (2, 2)
+        lr = 0.002
+        self.smry.write_line(self.orga.io.get_epoch_float(*epoch), lr,
+                             history_train=history_train_1)
+        self.check_file(target)
 
     def tearDown(self):
         os.remove(self.summary_file)

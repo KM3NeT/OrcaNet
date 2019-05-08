@@ -107,19 +107,33 @@ def gen_line_str(data, widths=None, seperator=" | ", float_precision=4, minimum_
         The widths of the cells.
 
     """
+    cells, new_widths = gen_line_cells(data, widths,
+                                       float_precision, minimum_cell_width)
+
+    line = seperator.join(str(cell) for cell in cells)
+
+    return line, new_widths
+
+
+def gen_line_cells(data, widths=None, float_precision=4, minimum_cell_width=9):
+    """
+    Generate the content of the cells for a line in the summary file.
+
+    See gen_line_str (above) for doc.
+
+    Returns
+    -------
+    cells : List
+    new_widths : List
+
+    """
     if widths is None:
         new_widths = []
     else:
         new_widths = widths
 
-    line = ""
+    cells = []
     for i, entry in enumerate(data):
-        # no seperator before the first entry
-        if i == 0:
-            sep = ""
-        else:
-            sep = seperator
-
         # If entry is a number, round to given precision and make it a string
         if not isinstance(entry, str):
             entry = format(float(entry), "."+str(float_precision)+"g")
@@ -131,10 +145,9 @@ def gen_line_str(data, widths=None, seperator=" | ", float_precision=4, minimum_
             cell_width = widths[i]
 
         cell_cont = format(entry, "<"+str(cell_width))
+        cells.append(cell_cont)
 
-        line += "{seperator}{entry}".format(seperator=sep, entry=cell_cont,)
-
-    return line, new_widths
+    return cells, new_widths
 
 
 class SummaryLogger:
@@ -211,8 +224,10 @@ class SummaryLogger:
         summary_data = self.orga.history.get_summary_data()
         if len(summary_data) > 0:
             last_line = summary_data[-1]
-            # round epoch to same precision as it appears in file
-            data[0] = round(data[0], self.float_precision)
+            # get epoch to same length as it appears in file
+            # TODO this is bad, epoch, fileno should probably be in the
+            #  summary.txt in their own columns
+            data[0] = float(self._gen_line_cells(data, widths)[0][0])
 
             if last_line["Epoch"] == data[0]:
                 # merge arrays but ignore LR
@@ -296,6 +311,13 @@ class SummaryLogger:
                                     float_precision=self.float_precision,
                                     minimum_cell_width=self.minimum_cell_width)
         return line, widths
+
+    def _gen_line_cells(self, data, widths=None):
+        cells, widths = gen_line_cells(data,
+                                       widths=widths,
+                                       float_precision=self.float_precision,
+                                       minimum_cell_width=self.minimum_cell_width)
+        return cells, widths
 
 
 def merge_arrays(base, supp, exclude=None):

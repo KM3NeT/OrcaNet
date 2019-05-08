@@ -989,8 +989,8 @@ class HistoryHandler:
     @staticmethod
     def _load_txt(filepath):
         # TODO suboptimal that n/a gets replaced by np.nan, because this
-        # means that legitamte, not availble data can not be distinguished
-        # from failed 'nan' metric values produced by training.
+        #  means that legitamte, not availble cells can not be distinguished
+        #  from failed 'nan' metric values produced by training.
 
         file_data = np.genfromtxt(
             filepath,
