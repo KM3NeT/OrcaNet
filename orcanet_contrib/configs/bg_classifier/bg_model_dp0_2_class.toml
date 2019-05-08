@@ -17,12 +17,12 @@ blocks = [
           {filters=64},
           {filters=64},
           {filters=64},
-          {filters=64, pool_size=[2, 2, 2]},
           {filters=64},
+          {filters=64, pool_size=[2, 2, 2]},
+          {filters=128},
           {filters=128},
           {filters=128},
           {filters=128, pool_size=[2, 2, 2]},
-          {filters=128},
           ]
 
 # ----------------------------------------------------------------------
