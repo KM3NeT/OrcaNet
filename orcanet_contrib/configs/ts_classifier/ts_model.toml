@@ -28,6 +28,7 @@ blocks = [
 # ----------------------------------------------------------------------
 [head]
 architecture = "categorical"
+dropout = 0.1
 architecture_args = {output_name="ts_output", categories=2}
 
 # ----------------------------------------------------------------------
@@ -35,7 +36,7 @@ architecture_args = {output_name="ts_output", categories=2}
 optimizer = "adam"
 
 [compile.losses]
-bg_output = {function="categorical_crossentropy", metrics=['acc']}
+ts_output = {function="categorical_crossentropy", metrics=['acc']}
 
 # ----------------------------------------------------------------------
 [orca_modifiers]

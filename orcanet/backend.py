@@ -72,8 +72,8 @@ def train_model(orga, model, epoch, batch_logger=False):
         verbose=orga.cfg.verbose_train,
         max_queue_size=orga.cfg.max_queue_size,
         callbacks=callbacks,
-        initial_epoch=epoch[0],
-        epochs=epoch[0] + 1,
+        initial_epoch=epoch[0] - 1,
+        epochs=epoch[0],
     )
 
     # get a dict with losses and metrics
