@@ -36,7 +36,7 @@ class TestFunctions(TestCase):
         self.assertSequenceEqual(y_lims, target)
 
     def test_get_ylims_one_point_val(self):
-        val_data = ([1., ], [3., ])
+        val_data = np.array([[1., ], [3., ]])
         y_lims = get_ylims(None, val_data)
         target = (2.925, 3.075)
         self.assertSequenceEqual(y_lims, target)

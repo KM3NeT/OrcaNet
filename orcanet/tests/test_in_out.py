@@ -466,16 +466,128 @@ class TestIOHandler(TestCase):
         self.assertDictEqual(value, target)
 
 
+class TestIOHandlerLR(TestCase):
+    """
+    Test the learning rate method of the io handler.
+    """
+    def setUp(self):
+        self.temp_dir = os.path.join(
+            os.path.dirname(__file__), ".temp", "TestIOHandlerLR")
+        os.makedirs(self.temp_dir)
+
+        cfg = Configuration(self.temp_dir, None, None)
+        self.io = IOHandler(cfg)
+        self.get_learning_rate = self.io.get_learning_rate
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir)
+
+    def test_get_learning_rate_float(self):
+        user_lr = 0.1
+        no_train_files = 3
+
+        self.io.cfg.learning_rate = user_lr
+        self.io.get_no_of_files = MagicMock(return_value=no_train_files)
+
+        for fileno in range(no_train_files):
+            lr = self.get_learning_rate((1, fileno))
+            self.assertEqual(lr, user_lr)
+
+        for fileno in range(no_train_files):
+            lr = self.get_learning_rate((6, fileno))
+            self.assertEqual(lr, user_lr)
+
+    def test_get_learning_rate_tuple(self):
+        user_lr = (0.1, 0.2)
+        no_train_files = 3
+
+        self.io.cfg.learning_rate = user_lr
+        self.io.get_no_of_files = MagicMock(return_value=no_train_files)
+
+        rates_epoch_1 = [0.1, 0.08, 0.064]
+        for fileno in range(no_train_files):
+            lr = self.get_learning_rate((1, fileno+1))
+            self.assertAlmostEqual(lr, rates_epoch_1[fileno])
+
+        rates_epoch_2 = [0.0512, 0.04096, 0.032768]
+        for fileno in range(no_train_files):
+            lr = self.get_learning_rate((2, fileno + 1))
+            self.assertAlmostEqual(lr, rates_epoch_2[fileno])
+
+    def test_get_learning_rate_function(self):
+        def get_lr(epoch, filenos):
+            return epoch+filenos
+
+        user_lr = get_lr
+        no_train_files = 3
+
+        self.io.cfg.learning_rate = user_lr
+        self.io.get_no_of_files = MagicMock(return_value=no_train_files)
+
+        rates_epoch_1 = [2, 3, 4]
+        for fileno in range(no_train_files):
+            lr = self.get_learning_rate((1, fileno+1))
+            self.assertAlmostEqual(lr, rates_epoch_1[fileno])
+
+        rates_epoch_2 = [3, 4, 5]
+        for fileno in range(no_train_files):
+            lr = self.get_learning_rate((2, fileno + 1))
+            self.assertAlmostEqual(lr, rates_epoch_2[fileno])
+
+    def test_get_learning_rate_other(self):
+        user_lr = print
+        no_train_files = 3
+
+        self.io.cfg.learning_rate = user_lr
+        self.io.get_no_of_files = MagicMock(return_value=no_train_files)
+
+        with self.assertRaises(TypeError):
+            self.get_learning_rate((1, 1))
+
+    def test_get_learning_rate_read_csv_file(self):
+        user_lr = "lr.csv"
+        no_train_files = "not used"
+
+        self.io.cfg.learning_rate = user_lr
+        self.io.get_no_of_files = MagicMock(return_value=no_train_files)
+
+        csv_content = (
+            "1  2   0.1\n"
+            "1  3   0.2\n"
+            "2  2   0.3\n"
+        )
+
+        with open(os.path.join(self.temp_dir, "lr.csv"), "w") as f:
+            f.write(csv_content)
+
+        with self.assertRaises(ValueError):
+            self.get_learning_rate([1, 1])
+
+        tests = [
+            {"inp": [1, 2], "target": 0.1},
+            {"inp": [1, 3], "target": 0.2},
+            {"inp": [1, 10], "target": 0.2},
+            {"inp": [2, 1], "target": 0.2},
+            {"inp": [2, 2], "target": 0.3},
+            {"inp": [2, 3], "target": 0.3},
+            {"inp": [25, 33], "target": 0.3},
+        ]
+        for test in tests:
+            self.assertEqual(
+                self.get_learning_rate(test["inp"]), test["target"])
+
+
 class TestHistoryHandler(TestCase):
+    """
+    Test the in out Handler on 2 dummy summary files
+    (summary.txt, summary_2.txt).
+    """
     def setUp(self):
         self.output_folder = os.path.join(os.path.dirname(__file__),
                                           "data", "dummy_model")
-        self.summary_filename = os.path.join(self.output_folder, "summary.txt")
-        self.summary_filename_2 = os.path.join(self.output_folder, "summary_2.txt")
-        self.train_log_folder = os.path.join(self.output_folder, "train_log")
+        self.history = HistoryHandler(self.output_folder)
 
-        self.history = HistoryHandler(self.summary_filename,
-                                      self.train_log_folder)
+        self.summary_filename_2 = "summary_2.txt"
 
     def test_get_metrics(self):
         metrics = self.history.get_metrics()
@@ -509,8 +621,8 @@ class TestHistoryHandler(TestCase):
         self.assertSequenceEqual(column_names, target)
 
     def test_get_state(self):
-        self.history = HistoryHandler(self.summary_filename_2,
-                                      self.train_log_folder)
+        self.history.summary_filename = self.summary_filename_2
+
         state = self.history.get_state()
         print(state)
         target = [
@@ -521,7 +633,7 @@ class TestHistoryHandler(TestCase):
         ]
         self.assertSequenceEqual(state, target)
 
-    def test_plot_metric_onknown_metric(self):
+    def test_plot_metric_unknown_metric(self):
         with self.assertRaises(ValueError):
             self.history.plot_metric("test")
 

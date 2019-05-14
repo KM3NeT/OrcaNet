@@ -36,14 +36,27 @@ class TestSequentialBuilder(TestCase):
 
     def test_attach_layer_conv(self):
         inp = Input((6, 6, 1))
-        body_defaults = {"type": "conv_block", "conv_dim": 2}
-        layer_config = {"filters": 2, "pool_size": 2, "dropout": 0.2, "batchnorm": True, "kernel_reg": "l2"}
+        body_defaults = {
+            "type": "conv_block",
+            "conv_dim": 2,
+        }
+        layer_config = {
+            "filters": 2,
+            "pool_size": 2,
+            "dropout": 0.2,
+            "batchnorm": True,
+            "kernel_l2_reg": 0.0001
+        }
 
         builder = BlockBuilder(body_defaults, None)
         x = builder.attach_block(inp, layer_config)
         model = Model(inp, x)
 
         self.assertIsInstance(model.layers[1], Convolution2D)
+        kreg = model.layers[1].get_config()["kernel_regularizer"]["config"]
+        self.assertAlmostEqual(kreg["l1"], 0.0)
+        self.assertAlmostEqual(kreg["l2"], layer_config["kernel_l2_reg"])
+
         self.assertIsInstance(model.layers[2], BatchNormalization)
         self.assertIsInstance(model.layers[3], Activation)
         self.assertIsInstance(model.layers[4], MaxPooling2D)
@@ -56,9 +69,9 @@ class TestSequentialBuilder(TestCase):
             "output_names": ['out_A', 'out_B'],
         }
 
-        inp = Input((5, ))
+        inp = Input((5, 1))
         builder = BlockBuilder()
-        x = builder.attach_output_layers(inp, head_arch, head_arch_args)
+        x = builder.attach_output_layers(inp, head_arch, **head_arch_args)
         model = Model(inp, x)
 
         target_output_shapes = {

@@ -3,14 +3,23 @@ from unittest.mock import MagicMock, patch
 from keras.models import Model
 from keras.layers import Dense, Input
 import os
+import shutil
 
 from orcanet.core import Organizer, Configuration
 
 
 class TestOrganizer(TestCase):
+    """
+    Test the organizer by creating a dummy directory .temp/core.
+    """
     def setUp(self):
-        self.orga = Organizer("./")
         self.temp_dir = os.path.join(os.path.dirname(__file__), ".temp", "core")
+        os.mkdir(self.temp_dir)
+
+        self.orga = Organizer(self.temp_dir)
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir)
 
     @patch('orcanet.core.plot_model')
     def test_load_model_new_training(self, mock_plot_model):
@@ -28,9 +37,9 @@ class TestOrganizer(TestCase):
             self.orga._get_model(target_model, logging=False)
 
         # model given = ok
-        target_model = "the model is simply handed through"
+        target_model = build_test_model()
         model = self.orga._get_model(target_model, logging=False)
-        self.assertEqual(target_model, model)
+        self.assertEqual(target_model.to_json(), model.to_json())
 
     def test_load_model_continue_training(self):
         # latest epoch is not None aka model has been trained before
@@ -39,19 +48,14 @@ class TestOrganizer(TestCase):
 
         # no model given = load model
         target_model = None
-        model_file = self.temp_dir + "test_model.h5"
+        model_file = os.path.join(self.temp_dir, "test_model.h5")
         self.orga.io.get_model_path = MagicMock(return_value=model_file)
 
-        try:
-            os.mkdir(self.temp_dir)
-            # no model given = ok
-            saved_model = build_test_model()
-            saved_model.save(model_file)
-            loaded_model = self.orga._get_model(model=target_model, logging=False)
-            # mssing: check if models are equal (they probably are)
-        finally:
-            os.remove(model_file)
-            os.rmdir(self.temp_dir)
+        # no model given = ok
+        saved_model = build_test_model()
+        saved_model.save(model_file)
+        loaded_model = self.orga._get_model(model=target_model, logging=False)
+        self.assertEqual(saved_model.to_json(), loaded_model.to_json())
 
         # model given = ok
         target_model = "the model is simply handed through"

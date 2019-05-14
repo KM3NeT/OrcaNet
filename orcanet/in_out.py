@@ -8,9 +8,55 @@ import os
 import shutil
 import h5py
 import numpy as np
+from inspect import signature
 
 from orcanet.utilities.nn_utilities import get_inputs
 from orcanet.utilities.visualization import plot_history
+
+
+def get_subfolder(main_folder, name=None, create=False):
+    """
+    Get the path to one or all subfolders of the main folder.
+
+    Parameters
+    ----------
+    main_folder : str
+        The main folder.
+    name : str or None
+        The name of the subfolder.
+    create : bool
+        If the subfolder should be created if it does not exist.
+
+    Returns
+    -------
+    subfolder : str or tuple
+        The path of the subfolder. If name is None, all subfolders
+        will be returned as a tuple.
+
+    """
+    if not main_folder[-1] == "/":
+        main_folder += "/"
+
+    subfolders = {
+        "train_log": main_folder + "train_log",
+        "saved_models": main_folder + "saved_models",
+        "plots": main_folder + "plots",
+        "activations": main_folder + "plots/activations",
+        "predictions": main_folder + "predictions",
+    }
+
+    def get(fdr):
+        subfdr = subfolders[fdr]
+        if create and not os.path.exists(subfdr):
+            print("Creating directory: " + subfdr)
+            os.makedirs(subfdr)
+        return subfdr
+
+    if name is None:
+        subfolder = [get(name) for name in subfolders]
+    else:
+        subfolder = get(name)
+    return subfolder
 
 
 class IOHandler(object):
@@ -127,25 +173,7 @@ class IOHandler(object):
             will be returned as a tuple.
 
         """
-        subfolders = {
-            "train_log": self.cfg.output_folder + "train_log",
-            "saved_models": self.cfg.output_folder + "saved_models",
-            "plots": self.cfg.output_folder + "plots",
-            "activations": self.cfg.output_folder + "plots/activations",
-            "predictions": self.cfg.output_folder + "predictions",
-        }
-
-        def get(fdr):
-            subfdr = subfolders[fdr]
-            if create and not os.path.exists(subfdr):
-                print("Creating directory: " + subfdr)
-                os.makedirs(subfdr)
-            return subfdr
-
-        if name is None:
-            subfolder = [get(name) for name in subfolders]
-        else:
-            subfolder = get(name)
+        subfolder = get_subfolder(self.cfg.output_folder, name, create)
         return subfolder
 
     def get_model_path(self, epoch, fileno, local=False):
@@ -711,6 +739,85 @@ class IOHandler(object):
         epoch_float = epoch - 1 + file_sizes_rltv[fileno - 1]
         return epoch_float
 
+    def get_learning_rate(self, epoch):
+        """
+        Get the learning rate for the current epoch and file number.
+
+        The user learning rate can be None, a float, a tuple, or a function.
+
+        Parameters
+        ----------
+        epoch : tuple
+            Epoch and file number.
+
+        Returns
+        -------
+        lr : float
+            The learning rate.
+
+        """
+        error_msg = "The learning rate must be either a float, a tuple of " \
+                    "two floats or a function."
+        no_train_files = self.get_no_of_files("train")
+        user_lr = self.cfg.learning_rate
+
+        if isinstance(user_lr, str):
+            # read lr from a csv file in the main folder, which must have
+            # 3 columns (Epoch, fileno, lr)
+            lr_file = os.path.join(self.cfg.output_folder, user_lr)
+            lr_table = np.genfromtxt(lr_file)
+            if not lr_table.shape[1] == 3:
+                raise ValueError("Invalid lr.csv format")
+            lr_table = [[lrt[0:2].tolist(), lrt[2]] for lrt in lr_table]
+            lr_table.sort()
+
+            lr = None
+            for line_no, table_epoch in enumerate(lr_table):
+                if table_epoch[0] > epoch:
+                    break
+                else:
+                    lr = table_epoch[1]
+            if lr is None:
+                raise ValueError(
+                    "csv learning rate not specified for epoch {}".format(epoch))
+            return lr
+
+        try:
+            # Float => Constant LR
+            lr = float(user_lr)
+            return lr
+        except (ValueError, TypeError):
+            pass
+
+        try:
+            # List => Exponentially decaying LR
+            length = len(user_lr)
+            lr_init = float(user_lr[0])
+            lr_decay = float(user_lr[1])
+            if length != 2:
+                raise TypeError(
+                    "{} (Your tuple has length {})".format(error_msg,
+                                                           len(user_lr)))
+
+            lr = lr_init * (1 - lr_decay) ** (
+                        (epoch[1] - 1) + (epoch[0] - 1) * no_train_files)
+            return lr
+        except (ValueError, TypeError):
+            pass
+
+        try:
+            # Callable => User defined function
+            n_params = len(signature(user_lr).parameters)
+            if n_params != 2:
+                raise TypeError("A custom learning rate function must have two "
+                                "input parameters: The epoch and the file number. "
+                                "(yours has {})".format(n_params))
+            lr = user_lr(epoch[0], epoch[1])
+            return lr
+        except (ValueError, TypeError):
+            raise TypeError("{} (You gave {} of type {}) ".format(
+                error_msg, user_lr, type(user_lr)))
+
 
 def split_name_of_predfile(file):
     """
@@ -742,9 +849,20 @@ class HistoryHandler:
     For reading and plotting data from summary and train log files.
 
     """
-    def __init__(self, summary_file, train_log_folder):
-        self.summary_filename = summary_file
-        self.train_log_folder = train_log_folder
+    def __init__(self, main_folder):
+        self.main_folder = main_folder
+        self.summary_filename = "summary.txt"
+
+    @property
+    def summary_file(self):
+        main_folder = self.main_folder
+        if not main_folder[-1] == "/":
+            main_folder += "/"
+        return main_folder + self.summary_filename
+
+    @property
+    def train_log_folder(self):
+        return get_subfolder(self.main_folder, "train_log")
 
     def plot_metric(self, metric_name, **kwargs):
         """
@@ -872,7 +990,7 @@ class HistoryHandler:
             Its shape is the number of lines with data.
 
         """
-        summary_data = self._load_txt(self.summary_filename)
+        summary_data = self._load_txt(self.summary_file)
         if summary_data.shape == ():
             # When only one line is present
             summary_data = summary_data.reshape(1,)

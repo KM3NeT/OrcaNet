@@ -38,6 +38,8 @@ dropout = 0.2
 activation = 'relu'
 # Add a batch normalization layer
 batchnorm=true
+# l2 regularizer for the weights of the layer.
+# kernel_l2_reg = 0.00001
 
 # blocks in the body section of the resulting network.
 # Each dict makes a new block. The default values above will be inserted
@@ -69,7 +71,7 @@ output_args = {output_names=['e', 'dx', 'dy', 'dz', 'by', 'vx', 'vy', 'vz', 'vt'
 
 # default values for the blocks in the head:
 # dropout = None
-# kernel_reg = None
+# kernel_l2_reg = None
 # activation = "relu"
 
 

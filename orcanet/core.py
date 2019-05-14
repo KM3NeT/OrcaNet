@@ -7,14 +7,13 @@ Core scripts for the OrcaNet package.
 import os
 import toml
 import warnings
-import numpy as np
 from keras.models import load_model
 from keras.utils import plot_model
 import keras.backend as kb
 import time
 from datetime import timedelta
 
-from orcanet.backend import make_model_prediction, save_actv_wghts_plot, get_learning_rate, train_model, validate_model
+from orcanet.backend import make_model_prediction, save_actv_wghts_plot, train_model, validate_model
 from orcanet.utilities.visualization import update_summary_plot
 from orcanet.in_out import IOHandler, HistoryHandler
 from orcanet.utilities.nn_utilities import load_zero_center_data, get_auto_label_modifier
@@ -61,8 +60,7 @@ class Organizer:
         """
         self.cfg = Configuration(output_folder, list_file, config_file)
         self.io = IOHandler(self.cfg)
-        self.history = HistoryHandler(self.cfg.output_folder + "summary.txt",
-                                      self.io.get_subfolder("train_log"))
+        self.history = HistoryHandler(output_folder)
 
         self.xs_mean = None
         self._auto_label_modifier = None
@@ -173,15 +171,13 @@ class Organizer:
 
         smry_logger = SummaryLogger(self, model)
 
-        n_train_files = self.io.get_no_of_files("train")
-        lr = get_learning_rate(next_epoch, self.cfg.learning_rate,
-                               n_train_files)
+        lr = self.io.get_learning_rate(next_epoch)
         kb.set_value(model.optimizer.lr, lr)
 
         files_dict = self.io.get_file("train", next_epoch[1])
 
         line = "Training in epoch {} on file {}/{}".format(
-            next_epoch[0], next_epoch[1], n_train_files)
+            next_epoch[0], next_epoch[1], self.io.get_no_of_files("train"))
         self.io.print_log(line)
         self.io.print_log("-" * len(line))
         self.io.print_log("Learning rate is at {}".format(
@@ -410,9 +406,12 @@ class Organizer:
         latest_epoch = self.io.get_latest_epoch()
 
         if latest_epoch is None:
+            # new training
             if model is None:
                 raise ValueError("You need to provide a compiled keras model "
                                  "for the start of the training! (You gave None)")
+            self._save_as_json(model)
+
             try:
                 plots_folder = self.io.get_subfolder("plots", create=True)
                 plot_model(model, plots_folder + "/model_plot.png")
@@ -424,6 +423,15 @@ class Organizer:
                 model = self.load_saved_model(*latest_epoch, logging=logging)
 
         return model
+
+    def _save_as_json(self, model):
+        """ Save the architecture of a model as json to fixed path. """
+        json_filename = "model_arch.json"
+
+        json_string = model.to_json(indent=1)
+        model_folder = self.io.get_subfolder("saved_models", create=True)
+        with open(os.path.join(model_folder, json_filename), "w") as f:
+            f.write(json_string)
 
     def _set_up(self, model, logging=False):
         """ Necessary setup for training, validating and predicting. """
@@ -489,14 +497,17 @@ class Configuration(object):
         before they are fed into the model. If None is given, all labels with
         the same name as the output layers will be passed to the model as a dict,
         with the keys being the dtype names.
-    learning_rate : float or tuple or function
+    learning_rate : float, tuple, function or str
         The learning rate for the training.
-        If it is a float, the learning rate will be constantly this value.
-        If it is a tuple of two floats, the first float gives the learning rate
+        If it is a float: The learning rate will be constantly this value.
+        If it is a tuple of two floats: The first float gives the learning rate
         in epoch 1 file 1, and the second float gives the decrease of the
         learning rate per file (e.g. 0.1 for 10% decrease per file).
-        You can also give a function, which takes as an input the epoch and the
+        If it is a function: Takes as an input the epoch and the
         file number (in this order), and returns the learning rate.
+        If it is a str: Path to a csv file inside the main folder, containing
+        3 columns with the epoch, fileno, and the value the lr will be set
+        to when reaching this epoch/fileno.
     max_queue_size : int
         max_queue_size option of the keras training and evaluation generator
         methods. How many batches get preloaded

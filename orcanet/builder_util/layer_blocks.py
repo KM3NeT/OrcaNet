@@ -1,6 +1,7 @@
 from keras.layers import Input, Dense, Dropout, Activation, Convolution3D, \
     BatchNormalization, MaxPooling3D, Convolution2D, MaxPooling2D
 from keras import backend as K
+from keras.regularizers import l2
 
 
 class ConvBlock:
@@ -14,7 +15,9 @@ class ConvBlock:
         Specifies the dimension of the convolutional block, 2D/3D.
     filters : int
         Number of filters used for the convolutional layer.
-    kernel_size : int
+    strides : int or tuple
+        The stride length of the convolution
+    kernel_size : int or tuple
         Kernel size which is used for all three dimensions.
     pool_size : None or tuple
         Specifies if a MaxPooling layer should be added. e.g. (1,1,2)
@@ -24,9 +27,8 @@ class ConvBlock:
     activation : str or None
         Type of activation function that should be used. E.g. 'linear',
         'relu', 'elu', 'selu'.
-    kernel_reg : str or None
-        If L2 regularization with 1e-4 should be employed. 'l2' to enable
-        the regularization.
+    kernel_l2_reg : float, optional
+        Regularization factor of l2 regularizer for the weights.
     batchnorm : bool
         Adds a batch normalization layer.
     kernel_initializer : string
@@ -36,19 +38,23 @@ class ConvBlock:
     def __init__(self, conv_dim,
                  filters,
                  kernel_size=3,
+                 strides=1,
                  pool_size=None,
+                 pool_padding="valid",
                  dropout=None,
                  activation='relu',
-                 kernel_reg=None,
+                 kernel_l2_reg=None,
                  batchnorm=False,
                  kernel_initializer="he_normal"):
         self.conv_dim = conv_dim
         self.filters = filters
         self.kernel_size = kernel_size
+        self.strides = strides
         self.pool_size = pool_size
+        self.pool_padding = pool_padding
         self.dropout = dropout
         self.activation = activation
-        self.kernel_reg = kernel_reg
+        self.kernel_l2_reg = kernel_l2_reg
         self.batchnorm = batchnorm
         self.kernel_initializer = kernel_initializer
 
@@ -62,12 +68,23 @@ class ConvBlock:
         else:
             raise ValueError('dim must be equal to 2 or 3.')
 
-        x = convolution_nd(self.filters,
-                           self.kernel_size,
+        if self.kernel_l2_reg is not None:
+            kernel_reg = l2(self.kernel_l2_reg)
+        else:
+            kernel_reg = None
+
+        if self.batchnorm:
+            use_bias = False
+        else:
+            use_bias = True
+
+        x = convolution_nd(filters=self.filters,
+                           kernel_size=self.kernel_size,
+                           strides=self.strides,
                            padding='same',
                            kernel_initializer=self.kernel_initializer,
-                           use_bias=False,
-                           kernel_regularizer=self.kernel_reg)(inputs)
+                           use_bias=use_bias,
+                           kernel_regularizer=kernel_reg)(inputs)
 
         if self.batchnorm:
             channel_axis = 1 if K.image_data_format() == "channels_first" else -1
@@ -75,7 +92,8 @@ class ConvBlock:
         if self.activation is not None:
             x = Activation(self.activation)(x)
         if self.pool_size is not None:
-            x = max_pooling_nd(pool_size=self.pool_size, padding='valid')(x)
+            x = max_pooling_nd(pool_size=self.pool_size,
+                               padding=self.pool_padding)(x)
         if self.dropout is not None:
             x = Dropout(self.dropout)(x)
 
@@ -95,9 +113,8 @@ class DenseBlock:
     activation : str or None
         Type of activation function that should be used. E.g. 'linear',
         'relu', 'elu', 'selu'.
-    kernel_reg : str or None
-        If L2 regularization with 1e-4 should be employed. 'l2' to enable
-        the regularization.
+    kernel_l2_reg : float, optional
+        Regularization factor of l2 regularizer for the weights.
     batchnorm : bool
         Adds a batch normalization layer.
 
@@ -105,19 +122,32 @@ class DenseBlock:
     def __init__(self, units,
                  dropout=None,
                  activation='relu',
-                 kernel_reg=None,
+                 kernel_l2_reg=None,
                  batchnorm=False,
                  kernel_initializer="he_normal"):
         self.units = units
         self.dropout = dropout
         self.activation = activation
-        self.kernel_reg = kernel_reg
+        self.kernel_l2_reg = kernel_l2_reg
         self.batchnorm = batchnorm
         self.kernel_initializer = kernel_initializer
 
     def __call__(self, inputs):
-        x = Dense(self.units, kernel_initializer=self.kernel_initializer,
-                  kernel_regularizer=self.kernel_reg)(inputs)
+        if self.kernel_l2_reg is not None:
+            kernel_reg = l2(self.kernel_l2_reg)
+        else:
+            kernel_reg = None
+
+        if self.batchnorm:
+            use_bias = False
+        else:
+            use_bias = True
+
+        x = Dense(units=self.units,
+                  use_bias=use_bias,
+                  kernel_initializer=self.kernel_initializer,
+                  kernel_regularizer=kernel_reg)(inputs)
+
         if self.batchnorm:
             channel_axis = 1 if K.image_data_format() == "channels_first" else -1
             x = BatchNormalization(axis=channel_axis)(x)

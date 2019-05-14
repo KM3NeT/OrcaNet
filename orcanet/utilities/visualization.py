@@ -60,24 +60,8 @@ def plot_history(
 
     """
     fig, ax = plt.subplots()
-    if train_data is None and val_data is None:
-        raise ValueError("Can not plot when no train and val data is given.")
-
-    if train_data is not None:
-        train_plot = plt.plot(
-            train_data[0], train_data[1], color=color, ls='-',
-            zorder=3, label=train_label, lw=0.6, alpha=0.5)
-        train_color = train_plot[0].get_color()
-    else:
-        train_color = color
-
-    if val_data is not None:
-        # Skip over nan values, so that all dots are connected
-        not_nan = ~np.isnan(val_data[1])
-        val_data = val_data[0][not_nan], val_data[1][not_nan]
-        # val plot always has the same color as the train plot
-        plt.plot(val_data[0], val_data[1], color=train_color,
-                 marker='o', zorder=3, label=val_label)
+    plot_curves(train_data, val_data,
+                train_label=train_label, val_label=val_label, color=color)
 
     if x_ticks is None:
         x_ticks = get_epoch_xticks(train_data, val_data)
@@ -93,15 +77,87 @@ def plot_history(
 
     if legend:
         ax.legend(loc='upper right')
+
     plt.xlabel(x_label)
     plt.ylabel(y_label)
+
     if title is not None:
         title = plt.title(title)
         title.set_position([.5, 1.04])
+
     if grid:
         plt.grid(True, zorder=0, linestyle='dotted')
 
     return fig
+
+
+def plot_curves(train_data, val_data=None,
+                train_label="training", val_label="validation", color=None,
+                train_smooth_ksize=None):
+    """
+    Plot a training and validation line.
+
+    Parameters
+    ----------
+    train_data : List
+        X data [0] and y data [1] of the train curve. Will be plotted as
+        connected dots.
+    val_data : List, optional
+        Optional X data [0] and y data [1] of the validation curve.
+        Will be plotted as a faint solid line of the same color as train.
+    color : str, optional
+        Color used for the train/val line.
+    train_label : str, optional
+        Label for the train line in the legend.
+    val_label : str, optional
+        Label for the validation line in the legend.
+    train_smooth_ksize : int, optional
+        Smooth the train curve by averaging over a moving window of given size.
+
+    """
+    if train_data is None and val_data is None:
+        raise ValueError("Can not plot when no train and val data is given.")
+
+    if train_data is not None:
+        if train_smooth_ksize is not None:
+            kernel = np.ones(train_smooth_ksize)/train_smooth_ksize
+            epoch = np.convolve(train_data[0], kernel, 'valid')
+            y_data = np.convolve(train_data[1], kernel, 'valid')
+        else:
+            epoch, y_data = train_data
+
+        train_plot = plt.plot(
+            epoch, y_data, color=color, ls='-',
+            zorder=3, label=train_label, lw=0.6, alpha=0.5)
+        train_color = train_plot[0].get_color()
+    else:
+        train_color = color
+
+    if val_data is not None:
+        val_data_clean = skip_nans(val_data)
+        # val plot always has the same color as the train plot
+        plt.plot(val_data_clean[0], val_data_clean[1], color=train_color,
+                 marker='o', zorder=3, label=val_label)
+
+
+def skip_nans(data):
+    """
+    Skip over nan values, so that all dots are connected.
+
+    Parameters
+    ----------
+    data : List
+        Contains x and y data as ndarrays. The y values may contain nans.
+
+    Returns
+    -------
+    data_clean : List
+        Contains x and y data as ndarrays. Points with y=nan are skipped.
+
+    """
+    not_nan = ~np.isnan(data[1])
+    data_clean = data[0][not_nan], data[1][not_nan]
+    return data_clean
 
 
 def get_ylims(train_data, val_data=None, fraction=0.25):
@@ -145,13 +201,13 @@ def get_ylims(train_data, val_data=None, fraction=0.25):
 
     mins, maxs = [], []
     if train_data is not None:
-        y_train = train_data[1]
+        y_train = skip_nans(train_data)[1]
         y_lims_train = reject_outliers(y_train, 5)
         mins.append(y_lims_train[0])
         maxs.append(y_lims_train[1])
 
     if val_data is not None:
-        y_val = val_data[1]
+        y_val = skip_nans(val_data)[1]
 
         if len(y_val) == 1:
             y_lim_val = y_val[0], y_val[0]

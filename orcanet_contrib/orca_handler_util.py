@@ -107,6 +107,15 @@ def orca_sample_modifiers(name):
             return xs_layer
         sample_modifier = swap_columns
 
+    elif name == "sum_last":
+        def sample_modifier(xs_files):
+            # sum over the last dimension
+            # e.g. shape (10,20,30) --> (10,20,1)
+            xs_layer = dict()
+            for l_name, x in xs_files.items():
+                xs_layer[l_name] = np.sum(x, axis=-1, keepdims=True)
+            return xs_layer
+
     elif name == 'xyz-t_and_yzt-x':
         def sample_modifier(xs_files):
             # Use xyz-t, and also transpose it to yzt-x and use that, too.

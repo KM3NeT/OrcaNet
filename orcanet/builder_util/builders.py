@@ -1,7 +1,6 @@
 from keras.models import Model
-from keras.layers import Dense, Flatten, Concatenate, Lambda
+from keras.layers import Dense, Flatten, Concatenate, Lambda, GlobalAveragePooling2D
 from keras import backend as K
-from keras.regularizers import l2
 import inspect
 
 from orcanet.builder_util.layer_blocks import (
@@ -11,6 +10,8 @@ from orcanet.builder_util.layer_blocks import (
 class BlockBuilder:
     """
     Can build single-input block-wise sequential neural network.
+
+    The body section of the network always ends with a flatten layer.
 
     Attributes
     ----------
@@ -28,20 +29,6 @@ class BlockBuilder:
             "conv_block": ConvBlock,
             "dense_block": DenseBlock,
         }
-
-        if body_defaults is not None and "kernel_reg" in body_defaults:
-            if body_defaults["kernel_reg"] == "l2":
-                body_defaults["kernel_reg"] = l2
-            else:
-                raise NameError(
-                    "Unknown kernel_reg: " + str(body_defaults["kernel_reg"]))
-
-        if head_defaults is not None and "kernel_reg" in head_defaults:
-            if head_defaults["kernel_reg"] == "l2":
-                head_defaults["kernel_reg"] = l2
-            else:
-                raise NameError(
-                    "Unknown kernel_reg: " + str(head_defaults["kernel_reg"]))
 
         self._check_arguments(body_defaults)
         self._check_arguments(head_defaults)
@@ -64,8 +51,8 @@ class BlockBuilder:
             connected to the previous one. The dict has to contain the type
             of the block, as well as any arguments required by that
             specific block type.
-        head_arch : str or None
-            Specifies the architecture of the head.
+        head_arch : str, optional
+            Specifies the architecture of the head. None for no head.
         head_arch_args : dict or None
             Required arguments for the given head_arch.
 
@@ -86,13 +73,19 @@ class BlockBuilder:
         x = input_layer
         for layer_config in body_configs:
             x = self.attach_block(x, layer_config)
-        conv_output_flat = Flatten()(x)
+
+        model_body = Model(input_layer, x)
+        last_b_layer = model_body.layers[-1]
+        last_b_layer.name = "BODYEND_" + last_b_layer.name
 
         if head_arch is None:
-            outputs = conv_output_flat
+            outputs = x
+
         else:
-            outputs = self.attach_output_layers(conv_output_flat,
-                                                head_arch, head_arch_args)
+            if head_arch_args is None:
+                head_arch_args = {}
+            outputs = self.attach_output_layers(x,
+                                                head_arch, **head_arch_args)
 
         model = Model(inputs=input_layer, outputs=outputs)
         return model
@@ -130,7 +123,7 @@ class BlockBuilder:
         x = block(**filled)(layer)
         return x
 
-    def attach_output_layers(self, layer, head_arch, head_arch_args):
+    def attach_output_layers(self, layer, head_arch, **head_arch_args):
         """
         Append the head dense layers to the network.
 
@@ -154,6 +147,9 @@ class BlockBuilder:
             assert head_arch_args is not None, "No output_kwargs given"
             outputs = self.attach_output_cat(layer, **head_arch_args)
 
+        elif head_arch == "gpool":
+            outputs = self.attach_output_gpool(layer, **head_arch_args)
+
         elif head_arch == "regression_error":
             # regression with error estimation, two outputs for each label
             assert head_arch_args is not None, "No output_kwargs given"
@@ -164,10 +160,16 @@ class BlockBuilder:
 
         return outputs
 
-    def attach_output_cat(self, layer, categories, output_name):
+    def attach_output_cat(self, layer, categories, output_name,
+                          flatten=True):
         """ Small dense network for multiple categories. """
+        if flatten:
+            x = Flatten()(layer)
+        else:
+            x = layer
+
         x = self.attach_block(
-            layer, {"type": "dense_block", "units": 128},
+            x, {"type": "dense_block", "units": 128},
             is_output=True)
 
         x = self.attach_block(
@@ -178,13 +180,25 @@ class BlockBuilder:
                     kernel_initializer='he_normal', name=output_name)(x)
         return [out, ]
 
-    def attach_output_reg_err(self, layer, output_names):
+    @staticmethod
+    def attach_output_gpool(layer, categories, output_name):
+        """ Global Pooling + 1 dense layer (like in resnet). """
+        x = GlobalAveragePooling2D()(layer)
+        out = Dense(units=categories, activation='softmax',
+                    kernel_initializer='he_normal', name=output_name)(x)
+        return [out, ]
+
+    def attach_output_reg_err(self, layer, output_names, flatten=True):
         """ Double network for regression + error estimation. """
+        if flatten:
+            flatten = Flatten()(layer)
+        else:
+            flatten = layer
         outputs = []
 
         # Network for the labels
         x = self.attach_block(
-            layer, {"type": "dense_block", "units": 128},
+            flatten, {"type": "dense_block", "units": 128},
             is_output=True)
 
         x = self.attach_block(
@@ -196,7 +210,7 @@ class BlockBuilder:
             outputs.append(output_label)
 
         # Network for the errors of the labels
-        x_err = Lambda(lambda a: K.stop_gradient(a))(layer)
+        x_err = Lambda(lambda a: K.stop_gradient(a))(flatten)
 
         x_err = self.attach_block(
             x_err, {"type": "dense_block", "units": 128},

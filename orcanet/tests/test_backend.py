@@ -8,7 +8,7 @@ from keras.layers import Dense, Input, Concatenate, Flatten
 from keras.callbacks import LambdaCallback
 
 from orcanet.core import Organizer
-from orcanet.backend import hdf5_batch_generator, get_datasets, get_learning_rate, train_model, validate_model, make_model_prediction, weighted_average
+from orcanet.backend import hdf5_batch_generator, get_datasets, train_model, validate_model, make_model_prediction, weighted_average
 from orcanet.utilities.nn_utilities import get_auto_label_modifier
 
 
@@ -212,56 +212,6 @@ class TestFunctions(TestCase):
         }
         datasets = get_datasets(mc_info, y_true, y_pred)
         self.assertDictEqual(datasets, target)
-
-    def test_get_learning_rate_float(self):
-        user_lr = 0.1
-        no_train_files = 3
-
-        for fileno in range(no_train_files):
-            lr = get_learning_rate((1, fileno), user_lr, no_train_files)
-            self.assertEqual(lr, user_lr)
-
-        for fileno in range(no_train_files):
-            lr = get_learning_rate((6, fileno), user_lr, no_train_files)
-            self.assertEqual(lr, user_lr)
-
-    def test_get_learning_rate_tuple(self):
-        user_lr = (0.1, 0.2)
-        no_train_files = 3
-
-        rates_epoch_1 = [0.1, 0.08, 0.064]
-        for fileno in range(no_train_files):
-            lr = get_learning_rate((1, fileno+1), user_lr, no_train_files)
-            self.assertAlmostEqual(lr, rates_epoch_1[fileno])
-
-        rates_epoch_2 = [0.0512, 0.04096, 0.032768]
-        for fileno in range(no_train_files):
-            lr = get_learning_rate((2, fileno + 1), user_lr, no_train_files)
-            self.assertAlmostEqual(lr, rates_epoch_2[fileno])
-
-    def test_get_learning_rate_function(self):
-        def get_lr(epoch, filenos):
-            return epoch+filenos
-
-        user_lr = get_lr
-        no_train_files = 3
-
-        rates_epoch_1 = [2, 3, 4]
-        for fileno in range(no_train_files):
-            lr = get_learning_rate((1, fileno+1), user_lr, no_train_files)
-            self.assertAlmostEqual(lr, rates_epoch_1[fileno])
-
-        rates_epoch_2 = [3, 4, 5]
-        for fileno in range(no_train_files):
-            lr = get_learning_rate((2, fileno + 1), user_lr, no_train_files)
-            self.assertAlmostEqual(lr, rates_epoch_2[fileno])
-
-    def test_get_learning_rate_other(self):
-        user_lr = print
-        no_train_files = 3
-
-        with self.assertRaises(TypeError):
-            get_learning_rate((1, 1), user_lr, no_train_files)
 
     def test_weighted_average(self):
         # metrics [A, B, C]

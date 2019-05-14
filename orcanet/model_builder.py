@@ -113,7 +113,11 @@ class ModelBuilder:
                                   self.head_arch, self.head_arch_args)
 
         elif self.body_arch == "multi":
-            # Build an identical network up to flatten for all inputs,
+            # TODO flatten layer has to be added to each individual network
+            #  before concatenating. Maybe add a multi option in the attach head
+            #  functions?
+            """
+            # Build networks with an identical body,
             # then concatenate and add head layers
             builder = BlockBuilder(self.body_args, self.head_args)
             mid_layers, input_layers = [], []
@@ -128,11 +132,13 @@ class ModelBuilder:
                 mid_layers.append(model.outputs[0])
             x = Concatenate()(mid_layers)
             output_layer = builder.attach_output_layers(x, self.head_arch,
-                                                        self.head_arch_args)
+                                                        **self.head_arch_args)
             model = Model(input_layers, output_layer)
+            """
+            raise NotImplementedError
 
         elif self.body_arch == "merge":
-            # Concatenate multiple models to a single big one.
+            # Concatenate multiple models with a flatten layer to a single big one.
             # block_config is a list of paths
             model_list = []
             for path in self.body_configs:
@@ -201,7 +207,8 @@ class ModelBuilder:
         builder = BlockBuilder(body_defaults=None,
                                head_defaults=self.head_args)
         output_layer = builder.attach_output_layers(x, self.head_arch,
-                                                    self.head_arch_args)
+                                                    flatten=False,
+                                                    **self.head_arch_args)
 
         model = Model(input_layers, output_layer)
         if no_drop:

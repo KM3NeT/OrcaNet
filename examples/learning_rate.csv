@@ -1,0 +1,11 @@
+# Example for setting the learning rate with a csv file.
+#
+# Place this in the main folder of an orcanet training, then use
+# learning_rate="learning_rate.csv"
+# in the configuration to use it.
+#
+# Columns are:
+# Epoch Fileno  LR
+1   1   0.001
+2   1   0.0005
+2   3   0.0001

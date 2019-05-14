@@ -4,9 +4,7 @@
 Code for training and validating NN's, as well as evaluating them.
 """
 
-from inspect import signature
 import os
-import sys
 import h5py
 from contextlib import ExitStack
 import numpy as np
@@ -281,67 +279,6 @@ def hdf5_batch_generator(orga, files_dict, f_size=None, zero_center=False,
                 yield xs, ys
             else:
                 yield xs, ys, y_values
-
-
-def get_learning_rate(epoch, user_lr, no_train_files):
-    """
-    Get the learning rate for the current epoch and file number.
-
-    Parameters
-    ----------
-    epoch : tuple
-        Epoch and file number.
-    user_lr : float or tuple or function.
-        The user input for the lr.
-    no_train_files : int
-        How many train files there are in total.
-
-    Returns
-    -------
-    lr : float
-        The learning rate.
-
-    Raises
-    ------
-    AssertionError
-        If the type of the user_lr is not right.
-
-    """
-    error_msg = "The learning rate must be either a float, a tuple of " \
-                "two floats or a function."
-    try:
-        # Float => Constant LR
-        lr = float(user_lr)
-        return lr
-    except (ValueError, TypeError):
-        pass
-
-    try:
-        # List => Exponentially decaying LR
-        length = len(user_lr)
-        lr_init = float(user_lr[0])
-        lr_decay = float(user_lr[1])
-        if length != 2:
-            raise TypeError("{} (Your tuple has length {})".format(error_msg,
-                                                                   len(user_lr)))
-
-        lr = lr_init * (1 - lr_decay) ** ((epoch[1]-1) + (epoch[0]-1) * no_train_files)
-        return lr
-    except (ValueError, TypeError):
-        pass
-
-    try:
-        # Callable => User defined function
-        n_params = len(signature(user_lr).parameters)
-        if n_params != 2:
-            raise TypeError("A custom learning rate function must have two "
-                            "input parameters: The epoch and the file number. "
-                            "(yours has {})".format(n_params))
-        lr = user_lr(epoch[0], epoch[1])
-        return lr
-    except (ValueError, TypeError):
-        raise TypeError("{} (You gave {} of type {}) ".format(
-            error_msg, user_lr, type(user_lr)))
 
 
 def save_actv_wghts_plot(orga, model, epoch, samples=1):
