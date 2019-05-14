@@ -599,6 +599,46 @@ def orca_learning_rates(name, total_file_no):
                 lr_temp = lr_temp * (1 - float(lr_decay))
 
             return lr_temp
+
+    elif name == "triple_decay_weaker":
+        def learning_rate(n_epoch, n_file):
+            """
+            Function that calculates the current learning rate based on
+            the number of already trained epochs.
+
+            Learning rate schedule: lr_decay = 2% for lr > 0.0003
+                                    lr_decay = 1% for 0.0003 >= lr > 0.0001
+                                    lr_decay = 0.5% for 0.0001 >= lr
+
+            Parameters
+            ----------
+            n_epoch : int
+                The number of the current epoch which is used to calculate
+                the new learning rate.
+            n_file : int
+                The number of the current filenumber which is used to
+                calculate the new learning rate.
+
+            Returns
+            -------
+            lr_temp : float
+                Calculated learning rate for this epoch.
+
+            """
+            n_lr_decays = (n_epoch - 1) * total_file_no + (n_file - 1)
+            lr_temp = 0.003  # * n_gpu TODO think about multi gpu lr
+
+            for i in range(n_lr_decays):
+                if lr_temp > 0.0003:
+                    lr_decay = 0.02  # standard for regression: 0.07, standard for PID: 0.02
+                elif 0.0003 >= lr_temp > 0.0001:
+                    lr_decay = 0.01  # standard for regression: 0.04, standard for PID: 0.01
+                else:
+                    lr_decay = 0.005  # standard for regression: 0.02, standard for PID: 0.005
+                lr_temp = lr_temp * (1 - float(lr_decay))
+
+            return lr_temp
+
     else:
         raise NameError("Unknown orca learning rate name", name)
 

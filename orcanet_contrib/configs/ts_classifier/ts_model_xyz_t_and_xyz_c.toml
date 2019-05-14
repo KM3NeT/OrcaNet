@@ -1,0 +1,45 @@
+# Info for building an OrcaNet model.
+
+[body]
+architecture = "single"
+
+# default values for the trunk layers of the network:
+type = "conv_block"
+conv_dim = 3
+kernel_size = 3
+dropout = 0.1
+activation = 'relu'
+batchnorm=true
+
+# config of every layer block, will overwrite the default values above
+blocks = [
+          {filters=64},
+          {filters=64},
+          {filters=64},
+          {filters=64},
+          {filters=64},
+          {filters=64, pool_size=[2, 2, 2]},
+          {filters=128},
+          {filters=128},
+          {filters=128},
+          {filters=128, pool_size=[2, 2, 2]},
+          ]
+
+# ----------------------------------------------------------------------
+[head]
+architecture = "categorical"
+dropout = 0.1
+architecture_args = {output_name="ts_output", categories=2}
+
+# ----------------------------------------------------------------------
+[compile]
+optimizer = "adam"
+
+[compile.losses]
+ts_output = {function="categorical_crossentropy", metrics=['acc']}
+
+# ----------------------------------------------------------------------
+[orca_modifiers]
+sample_modifier = 'xyz-t_and_xyz-c_single_input'
+label_modifier = 'ts_classifier'
+dataset_modifier = 'ts_classifier'

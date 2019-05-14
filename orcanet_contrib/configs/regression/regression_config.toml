@@ -8,4 +8,5 @@ zero_center_folder = "/home/saturn/capn/mppi033h/Data/zero_center_folder/"
 train_logger_display = 250
 train_logger_flush = -1
 verbose_train = 1
+verbose_val = 1
 validate_interval = 2
