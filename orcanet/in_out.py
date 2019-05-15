@@ -768,12 +768,12 @@ class IOHandler(object):
             lr_table = np.genfromtxt(lr_file)
             if not lr_table.shape[1] == 3:
                 raise ValueError("Invalid lr.csv format")
-            lr_table = [[lrt[0:2].tolist(), lrt[2]] for lrt in lr_table]
+            lr_table = [[tuple(lrt[0:2]), lrt[2]] for lrt in lr_table]
             lr_table.sort()
 
             lr = None
             for line_no, table_epoch in enumerate(lr_table):
-                if table_epoch[0] > epoch:
+                if table_epoch[0] > tuple(epoch):
                     break
                 else:
                     lr = table_epoch[1]

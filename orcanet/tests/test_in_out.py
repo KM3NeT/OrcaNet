@@ -561,16 +561,16 @@ class TestIOHandlerLR(TestCase):
             f.write(csv_content)
 
         with self.assertRaises(ValueError):
-            self.get_learning_rate([1, 1])
+            self.get_learning_rate((1, 1))
 
         tests = [
-            {"inp": [1, 2], "target": 0.1},
-            {"inp": [1, 3], "target": 0.2},
+            {"inp": (1, 2), "target": 0.1},
+            {"inp": (1, 3), "target": 0.2},
             {"inp": [1, 10], "target": 0.2},
-            {"inp": [2, 1], "target": 0.2},
-            {"inp": [2, 2], "target": 0.3},
-            {"inp": [2, 3], "target": 0.3},
-            {"inp": [25, 33], "target": 0.3},
+            {"inp": (2, 1), "target": 0.2},
+            {"inp": (2, 2), "target": 0.3},
+            {"inp": (2, 3), "target": 0.3},
+            {"inp": (25, 33), "target": 0.3},
         ]
         for test in tests:
             self.assertEqual(
