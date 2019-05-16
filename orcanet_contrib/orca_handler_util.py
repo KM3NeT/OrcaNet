@@ -103,7 +103,7 @@ def orca_sample_modifiers(name):
             # Transpose dimensions
             xs_layer = dict()
             keys = list(xs_files.keys())
-            xs_layer[keys[0]] = np.transpose(xs_files, xyzt_permute[name])
+            xs_layer[keys[0]] = np.transpose(xs_files[keys[0]], xyzt_permute[name])
             return xs_layer
         sample_modifier = swap_columns
 

@@ -128,7 +128,7 @@ def plot_curves(train_data, val_data=None,
 
         train_plot = plt.plot(
             epoch, y_data, color=color, ls='-',
-            zorder=3, label=train_label, lw=0.6, alpha=0.5)
+            zorder=3, label=train_label, lw=0.5, alpha=0.5)
         train_color = train_plot[0].get_color()
     else:
         train_color = color
@@ -137,7 +137,7 @@ def plot_curves(train_data, val_data=None,
         val_data_clean = skip_nans(val_data)
         # val plot always has the same color as the train plot
         plt.plot(val_data_clean[0], val_data_clean[1], color=train_color,
-                 marker='o', zorder=3, label=val_label)
+                 marker='o', zorder=3, lw=0.5, markersize=3, label=val_label)
 
 
 def skip_nans(data):

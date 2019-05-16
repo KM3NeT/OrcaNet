@@ -1,7 +1,8 @@
 Unreleased changes
 ------------------
 
-* 
+* Changed plot_history default line width and marker size.
+* Bugfix for swap_columns sample_modifier in orca_handler_util
 
 Version 0
 ---------
