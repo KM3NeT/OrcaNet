@@ -3,6 +3,7 @@ Unreleased changes
 
 * Changed plot_history default line width and marker size.
 * Bugfix for swap_columns sample_modifier in orca_handler_util
+* Fixed filter_tf_garbage option. The tf CPP_MIN_LOG_LEVEl variable should now be set when instantiating the Organizer.
 
 Version 0
 ---------

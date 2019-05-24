@@ -59,7 +59,7 @@ def orca_train(output_folder, list_file, config_file, model_file,
 
     """
     # Set up the Organizer with the input data
-    orga = Organizer(output_folder, list_file, config_file)
+    orga = Organizer(output_folder, list_file, config_file, tf_log_level=1)
 
     # Load in the orga sample-, label-, and dataset-modifiers, as well as
     # the custom objects

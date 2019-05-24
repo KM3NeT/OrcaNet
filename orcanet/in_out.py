@@ -1099,7 +1099,7 @@ class HistoryHandler:
 
             line_state = {"epoch": line["Epoch"],
                           "is_trained": is_trained,
-                          "is_validated": is_val,}
+                          "is_validated": is_val, }
             state_dicts.append(line_state)
 
         return state_dicts

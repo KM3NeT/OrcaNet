@@ -188,7 +188,7 @@ class SummaryLogger:
         ----------
         epoch_float : float
             The current epoch and fileno as a float.
-        lr : float
+        lr : float/str
             The current learning rate of the model.
         history_train : dict
             Dict containing the history of the training, averaged over files.
@@ -482,7 +482,7 @@ class BatchLogger(ks.callbacks.Callback):
 
     def _write_head(self):
         """ write column names for all losses / metrics """
-        column_names = ['Batch','Batch_float']
+        column_names = ['Batch', 'Batch_float']
         for i, metric in enumerate(self.model.metrics_names):
             column_names.append(metric)
         self._logger = TrainfileLogger(self.file, column_names)

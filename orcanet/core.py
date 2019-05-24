@@ -35,8 +35,7 @@ class Organizer:
         during training.
 
     """
-
-    def __init__(self, output_folder, list_file=None, config_file=None):
+    def __init__(self, output_folder, list_file=None, config_file=None, tf_log_level=None):
         """
         Set the attributes of the Configuration object.
 
@@ -56,8 +55,17 @@ class Organizer:
         config_file : str or None
             Path to a toml config file with settings that are used instead of
             the default ones.
+        tf_log_level : int/str
+            Sets the TensorFlow CPP_MIN_LOG_LEVEL environment variable.
+            0 = all messages are logged (default behavior).
+            1 = INFO messages are not printed.
+            2 = INFO and WARNING messages are not printed.
+            3 = INFO, WARNING, and ERROR messages are not printed.
 
         """
+        if tf_log_level is not None:
+            os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(tf_log_level)
+
         self.cfg = Configuration(output_folder, list_file, config_file)
         self.io = IOHandler(self.cfg)
         self.history = HistoryHandler(output_folder)
@@ -275,7 +283,7 @@ class Organizer:
 
         Returns
         -------
-        pred_filename : list
+        pred_filename : List
             List to the paths of all created prediction file.
             If concatenate = True, the list only contains the
             path to the concatenated prediction file.
@@ -317,7 +325,8 @@ class Organizer:
             else:
                 # omit directories if there are any in the concatenated folder
                 fname_conc_file_list = list(file for file in os.listdir(concatenated_folder)
-                                        if os.path.isfile(os.path.join(concatenated_folder, file)))
+                                            if os.path.isfile(os.path.join(concatenated_folder,
+                                                                           file)))
                 pred_filepaths = [concatenated_folder + '/' + fname_conc_file_list[0]]
 
         return pred_filepaths
@@ -435,9 +444,6 @@ class Organizer:
 
     def _set_up(self, model, logging=False):
         """ Necessary setup for training, validating and predicting. """
-        if self.cfg.filter_out_tf_garbage:
-            os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
-
         if self.cfg.get_list_file() is None:
             raise ValueError("No files specified. You need to load a toml "
                              "list file with your files before training")
@@ -483,9 +489,6 @@ class Configuration(object):
         in the resulting h5 file. If none, every output layer will get one
         dataset each for both the label and the prediction, and one dataset
         containing the mc_info from the validation files.
-    filter_out_tf_garbage : bool
-        If true, surpresses the tensorflow info logs which usually spam
-        the terminal.
     key_samples : str
         The name of the datagroup in the h5 input files which contains
         the samples for the network.
@@ -592,7 +595,6 @@ class Configuration(object):
         self.verbose_val = 0
 
         self.n_events = None
-        self.filter_out_tf_garbage = True
         self.max_queue_size = 10
         self.train_logger_display = 100
         self.train_logger_flush = -1

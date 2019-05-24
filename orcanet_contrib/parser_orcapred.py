@@ -53,7 +53,7 @@ def orca_pred(output_folder, list_file, config_file, model_file):
 
     """
     # Set up the Organizer with the input data
-    orga = Organizer(output_folder, list_file, config_file)
+    orga = Organizer(output_folder, list_file, config_file, tf_log_level=1)
 
     # When predicting with a orga model, the right modifiers and custom
     # objects need to be given
