@@ -2,7 +2,7 @@
 Use orga.predict with a parser.
 
 Usage:
-    parser_orcapred.py FOLDER LIST CONFIG MODEL
+    parser_orcapred.py FOLDER LIST CONFIG MODEL [--epoch EPOCH] [--fileno FILENO]
     parser_orcapred.py (-h | --help)
 
 Arguments:
@@ -18,7 +18,9 @@ Arguments:
             An example can be found in examples/model_file.toml.
 
 Options:
-    -h --help                       Show this screen.
+    -h --help        Show this screen.
+    --epoch=EPOCH    Use model of given epoch. [default: None]
+    --fileno=FILENO  Use model of given fileno. [default: None]
 
 """
 from matplotlib import use
@@ -32,9 +34,12 @@ from orcanet_contrib.eval_nn import make_performance_plots
 from orcanet_contrib.orca_handler_util import update_objects
 
 
-def orca_pred(output_folder, list_file, config_file, model_file):
+def orca_pred(output_folder, list_file, config_file, model_file,
+              epoch=None, fileno=None):
     """
     Run orga.predict with predefined ModelBuilder networks using a parser.
+
+    Per default, the most recent saved model will be loaded.
 
     Parameters
     ----------
@@ -50,6 +55,10 @@ def orca_pred(output_folder, list_file, config_file, model_file):
     model_file : str
         Path to a file with parameters to build a model of a predefined
         architecture with OrcaNet.
+    epoch : int, optional
+        The epoch of the saved model to predict with.
+    fileno : int, optional
+        The filenumber of the saved model to predict with.
 
     """
     # Set up the Organizer with the input data
@@ -61,7 +70,8 @@ def orca_pred(output_folder, list_file, config_file, model_file):
 
     # Per default, a prediction will be done for the model with the
     # highest epoch and filenumber.
-    pred_filepath_conc = orga.predict(epoch=-1, fileno=-1, concatenate=True)[0]
+    pred_filepath_conc = orga.predict(epoch=epoch, fileno=fileno,
+                                      concatenate=True)[0]
 
     # make performance plots
     plots_folder = orga.io.get_subfolder(name='plots')
@@ -77,11 +87,22 @@ def orca_pred(output_folder, list_file, config_file, model_file):
 def main():
     """ Run the orca_pred function with a parser. """
     args = docopt(__doc__)
-    output_folder = args['FOLDER']
-    list_file = args['LIST']
-    config_file = args['CONFIG']
-    model_file = args['MODEL']
-    orca_pred(output_folder, list_file, config_file, model_file)
+    if args["--epoch"] == "None":
+        epoch = None
+    else:
+        epoch = args["--epoch"]
+
+    if args["--fileno"] == "None":
+        fileno = None
+    else:
+        fileno = args["--fileno"]
+
+    orca_pred(output_folder=args['FOLDER'],
+              list_file=args['LIST'],
+              config_file=args['CONFIG'],
+              model_file=args['MODEL'],
+              epoch=epoch,
+              fileno=fileno)
 
 
 if __name__ == '__main__':

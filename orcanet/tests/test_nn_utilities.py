@@ -50,7 +50,7 @@ class TetstZeroCenter(TestCase):
         make_dummy_data(self.train_inp_B[0], self.train_inp_B[1], self.shape, mode=2)
 
         orga = Organizer(self.output_folder, config_file=config_file)
-        orga.cfg._train_files = self.train_pathes
+        orga.cfg._files_dict["train"] = self.train_pathes
         orga.cfg._list_file = "test.toml"
         orga.cfg.zero_center_folder = self.temp_dir
 

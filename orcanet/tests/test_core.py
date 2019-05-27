@@ -58,7 +58,7 @@ class TestOrganizer(TestCase):
         self.assertEqual(saved_model.to_json(), loaded_model.to_json())
 
         # model given = ok
-        target_model = "the model is simply handed through"
+        target_model = 1.2
 
         model = self.orga._get_model(target_model, logging=False)
         self.assertEqual(target_model, model)
@@ -198,6 +198,8 @@ class TestConfiguration(TestCase):
             cfg.get_files("train")
         with self.assertRaises(AttributeError):
             cfg.get_files("val")
+        with self.assertRaises(AttributeError):
+            cfg.get_files("inference")
         with self.assertRaises(NameError):
             cfg.get_files("schmu")
 
@@ -226,10 +228,12 @@ class TestConfiguration(TestCase):
             '[input_A]',
             'train_files = ["input_A_train_1.h5", "input_A_train_2.h5"]',
             'validation_files = ["input_A_val_1.h5"]',
+            'inference_files = ["input_A_inf_1.h5"]',
 
             '[input_B]',
             'train_files = ["input_B_train_1.h5", "input_B_train_2.h5",]',
             'validation_files = ["input_B_val_1.h5",]',
+            'inference_files = ["input_B_inf_1.h5",]',
         ]
         file_name = self.temp_dir + "/test_config.toml"
 
@@ -261,21 +265,20 @@ class TestConfiguration(TestCase):
             with open(file_name, "w") as f:
                 for line in content:
                     f.write(line + "\n")
-            with self.assertRaises(ValueError):
+            with self.assertRaises(NameError):
                 cfg.import_list_file(file_name)
         finally:
             os.remove(file_name)
 
     def test_load_list_file_no_train_files(self):
         cfg = Configuration("./", None, None)
-
+        val_files = {"input_A": ("input_A_val_1.h5", ),
+                     "input_B": ("input_B_val_1.h5", )}
         content = [
             '[input_A]',
-            'schmu=1',
             'validation_files = ["input_A_val_1.h5"]',
 
             '[input_B]',
-            'train_files = ["input_B_train_1.h5", "input_B_train_2.h5",]',
             'validation_files = ["input_B_val_1.h5",]',
         ]
         file_name = self.temp_dir + "/test_config.toml"
@@ -284,8 +287,14 @@ class TestConfiguration(TestCase):
             with open(file_name, "w") as f:
                 for line in content:
                     f.write(line + "\n")
-            with self.assertRaises(NameError):
-                cfg.import_list_file(file_name)
+            cfg.import_list_file(file_name)
+            with self.assertRaises(AttributeError):
+                cfg.get_files("train")
+            with self.assertRaises(AttributeError):
+                cfg.get_files("inference")
+
+            self.assertEqual(val_files, cfg.get_files("val"))
+
         finally:
             os.remove(file_name)
 

@@ -12,11 +12,19 @@ from matplotlib.backends.backend_pdf import PdfPages
 from orcanet.utilities.nn_utilities import get_layer_output
 
 
-def plot_history(
-        train_data, val_data=None,
-        color=None, title=None, x_label="Epoch", y_label=None, grid=True,
-        legend=True, train_label="training", val_label="validation",
-        x_lims=None, y_lims="auto", x_ticks=None):
+def plot_history(train_data,
+                 val_data=None,
+                 color=None,
+                 title=None,
+                 x_label="Epoch",
+                 y_label=None,
+                 grid=True,
+                 legend=True,
+                 train_label="training",
+                 val_label="validation",
+                 x_lims=None,
+                 y_lims="auto",
+                 x_ticks=None):
     """
     Plot a training and optionally a validation line in a single plot.
 

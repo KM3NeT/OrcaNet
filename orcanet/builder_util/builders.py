@@ -1,5 +1,5 @@
 from keras.models import Model
-from keras.layers import Dense, Flatten, Concatenate, Lambda, GlobalAveragePooling2D
+from keras.layers import Dense, Flatten, Concatenate, Lambda, GlobalAveragePooling2D, Dropout
 from keras import backend as K
 import inspect
 
@@ -127,6 +127,8 @@ class BlockBuilder:
         """
         Append the head dense layers to the network.
 
+        The output arhcitectures are listed below.
+
         Parameters
         ----------
         layer : keras layer
@@ -134,7 +136,8 @@ class BlockBuilder:
         head_arch : str
             Specifies the architecture of the head layers.
         head_arch_args : dict
-            Required arguments for the given output_arch.
+            Arguments for the given output_arch. Given as the output_args
+            dict in the model toml file.
 
         Returns
         -------
@@ -181,11 +184,16 @@ class BlockBuilder:
         return [out, ]
 
     @staticmethod
-    def attach_output_gpool(layer, categories, output_name):
+    def attach_output_gpool(layer, categories, output_name, dropout=None):
         """ Global Pooling + 1 dense layer (like in resnet). """
         x = GlobalAveragePooling2D()(layer)
-        out = Dense(units=categories, activation='softmax',
-                    kernel_initializer='he_normal', name=output_name)(x)
+        if dropout is not None:
+            x = Dropout(dropout)(x)
+
+        out = Dense(units=categories,
+                    activation='softmax',
+                    kernel_initializer='he_normal',
+                    name=output_name)(x)
         return [out, ]
 
     def attach_output_reg_err(self, layer, output_names, flatten=True):

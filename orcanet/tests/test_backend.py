@@ -1,6 +1,7 @@
 from unittest import TestCase
 from unittest.mock import MagicMock
 import os
+import shutil
 import h5py
 import numpy as np
 from keras.models import Model
@@ -23,13 +24,13 @@ class TestBatchGenerator(TestCase):
         cls.n_bins = {'input_A': (2, 3), 'input_B': (2, 3)}
         cls.train_sizes = [3, 5]
         cls.train_A_file_1 = {
-            "path": cls.temp_dir + "/input_A_train_1.h5",
+            "path": os.path.join(cls.temp_dir, "input_A_train_1.h5"),
             "shape": cls.n_bins["input_A"],
             "size": cls.train_sizes[0],
         }
 
         cls.train_B_file_1 = {
-            "path": cls.temp_dir + "/input_B_train_1.h5",
+            "path":  os.path.join(cls.temp_dir, "input_B_train_1.h5"),
             "shape": cls.n_bins["input_B"],
             "size": cls.train_sizes[0],
         }
@@ -56,9 +57,7 @@ class TestBatchGenerator(TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        os.remove(cls.train_A_file_1["path"])
-        os.remove(cls.train_B_file_1["path"])
-        os.rmdir(cls.temp_dir)
+        shutil.rmtree(cls.temp_dir)
 
     def test_batch(self):
         filepaths = self.filepaths_file_1
@@ -289,23 +288,26 @@ class TestFunctions(TestCase):
 class TestTrainValidatePredict(TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.temp_dir = os.path.join(os.path.dirname(__file__), ".temp",
-                                    "test_backend")
-        cls.pred_dir = os.path.join(os.path.dirname(__file__), ".temp",
-                                    "predictions")
+        cls.temp_dir = os.path.join(os.path.dirname(__file__),
+                                    ".temp", "test_backend")
+        cls.pred_dir = os.path.join(cls.temp_dir, "predictions")
+
         os.mkdir(cls.temp_dir)
         os.mkdir(cls.pred_dir)
-        cls.pred_filepath = cls.pred_dir + '/pred_model_epoch_1_file_3_on_listfilename_val_file_1.h5'
+
+        cls.pred_filepath = os.path.join(
+            cls.pred_dir,
+            'pred_model_epoch_1_file_3_on_listfilename_val_file_1.h5')
         cls.file_sizes = [500, ]
         # make some dummy data
         cls.inp_A_file = {
-            "path": cls.temp_dir + "/input_A_file.h5",
+            "path": os.path.join(cls.temp_dir, "input_A_file.h5"),
             "shape": (2, 3),
             "size": cls.file_sizes[0],
         }
 
         cls.inp_B_file = {
-            "path": cls.temp_dir + "/input_B_file.h5",
+            "path": os.path.join(cls.temp_dir, "input_B_file.h5"),
             "shape": (3, 4),
             "size": cls.file_sizes[0],
         }
@@ -329,7 +331,7 @@ class TestTrainValidatePredict(TestCase):
         cls.train_B_file_1_ctnt = save_dummy_h5py(**cls.inp_B_file, mode="half")
 
     def setUp(self):
-        self.orga = Organizer("./.temp")
+        self.orga = Organizer(self.temp_dir)
         self.orga.cfg.batchsize = 9
 
         self.orga.io.get_local_files = MagicMock(return_value=self.filepaths)
@@ -343,10 +345,7 @@ class TestTrainValidatePredict(TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        os.remove(cls.inp_A_file["path"])
-        os.remove(cls.inp_B_file["path"])
-        os.rmdir(cls.temp_dir)
-        os.rmdir(cls.pred_dir)
+        shutil.rmtree(cls.temp_dir)
 
     def test_train(self):
         epoch = (1, 1)
@@ -383,7 +382,7 @@ class TestTrainValidatePredict(TestCase):
         # dummy values
         epoch, fileno = 1, 3
         # mock get_latest_prediction_file_no
-        self.orga.io.get_latest_prediction_file_no = MagicMock(return_value=None)
+        # self.orga.io.get_latest_prediction_file_no = MagicMock(return_value=None)
 
         try:
             make_model_prediction(self.orga, self.model, epoch, fileno)

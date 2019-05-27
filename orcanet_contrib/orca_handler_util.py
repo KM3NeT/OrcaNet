@@ -326,6 +326,9 @@ def orca_label_modifiers(name):
         def label_modifier(y_values):
             # [1, 0] for 1 muon
             # [0, 1] for 2+ muons
+            if y_values is None or 'n_muons_10_mchits' not in y_values.dtype.names:
+                return None
+
             n_muons = y_values['n_muons_10_mchits']
             batchsize = y_values.shape[0]
 
@@ -507,16 +510,21 @@ def orca_dataset_modifiers(name):
         # Muon multiplicity categorizer
         # convert the output into a struct. array, with dtype names
         # e.g. n_muon_cat_1, n_muon_cat_2, ...
+        # works for any number of categories
         def dataset_modifier(mc_info, y_true, y_pred):
             # y_pred and y_true are dicts with keys for each output
             # we only have 1 output here (n_muon_cat)
-            y_pred = y_pred['n_muon_cat']
-            y_true = y_true['n_muon_cat']
-
             datasets = dict()
-            datasets['mc_info'] = mc_info  # is already a structured array
+
+            y_pred = y_pred['n_muon_cat']
             datasets["pred"] = convert_to_rec_array(y_pred, "n_muon_cat")
-            datasets["true"] = convert_to_rec_array(y_true, "n_muon_cat")
+
+            if y_true is not None:
+                y_true = y_true['n_muon_cat']
+                datasets["true"] = convert_to_rec_array(y_true, "n_muon_cat")
+
+            if mc_info is not None:
+                datasets['mc_info'] = mc_info  # is already a structured array
 
             return datasets
 

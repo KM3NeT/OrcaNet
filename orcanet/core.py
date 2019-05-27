@@ -13,9 +13,10 @@ import keras.backend as kb
 import time
 from datetime import timedelta
 
-from orcanet.backend import make_model_prediction, save_actv_wghts_plot, train_model, validate_model
+from orcanet.backend import make_model_prediction, save_actv_wghts_plot, train_model, validate_model, h5_inference
 from orcanet.utilities.visualization import update_summary_plot
-from orcanet.in_out import IOHandler, HistoryHandler
+from orcanet.in_out import IOHandler
+from orcanet.history import HistoryHandler
 from orcanet.utilities.nn_utilities import load_zero_center_data, get_auto_label_modifier
 from orcanet.logging import log_start_training, SummaryLogger, log_start_validation
 
@@ -48,11 +49,11 @@ class Organizer:
             Name of the folder of this model in which everything will be saved,
             e.g., the summary.txt log file is located in here.
             Will be used to load saved files or to save new ones.
-        list_file : str or None
+        list_file : str, optional
             Path to a toml list file with pathes to all the h5 files that should
             be used for training and validation.
             Will be used to extract of samples or labels.
-        config_file : str or None
+        config_file : str, optional
             Path to a toml config file with settings that are used instead of
             the default ones.
         tf_log_level : int/str
@@ -89,12 +90,13 @@ class Organizer:
 
         Parameters
         ----------
-        model : ks.models.Model or None
-            Compiled keras model to use for training and validation. Required
-            for the first epoch (the start of training).
-            Afterwards, if model is None, the most recent model will be
+        model : ks.models.Model or str, optional
+            Compiled keras model to use for training. Required for the first
+            epoch (the start of training).
+            Can also be the path to a saved keras model, which will be laoded.
+            If model is None, the most recent saved model will be
             loaded automatically to continue the training.
-        epochs : int or None
+        epochs : int, optional
             How many epochs should be trained by running this function.
             None for infinite.
 
@@ -113,7 +115,7 @@ class Organizer:
         if latest_epoch is not None:
             state = self.history.get_state()[-1]
             if state["is_validated"] is False and self._val_is_due(latest_epoch):
-                    self.validate()
+                self.validate()
 
         next_epoch = self.io.get_next_epoch(latest_epoch)
         n_train_files = self.io.get_no_of_files("train")
@@ -141,10 +143,11 @@ class Organizer:
 
         Parameters
         ----------
-        model : ks.models.Model or None
+        model : ks.models.Model or str, optional
             Compiled keras model to use for training. Required for the first
             epoch (the start of training).
-            Afterwards, if model is None, the most recent model will be
+            Can also be the path to a saved keras model, which will be laoded.
+            If model is None, the most recent saved model will be
             loaded automatically to continue the training.
 
         Returns
@@ -261,46 +264,43 @@ class Organizer:
 
         return history
 
-    def predict(self, epoch=-1, fileno=-1, concatenate=False):
+    def predict(self, epoch=None, fileno=None, concatenate=False):
         """
         Make a prediction if it does not exist yet, and return its filepath.
 
-        Load a model, let it predict on all samples of the validation set
+        Load the model with the lowest validation loss, let it predict on
+        all samples of the validation set
         in the toml list, and save this prediction together with all the
         mc_info as a h5 file in the predictions subfolder.
 
-        Setting epoch, fileno = -1, -1 will load the most recent epoch
-        found in the main folder.
-
         Parameters
         ----------
-        epoch : int
-            The epoch of the model to load for prediction
-        fileno : int
-            The file number of the model to load for prediction.
+        epoch : int, optional
+            Epoch of a model to load.
+        fileno : int, optional
+            File number of a model to load.
         concatenate : bool
             Whether the prediction files should also be concatenated.
 
         Returns
         -------
         pred_filename : List
-            List to the paths of all created prediction file.
-            If concatenate = True, the list only contains the
+            List to the paths of all created prediction files.
+            If concatenate = True, the list always only contains the
             path to the concatenated prediction file.
 
         """
-        if fileno == -1 and epoch == -1:
-            latest_epoch = self.io.get_latest_epoch()
-            if latest_epoch is None:
-                raise FileNotFoundError("Can not look up most recent model: "
-                                        "No models found for {}".format(self.cfg.output_folder))
-            epoch, fileno = latest_epoch
+        if fileno is None and epoch is None:
+            epoch, fileno = self.history.get_best_epoch_fileno()
             print("Automatically set epoch to epoch {} file {}.".format(epoch, fileno))
+        elif fileno is None or epoch is None:
+            raise ValueError(
+                "Either both or none of epoch and fileno must be None")
 
         is_pred_done = self._check_if_pred_already_done(epoch, fileno)
         if is_pred_done:
             print("Prediction has already been done.")
-            pred_filepaths = self.io.get_pred_files_list()
+            pred_filepaths = self.io.get_pred_files_list(epoch, fileno)
 
         else:
             model = self.load_saved_model(epoch, fileno, logging=False)
@@ -312,7 +312,7 @@ class Organizer:
             print('Finished predicting on all validation files.')
             print("Elapsed time: {}\n".format(timedelta(seconds=elapsed_s)))
 
-            pred_filepaths = self.io.get_pred_files_list()
+            pred_filepaths = self.io.get_pred_files_list(epoch, fileno)
 
         # concatenate all prediction files if wished
         concatenated_folder = self.io.get_subfolder("predictions") + '/concatenated'
@@ -331,6 +331,62 @@ class Organizer:
 
         return pred_filepaths
 
+    def inference(self, epoch=None, fileno=None):
+        """
+        Make an inference and return the filepaths.
+
+        Load the model with the lowest validation loss, let
+        it predict on all samples of the inference set
+        in the toml list, and save this prediction as a h5 file in the
+        predictions subfolder. Mc_info will only be added if it is in
+        the input file, so this can be used on un-labelled data as well.
+
+        Parameters
+        ----------
+        epoch : int, optional
+            Epoch of a model to load.
+        fileno : int, optional
+            File number of a model to load.
+
+        Returns
+        -------
+        filenames : list
+            List to the paths of all created output files.
+
+        """
+        if fileno is None and epoch is None:
+            epoch, fileno = self.history.get_best_epoch_fileno()
+            print("Automatically set epoch to epoch {} file {}.".format(epoch, fileno))
+        elif fileno is None or epoch is None:
+            raise ValueError(
+                "Either both or none of epoch and fileno must be None")
+
+        model = self.load_saved_model(epoch, fileno, logging=False)
+        self._set_up(model)
+
+        filenames = []
+        for f_number, files_dict in enumerate(self.io.yield_files("inference"), 1):
+            # output filename is based on name of file in first input
+            first_filename = os.path.basename(list(files_dict.values())[0])
+            output_filename = "model_epoch_{}_file_{}_on_{}".format(
+                epoch, fileno, first_filename)
+
+            output_path = os.path.join(self.io.get_subfolder("predictions"),
+                                       output_filename)
+            filenames.append(output_path)
+            if os.path.exists(output_path):
+                warnings.warn("Warning: {} exists already, skipping "
+                              "file".format(output_filename))
+                continue
+
+            start_time = time.time()
+            h5_inference(self, model, files_dict, output_path)
+            elapsed_s = int(time.time() - start_time)
+            print('Finished on file {} in {}'.format(
+                first_filename, timedelta(seconds=elapsed_s)))
+
+        return filenames
+
     def _check_if_pred_already_done(self, epoch, fileno):
         """
         Checks if the prediction has already been done before.
@@ -348,7 +404,7 @@ class Organizer:
 
         if latest_pred_file_no is None:
             pred_done = False
-        elif latest_pred_file_no == total_no_of_val_files - 1:  # val_file_nos start with 0
+        elif latest_pred_file_no == total_no_of_val_files:
             return True
         else:
             pred_done = False
@@ -419,6 +475,12 @@ class Organizer:
             if model is None:
                 raise ValueError("You need to provide a compiled keras model "
                                  "for the start of the training! (You gave None)")
+
+            elif isinstance(model, str):
+                # path to a saved model
+                self.io.print_log("Loading model from " + model, logging=logging)
+                model = load_model(model)
+
             self._save_as_json(model)
 
             try:
@@ -430,6 +492,11 @@ class Organizer:
         else:
             if model is None:
                 model = self.load_saved_model(*latest_epoch, logging=logging)
+
+            elif isinstance(model, str):
+                # path to a saved model
+                self.io.print_log("Loading model from " + model, logging=logging)
+                model = load_model(model)
 
         return model
 
@@ -445,14 +512,11 @@ class Organizer:
     def _set_up(self, model, logging=False):
         """ Necessary setup for training, validating and predicting. """
         if self.cfg.get_list_file() is None:
-            raise ValueError("No files specified. You need to load a toml "
-                             "list file with your files before training")
+            raise ValueError("No files specified. Need to load a toml "
+                             "list file with pathes to h5 files first.")
 
         if self.cfg.label_modifier is None:
             self._auto_label_modifier = get_auto_label_modifier(model)
-
-        if self.cfg.use_scratch_ssd:
-            self.io.use_local_node()
 
         if self.cfg.zero_center_folder is not None:
             self.get_xs_mean(logging)
@@ -554,7 +618,7 @@ class Configuration(object):
 
     """
     # TODO add a clober script that properly deletes models + logfiles
-    def __init__(self, output_folder, list_file, config_file):
+    def __init__(self, output_folder, list_file=None, config_file=None):
         """
         Set the attributes of the Configuration object.
 
@@ -608,8 +672,11 @@ class Configuration(object):
             self.output_folder = output_folder+"/"
 
         # Private attributes:
-        self._train_files = None
-        self._val_files = None
+        self._files_dict = {
+            "train": None,
+            "val": None,
+            "inference": None,
+        }
         self._list_file = None
 
         # Load the optionally given list and config files.
@@ -620,8 +687,7 @@ class Configuration(object):
 
     def import_list_file(self, list_file):
         """
-        Import the filepaths of the training and validation files from a toml
-        list file.
+        Import the filepaths of the h5 files from a toml list file.
 
         Parameters
         ----------
@@ -634,34 +700,47 @@ class Configuration(object):
                              "({})".format(self._list_file))
 
         file_content = toml.load(list_file)
-        train_files, validation_files = {}, {}
 
-        # no of train/val files in each input set
-        n_train, n_val = [], []
-        for input_key, input_values in file_content.items():
-            if not len(input_values.keys()) == 2:
-                raise ValueError("Wrong input format in toml list file (input {}:"
-                                 " {})".format(input_key, input_values))
-            if "train_files" not in input_values.keys():
-                raise NameError("No train files specified in toml list file")
-            if "validation_files" not in input_values.keys():
-                raise NameError("No validation files specified in toml list file")
+        name_mapping = {
+            "train_files": "train",
+            "validation_files": "val",
+            "inference_files": "inference",
+        }
 
-            train_files[input_key] = tuple(input_values["train_files"])
-            validation_files[input_key] = tuple(input_values["validation_files"])
-            n_train.append(len(train_files[input_key]))
-            n_val.append(len(validation_files[input_key]))
+        for toml_name, files_dict_name in name_mapping.items():
+            files = self._extract_filepaths(file_content, toml_name)
+            self._files_dict[files_dict_name] = files or None
 
-        if not n_train.count(n_train[0]) == len(n_train):
-            raise ValueError("The specified training inputs do not "
-                             "all have the same number of files!")
-        if not n_val.count(n_val[0]) == len(n_val):
-            raise ValueError("The specified validation inputs do not "
-                             "all have the same number of files!")
-
-        self._train_files = train_files
-        self._val_files = validation_files
         self._list_file = list_file
+
+    @staticmethod
+    def _extract_filepaths(file_content, which):
+        """
+        Get train/val/inf filepaths for different inputs from a toml readout.
+        Makes sure that all input have the same number of files.
+
+        """
+        allowed_which = ["train_files", "validation_files", "inference_files"]
+        assert which in allowed_which
+
+        files = {}
+        n_files = []
+        for input_key, input_values in file_content.items():
+            if not all([key in allowed_which
+                        for key in input_values.keys()]):
+                raise NameError("Unknown argument in toml file: Must be"
+                                " either of {}".format(allowed_which))
+
+            if which in input_values:
+                files_input = tuple(input_values[which])
+                files[input_key] = files_input
+                n_files.append(len(files_input))
+
+        if n_files and n_files.count(n_files[0]) != len(n_files):
+            raise ValueError(
+                "Input with different number of {} in toml list".format(which))
+
+        return files
 
     def update_config(self, config_file):
         """
@@ -696,7 +775,7 @@ class Configuration(object):
         Parameters
         ----------
         which : str
-            Either "train" or "val".
+            Either "train", "val" or "inference".
 
         Returns
         -------
@@ -710,16 +789,11 @@ class Configuration(object):
                     }
 
         """
-        if which == "train":
-            if self._train_files is None:
-                raise AttributeError("No train files have been specified!")
-            return self._train_files
-        elif which == "val":
-            if self._val_files is None:
-                raise AttributeError("No validation files have been specified!")
-            return self._val_files
-        else:
+        if which not in self._files_dict.keys():
             raise NameError("Unknown fileset name ", which)
+        if self._files_dict[which] is None:
+            raise AttributeError("No {} files have been specified!".format(which))
+        return self._files_dict[which]
 
     @property
     def default_values(self):

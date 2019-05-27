@@ -5,18 +5,27 @@
 # model, it will get data from this set.
 [input_A]
 
-# A list of files used during training
+# A list of files used during training.
 train_files = [
 "path/to/train_file_1_input_A.h5",
 "path/to/train_file_2_input_A.h5",
 ]
 
-# A list of files used during valdation
+# A list of files used during valdation. Per default, validation will be
+# a part of the training process, so these are required to train a model.
 validation_files = [
 "path/to/val_file_1_input_A.h5",
 ]
 
+# An optional list of files to apply trained models on. They do not need
+# to contain labels.
+inference_files = [
+"path/to/inference_file_1_input_A.h5",
+]
+
 # Another input set for a second input layer of the model.
+# Each input must have the same number of training, validation,
+# and/or inference files.
 [input_B]
 train_files = [
 "path/to/train_file_1_input_B.h5",
@@ -27,7 +36,9 @@ validation_files = [
 "path/to/val_file_1_input_B.h5",
 ]
 
-
+inference_files = [
+"path/to/inference_file_1_input_B.h5",
+]
 
 
 

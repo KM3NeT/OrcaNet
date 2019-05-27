@@ -51,8 +51,8 @@ class TestIntegration(TestCase):
 
         def make_orga():
             orga = Organizer(self.output_folder, config_file=config_file)
-            orga.cfg._train_files = self.train_pathes
-            orga.cfg._val_files = self.val_pathes
+            orga.cfg._files_dict["train"] = self.train_pathes
+            orga.cfg._files_dict["val"] = self.val_pathes
             orga.cfg._list_file = "test.toml"
             orga.cfg.zero_center_folder = self.temp_dir
             orga.cfg.label_modifier = label_modifier
@@ -76,7 +76,7 @@ class TestIntegration(TestCase):
             '_input_' + "testing_input" + '.npz'
         zero_center_used_ip_files = np.load(file)['zero_center_used_ip_files']
         self.assertTrue(np.array_equal(zero_center_used_ip_files,
-                                       orga.cfg._train_files["testing_input"]))
+                                       orga.cfg._files_dict["train"]["testing_input"]))
 
     def test_integration_multi_input_model(self):
         """
