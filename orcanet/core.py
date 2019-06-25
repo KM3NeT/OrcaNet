@@ -7,13 +7,13 @@ Core scripts for the OrcaNet package.
 import os
 import toml
 import warnings
+import time
+from datetime import timedelta
 from keras.models import load_model
 from keras.utils import plot_model
 import keras.backend as kb
-import time
-from datetime import timedelta
 
-from orcanet.backend import make_model_prediction, save_actv_wghts_plot, train_model, validate_model, h5_inference
+import orcanet.backend as backend
 from orcanet.utilities.visualization import update_summary_plot
 from orcanet.in_out import IOHandler
 from orcanet.history import HistoryHandler
@@ -36,7 +36,10 @@ class Organizer:
         during training.
 
     """
-    def __init__(self, output_folder, list_file=None, config_file=None, tf_log_level=None):
+    def __init__(self, output_folder,
+                 list_file=None,
+                 config_file=None,
+                 tf_log_level=None):
         """
         Set the attributes of the Configuration object.
 
@@ -108,13 +111,13 @@ class Organizer:
         """
         latest_epoch = self.io.get_latest_epoch()
 
-        model = self._get_model(model, logging=True)
+        model = self._get_model(model, logging=False)
         self._stored_model = model
 
         # check if the validation is missing for the latest fileno
         if latest_epoch is not None:
             state = self.history.get_state()[-1]
-            if state["is_validated"] is False and self._val_is_due(latest_epoch):
+            if state["is_validated"] is False and self.val_is_due(latest_epoch):
                 self.validate()
 
         next_epoch = self.io.get_next_epoch(latest_epoch)
@@ -126,7 +129,7 @@ class Organizer:
             for file_no in range(next_epoch[1], n_train_files + 1):
                 curr_epoch = (next_epoch[0], file_no)
                 self.train(model)
-                if self._val_is_due(curr_epoch):
+                if self.val_is_due(curr_epoch):
                     self.validate()
 
             next_epoch = (next_epoch[0] + 1, 1)
@@ -200,7 +203,7 @@ class Organizer:
                                                        input_file)))
 
         start_time = time.time()
-        history = train_model(self, model, next_epoch, batch_logger=True)
+        history = backend.train_model(self, model, next_epoch, batch_logger=True)
         elapsed_s = int(time.time() - start_time)
 
         model.save(model_path)
@@ -213,6 +216,8 @@ class Organizer:
         self.io.print_log("Saved model to: {}\n".format(model_path_local))
 
         update_summary_plot(self)
+        if self.cfg.cleanup_models:
+            self.cleanup_models()
 
         return history
 
@@ -250,7 +255,7 @@ class Organizer:
         log_start_validation(self)
 
         start_time = time.time()
-        history = validate_model(self, model)
+        history = backend.validate_model(self, model)
         elapsed_s = int(time.time() - start_time)
 
         self.io.print_log('Validation results:')
@@ -260,7 +265,12 @@ class Organizer:
         smry_logger.write_line(epoch_float, "n/a", history_val=history)
 
         update_summary_plot(self)
-        save_actv_wghts_plot(self, model, latest_epoch, samples=self.cfg.batchsize)
+        backend.save_actv_wghts_plot(self, model,
+                                     latest_epoch,
+                                     samples=self.cfg.batchsize)
+
+        if self.cfg.cleanup_models:
+            self.cleanup_models()
 
         return history
 
@@ -307,7 +317,7 @@ class Organizer:
             self._set_up(model)
 
             start_time = time.time()
-            make_model_prediction(self, model, epoch, fileno, samples=None)
+            backend.make_model_prediction(self, model, epoch, fileno)
             elapsed_s = int(time.time() - start_time)
             print('Finished predicting on all validation files.')
             print("Elapsed time: {}\n".format(timedelta(seconds=elapsed_s)))
@@ -380,12 +390,39 @@ class Organizer:
                 continue
 
             start_time = time.time()
-            h5_inference(self, model, files_dict, output_path)
+            backend.h5_inference(self, model, files_dict, output_path)
             elapsed_s = int(time.time() - start_time)
             print('Finished on file {} in {}'.format(
                 first_filename, timedelta(seconds=elapsed_s)))
 
         return filenames
+
+    def cleanup_models(self):
+        """
+        Delete all models except for the best (lowest val loss) and
+        the most recent one.
+
+        """
+        all_epochs = self.io.get_all_epochs()
+        latest_epoch = self.io.get_latest_epoch()
+        try:
+            best_epoch = self.history.get_best_epoch_fileno(metric="val_loss")
+        except ValueError:
+            # no best epoch exists
+            best_epoch = latest_epoch
+
+        assert best_epoch in all_epochs, "best_epoch not in all_epochs"
+        assert latest_epoch in all_epochs, "latest_epoch not in all_epochs"
+
+        print("\nClean-up saved models:")
+        for epoch in all_epochs:
+            model_path = self.io.get_model_path(epoch[0], epoch[1])
+            model_name = os.path.basename(model_path)
+            if epoch == best_epoch or epoch == latest_epoch:
+                print("Keeping model {}".format(model_name))
+            else:
+                print("Deleting model {}".format(model_name))
+                os.remove(model_path)
 
     def _check_if_pred_already_done(self, epoch, fileno):
         """
@@ -471,7 +508,7 @@ class Organizer:
         latest_epoch = self.io.get_latest_epoch()
 
         if latest_epoch is None:
-            # new training
+            # new training, log info about model
             if model is None:
                 raise ValueError("You need to provide a compiled keras model "
                                  "for the start of the training! (You gave None)")
@@ -481,15 +518,18 @@ class Organizer:
                 self.io.print_log("Loading model from " + model, logging=logging)
                 model = load_model(model)
 
-            self._save_as_json(model)
+            if logging:
+                self._save_as_json(model)
+                model.summary(print_fn=self.io.print_log)
 
-            try:
-                plots_folder = self.io.get_subfolder("plots", create=True)
-                plot_model(model, plots_folder + "/model_plot.png")
-            except OSError as e:
-                warnings.warn("Can not plot model: " + str(e))
+                try:
+                    plots_folder = self.io.get_subfolder("plots", create=True)
+                    plot_model(model, plots_folder + "/model_plot.png")
+                except OSError as e:
+                    warnings.warn("Can not plot model: " + str(e))
 
         else:
+            # resuming training, load model if it is not given
             if model is None:
                 model = self.load_saved_model(*latest_epoch, logging=logging)
 
@@ -521,8 +561,14 @@ class Organizer:
         if self.cfg.zero_center_folder is not None:
             self.get_xs_mean(logging)
 
-    def _val_is_due(self, epoch):
-        """ True if validation is due on given epoch according to schedule. """
+    def val_is_due(self, epoch=None):
+        """
+        True if validation is due on given epoch according to schedule.
+        Does not check if it has been done already.
+
+        """
+        if epoch is None:
+            epoch = self.io.get_latest_epoch()
         n_train_files = self.io.get_no_of_files("train")
         val_sched = (epoch[1] == n_train_files) or \
                     (self.cfg.validate_interval is not None and
@@ -545,6 +591,9 @@ class Configuration(object):
         the network.
     callback_train : keras callback or list or None
         Callback or list of callbacks to use during training.
+    cleanup_models : bool
+        If true, will only keep the best (in terms of val loss) and the most
+        recent from all saved models in order to save disk space.
     custom_objects : dict or None
         Optional dictionary mapping names (strings) to custom classes or
         functions to be considered by keras during deserialization of models.
@@ -643,6 +692,7 @@ class Configuration(object):
 
         self.zero_center_folder = None
         self.validate_interval = None
+        self.cleanup_models = False
 
         self.sample_modifier = None
         self.dataset_modifier = None

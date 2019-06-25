@@ -1,0 +1,41 @@
+Learning rate
+=============
+
+The learning rate is stored in ``organizer.cfg.learning_rate``, and is set
+to 0.001 per default.
+Depending on what type this attribute is, the learning rate schedule
+during the training will be one of the following:
+
+Float
+*****
+The learning rate will be constantly this value, for all epochs.
+
+Tuple
+*****
+A tuple (or list) of two floats: The first float gives the learning rate
+in epoch 1 file 1, and the second float gives the decrease of the
+learning rate per file.
+
+For example, if ``organizer.cfg.learning_rate`` = [0.1, 0.5] is used,
+the learning rates will be 0.1, 0.05, 0.025, 0.0125, ...
+
+Function
+********
+A custom learning rate schedule.
+The function has to have exactly two input parameters:
+The epoch and the file number (in this order).
+It must return the learning rate for this (epoch, fileno) pair.
+
+String
+******
+A custom learning rate schedule in the form of a txt document.
+It is the path to a csv file inside the output folder the organizer was initialized with.
+This file must contain 3 columns with the epoch, fileno, and the value the lr
+will be set
+to when reaching this epoch/fileno.
+
+An example can be found in orcanet/examples/learning_rate.csv:
+
+.. literalinclude:: ../examples/learning_rate.csv
+   :linenos:
+

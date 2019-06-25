@@ -10,7 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
-from orcanet.utilities.visualization import (
+from orcanet.utilities.layer_plotting import (
     plot_activations, plot_weights)
 from orcanet.logging import BatchLogger
 from orcanet.in_out import h5_get_number_of_rows

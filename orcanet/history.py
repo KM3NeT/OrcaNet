@@ -40,11 +40,6 @@ class HistoryHandler:
         kwargs
             Keyword arguments for the plot_history function.
 
-        Returns
-        -------
-        fig : matplotlib.figure.Figure
-            The plot.
-
         """
         summary_data = self.get_summary_data()
         full_train_data = self.get_train_data()
@@ -80,8 +75,7 @@ class HistoryHandler:
         if "y_label" not in kwargs:
             kwargs["y_label"] = metric_name
 
-        fig = plot_history(train_data, val_data, **kwargs)
-        return fig
+        plot_history(train_data, val_data, **kwargs)
 
     def plot_lr(self, **kwargs):
         """
@@ -110,8 +104,7 @@ class HistoryHandler:
         if "legend" not in kwargs:
             kwargs["legend"] = False
 
-        fig = plot_history(train_data=None, val_data=val_data, **kwargs)
-        return fig
+        plot_history(train_data=None, val_data=val_data, **kwargs)
 
     def get_metrics(self):
         """
@@ -156,13 +149,36 @@ class HistoryHandler:
             summary_data = summary_data.reshape(1,)
         return summary_data
 
-    def get_best_epoch_info(self, metric="val_loss"):
+    def get_best_epoch_info(self, metric="val_loss", mini=True):
         """
-        Get the line in the summary file where the given metric is smallest.
+        Get the line in the summary file where the given metric is best, i.e.
+        either minimal  or maximal.
+
+        Parameters
+        ----------
+        metric : str
+            Which metric to look up.
+        mini : bool
+            If true, look up the minimum. Else the maximum.
+
+        Raises
+        ------
+        ValueError
+            If there is no best line (e.g. no validation has been done).
+
         """
         summary_data = self.get_summary_data()
-        min_loss = np.nanmin(summary_data[metric])
-        best_index = np.where(summary_data[metric] == min_loss)[0]
+        metric_data = summary_data[metric]
+
+        if all(np.isnan(metric_data)):
+            raise ValueError("Can not find best epoch in summary.txt")
+
+        if mini:
+            opt_loss = np.nanmin(metric_data)
+        else:
+            opt_loss = np.nanmax(metric_data)
+
+        best_index = np.where(metric_data == opt_loss)[0]
         # if multiple epochs with same loss, take first
         best_index = min(best_index)
         best_line = summary_data[best_index]

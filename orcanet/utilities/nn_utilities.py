@@ -35,29 +35,6 @@ def get_auto_label_modifier(model):
     return label_modifier
 
 
-def get_inputs(model):
-    """
-    Get the names and the layers of the inputs of the model.
-
-    Parameters
-    ----------
-    model : ks.model
-        A keras model.
-
-    Returns
-    -------
-    layers :dict
-        The input layers and names.
-
-    """
-    from keras.layers import InputLayer
-    layers = {}
-    for layer in model.layers:
-        if isinstance(layer, InputLayer):
-            layers[layer.name] = layer
-    return layers
-
-
 def get_layer_output(model, samples, layer_name, mode="test"):
     """
     Get the output of an intermediate layer from a model.

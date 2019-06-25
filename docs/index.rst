@@ -15,11 +15,17 @@
 .. include:: ../Readme.rst
 
 .. toctree::
+    :hidden:
+    :titlesonly:
+
+    self
+
+.. toctree::
    :maxdepth: 2
-   :caption: Contents:
 
    intro
    input_list
+   lr
    modifiers
    full_example
    CONTRIBUTING

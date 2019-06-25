@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-TODO
+Michael's orcanet utility stuff.
+
 """
 import numpy as np
 import toml
@@ -290,56 +291,6 @@ def orca_label_modifiers(name):
             ys['bg_output'] = categorical_bg.astype(np.float32)
             return ys
 
-    elif name == "muon_multi":
-        def label_modifier(y_values):
-            # [1, 0, 0] for 1 muon
-            # [0, 1, 0] for 2 muons
-            # [0, 0, 1] for 3+ muons
-            n_muons = y_values['n_muons']
-            batchsize = y_values.shape[0]
-
-            n_muon_cat = np.zeros((batchsize, 3))
-            n_muon_cat[:, 0] = n_muons == 1
-            n_muon_cat[:, 1] = n_muons == 2
-            n_muon_cat[:, 2] = n_muons > 2
-
-            ys = dict()
-            ys['n_muon_cat'] = n_muon_cat.astype(np.float32)
-            return ys
-
-    elif name == "muon_multi_2":
-        def label_modifier(y_values):
-            # [1, 0] for 1 muon
-            # [0, 1] for 2+ muons
-            n_muons = y_values['n_muons']
-            batchsize = y_values.shape[0]
-
-            n_muon_cat = np.zeros((batchsize, 2))
-            n_muon_cat[:, 0] = n_muons == 1
-            n_muon_cat[:, 1] = n_muons > 1
-
-            ys = dict()
-            ys['n_muon_cat'] = n_muon_cat.astype(np.float32)
-            return ys
-
-    elif name == "muon_multi_two_ctg_10_mchits":
-        def label_modifier(y_values):
-            # [1, 0] for 1 muon
-            # [0, 1] for 2+ muons
-            if y_values is None or 'n_muons_10_mchits' not in y_values.dtype.names:
-                return None
-
-            n_muons = y_values['n_muons_10_mchits']
-            batchsize = y_values.shape[0]
-
-            n_muon_cat = np.zeros((batchsize, 2))
-            n_muon_cat[:, 0] = n_muons == 1
-            n_muon_cat[:, 1] = n_muons > 1
-
-            ys = dict()
-            ys['n_muon_cat'] = n_muon_cat.astype(np.float32)
-            return ys
-
     else:
         raise ValueError("Unknown output_type: " + str(name))
 
@@ -356,7 +307,27 @@ def orca_dataset_modifiers(name):
         Name of the dataset modifier that should be used.
 
     """
-    if name == 'bg_classifier':
+    if name == "struc_arr":
+        # Multi-purpose conversion to rec array
+        #
+        # Output from network: Dict with 2darrays, shapes (x, y_i)
+        # Transform this into a recarray with shape (x, y_1 + y_2 + ...) like this:
+        # y_pred = {"foo": ndarray, "bar": ndarray}
+        # --> dtypes = [foo_1, foo_2, ..., bar_1, bar_2, ... ]
+
+        def dataset_modifier(mc_info, y_true, y_pred):
+            datasets = dict()
+            datasets["pred"] = dict_to_recarray(y_pred)
+
+            if y_true is not None:
+                datasets["true"] = dict_to_recarray(y_true)
+
+            if mc_info is not None:
+                datasets['mc_info'] = mc_info  # is already a structured array
+
+            return datasets
+
+    elif name == 'bg_classifier':
         def dataset_modifier(mc_info, y_true, y_pred):
 
             # y_pred and y_true are dicts with keys for each output
@@ -506,58 +477,37 @@ def orca_dataset_modifiers(name):
 
             return datasets
 
-    elif name == 'muon_multi':
-        # Muon multiplicity categorizer
-        # convert the output into a struct. array, with dtype names
-        # e.g. n_muon_cat_1, n_muon_cat_2, ...
-        # works for any number of categories
-        def dataset_modifier(mc_info, y_true, y_pred):
-            # y_pred and y_true are dicts with keys for each output
-            # we only have 1 output here (n_muon_cat)
-            datasets = dict()
-
-            y_pred = y_pred['n_muon_cat']
-            datasets["pred"] = convert_to_rec_array(y_pred, "n_muon_cat")
-
-            if y_true is not None:
-                y_true = y_true['n_muon_cat']
-                datasets["true"] = convert_to_rec_array(y_true, "n_muon_cat")
-
-            if mc_info is not None:
-                datasets['mc_info'] = mc_info  # is already a structured array
-
-            return datasets
-
     else:
         raise ValueError('Unknown dataset modifier: ' + str(name))
 
     return dataset_modifier
 
 
-def convert_to_rec_array(ndarray, name):
+def dict_to_recarray(data_dict):
     """
-    Convert a 2d np array to a rec array with dtype names from given name.
-
-    E.g. when name is "category", dtype names will be "category_1",
-    "category_2", ...
+    Convert a dict with 2d np arrays to a 2d struc array, with column
+    names derived from the dict keys.
 
     Parameters
     ----------
-    ndarray : ndarray
-        A 2d numpy array.
-    name : str
-        Base str for the names of the dtypes.
+    data_dict : dict
+        Keys: name of the output layer.
+        Values: 2d arrays, first dimension matches
 
     Returns
     -------
     recarray : ndarray
-        The numpy rec array.
 
     """
-    rows, cols = ndarray.shape
+    column_names = []
+    for output_name, data in data_dict.items():
+        columns = data.shape[1]
+        for i in range(columns):
+            column_names.append(output_name + "_" + str(i+1))
+    names = ",".join([name for name in column_names])
 
-    names = ",".join([name+"_"+str(i) for i in range(1, cols + 1)])
-    recarray = np.core.records.fromrecords(ndarray, names=names)
+    data = np.concatenate(list(data_dict.values()), axis=1)
+    recarray = np.core.records.fromrecords(data, names=names)
     return recarray
 
 

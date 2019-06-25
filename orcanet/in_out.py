@@ -10,8 +10,6 @@ import h5py
 import numpy as np
 from inspect import signature
 
-from orcanet.utilities.nn_utilities import get_inputs
-
 
 def get_subfolder(main_folder, name=None, create=False):
     """
@@ -56,6 +54,31 @@ def get_subfolder(main_folder, name=None, create=False):
     else:
         subfolder = get(name)
     return subfolder
+
+
+def get_inputs(model):
+    """
+    Get the names and the keras layers of the inputs of the model.
+
+    Parameters
+    ----------
+    model : ks.model
+        A keras model.
+
+    Returns
+    -------
+    layers :dict
+        The input layers and names.
+
+    """
+    input_tensors = model.inputs
+    input_layers = {}
+    for layer_no, layer in enumerate(model.layers):
+        # in the case of a single input model, the layer after the input
+        # has the same input tensor as the input layer!!! (keras 2.2.4)
+        if layer.input in input_tensors and layer.name in model.input_names:
+            input_layers[layer.name] = layer
+    return input_layers
 
 
 class IOHandler(object):
@@ -295,7 +318,7 @@ class IOHandler(object):
 
         Returns
         -------
-        pred_files_list : list
+        pred_files_list : List
             List with the full filepaths of all prediction results files.
 
         """
@@ -332,7 +355,7 @@ class IOHandler(object):
 
         Returns
         -------
-        cum_number_of_rows : list
+        cum_number_of_rows : List
             List that contains the cumulative number of rows (i.e. [0,100,200,300,...] if each file has 100 rows).
 
         """

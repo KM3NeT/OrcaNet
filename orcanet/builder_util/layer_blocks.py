@@ -1,5 +1,6 @@
 from keras.layers import Input, Dense, Dropout, Activation, Convolution3D, \
-    BatchNormalization, MaxPooling3D, Convolution2D, MaxPooling2D
+    BatchNormalization, MaxPooling3D, Convolution2D, MaxPooling2D, SpatialDropout2D,\
+    SpatialDropout3D
 from keras import backend as K
 from keras.regularizers import l2
 
@@ -24,6 +25,10 @@ class ConvBlock:
         -> sizes for a 3D conv block.
     dropout : float or None
         Adds a dropout layer if the value is not None.
+        Can not be used together with sdropout.
+    sdropout : float or None
+        Adds a spatial dropout layer if the value is not None.
+        Can not be used together with dropout.
     activation : str or None
         Type of activation function that should be used. E.g. 'linear',
         'relu', 'elu', 'selu'.
@@ -42,6 +47,7 @@ class ConvBlock:
                  pool_size=None,
                  pool_padding="valid",
                  dropout=None,
+                 sdropout=None,
                  activation='relu',
                  kernel_l2_reg=None,
                  batchnorm=False,
@@ -53,18 +59,24 @@ class ConvBlock:
         self.pool_size = pool_size
         self.pool_padding = pool_padding
         self.dropout = dropout
+        self.sdropout = sdropout
         self.activation = activation
         self.kernel_l2_reg = kernel_l2_reg
         self.batchnorm = batchnorm
         self.kernel_initializer = kernel_initializer
 
     def __call__(self, inputs):
+        if self.dropout is not None and self.sdropout is not None:
+            raise ValueError("Can only use either dropout or spatial "
+                             "dropout, not both")
         if self.conv_dim == 2:
             convolution_nd = Convolution2D
             max_pooling_nd = MaxPooling2D
+            s_dropout_nd = SpatialDropout2D
         elif self.conv_dim == 3:
             convolution_nd = Convolution3D
             max_pooling_nd = MaxPooling3D
+            s_dropout_nd = SpatialDropout3D
         else:
             raise ValueError('dim must be equal to 2 or 3.')
 
@@ -96,6 +108,8 @@ class ConvBlock:
                                padding=self.pool_padding)(x)
         if self.dropout is not None:
             x = Dropout(self.dropout)(x)
+        elif self.sdropout is not None:
+            x = s_dropout_nd(self.sdropout)(x)
 
         return x
 

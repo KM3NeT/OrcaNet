@@ -77,7 +77,7 @@ class TestOrganizer(TestCase):
 
         self.orga.io.get_no_of_files = MagicMock(return_value=no_of_files)
         for epoch, target in targets.items():
-            value = self.orga._val_is_due(epoch)
+            value = self.orga.val_is_due(epoch)
             self.assertEqual(value, target)
 
     def test_check_if_pred_already_done(self):

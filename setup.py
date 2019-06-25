@@ -29,9 +29,13 @@ setup(
         'Programming Language :: Python',
     ],
 
-    entry_points={'console_scripts': ['orcatrain=orcanet_contrib.parser_orcatrain:main',
-                                      'orcapred=orcanet_contrib.parser_orcapred:main',
-                                      ]},
+    entry_points={
+        'console_scripts': [
+            'summarize=orcanet.utilities.summarize_training:main',
+            'orcatrain=orcanet_contrib.parser_orcatrain:main',
+            'orcapred=orcanet_contrib.parser_orcapred:main',
+        ]
+    },
 
 )
 
