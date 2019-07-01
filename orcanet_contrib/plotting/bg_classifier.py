@@ -7,7 +7,7 @@ Code for making plots for background classifiers (muon/random_noise/neutrinos).
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
-from orcanet_contrib.plotting.utils import get_event_selection_mask, in_nd
+from orcanet_contrib.plotting.utils import get_mc_info_and_other_datasets
 
 
 def make_prob_hists_bg_classifier(pred_file, savefolder, bg_classes=('not_neutrino', 'neutrino'),
@@ -56,18 +56,12 @@ def make_prob_hists_bg_classifier(pred_file, savefolder, bg_classes=('not_neutri
 
         pdf_plots.savefig(fig)
 
-    ptype, is_cc = pred_file['mc_info']['particle_type'], pred_file['mc_info']['is_cc']
-    if cuts is not None:
-        assert isinstance(cuts, str)
-        print('Event number before selection: ' + str(ptype.shape))
-        evt_sel_mask = get_event_selection_mask(pred_file['mc_info'], cut_name=cuts)
-        ptype, is_cc = ptype[evt_sel_mask], is_cc[evt_sel_mask]
-        print('Event number after selection: ' + str(ptype.shape))
+    dsets = get_mc_info_and_other_datasets(pred_file, 'mc_info', 'pred', cuts=cuts)
+    mc_info, pred = dsets[0], dsets[1]
+    ptype, is_cc = mc_info['particle_type'], mc_info['is_cc']
 
     for bg_class in bg_classes:
-        prob_class = pred_file['pred']['prob_' + bg_class]
-        if cuts is not None:
-            prob_class = prob_class[evt_sel_mask]
+        prob_class = pred['prob_' + bg_class]
 
         savename = 'prob_' + bg_class if savename_prefix is None else savename_prefix + '_prob_' + bg_class
         pdf_plots = PdfPages(savefolder + '/' + savename + '.pdf')
@@ -155,15 +149,15 @@ def make_prob_hists_for_class(prob_class, ptype, is_cc, axes, x_range=(0, 1)):
         axes.set_xlim(x_range)
 
 
-def make_contamination_to_neutrino_efficiency_plot(pred_file, pred_file_std_reco, dataset_modifier, savefolder):
+def make_contamination_to_neutrino_efficiency_plot(pred_file_1, pred_file_2, dataset_modifier, savefolder, cuts=None):
     """
     Makes bg classifier plots like muon contamination vs neutrino efficiency, both weighted 1 year and non weighted.
 
     Parameters
     ----------
-    pred_file : h5py.File
+    pred_file_1 : h5py.File
         H5py file instance, which stores the background classification predictions of a nn model.
-    pred_file_std_reco : h5py.File
+    pred_file_2 : h5py.File
         H5py file instance of a second reco result, typically the results of the standard reconstruction.
     dataset_modifier : str
         Specifies which dataset_modifier has been used in creating both pred files.
@@ -171,83 +165,22 @@ def make_contamination_to_neutrino_efficiency_plot(pred_file, pred_file_std_reco
         Full dirpath of the folder where all the plots of this function should be saved.
 
     """
-    mc_info, mc_info_std, pred, pred_std = select_events_that_exist_in_both_pred_files(pred_file, pred_file_std_reco)
+    mc_info_1, mc_info_2 = pred_file_1['mc_info'], pred_file_2['mc_info']
+    pred_1, pred_2 = pred_file_1['pred'], pred_file_2['pred']
+
+    if cuts is not None:
+        assert type(cuts) is tuple
+        mc_info_1, mc_info_2 = mc_info_1[cuts[0]], mc_info_2[cuts[1]]
+        pred_1, pred_2 = pred_1[cuts[0]], pred_2[cuts[1]]
 
     if dataset_modifier == 'bg_classifier_2_class':
         pdf_plots = PdfPages(savefolder + '/muon_contamination_to_neutr_efficiency.pdf')
-        plot_contamination_to_neutr_eff_multi_e_cut(mc_info, mc_info_std, pred, pred_std, pdf_plots)
+        plot_contamination_to_neutr_eff_multi_e_cut(mc_info_1, mc_info_2, pred_1, pred_2, pdf_plots)
 
         pdf_plots.close()
 
 
-def select_events_that_exist_in_both_pred_files(pred_file, pred_file_2):
-    """
-    Function that applies an event selection.
-
-    Events are selected, if they are both found in the pred_file and pred_file_std_reco.
-    Then, the selection is applied to BOTH pred_files of the input.
-
-    TODO could be done without using the get_event_selection_mask!
-
-    Parameters
-    ----------
-    pred_file : h5py.File
-        H5py file instance of a prediction file.
-    pred_file_2 : h5py.File
-        H5py file instance of another prediction file.
-
-    Returns
-    -------
-    mc_info : ndarray(ndim=2)
-        Structured array containing the MC info of file 1 with the applied event selection.
-    mc_info_2 : ndarray(ndim=2)
-        Structured array containing the MC info of file 2 with the applied event selection.
-    pred : ndarray(ndim=2)
-        Structured array containing the pred dataset of file 1 with the applied event selection.
-    pred_2 : ndarray(ndim=2)
-        Structured array containing the pred dataset of file 2 with the applied event selection.
-
-    """
-    # select pred_file evts that are in the std reco summary files
-    print('Shape of mc_info pred_file_1 before selection: ' + str(pred_file['mc_info'].shape))
-    evt_sel_mask_dl_in_std = get_event_selection_mask(pred_file['mc_info'], cut_name='bg_classifier')
-
-    mc_info = pred_file['mc_info'][evt_sel_mask_dl_in_std]
-    pred = pred_file['pred'][evt_sel_mask_dl_in_std]
-    print('Shape of mc_info pred_file_1 after selection: ' + str(mc_info.shape))
-
-    # get rid of duplicates!
-    print('Shape of mc_info pred_file_1 before deselecting the few duplicates: ' + str(mc_info.shape))
-    unq, idx, count = np.unique(mc_info[['run_id', 'event_id', 'prod_ident', 'particle_type', 'is_cc']], axis=0, return_counts=True, return_index=True)
-    # select only unique rows
-    mask = np.zeros(mc_info.shape[0], np.bool)
-    mask[idx] = 1
-    mc_info = mc_info[mask]
-    print('Shape of mc_info pred_file_1 after deselecting the few duplicates: ' + str(mc_info.shape))
-    pred = pred[mask]
-
-    # select pred_file_2 events that are in the already cut pred_file
-    ax = np.newaxis
-    mc_info_2 = pred_file_2['mc_info']
-
-    mc_info_dl_reco = np.concatenate([mc_info['run_id'][:, ax], mc_info['event_id'][:, ax],
-                                      mc_info['prod_ident'][:, ax], mc_info['particle_type'][:, ax],
-                                      mc_info['is_cc'][:, ax]], axis=1)
-
-    mc_info_std_reco_selection = np.concatenate([mc_info_2['run_id'][:, ax], mc_info_2['event_id'][:, ax],
-                                                 mc_info_2['prod_ident'][:, ax], mc_info_2['particle_type'][:, ax],
-                                                 mc_info_2['is_cc'][:, ax]], axis=1)
-
-    print('Shape of mc_info pred_file_2 (std reco) before selection: ' + str(pred_file_2['mc_info'].shape))
-    evt_sel_mask_std_in_dl = in_nd(mc_info_std_reco_selection, mc_info_dl_reco)
-    mc_info_2 = pred_file_2['mc_info'][evt_sel_mask_std_in_dl]
-    print('Shape of mc_info pred_file_2 (std reco) after selection: ' + str(mc_info_2.shape))
-    pred_2 = pred_file_2['pred'][evt_sel_mask_std_in_dl]
-
-    return mc_info, mc_info_2, pred, pred_2
-
-
-def plot_contamination_to_neutr_eff_multi_e_cut(mc_info, mc_info_std, pred, pred_std, pdf_plots):
+def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl, pred_std, pdf_plots):
     """
     Make muon/random-noise contamination plots vs neutrino efficiency.
 
@@ -255,171 +188,236 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info, mc_info_std, pred, pred
 
     Parameters
     ----------
-    mc_info : ndarray(ndim=2)
+    mc_info_dl : ndarray(ndim=2)
         Structured array containing the MC info of reco 1.
     mc_info_std : ndarray(ndim=2)
         Structured array containing the MC info of reco 2 (typically standard reco).
-    pred : ndarray(ndim=2)
-        Structured array containing the pred info of reco 1.
+    pred_dl : ndarray(ndim=2)
+        Structured array containing the pred_dl info of reco 1.
     pred_std : ndarray(ndim=2)
-        Structured array containing the pred info of reco 2 (typically standard reco).
+        Structured array containing the pred_dl info of reco 2 (typically standard reco).
     pdf_plots : mpl.backends.backend_pdf.PdfPages
         Matplotlib pdfpages instance, to which the plots should be saved.
 
     """
     def make_plots():
-        fig, ax = plt.subplots()
-        # -- Make non weighted plots -- #
-        ax.plot(np.array(x_contamination_mupage), np.array(y_neutrino_efficiency), label='OrcaNet')
-        ax.plot(np.array(x_contamination_mupage_std), np.array(y_neutrino_efficiency_std), label='Std Reco')
-
-        ax.set_xlim(left=0, right=0.02)
-        ax.set_ylim(bottom=80, top=100.5)
-        ax.set_xlabel('Fraction of muons in dataset [%]'), ax.set_ylabel('Percentage of surviving neutrinos [%]')
-        ax.grid(True)
-        ax.legend(loc='upper right')
-        plt.title('E-range:' + str(tpl) + ', N_muon: ' + str(n_muons_total) + ', N_neutrinos: ' + str(n_neutrinos_total_e_cut))
-
-        pdf_plots.savefig(fig)
-        ax.cla()
-
-        #  make neutr eff vs. n_muons_left plot
-        ax.plot(np.array(y_neutrino_efficiency), np.array(y_n_muons), label='OrcaNet')
-        ax.plot(np.array(y_neutrino_efficiency_std), np.array(y_n_muons_std), label='Std Reco')
-
-        ax.set_yscale('log')
-        ax.set_xlabel('Percentage of surviving neutrinos [%]'), ax.set_ylabel('Number of muons left (total: ' + str(n_muons_total) + ')')
-        ax.grid(True)
-        ax.legend(loc='upper right')
-        plt.title('E-range:' + str(tpl) + ', N_muon: ' + str(n_muons_total) + ', N_neutrinos: ' + str(n_neutrinos_total_e_cut))
-
-        #ax.set_xlim(left=80, right=100)
-
-        pdf_plots.savefig(fig)
-        plt.close()
-
         # -- Make weighted plots -- #
+
+        # - Make continous plots
         # Muon contamination
+
         fig, ax = plt.subplots()
 
-        ax.plot(np.array(ax_muon_contamination_weighted), np.array(ax_neutrino_efficiency_weighted), label='OrcaNet')
-        ax.plot(np.array(ax_muon_contamination_weighted_std), np.array(ax_neutrino_efficiency_weighted_std), label='Std Reco')
+        ax.plot(np.array(muon_cont_weighted_dl), np.array(neutrino_eff_weighted_dl), label='CNN')
+        ax.plot(np.array(muon_cont_weighted_std), np.array(neutrino_eff_weighted_std), label='RF')
 
         ax.set_xlim(left=0, right=20)
         ax.set_xlabel('Muon contamination [%]'), ax.set_ylabel('Neutrino Efficiency [%]')
         ax.grid(True)
         ax.legend(loc='upper right')
-        plt.title('E-range:' + str(tpl) + ', weighted for one year')
+        plt.title('E-range:' + str(tpl) + ', weighted for an atmospheric flux')
 
         pdf_plots.savefig(fig)
+        plt.close()
 
         # Random noise contamination
         fig, ax = plt.subplots()
 
-        ax.plot(np.array(ax_rn_contamination_weighted), np.array(ax_neutrino_efficiency_weighted), label='OrcaNet')
-        ax.plot(np.array(ax_rn_contamination_weighted_std), np.array(ax_neutrino_efficiency_weighted_std), label='Std Reco')
+        ax.plot(np.array(rn_cont_weighted_dl), np.array(neutrino_eff_weighted_dl), label='CNN')
+        ax.plot(np.array(rn_cont_weighted_std), np.array(neutrino_eff_weighted_std), label='RF')
 
         ax.set_xlim(left=0, right=5)
         ax.set_xlabel('Random noise contamination [%]'), ax.set_ylabel('Neutrino Efficiency [%]')
         ax.grid(True)
         ax.legend(loc='upper right')
-        plt.title('E-range:' + str(tpl) + ', weighted for one year')
+        plt.title('E-range:' + str(tpl) + ', weighted for 10kHz noise')
 
         pdf_plots.savefig(fig)
         plt.close()
 
-    ptype_dl, is_cc_dl = mc_info['particle_type'], mc_info['is_cc']
-    ptype_std, is_cc_std = mc_info_std['particle_type'], mc_info_std['is_cc']
-    is_neutrino, is_neutrino_std = select_class('neutrino', ptype_dl, is_cc_dl), select_class('neutrino', ptype_std, is_cc_std)
-    is_mupage, is_mupage_std = select_class('mupage', ptype_dl, is_cc_dl), select_class('mupage', ptype_std, is_cc_std)
-    is_rn, is_rn_std = select_class('random_noise', ptype_dl, is_cc_dl), select_class('random_noise', ptype_std, is_cc_std)
+        # - Make errorbar plots
+        # Muon contamination
 
-    n_neutrinos_total = np.count_nonzero(is_neutrino)  # dl or std doesnt matter for n_neutrinos_total
-    n_muons_total = np.count_nonzero(is_mupage)
-    n_rn_total = np.count_nonzero(is_rn)
+        fig, ax = plt.subplots()
+
+        data_points_range_mupage = np.linspace(0, 20, 21)
+        idx_mupage_closest_dl, idx_mupage_closest_std = [], []
+        for j in range(len(data_points_range_mupage)):
+            dpoint = data_points_range_mupage[j]
+
+            idx_mupage_closest_dl.append((np.abs(np.array(muon_cont_weighted_dl) - dpoint)).argmin())
+            idx_mupage_closest_std.append((np.abs(np.array(muon_cont_weighted_std) - dpoint)).argmin())
+
+        dpoints_neutr_eff_dl = np.array(neutrino_eff_weighted_dl)[idx_mupage_closest_dl]
+        dpoints_muon_cont_dl = np.array(muon_cont_weighted_dl)[idx_mupage_closest_dl]
+        dpoints_muon_cont_err_dl = np.array(muon_cont_weighted_dl_err)[idx_mupage_closest_dl]
+
+        dpoints_neutr_eff_std = np.array(neutrino_eff_weighted_std)[idx_mupage_closest_std]
+        dpoints_muon_cont_std = np.array(muon_cont_weighted_std)[idx_mupage_closest_std]
+        dpoints_muon_cont_err_std = np.array(muon_cont_weighted_std_err)[idx_mupage_closest_std]
+
+        plt.errorbar(dpoints_muon_cont_dl, dpoints_neutr_eff_dl, xerr=dpoints_muon_cont_err_dl, fmt='.', markersize=4, label='CNN', linewidth=0.7)
+        plt.errorbar(dpoints_muon_cont_std, dpoints_neutr_eff_std, xerr=dpoints_muon_cont_err_std, fmt='.', markersize=4, label='RF', linewidth=0.7)
+
+        ax.set_xlim(left=0, right=20)
+        ax.set_xlabel('Muon contamination [%]'), ax.set_ylabel('Neutrino Efficiency [%]')
+        ax.grid(True)
+        ax.legend(loc='upper right')
+        plt.title('E-range:' + str(tpl) + ', weighted for an atmospheric flux')
+
+        pdf_plots.savefig(fig)
+        plt.close()
+
+        # Random noise contamination
+
+        fig, ax = plt.subplots()
+
+        data_points_range_rn = np.linspace(0, 10, 21)
+        idx_rn_closest_dl, idx_rn_closest_std = [], []
+        for j in range(len(data_points_range_rn)):
+            dpoint = data_points_range_rn[j]
+
+            idx_rn_closest_dl.append((np.abs(np.array(rn_cont_weighted_dl) - dpoint)).argmin())
+            idx_rn_closest_std.append((np.abs(np.array(rn_cont_weighted_std) - dpoint)).argmin())
+
+        dpoints_neutr_eff_dl = np.array(neutrino_eff_weighted_dl)[idx_rn_closest_dl]
+        dpoints_rn_cont_dl = np.array(rn_cont_weighted_dl)[idx_rn_closest_dl]
+        dpoints_rn_cont_err_dl = np.array(rn_cont_weighted_dl_err)[idx_rn_closest_dl]
+
+        dpoints_neutr_eff_std = np.array(neutrino_eff_weighted_std)[idx_rn_closest_std]
+        dpoints_rn_cont_std = np.array(rn_cont_weighted_std)[idx_rn_closest_std]
+        dpoints_rn_cont_err_std = np.array(rn_cont_weighted_std_err)[idx_rn_closest_std]
+
+        plt.errorbar(dpoints_rn_cont_dl, dpoints_neutr_eff_dl, xerr=dpoints_rn_cont_err_dl, fmt='.', markersize=4, label='CNN', linewidth=0.7)
+        plt.errorbar(dpoints_rn_cont_std, dpoints_neutr_eff_std, xerr=dpoints_rn_cont_err_std, fmt='.', markersize=4, label='RF', linewidth=0.7)
+
+        ax.set_xlim(left=0, right=5)
+        ax.set_xlabel('Random noise contamination [%]'), ax.set_ylabel('Neutrino Efficiency [%]')
+        ax.grid(True)
+        ax.legend(loc='upper right')
+        plt.title('E-range:' + str(tpl) + ', weighted for 10kHz noise')
+
+        pdf_plots.savefig(fig)
+        plt.close()
+
+    ptype_dl, is_cc_dl = mc_info_dl['particle_type'], mc_info_dl['is_cc']
+    ptype_std, is_cc_std = mc_info_std['particle_type'], mc_info_std['is_cc']
+    is_neutrino_dl, is_neutrino_std = select_class('neutrino', ptype_dl, is_cc_dl), select_class('neutrino', ptype_std, is_cc_std)
+    is_mupage_dl, is_mupage_std = select_class('mupage', ptype_dl, is_cc_dl), select_class('mupage', ptype_std, is_cc_std)
+    is_rn_dl, is_rn_std = select_class('random_noise', ptype_dl, is_cc_dl), select_class('random_noise', ptype_std, is_cc_std)
+
+    n_neutrinos_total = np.count_nonzero(is_neutrino_dl)  # dl or std doesnt matter for n_neutrinos_total
+    n_muons_total = np.count_nonzero(is_mupage_dl)
+    n_rn_total = np.count_nonzero(is_rn_dl)
     print('Total number of neutrinos: ' + str(n_neutrinos_total) + ', ' + str(np.count_nonzero(is_neutrino_std)))
     print('Total number of mupage muons: ' + str(n_muons_total) + ', ' + str(np.count_nonzero(is_mupage_std)))
     print('Total number of random_noise: ' + str(n_rn_total) + ', ' + str(np.count_nonzero(is_rn_std)))
 
     # define e_cut and cut values on neutrino prob
     e_cuts = ((1, 100), (1, 5), (5, 10), (10, 20), (20, 100))
-    cuts = np.logspace(-5.9, 1, num=20000)  # cuts = np.linspace(0, 1, 10000)
-    prob_not_neutrino = pred['prob_not_neutrino']
+    cuts = np.logspace(-5.9, 1, num=10000)  # cuts = np.linspace(0, 1, 10000)
+    prob_not_neutrino = pred_dl['prob_not_neutrino']
     muon_score_std = pred_std['prob_muon']
     rn_noise_score_std = pred_std['prob_noise']
-    w_1_y = mc_info['oscillated_weight_one_year_bg_sel']
+    w_1_y = mc_info_dl['oscillated_weight_one_year_bg_sel']
     w_1_y_std = mc_info_std['oscillated_weight_one_year_bg_sel']
 
     for tpl in e_cuts:
         print('Making contamination plots for e-cut ' + str(tpl))
+
         e_low, e_high = tpl[0], tpl[1]
-        e_cut_mask = np.logical_and(mc_info['energy'] >= e_low, mc_info['energy'] < e_high)
+        e_cut_mask_dl = np.logical_and(mc_info_dl['energy'] >= e_low, mc_info_dl['energy'] < e_high)
         e_cut_mask_std = np.logical_and(mc_info_std['energy'] >= e_low, mc_info_std['energy'] < e_high)
 
         # make energy cuts on neutrinos only
-        is_neutrino_e_cut = np.logical_and(e_cut_mask, is_neutrino)
+        is_neutrino_e_cut_dl = np.logical_and(e_cut_mask_dl, is_neutrino_dl)
         is_neutrino_e_cut_std = np.logical_and(e_cut_mask_std, is_neutrino_std)
 
-        n_neutrinos_total_e_cut = np.count_nonzero(is_neutrino_e_cut)  # should be same for both dl and std
-        n_neutrinos_total_e_cut_weighted = np.sum(w_1_y[is_neutrino_e_cut])
+        # n_neutrinos_total_e_cut = np.count_nonzero(is_neutrino_e_cut_dl)  # should be same for both dl and std
+        n_neutrinos_total_e_cut_weighted = np.sum(w_1_y[is_neutrino_e_cut_dl])
 
         n_neutrinos_total_e_cut_weighted_std = np.sum(w_1_y_std[is_neutrino_e_cut_std])
         assert np.round(n_neutrinos_total_e_cut_weighted_std, 5) == np.round(n_neutrinos_total_e_cut_weighted, 5)
 
-        x_contamination_mupage, y_neutrino_efficiency, y_n_muons = [], [], []
-        x_contamination_mupage_std, y_neutrino_efficiency_std, y_n_muons_std = [], [], []
+        # x_contamination_mupage_dl, y_neutrino_efficiency_dl, y_n_muons_dl = [], [], []
+        # x_contamination_mupage_std, y_neutrino_efficiency_std, y_n_muons_std = [], [], []
 
-        ax_neutrino_efficiency_weighted, ax_muon_contamination_weighted = [], []
-        ax_neutrino_efficiency_weighted_std, ax_muon_contamination_weighted_std = [], []
-        ax_rn_contamination_weighted, ax_rn_contamination_weighted_std = [], []
+        neutrino_eff_weighted_dl, muon_cont_weighted_dl, rn_cont_weighted_dl = [], [], []
+        neutrino_eff_weighted_std, muon_cont_weighted_std, rn_cont_weighted_std = [], [], []
+
+        muon_cont_weighted_dl_err, muon_cont_weighted_std_err = [], []
+        rn_cont_weighted_dl_err, rn_cont_weighted_std_err = [], []
 
         for i in range(len(cuts)):
-            # -- non weighted -- #
-            # dl, how many events are left for the first (dl) pred array?
-            n_neutrino = np.count_nonzero(prob_not_neutrino[is_neutrino_e_cut] < cuts[i])
-            n_muons = np.count_nonzero(prob_not_neutrino[is_mupage] < cuts[i])
 
-            if n_neutrino != 0:
-                x_contamination_mupage.append((n_muons / n_neutrino) * 100)
-                y_neutrino_efficiency.append((n_neutrino / n_neutrinos_total_e_cut) * 100)
-                y_n_muons.append(n_muons)
-
-            # std, how many events are left for std reco?
-            n_neutrino_std = np.count_nonzero(muon_score_std[is_neutrino_e_cut_std] < cuts[i])
-            n_muons_std = np.count_nonzero(muon_score_std[is_mupage_std] < cuts[i])
-
-            if n_neutrino_std != 0:
-                x_contamination_mupage_std.append((n_muons_std / n_neutrino_std) * 100)
-                y_neutrino_efficiency_std.append((n_neutrino_std / n_neutrinos_total_e_cut) * 100)
-                y_n_muons_std.append(n_muons_std)
-
-            # -- weighted -- #
             # dl
-            neutr_sel, mupage_sel, rn_sel = prob_not_neutrino[is_neutrino_e_cut] < cuts[i], prob_not_neutrino[is_mupage] < cuts[i], prob_not_neutrino[is_rn] < cuts[i]
-            n_neutrino_weighted = np.sum(w_1_y[is_neutrino_e_cut][neutr_sel])
-            n_mupage_weighted = np.sum(w_1_y[is_mupage][mupage_sel])
-            n_rn_weighted = np.sum(w_1_y[is_rn][rn_sel])
 
-            if n_neutrino_weighted != 0:
-                ax_neutrino_efficiency_weighted.append((n_neutrino_weighted / n_neutrinos_total_e_cut_weighted) * 100)
-                ax_muon_contamination_weighted.append((n_mupage_weighted / n_neutrino_weighted) * 100)
-                ax_rn_contamination_weighted.append((n_rn_weighted / n_neutrino_weighted) * 100)
+            # if np.count_nonzero(mupage_sel_dl) != 0:
+            #     fract_n_mupage_err_to_n_mupage_dl = n_mupage_err_dl / np.count_nonzero(mupage_sel_dl)
+            # else:
+            #     fract_n_mupage_err_to_n_mupage_dl = 0
+
+            neutr_sel_dl = prob_not_neutrino[is_neutrino_e_cut_dl] < cuts[i]
+            n_neutrino_weighted_dl = np.sum(w_1_y[is_neutrino_e_cut_dl][neutr_sel_dl])
+
+            if n_neutrino_weighted_dl != 0:
+                mupage_sel_dl = prob_not_neutrino[is_mupage_dl] < cuts[i]
+                rn_sel_dl = prob_not_neutrino[is_rn_dl] < cuts[i]
+
+                n_mupage_weighted_dl = np.sum(w_1_y[is_mupage_dl][mupage_sel_dl])
+                n_rn_weighted_dl = np.sum(w_1_y[is_rn_dl][rn_sel_dl])
+
+                neutrino_eff_weighted_dl.append((n_neutrino_weighted_dl / n_neutrinos_total_e_cut_weighted) * 100)
+                muon_cont_weighted_dl.append((n_mupage_weighted_dl / n_neutrino_weighted_dl) * 100)
+                rn_cont_weighted_dl.append((n_rn_weighted_dl / n_neutrino_weighted_dl) * 100)
+
+                # we calculate n_mupage_weighted_dl / n_neutrino_weighted_dl
+                # errors on n_neutrino can be neglected, since statistics large
+                # gaussian error prop: err_cont = abs(1/n_neutr) * delta n_mupage
+
+                n_mupage_err_dl = np.sqrt(np.count_nonzero(mupage_sel_dl))
+                n_rn_err_dl = np.sqrt(np.count_nonzero(rn_sel_dl))
+                # n_mupage_weighted_err_dl = n_mupage_weighted_dl * fract_n_mupage_err_to_n_mupage_dl
+                # muon_cont_weighted_dl_err.append((np.abs(1/np.count_nonzero(neutr_sel_dl)) * n_mupage_err_dl) * 100)
+                muon_cont_weighted_dl_err.append(((n_mupage_err_dl * 33.2137) / n_neutrino_weighted_dl) * 100)
+                rn_cont_weighted_dl_err.append(((n_rn_err_dl * 332.87896624) / n_neutrino_weighted_dl) * 100)
 
             # std
-            neutr_sel_std, mupage_sel_std, rn_sel_std = muon_score_std[is_neutrino_e_cut_std] < cuts[i], muon_score_std[is_mupage_std] < cuts[i], rn_noise_score_std[is_rn_std] < cuts[i]
+
+            # if np.count_nonzero(mupage_sel_std) != 0:
+            #     fract_n_mupage_err_to_n_mupage_std = n_mupage_err_std / np.count_nonzero(mupage_sel_std)
+            # else:
+            #     fract_n_mupage_err_to_n_mupage_std = 0
+
+            neutr_sel_std = muon_score_std[is_neutrino_e_cut_std] < cuts[i]
             n_neutrino_weighted_std = np.sum(w_1_y_std[is_neutrino_e_cut_std][neutr_sel_std])
-            n_mupage_weighted_std = np.sum(w_1_y_std[is_mupage_std][mupage_sel_std])
-            n_rn_weighted_std = np.sum(w_1_y_std[is_rn_std][rn_sel_std])
 
             if n_neutrino_weighted_std != 0:
-                ax_neutrino_efficiency_weighted_std.append((n_neutrino_weighted_std / n_neutrinos_total_e_cut_weighted) * 100)
-                ax_muon_contamination_weighted_std.append((n_mupage_weighted_std / n_neutrino_weighted_std) * 100)
-                ax_rn_contamination_weighted_std.append((n_rn_weighted_std / n_neutrino_weighted_std) * 100)
+                mupage_sel_std = muon_score_std[is_mupage_std] < cuts[i]
+                rn_sel_std = rn_noise_score_std[is_rn_std] < cuts[i]
+
+                n_mupage_weighted_std = np.sum(w_1_y_std[is_mupage_std][mupage_sel_std])
+                n_rn_weighted_std = np.sum(w_1_y_std[is_rn_std][rn_sel_std])
+
+                neutrino_eff_weighted_std.append((n_neutrino_weighted_std / n_neutrinos_total_e_cut_weighted) * 100)
+                muon_cont_weighted_std.append((n_mupage_weighted_std / n_neutrino_weighted_std) * 100)
+                rn_cont_weighted_std.append((n_rn_weighted_std / n_neutrino_weighted_std) * 100)
+
+                # we calculate n_mupage_weighted_std / n_neutrino_weighted_std
+                # errors on n_neutrino can be neglected, since statistics large
+                # gaussian error prop: err_cont = abs(1/n_neutr) * delta n_mupage
+
+                n_mupage_err_std = np.sqrt(np.count_nonzero(mupage_sel_std))
+                n_rn_err_std = np.sqrt(np.count_nonzero(rn_sel_std))
+                # n_mupage_weighted_err_std = n_mupage_weighted_std * fract_n_mupage_err_to_n_mupage_std
+                # muon_cont_weighted_std_err.append((np.abs(1/np.count_nonzero(neutr_sel_std)) * n_mupage_err_std) * 100)
+                muon_cont_weighted_std_err.append(((n_mupage_err_std * 33.2137) / n_neutrino_weighted_std) * 100)
+                rn_cont_weighted_std_err.append(((n_rn_err_std * 332.87896624) / n_neutrino_weighted_std) * 100)
 
         # remove all 0 entries with n_muons, only needed for dl, since standard reco cant go to 0 muons anyways
-        idx_last_zero = np.amax(np.where(np.array(y_n_muons) == 0))
-        y_n_muons = y_n_muons[idx_last_zero:]
-        y_neutrino_efficiency = y_neutrino_efficiency[idx_last_zero:]
-        x_contamination_mupage = x_contamination_mupage[idx_last_zero:]
+        # idx_last_zero = np.amax(np.where(np.array(y_n_muons_dl) == 0))
+        # y_n_muons_dl = y_n_muons_dl[idx_last_zero:]
+        # y_neutrino_efficiency_dl = y_neutrino_efficiency_dl[idx_last_zero:]
+        # x_contamination_mupage_dl = x_contamination_mupage_dl[idx_last_zero:]
 
         make_plots()

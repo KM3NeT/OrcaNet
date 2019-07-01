@@ -73,15 +73,13 @@ def orca_pred(output_folder, list_file, config_file, model_file,
     pred_filepath_conc = orga.predict(epoch=epoch, fileno=fileno,
                                       concatenate=True)[0]
 
-    # make performance plots
-    plots_folder = orga.io.get_subfolder(name='plots')
-
-    try:
-        dataset_modifier = toml.load(model_file)["orca_modifiers"][
+    # make performance plots, only available for bg/ts/regression
+    dataset_modifier = toml.load(model_file)["orca_modifiers"][
             "dataset_modifier"]
+    dset_mod_available_plots = ['regression, bg_classifier, ts_classifier']
+    if any(x in dataset_modifier for x in dset_mod_available_plots):
+        plots_folder = orga.io.get_subfolder(name='plots')
         make_performance_plots(pred_filepath_conc, dataset_modifier, plots_folder)
-    except (NameError, KeyError):
-        pass
 
 
 def main():

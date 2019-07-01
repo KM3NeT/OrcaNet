@@ -7,6 +7,9 @@ Unreleased changes
 * Faster summary plot plotting
 * Rework of train/val plotter
 * Expanded doc
+* Add option to log the compile options in the ModelBuilder class, when a model is compiled.
+* Add support for xyz-t + xyz-p (vertically stacked) and yzt-x double input, pre-trained model
+* New plots in orcanet_contrib for regression & ts and minor other stuff.
 
 
 Version 0

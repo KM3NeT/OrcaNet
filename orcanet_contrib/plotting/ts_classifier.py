@@ -29,9 +29,14 @@ def get_latex_code_for_ptype_str(class_name):
     labels = {'muon-CC': r'$\nu_{\mu}-CC$', 'a_muon-CC': r'$\overline{\nu}_{\mu}-CC$', 'elec-CC': r'$\nu_{e}-CC$',
               'a_elec-CC': r'$\overline{\nu}_{e}-CC$', 'elec-NC': r'$\nu_{e}-NC$',
               'a_elec-NC': r'$\overline{\nu}_{e}-NC$', 'tau-CC': r'$\nu_{\tau}-CC$',
-              'a_tau-CC': r'$\overline{\nu}_{\tau}-CC$'}
-    label = labels[class_name]
+              'a_tau-CC': r'$\overline{\nu}_{\tau}-CC$',
+              'muon-CC_nu_anu': r'$\nu^{\mathrm{CC}}_{\mu}$',
+              'elec-CC_nu_anu': r'$\nu^{\mathrm{CC}}_{e}$',
+              'elec-NC_nu_anu': r'$\nu^{\mathrm{NC}}_{e}$',
+              'tau-CC_nu_anu': r'$\nu^{\mathrm{CC}}_{\tau}$'
+              }
 
+    label = labels[class_name]
     return label
 
 # -- Utility functions -- #
@@ -39,8 +44,9 @@ def get_latex_code_for_ptype_str(class_name):
 
 # -- Functions for making energy to accuracy plots -- #
 
-def make_e_to_acc_plot_ts(pred_file, title, savefolder, plot_range=(1, 100),
-                          cuts=None, prob_threshold_shower=0.5):
+def make_e_to_acc_plot_ts(pred_file, title='', savefolder='', plot_range=(1, 100),
+                          cuts=None, prob_threshold_shower=0.5, savename_prefix='', merge_nu_anu=False,
+                          save=False):
     """
     Makes a track-shower step plot for energy to "Fraction of events classified as track" for different neutrino types.
 
@@ -61,59 +67,81 @@ def make_e_to_acc_plot_ts(pred_file, title, savefolder, plot_range=(1, 100),
         Sets the lower threshold for when an event is classified as a shower based on the nn shower probability.
 
     """
-    y_pred, y_true, mc_info = pred_file['pred'], pred_file['true'], pred_file['mc_info']
-    nn_pred_correct = get_nn_pred_correct_info(y_pred, y_true, prob_threshold_shower=prob_threshold_shower)
+    def configure_and_save_plot(title):
+        """ """
+        axes.legend(loc='center right', ncol=2)
+
+        x_ticks_major = np.arange(0, 101, 10)
+        y_ticks_major = np.arange(0, 1.1, 0.1)
+        plt.xticks(x_ticks_major)
+        plt.minorticks_on()
+
+        plt.xlabel('Energy [GeV]')
+        plt.ylabel('Fraction of events classified as track')
+        plt.ylim((0, 1.05))
+        plt.yticks(y_ticks_major)
+        title = plt.title(title)
+        title.set_position([.5, 1.04])
+        plt.grid(True, zorder=0, linestyle='dotted')
+
+        plt.text(0.05, 0.92, 'KM3NeT Preliminary', transform=axes.transAxes, weight='bold')
+
+        plt.savefig(savefolder + '/' + savename_prefix + 'ts_e_to_acc_3-100GeV.pdf')
+        plt.savefig(savefolder + '/' + savename_prefix + 'ts_e_to_acc_3-100GeV.png', dpi=600)
+
+        x_ticks_major = np.arange(0, 101, 5)
+        plt.xticks(x_ticks_major)
+        plt.xlim((0, 40))
+        plt.savefig(savefolder + '/' + savename_prefix + 'ts_e_to_acc_3-40GeV.pdf')
+        plt.savefig(savefolder + '/' + savename_prefix + 'ts_e_to_acc_3-40GeV.png', dpi=600)
+
+    y_pred, mc_info = pred_file['pred'], pred_file['mc_info']
+    nn_pred_correct = get_nn_pred_correct_info(y_pred, mc_info, prob_threshold_shower=prob_threshold_shower)
     print_accuracy(nn_pred_correct, print_text='Accuracy of the T/S classifier without any event selection: ')
 
     if cuts is not None:
-        assert isinstance(cuts, str)
-        evt_sel_mask = get_event_selection_mask(mc_info, cut_name=cuts)
+        if isinstance(cuts, str):
+            evt_sel_mask = get_event_selection_mask(mc_info, cut_name=cuts)
+        else:
+            evt_sel_mask = cuts
+
+        print('Shape of the mc_info dataset before the applied cut: ' + str(mc_info.shape))
         mc_info = mc_info[evt_sel_mask]
+        print('Shape of the mc_info dataset after the applied cut: ' + str(mc_info.shape))
         nn_pred_correct = nn_pred_correct[evt_sel_mask]
-        print_accuracy(nn_pred_correct, print_text='Accuracy of the T/S classifier with the event selection "'
-                                                   + cuts + '": ')
+        print_accuracy(nn_pred_correct, print_text='Accuracy of the T/S classifier with event selection')
 
     fig, axes = plt.subplots()
 
-    make_step_plot_e_acc_class('muon-CC', mc_info, nn_pred_correct, axes, plot_range=plot_range, linestyle='-', color='b')
-    make_step_plot_e_acc_class('a_muon-CC', mc_info, nn_pred_correct, axes, plot_range=plot_range, linestyle='--', color='b')
-    make_step_plot_e_acc_class('elec-CC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='-', color='r')
-    make_step_plot_e_acc_class('a_elec-CC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='--', color='r')
-    make_step_plot_e_acc_class('elec-NC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='-', color='saddlebrown')
-    make_step_plot_e_acc_class('a_elec-NC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='--', color='saddlebrown')
-    make_step_plot_e_acc_class('tau-CC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='-', color='g')
-    make_step_plot_e_acc_class('a_tau-CC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='--', color='g')
+    if merge_nu_anu is False:
+        make_step_plot_e_acc_class('muon-CC', mc_info, nn_pred_correct, axes, plot_range=plot_range, linestyle='-', color='b')
+        make_step_plot_e_acc_class('a_muon-CC', mc_info, nn_pred_correct, axes, plot_range=plot_range, linestyle='--', color='b')
+        make_step_plot_e_acc_class('elec-CC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='-', color='r')
+        make_step_plot_e_acc_class('a_elec-CC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='--', color='r')
+        make_step_plot_e_acc_class('elec-NC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='-', color='saddlebrown')
+        make_step_plot_e_acc_class('a_elec-NC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='--', color='saddlebrown')
+        make_step_plot_e_acc_class('tau-CC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='-', color='g')
+        make_step_plot_e_acc_class('a_tau-CC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='--', color='g')
 
-    axes.legend(loc='center right', ncol=2)
+        if save is True:
+            configure_and_save_plot(title)
+        plt.close()
 
-    x_ticks_major = np.arange(0, 101, 10)
-    y_ticks_major = np.arange(0, 1.1, 0.1)
-    plt.xticks(x_ticks_major)
-    plt.minorticks_on()
+    else:
+        be_and_1d_acc_per_e_bin = dict()  # contains bin edges and hists
 
-    plt.xlabel('Energy [GeV]')
-    plt.ylabel('Fraction of events classified as track')
-    plt.ylim((0, 1.05))
-    plt.yticks(y_ticks_major)
-    title = plt.title(title)
-    title.set_position([.5, 1.04])
-    plt.grid(True, zorder=0, linestyle='dotted')
+        be_and_1d_acc_per_e_bin['muon-CC_nu_anu'] = make_step_plot_e_acc_class('muon-CC_nu_anu', mc_info, nn_pred_correct, axes, plot_range=plot_range, linestyle='-', color='b')
+        be_and_1d_acc_per_e_bin['elec-CC_nu_anu'] = make_step_plot_e_acc_class('elec-CC_nu_anu', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='-', color='r')
+        be_and_1d_acc_per_e_bin['elec-NC_nu_anu'] = make_step_plot_e_acc_class('elec-NC_nu_anu', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='-', color='saddlebrown')
+        be_and_1d_acc_per_e_bin['tau-CC_nu_anu'] = make_step_plot_e_acc_class('tau-CC_nu_anu', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='-', color='g')
 
-    plt.text(0.05, 0.92, 'KM3NeT Preliminary', transform=axes.transAxes, weight='bold')
+        if save is True:
+            configure_and_save_plot(title)
 
-    plt.savefig(savefolder + '/ts_e_to_acc_3-100GeV.pdf')
-    plt.savefig(savefolder + '/ts_e_to_acc_3-100GeV.png', dpi=600)
-
-    x_ticks_major = np.arange(0, 101, 5)
-    plt.xticks(x_ticks_major)
-    plt.xlim((0, 40))
-    plt.savefig(savefolder + '/ts_e_to_acc_3-40GeV.pdf')
-    plt.savefig(savefolder + '/ts_e_to_acc_3-40GeV.png', dpi=600)
-
-    plt.close()
+        return be_and_1d_acc_per_e_bin
 
 
-def get_nn_pred_correct_info(y_pred, y_true, prob_threshold_shower=0.5):
+def get_nn_pred_correct_info(y_pred, mc_info, prob_threshold_shower=0.5):
     """
     Function that checks if the predictions by the neural network are correct or not for the binary T/S classification.
 
@@ -138,7 +166,9 @@ def get_nn_pred_correct_info(y_pred, y_true, prob_threshold_shower=0.5):
                          'binary categorization problems and not for problems with more than two classes!')
 
     is_shower_pred = (y_pred['prob_shower'] > prob_threshold_shower)
-    is_shower_true = (y_true['cat_shower'] > 0)
+
+    is_nu_mu_cc = np.logical_and(np.abs(mc_info['particle_type']) == 14, mc_info['is_cc'] == 1)
+    is_shower_true = np.invert(is_nu_mu_cc)
 
     # True: if True, True (correct pred for shower) or False, False (correct pred for track)
     nn_pred_correct = is_shower_pred == is_shower_true
@@ -166,7 +196,7 @@ def print_accuracy(nn_pred_correct, print_text='Accuracy of the T/S classifier: 
     print(print_text + '\n' + str(accuracy * 100) + ', based on ' + str(n_total) + ' events')
 
 
-def select_class(class_name, ptype, is_cc):
+def select_class(class_name, ptype, is_cc, merge_nu_anu=False):
     """
     Returns a boolean array which specifies, which rows in the ptype & is_cc 1d arrays belong to a single
     class, specified by the class_name.
@@ -179,6 +209,8 @@ def select_class(class_name, ptype, is_cc):
         Array with particle_types of some events.
     is_cc : ndarray(ndim=1)
         Array with is_cc of some events.
+    merge_nu_anu : bool
+        If particle or antiparticle shouldn't matter in the selection.
 
     Returns
     -------
@@ -188,10 +220,17 @@ def select_class(class_name, ptype, is_cc):
     """
     particle_types = {'muon-CC': (14, 1), 'a_muon-CC': (-14, 1), 'elec-CC': (12, 1),
                       'a_elec-CC': (-12, 1), 'elec-NC': (12, 0), 'a_elec-NC': (-12, 0),
-                      'tau-CC': (16, 1), 'a_tau-CC': (-16, 1)}
+                      'tau-CC': (16, 1), 'a_tau-CC': (-16, 1),
+                      'muon-CC_nu_anu': (14, 1), 'elec-CC_nu_anu': (12, 1), 'elec-NC_nu_anu': (12, 0),
+                      'tau-CC_nu_anu': (16, 1)
+                      }
 
     try:
-        is_class = np.logical_and(ptype == particle_types[class_name][0], is_cc == particle_types[class_name][1])
+        if merge_nu_anu is True:
+            is_class = np.logical_and(ptype == np.abs(particle_types[class_name][0]), is_cc == particle_types[class_name][1])
+        else:
+            is_class = np.logical_and(ptype == particle_types[class_name][0], is_cc == particle_types[class_name][1])
+
     except KeyError:
         raise ValueError('The class ' + str(class_name) + ' is not available in the particle_types dictionary.')
 
@@ -226,11 +265,12 @@ def make_step_plot_e_acc_class(class_name, mc_info, nn_pred_correct, axes, inver
     """
     ptype, is_cc = mc_info['particle_type'], mc_info['is_cc']
 
-    is_class = select_class(class_name, ptype, is_cc)
+    merge_nu_anu = True if 'nu_anu' in class_name else False
+    is_class = select_class(class_name, ptype, is_cc, merge_nu_anu=merge_nu_anu)
 
     energy = mc_info[is_class]['energy']
     if energy.size == 0:
-        return  # class not contained
+        return None, None  # class not contained
     nn_pred_correct = nn_pred_correct[is_class].astype(np.int8)
 
     hist_1d_energy = np.histogram(energy, bins=99, range=plot_range)
@@ -252,6 +292,134 @@ def make_step_plot_e_acc_class(class_name, mc_info, nn_pred_correct, axes, inver
 
     axes.step(bin_edges, hist_1d_energy_accuracy_bins_leading_zero, where='pre', linestyle=linestyle, color=color,
               label=label, zorder=3)
+
+    return bin_edges, hist_1d_energy_accuracy_bins_leading_zero
+
+
+def make_e_to_acc_plot_with_diff(pred_file_1, pred_file_2, savefolder, cuts=None,
+                                 prob_threshold_shower=0.5, plot_range=(1, 100)):
+    """
+    Same as make_e_to_acc_plot_ts, but with diff plot between pred_file_1 and pref_file_2 at the bottom.
+
+    Parameters
+    ----------
+    pred_file_1 : h5py.File
+    pred_file_2 : h5py.File
+    savefolder : str
+    cuts : None/tuple
+    prob_threshold_shower : float
+    plot_range : tuple(int)
+
+    """
+    def configure_plot():
+        axes.legend(loc='center right', ncol=2)
+
+        y_ticks_major = np.arange(0, 1.1, 0.1)
+        plt.xticks(x_ticks_major)
+        plt.minorticks_on()
+
+        plt.ylabel('Fraction of events classified as track')
+        plt.ylim((0, 1.05))
+        plt.yticks(y_ticks_major)
+        title = plt.title('Classified as track')
+        title.set_position([.5, 1.04])
+        plt.grid(True, zorder=0, linestyle='dotted')
+
+        plt.text(0.05, 0.92, 'KM3NeT Preliminary', transform=axes.transAxes, weight='bold')
+
+    if cuts is None:
+        cuts = (None, None)
+
+    be_and_1d_acc_per_e_bin_1 = make_e_to_acc_plot_ts(pred_file_1, cuts=cuts[0],
+                                                      prob_threshold_shower=prob_threshold_shower,
+                                                      plot_range=plot_range, merge_nu_anu=True, save=False)
+    be_and_1d_acc_per_e_bin_2 = make_e_to_acc_plot_ts(pred_file_2, cuts=cuts[1],
+                                                      prob_threshold_shower=prob_threshold_shower,
+                                                      plot_range=plot_range, merge_nu_anu=True, save=False)
+
+    # Save diff only plot
+    def get_gaps_track_shower(be_and_1d_acc_per_e_bin_1, be_and_1d_acc_per_e_bin_2, key_type_1, key_type_2):
+        """ """
+        gap_type_1_type_2_dict_1 = np.abs(be_and_1d_acc_per_e_bin_1[key_type_1][1] - be_and_1d_acc_per_e_bin_1[key_type_2][1])
+        gap_type_1_type_2_dict_2 = np.abs(be_and_1d_acc_per_e_bin_2[key_type_1][1] - be_and_1d_acc_per_e_bin_2[key_type_2][1])
+
+        diff_gap_1_div_2 = ((gap_type_1_type_2_dict_1 / gap_type_1_type_2_dict_2) - 1) * 100
+        return diff_gap_1_div_2
+
+    diff_gap_mu_cc_e_cc_f1_f2 = get_gaps_track_shower(be_and_1d_acc_per_e_bin_1, be_and_1d_acc_per_e_bin_2,
+                                                      'muon-CC_nu_anu', 'elec-CC_nu_anu')
+    diff_gap_mu_cc_e_nc_f1_f2 = get_gaps_track_shower(be_and_1d_acc_per_e_bin_1, be_and_1d_acc_per_e_bin_2,
+                                                      'muon-CC_nu_anu', 'elec-NC_nu_anu')
+
+    fig, axes = plt.subplots()
+
+    axes.step(be_and_1d_acc_per_e_bin_1['muon-CC_nu_anu'][0], diff_gap_mu_cc_e_cc_f1_f2, where='pre', linestyle='-', color='darkorchid',
+              label=r'$\nu^{\mathrm{CC}}_{\mu} \;\mathrm{to}\; \nu^{\mathrm{CC}}_{e}$', zorder=3)
+    axes.step(be_and_1d_acc_per_e_bin_1['muon-CC_nu_anu'][0], diff_gap_mu_cc_e_nc_f1_f2, where='pre', linestyle='-', color='darkorange',
+              label=r'$\nu^{\mathrm{CC}}_{\mu} \;\mathrm{to}\; \nu^{\mathrm{NC}}_{e}$', zorder=3)
+
+    axes.legend(loc='lower right', ncol=2)
+    plt.xlabel('Energy [GeV]')
+    plt.ylabel('Relative Improvement [%]')
+    plt.grid(True, zorder=0, linestyle='dotted')
+
+    plt.savefig(savefolder + '/ts_e_to_acc_3-100GeV_diff_only.pdf')
+    plt.savefig(savefolder + '/ts_e_to_acc_3-100GeV_diff_only.png', dpi=600)
+
+    x_ticks_major = np.arange(0, 101, 5)
+    plt.xticks(x_ticks_major)
+    plt.xlim((0, 40))
+    plt.savefig(savefolder + '/ts_e_to_acc_3-40GeV_diff_only.pdf')
+    plt.savefig(savefolder + '/ts_e_to_acc_3-40GeV_diff_only.png', dpi=600)
+
+    plt.close()
+
+    # Make e to acc plot of file 1
+    fig, axes = plt.subplots()
+
+    # plot the hist data of all different interactions
+    colors = {'muon-CC_nu_anu': 'b', 'elec-CC_nu_anu': 'r', 'elec-NC_nu_anu': 'saddlebrown', 'tau-CC_nu_anu': 'g'}
+    for key in be_and_1d_acc_per_e_bin_1:
+        if be_and_1d_acc_per_e_bin_1[key][0] is None:
+            continue
+
+        label = get_latex_code_for_ptype_str(key)
+        bin_edges = be_and_1d_acc_per_e_bin_1[key][0]
+        hist_1d = be_and_1d_acc_per_e_bin_1[key][1]
+        axes.step(bin_edges, hist_1d, where='pre', linestyle='-', color=colors[key],
+                  label=label, zorder=3)
+
+    configure_plot()
+
+    # Add a small plot window to the bottom of the canvas, and change gca to that.
+    plt.gca().set_position((.1, .3, .8, .6))
+    plt.setp(plt.gca().get_xticklabels(), visible=False)
+    axes_2 = plt.axes([0.1, 0.1, .8, .2], sharex=plt.gca())
+    size_x, size_y = plt.gcf().get_size_inches()
+    plt.gcf().set_size_inches([size_x, size_y * 1.333])
+
+    # plot the difference to small window
+
+    axes_2.step(be_and_1d_acc_per_e_bin_1['muon-CC_nu_anu'][0], diff_gap_mu_cc_e_cc_f1_f2, where='pre', linestyle='-', color='darkorchid',
+                label=r'$\nu^{\mathrm{CC}}_{\mu} \;\mathrm{to}\; \nu^{\mathrm{CC}}_{e}$', zorder=3)
+    axes_2.step(be_and_1d_acc_per_e_bin_1['muon-CC_nu_anu'][0], diff_gap_mu_cc_e_nc_f1_f2, where='pre', linestyle='-', color='darkorange',
+                label=r'$\nu^{\mathrm{CC}}_{\mu} \;\mathrm{to}\; \nu^{\mathrm{NC}}_{e}$', zorder=3)
+
+    axes_2.legend(loc='lower right', ncol=2)
+    plt.xlabel('Energy [GeV]')
+    plt.ylabel('Rel. Improvement [%]')
+    plt.grid(True, zorder=0, linestyle='dotted')
+    plt.ylim((-25, 25))
+
+    plt.savefig(savefolder + '/ts_e_to_acc_3-100GeV_w_diff.pdf')
+    plt.savefig(savefolder + '/ts_e_to_acc_3-100GeV_w_diff.png', dpi=600)
+
+    x_ticks_major = np.arange(0, 101, 5)
+    plt.xticks(x_ticks_major)
+    plt.xlim((0, 40))
+    plt.savefig(savefolder + '/ts_e_to_acc_3-40GeV_w_diff.pdf')
+    plt.savefig(savefolder + '/ts_e_to_acc_3-40GeV_w_diff.png', dpi=600)
+
 
 # -- Functions for making energy to accuracy plots -- #
 
@@ -397,42 +565,53 @@ def plot_ts_separability(pred_file, savefolder, pred_file_2=None, cuts=None):
     prob_track = pred_file['pred']['prob_track']
 
     if cuts is not None:
-        assert isinstance(cuts, str)
-        evt_sel_mask = get_event_selection_mask(mc_info, cut_name=cuts)
-        mc_info = mc_info[evt_sel_mask]
-        prob_track = prob_track[evt_sel_mask]
+        if type(cuts) is tuple:
+            mc_info, prob_track = mc_info[cuts[0]], prob_track[cuts[0]]
+            print('Sep.: Shape of mc_info_1 after cut: ' + str(mc_info.shape))
+        else:
+            assert isinstance(cuts, str)
+            evt_sel_mask = get_event_selection_mask(mc_info, cut_name=cuts)
+            mc_info = mc_info[evt_sel_mask]
+            prob_track = prob_track[evt_sel_mask]
 
     separabilities = calculcate_separability(mc_info, prob_track)
 
     # plot the correlation coefficients
     fig, axes = plt.subplots()
     plt.plot(separabilities[:, 1], separabilities[:, 0], 'b', marker='o', lw=0.5, markersize=3,
-             label='Deep Learning')
+             label='CNN')
 
     if pred_file_2 is not None:
         mc_info_2 = pred_file_2['mc_info']
         prob_track_2 = pred_file_2['pred']['prob_track']
 
         if cuts is not None:
-            assert isinstance(cuts, str)
-            evt_sel_mask_2 = get_event_selection_mask(mc_info_2, cut_name=cuts)
-            mc_info_2 = mc_info_2[evt_sel_mask_2]
-            prob_track_2 = prob_track_2[evt_sel_mask_2]
+            if type(cuts) is tuple:
+                mc_info_2, prob_track_2 = mc_info_2[cuts[1]], prob_track_2[cuts[1]]
+                print('Sep.: Shape of mc_info_2 after cut: ' + str(mc_info_2.shape))
+            else:
+                assert isinstance(cuts, str)
+                evt_sel_mask_2 = get_event_selection_mask(mc_info_2, cut_name=cuts)
+                mc_info_2 = mc_info_2[evt_sel_mask_2]
+                prob_track_2 = prob_track_2[evt_sel_mask_2]
 
         separabilities_2 = calculcate_separability(mc_info_2, prob_track_2)
         plt.plot(separabilities_2[:, 1], separabilities_2[:, 0], 'r', marker='o', lw=0.5,
-                 markersize=3, label='Shallow Learning')
+                 markersize=3, label='RF')
 
     plt.xlabel('Energy [GeV]')
     plt.ylabel('Separability (1-c)')
     plt.grid(True, zorder=0, linestyle='dotted')
 
     axes.legend(loc='center right')
-    title = plt.title('Separability for track vs shower PID')
+    title = plt.title('Separability for track-shower classification')
     title.set_position([.5, 1.04])
 
     plt.yticks(np.arange(0, 1.1, 0.1))
     # plt.xticks(np.arange(0, 110, 10))
+    # plt.xlim(right=100)
+    # plt.ylim(top=1)
+
     plt.xscale('log')
     plt.text(0.05, 0.92, 'KM3NeT Preliminary', transform=axes.transAxes, weight='bold')
 
@@ -453,7 +632,8 @@ def calculcate_separability(mc_info, prob_track, bins=40, e_cut_range=np.logspac
     prob_track : ndarray(ndim=1)
         Array containing the track probabilities by a classifier.
     bins : int
-        For how many energy bins the separability should be calculated.
+        How many bins should be used in the prob_track/shower histograms
+        that are created for the calculation of the separability.
     e_cut_range : ndarray(ndim=1)
         Energy range for the calculation of the separability factors.
 
@@ -470,29 +650,28 @@ def calculcate_separability(mc_info, prob_track, bins=40, e_cut_range=np.logspac
         if n <= 2:
             continue  # ecut steffen
 
-        e_cut_mask = np.logical_and(e_cut[0] <= mc_energy, mc_energy <= e_cut[1])
+        e_cut_mask = np.logical_and(e_cut[0] <= mc_energy, mc_energy < e_cut[1])
 
         is_muon_cc_and_e_cut = np.logical_and(is_muon_cc, e_cut_mask)
         is_elec_cc_and_e_cut = np.logical_and(is_elec_cc, e_cut_mask)
 
-        hist_prob_track_e_cut_muon_cc = np.histogram(prob_track[is_muon_cc_and_e_cut], bins=40, density=True)
-        hist_prob_track_e_cut_elec_cc = np.histogram(prob_track[is_elec_cc_and_e_cut], bins=40, density=True)
+        hist_prob_track_e_cut_muon_cc = np.histogram(prob_track[is_muon_cc_and_e_cut], bins=bins, density=True)
+        hist_prob_track_e_cut_elec_cc = np.histogram(prob_track[is_elec_cc_and_e_cut], bins=bins, density=True)
 
-        correlation_coeff_enumerator = 0
+        c_enumerator = 0
         for j in range(bins - 1):
-            correlation_coeff_enumerator += hist_prob_track_e_cut_muon_cc[0][j] * hist_prob_track_e_cut_elec_cc[0][j]
+            c_enumerator += hist_prob_track_e_cut_muon_cc[0][j] * hist_prob_track_e_cut_elec_cc[0][j]
 
         sum_prob_muon_cc = np.sum(hist_prob_track_e_cut_muon_cc[0] ** 2)
         sum_prob_elec_cc = np.sum(hist_prob_track_e_cut_elec_cc[0] ** 2)
+        c_denominator = np.sqrt(sum_prob_muon_cc * sum_prob_elec_cc)
 
-        correlation_coeff_denominator = np.sqrt(sum_prob_muon_cc * sum_prob_elec_cc)
+        separability = 1 - (c_enumerator / c_denominator)
 
-        separability = 1 - correlation_coeff_enumerator / float(correlation_coeff_denominator)
-
-        average_energy = 10 ** ((np.log10(e_cut[1]) + np.log10(e_cut[0])) / float(2))
+        # average_energy = 10 ** ((np.log10(e_cut[1]) + np.log10(e_cut[0])) / 2)
+        average_energy = np.mean(mc_energy[e_cut_mask])
 
         separabilities.append((separability, average_energy))
 
     separabilities = np.array(separabilities)
-
     return separabilities

@@ -1,0 +1,27 @@
+# Info for building an OrcaNet model.
+
+[body]
+architecture = "merge"
+
+# config of every layer block, will overwrite the default values above
+blocks = ['/home/woody/capn/mppi033h/orcanet_trainings/ts_classifier/ts_classifier_dp0.1_xyzt_and_xyzc/saved_models/model_epoch_11_file_10.h5',
+          '/home/woody/capn/mppi033h/orcanet_trainings/ts_classifier/ts_classifier_dp0.1_yztx/saved_models/model_epoch_8_file_1.h5']
+
+# ----------------------------------------------------------------------
+[head]
+architecture = "categorical"
+dropout = 0.1
+architecture_args = {output_name="ts_output", categories=2}
+
+# ----------------------------------------------------------------------
+[compile]
+optimizer = "adam"
+
+[compile.losses]
+ts_output = {function="categorical_crossentropy", metrics=['acc']}
+
+# ----------------------------------------------------------------------
+[orca_modifiers]
+sample_modifier = 'xyz-t_and_xyz-c_single_input_and_yzt-x'
+label_modifier = 'ts_classifier'
+dataset_modifier = 'ts_classifier'
