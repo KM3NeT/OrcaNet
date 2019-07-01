@@ -8,6 +8,7 @@ import keras as ks
 from keras.layers import Concatenate, Flatten, BatchNormalization, Dropout
 from keras.models import Model
 import toml
+from datetime import datetime
 
 from orcanet.builder_util.builders import BlockBuilder
 
@@ -80,7 +81,7 @@ class ModelBuilder:
             raise KeyError("Missing parameter in toml model file: "
                            + str(option)) from None
 
-    def build(self, orga):
+    def build(self, orga, log_comp_opts=False):
         """
         Build the network.
 
@@ -91,6 +92,9 @@ class ModelBuilder:
         ----------
         orga : object Organizer
             Contains all the configurable options in the OrcaNet scripts.
+        log_comp_opts : bool
+            If the info used for the compilation of the model should be
+            logged to the log.txt.
 
         Returns
         -------
@@ -154,6 +158,8 @@ class ModelBuilder:
                                                           orga.cfg.batchsize)
         """
         self.compile_model(model, custom_objects)
+        if log_comp_opts:
+            self.log_model_properties(orga)
         model.summary()
         return model
 
@@ -185,7 +191,7 @@ class ModelBuilder:
         """
         # Get the input and Flatten layers in each of the given models
         input_layers, flattens = [], []
-        for model in model_list:
+        for i, model in enumerate(model_list):
             if len(model.inputs) != 1:
                 raise ValueError(
                     "model input is not length 1 {}".format(model.inputs))
@@ -193,6 +199,7 @@ class ModelBuilder:
             flatten_found = 0
             for layer in model.layers:
                 layer.trainable = trainable
+                layer.name = layer.name + '_net_' + str(i)
                 if isinstance(layer, BatchNormalization):
                     layer.stateful = stateful
                 elif isinstance(layer, Flatten):
@@ -266,6 +273,21 @@ class ModelBuilder:
         model.compile(loss=loss_functions, optimizer=optimizer,
                       metrics=loss_metrics, loss_weights=loss_weights)
         return model
+
+    def log_model_properties(self, orga):
+        """
+        Writes the compile_opt config to the full log file.
+        """
+        lines = list()
+        lines.append('-' * 60)
+        time = datetime.now().strftime('%Y-%m-%d  %H:%M:%S')
+        lines.append('-' * 19 + " {} ".format(time) + '-' * 19)
+        lines.append("A model has been built using the model builder with the following configurations:\n")
+        lines.append('Loss functions: ')
+        for key in self.compile_opt:
+            lines.append(key + ': ' + str(self.compile_opt[key]))
+        lines.append('\n')
+        orga.io.print_log(lines)
 
 
 def change_dropout_rate(model, before_concat, after_concat=None):

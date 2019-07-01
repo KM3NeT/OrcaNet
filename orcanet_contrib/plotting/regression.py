@@ -10,7 +10,7 @@ import numpy as np
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 
-from orcanet_contrib.plotting.utils import correct_reco_energy, select_ic, get_event_selection_mask
+from orcanet_contrib.plotting.utils import correct_reco_energy, select_ic, get_event_selection_mask, get_mc_info_and_other_datasets
 
 
 # --------------------------- Code for 2d plots --------------------------- #
@@ -62,6 +62,13 @@ def make_2d_prop_to_prop_plot(pred_file, prop_1_name, prop_2_name, savefolder, s
         cbar = fig.colorbar(pcm_prop_1_prop_2, ax=ax)
         cbar.ax.set_ylabel('Number of events')
         x_label, y_label = properties[prop_1_name]['ax_label'], properties[prop_2_name]['ax_label']
+
+        if ic == 'elec-CC' and reco_energy_correction is True:
+            if 'Reconstructed energy' in x_label:
+                x_label = 'Corrected reconstructed energy (GeV)'
+            if 'Reconstructed energy' in y_label:
+                y_label = 'Corrected reconstructed energy (GeV)'
+
         ax.set_xlabel(x_label), ax.set_ylabel(y_label)
         plt.tight_layout()
 
@@ -70,19 +77,10 @@ def make_2d_prop_to_prop_plot(pred_file, prop_1_name, prop_2_name, savefolder, s
         ax.cla()
 
     properties = get_make_2d_energy_resolution_plot_properties_dict()
-    if reco_energy_correction is not None:
-        properties['energy_reco']['ax_label'] = 'Corrected reconstructed energy (GeV)'  # add corrected info in str
 
-    mc_info = pred_file['mc_info']
     dset_key_prop_1, dset_key_prop_2 = properties[prop_1_name]['dset_key'], properties[prop_2_name]['dset_key']
-    prop_dset_1, prop_dset_2 = pred_file[dset_key_prop_1], pred_file[dset_key_prop_2]  # e.g. y_pred dset
-
-    if cuts is not None:
-        assert isinstance(cuts, str)
-        evt_sel_mask = get_event_selection_mask(mc_info, cut_name=cuts)
-        mc_info = mc_info[evt_sel_mask]
-        prop_dset_1 = prop_dset_1[evt_sel_mask]
-        prop_dset_2 = prop_dset_2[evt_sel_mask]
+    dsets = get_mc_info_and_other_datasets(pred_file, 'mc_info', (dset_key_prop_1, dset_key_prop_2), cuts=cuts)
+    mc_info, prop_dset_1, prop_dset_2 = dsets[0], dsets[1], dsets[2]
 
     prop_1 = get_property_info_to_plot(mc_info, prop_dset_1, properties, prop_1_name, reco_energy_correction)
     prop_2 = get_property_info_to_plot(mc_info, prop_dset_2, properties, prop_2_name, reco_energy_correction)
@@ -97,11 +95,6 @@ def make_2d_prop_to_prop_plot(pred_file, prop_1_name, prop_2_name, savefolder, s
 
     for ic in ic_list.keys():
         is_ic = select_ic(mc_info['particle_type'], mc_info['is_cc'], ic)
-
-        # TODO
-        print(ic)
-        print(np.count_nonzero(is_ic))
-
         if bool(np.any(is_ic, axis=0)) is False:
             continue
 
@@ -135,10 +128,10 @@ def get_make_2d_energy_resolution_plot_properties_dict():
     """
     properties = {
                   'energy_reco': {'dset_key': 'pred', 'col_name': 'pred_energy', 'bins': np.arange(1, 101, 1),
-                                  'title_name': 'reco energy', 'ax_label': 'Reconstructed energy (GeV)',
+                                  'title_name': 'reco energy', 'ax_label': 'Reconstructed energy [GeV]',
                                   'lim': (1, 100)},
                   'energy_true': {'dset_key': 'mc_info', 'col_name': 'energy', 'bins': np.arange(1, 101, 1),
-                                  'title_name': 'true energy', 'ax_label': 'True energy (GeV)', 'lim': (1, 100)},
+                                  'title_name': 'true energy', 'ax_label': 'True energy [GeV]', 'lim': (1, 100)},
                   'dir_x_reco': {'dset_key': 'pred', 'col_name': 'pred_dir_x', 'bins': np.linspace(-1, 1, 100),
                                  'title_name': 'reco dir-x', 'ax_label': 'Reconstructed dir-x', 'lim': (-1, 1)},
                   'dir_y_reco': {'dset_key': 'pred', 'col_name': 'pred_dir_y', 'bins': np.linspace(-1, 1, 100),
@@ -152,13 +145,13 @@ def get_make_2d_energy_resolution_plot_properties_dict():
                   'dir_z_true': {'dset_key': 'mc_info', 'col_name': 'dir_z', 'bins': np.linspace(-1, 1, 100),
                                  'title_name': 'true dir-z', 'ax_label': 'True dir-z', 'lim': (-1, 1)},
                   'azimuth_reco': {'dset_key': 'pred', 'bins': np.linspace(-math.pi, math.pi, 100),
-                                   'title_name': 'reco azimuth', 'ax_label': 'Reconstructed azimuth (rad)'},
+                                   'title_name': 'reco azimuth', 'ax_label': 'Reconstructed azimuth [rad]'},
                   'azimuth_true': {'dset_key': 'mc_info', 'bins': np.linspace(-math.pi, math.pi, 100),
-                                   'title_name': 'true azimuth', 'ax_label': 'True azimuth (rad)'},
+                                   'title_name': 'true azimuth', 'ax_label': 'True azimuth [rad]'},
                   'zenith_reco': {'dset_key': 'pred', 'bins': np.linspace(-math.pi/float(2), math.pi/float(2), 100),
-                                  'title_name': 'reco zenith', 'ax_label': 'Reconstructed zenith (rad)'},
+                                  'title_name': 'reco zenith', 'ax_label': 'Reconstructed zenith [rad]'},
                   'zenith_true': {'dset_key': 'mc_info', 'bins': np.linspace(-math.pi/float(2), math.pi/float(2), 100),
-                                  'title_name': 'true zenith', 'ax_label': 'True zenith (rad)'},
+                                  'title_name': 'true zenith', 'ax_label': 'True zenith [rad]'},
                   'bjorkeny_reco': {'dset_key': 'pred', 'col_name': 'pred_bjorkeny', 'bins': np.linspace(0, 1, 101),
                                     'title_name': 'reco bjorkeny', 'ax_label': 'Reconstructed bjorkeny'},
                   'bjorkeny_true': {'dset_key': 'mc_info', 'col_name': 'bjorkeny', 'bins': np.linspace(0, 1, 101),
@@ -174,7 +167,11 @@ def get_make_2d_energy_resolution_plot_properties_dict():
                   'vtx_y_true': {'dset_key': 'mc_info', 'col_name': 'vertex_pos_y', 'bins': 50,
                                  'title_name': 'true vtx-y', 'ax_label': 'True vtx-y'},
                   'vtx_z_true': {'dset_key': 'mc_info', 'col_name': 'vertex_pos_z', 'bins': 50,
-                                 'title_name': 'true vtx-z', 'ax_label': 'True vtx-z'}
+                                 'title_name': 'true vtx-z', 'ax_label': 'True vtx-z'},
+                  'vtx_long_reco_mc': {'dset_key': 'pred', 'col_name': None, 'bins': 150, 'lim': (-30, 30),
+                                       'title_name': 'vtx long', 'ax_label': 'Vtx longitudinal distance [m]'},
+                  'vtx_perp_reco_mc': {'dset_key': 'pred', 'col_name': None, 'bins': 150, 'lim': (0, 30),
+                                       'title_name': 'vtx perp', 'ax_label': 'Vtx perpendicular distance [m]'}
                   }
 
     return properties
@@ -207,7 +204,7 @@ def get_property_info_to_plot(mc_info, prop_dset, properties, prop_name, reco_en
         1d array which contains the data of the specified property that will be plotted on one axis later on.
 
     """
-    if 'azimuth' in prop_name or 'zenith' in prop_name:
+    if 'azimuth' in prop_name:
         # atan2(y,x)
         dset_key = properties[prop_name]['dset_key']
         col_name_prefix = '' if dset_key != 'pred' else 'pred_'
@@ -222,6 +219,42 @@ def get_property_info_to_plot(mc_info, prop_dset, properties, prop_name, reco_en
 
         zenith = convert_vectorial_to_spherical_dir(prop_dset, 'zenith', col_name_prefix)
         prop = zenith
+
+    elif 'vtx_perp' in prop_name or 'vtx_long' in prop_name:
+        ax = np.newaxis
+
+        # vtx
+        col_name_x_mc, col_name_x_r = properties['vtx_x_true']['col_name'], properties['vtx_x_reco']['col_name']
+        col_name_y_mc, col_name_y_r = properties['vtx_y_true']['col_name'], properties['vtx_y_reco']['col_name']
+        col_name_z_mc, col_name_z_r = properties['vtx_z_true']['col_name'], properties['vtx_z_reco']['col_name']
+
+        vtx_x_mc, vtx_y_mc, vtx_z_mc = mc_info[col_name_x_mc], mc_info[col_name_y_mc], mc_info[col_name_z_mc]
+        vtx_x_r, vtx_y_r, vtx_z_r = prop_dset[col_name_x_r], prop_dset[col_name_y_r], prop_dset[col_name_z_r]
+
+        vtx_mc_vec = np.concatenate([vtx_x_mc[:, ax], vtx_y_mc[:, ax], vtx_z_mc[:, ax]], axis=1)
+        vtx_r_vec = np.concatenate([vtx_x_r[:, ax], vtx_y_r[:, ax], vtx_z_r[:, ax]], axis=1)
+
+        # dirs
+        col_name_dir_x_mc = properties['dir_x_true']['col_name']
+        col_name_dir_y_mc = properties['dir_y_true']['col_name']
+        col_name_dir_z_mc = properties['dir_z_true']['col_name']
+
+        dir_x_mc, dir_y_mc, dir_z_mc = mc_info[col_name_dir_x_mc], mc_info[col_name_dir_y_mc], mc_info[col_name_dir_z_mc]
+        dir_mc_vec = np.concatenate([dir_x_mc[:, ax], dir_y_mc[:, ax], dir_z_mc[:, ax]], axis=1)
+
+        if 'vtx_perp' in prop_name:
+            # let p be vertex vect or reco, a vtx vec of true and b true dir vect
+            # then, x = a + lambda * b is the line
+            # and perp_dist = |(p-a) x b| / |b|
+
+            perp_dist = np.linalg.norm(np.cross((vtx_r_vec - vtx_mc_vec), dir_mc_vec), axis=1) / np.linalg.norm(dir_mc_vec, axis=1)
+            prop = perp_dist
+
+        elif 'vtx_long' in prop_name:
+            # project (p-a) on b
+            diff_vtx_vec_r_mc = vtx_r_vec - vtx_mc_vec
+            long_dist = np.einsum('ij,ij->i', diff_vtx_vec_r_mc, dir_mc_vec)
+            prop = long_dist
 
     elif 'bjorkeny_true' in prop_name:
         # correct true by to 1 for e-NC events for the plotting
@@ -256,7 +289,7 @@ def get_property_info_to_plot(mc_info, prop_dset, properties, prop_name, reco_en
 
 
 def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, savefolder, savename,
-                                               reco_energy_correction=None, energy_bins=np.linspace(1, 100, 32),
+                                               reco_energy_correction=None, energy_bins=np.arange(1, 101, 2.5),
                                                cuts=None, compare_2nd_reco=None):
     """
     Makes binned 1d plots that show
@@ -303,12 +336,12 @@ def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, s
     """
     fig, ax = plt.subplots()
     pdf_plots = mpl.backends.backend_pdf.PdfPages(savefolder + '/' + savename + '.pdf')
-    title_prefix = 'OrcaNet: '
+    title_prefix = 'CNN: '
 
     properties = {'dirs_vector': {'sub_props': ['dir_x', 'dir_y', 'dir_z'], 'ylabel': ' error (dir)'},
                   'dirs_spherical': {'sub_props': ['azimuth', 'zenith'], 'ylabel': ' error (dir)'},
-                  'energy': {'sub_props': ['energy'], 'ylabel': ' error (corrected energy)', 'correct': 'median'},
-                  'vertex_vector': {'sub_props': ['vtx_x', 'vtx_y', 'vtx_z'], 'ylabel': ' error (vertex)'},
+                  'energy': {'sub_props': ['energy'], 'ylabel': ' error (energy, GeV)', 'correct': 'median'},
+                  'vertex_vector': {'sub_props': ['vtx_x', 'vtx_y', 'vtx_z'], 'ylabel': ' error (vertex, m)'},
                   'bjorkeny': {'sub_props': ['bjorkeny'], 'ylabel': ' error (bjorkeny)'}}
 
     ic_list = {'muon-CC': {'title': 'Track like (' + r'$\nu_{\mu}-CC$)'},
@@ -316,16 +349,20 @@ def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, s
                'elec-NC': {'title': 'Shower like (' + r'$\nu_{e}-NC$)'},
                'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
 
-    mc_info, pred = get_mc_info_and_pred_datasets(pred_file, 'mc_info', 'pred', cuts)
+    if type(cuts) is str:
+        cuts = (cuts, cuts)
+
+    dsets = get_mc_info_and_other_datasets(pred_file, 'mc_info', 'pred', cuts=cuts[0])
+    mc_info, pred = dsets[0], dsets[1]
+
     if compare_2nd_reco is not None:
         pred_file_2 = compare_2nd_reco
-        mc_info_2, pred_2 = get_mc_info_and_pred_datasets(pred_file_2, 'mc_info', 'pred', cuts)
+        dsets = get_mc_info_and_other_datasets(pred_file_2, 'mc_info', 'pred', cuts=cuts[1])
+        mc_info_2, pred_2 = dsets[0], dsets[1]
 
     sub_props_list = properties[property_name]['sub_props']
     for ic in ic_list.keys():
         is_ic = select_ic(mc_info['particle_type'], mc_info['is_cc'], ic)
-        print(ic)
-        print(np.count_nonzero(is_ic))
         if bool(np.any(is_ic, axis=0)) is False:
             continue
 
@@ -351,7 +388,17 @@ def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, s
         ax.minorticks_on()
         title = plt.title(title_prefix + ic_list[ic]['title'])
         title.set_position([.5, 1.04])
-        y_label = r'$\sigma / E_{true}$ for ' + property_name + ' reco' if mode[0] == 'rel_std_div' else mode[1] + properties[property_name]['ylabel']
+
+        if mode[0] == 'rel_std_div':
+            y_label = r'$\sigma / E_{true}$ for ' + property_name + ' reco'
+        elif mode[0] == 'std_div':
+            y_label = r'$\sigma$ for ' + property_name + ' reco'
+        else:
+            mode_str = mode[1].replace('_', ' ').capitalize()
+            y_label = mode_str + properties[property_name]['ylabel']
+            if ic == 'elec-CC' and '(energy)' in y_label and reco_energy_correction is True:
+                y_label = mode_str + ' error (corrected energy)'
+
         ax.set_xlabel('True energy (GeV)'), ax.set_ylabel(y_label)
         ax.grid(True)
         ax.legend(loc='upper right')
@@ -363,43 +410,8 @@ def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, s
     pdf_plots.close()
 
 
-def get_mc_info_and_pred_datasets(pred_file, mc_info_key, pred_key, cuts):
-    """
-    Gets the mc_info and pred_datasets from a h5py pred_file instance and applies some cuts if cuts is not None.
-
-    Parameters
-    ----------
-    pred_file : h5py.File
-        H5py file instance, which stores the regression predictions of a nn model.
-    mc_info_key : str
-        Key of the mc_info dataset in the pred_file.
-    pred_key : str
-        Key of the pred dataset in the pred_file.
-    cuts : None/str
-        Specifies, if cuts should be used for the plot. Either None or a str, that is available in the
-        load_event_selection_file() function.
-
-    Returns
-    -------
-    mc_info : h5py.dataset.Dataset/ndarray(ndim=2)
-        The (cut) mc_info structured array of an OrcaNet nn prediction file.
-    pred : h5py.dataset.Dataset/ndarray(ndim=2)
-        The (cut) pred dataset of a nn OrcaNet classifier, which contains all predicted labels as single columns.
-
-    """
-    mc_info = pred_file[mc_info_key]
-    pred = pred_file[pred_key]
-    if cuts is not None:
-        assert isinstance(cuts, str)
-        evt_sel_mask = get_event_selection_mask(mc_info, cut_name=cuts)
-        mc_info = mc_info[evt_sel_mask]
-        pred = pred[evt_sel_mask]
-
-    return mc_info, pred
-
-
 def calc_plot_data_of_energy_dependent_label(mc_info, pred, prop_name, mode, selection=None,
-                                             energy_bins=np.linspace(1, 100, 32), reco_energy_correction=None):
+                                             energy_bins=np.arange(1, 101, 2), reco_energy_correction=None):
     """
     Returns two different kind of performance metrics vs energy, dependent on the mode parameter:
 
@@ -498,7 +510,9 @@ def calc_plot_data_of_energy_dependent_label(mc_info, pred, prop_name, mode, sel
 
     energy_true = mc_info['energy']
     if mode[0] == 'rel_std_div':
-        energy_to_property_performance_plot_data = get_rel_std_div_plot_data(prop_pred, energy_true, energy_bins)
+        energy_to_property_performance_plot_data = get_rel_std_div_plot_data(prop_pred, energy_true, energy_bins, e_relative=True)
+    elif mode[0] == 'std_div':
+        energy_to_property_performance_plot_data = get_rel_std_div_plot_data(prop_pred, energy_true, energy_bins, e_relative=False)
     else:
         metric = mode[1]
         err = np.abs(prop_pred - prop_true)
@@ -507,7 +521,7 @@ def calc_plot_data_of_energy_dependent_label(mc_info, pred, prop_name, mode, sel
     return energy_to_property_performance_plot_data
 
 
-def get_rel_std_div_plot_data(prop_pred, energy_true, energy_bins):
+def get_rel_std_div_plot_data(prop_pred, energy_true, energy_bins, e_relative=True):
     """
     Function that calculates the relative standard deviation of prop_pred in a certain energy range and returns
     it together with the energy_bins array from the input.
@@ -520,32 +534,38 @@ def get_rel_std_div_plot_data(prop_pred, energy_true, energy_bins):
         True MC energy values.
     energy_bins : ndarray(ndim=1)
         Array which specifies the energy bins that should be used for the x-binning.
+    e_relative : bool
+        If the calculcation should be relative to the true MC energy or not.
 
     Returns
     -------
-    energy_binned_rel_std_plot_data : tuple(ndarray, ndarray)
+    energy_binned_std_plot_data : tuple(ndarray, ndarray)
         Tuple containing 2 arrays:
         1) energy_bins array from the input.
         2) the relative (relative to e-mc-bin) standard deviation of the property for each bin.
 
     """
-    std_rel = []  # y-axis data
+    std = []  # y-axis data
     for i in range(energy_bins.shape[0] - 1):
         e_range_low, e_range_high = energy_bins[i], energy_bins[i+1]
-        e_range_mean = (e_range_low + e_range_high) / float(2)
+        e_range_mean = (e_range_low + e_range_high) / 2
 
         # cut out prop_pred values within a certain energy bin
         prop_pred_cut_boolean = np.logical_and(e_range_low < energy_true, energy_true <= e_range_high)
         prop_pred_cut = prop_pred[prop_pred_cut_boolean]
 
         std_temp = np.std(prop_pred_cut)
-        std_rel.append(std_temp / float(e_range_mean))
+
+        if e_relative is True:
+            std.append(std_temp / e_range_mean)
+        else:
+            std.append(std_temp)
 
     # fix for mpl
-    std_rel.append(std_rel[-1])
-    energy_binned_rel_std_plot_data = [energy_bins, std_rel]
+    std.append(std[-1])
+    energy_binned_std_plot_data = [energy_bins, std]
 
-    return energy_binned_rel_std_plot_data
+    return energy_binned_std_plot_data
 
 
 def bin_error_in_energy_bins(err, mc_energy, energy_bins, metric='median_relative'):
@@ -747,13 +767,8 @@ def make_1d_reco_err_to_reco_residual_plot(pred_file, savefolder, savename, cuts
                   'vtx_z': {'col_name_pred': 'pred_vtx_z', 'col_name_true': 'true_vtx_z', 'col_name_pred_err': 'pred_err_vtx_z', 'unit': '[rad]'},
                   'vtx_t': {'col_name_pred': 'pred_vtx_t', 'col_name_true': 'true_vtx_t', 'col_name_pred_err': 'pred_err_vtx_t', 'unit': '[rad]'}}
 
-    mc_info, pred, true = pred_file['mc_info'], pred_file['pred'], pred_file['true']
-    if cuts is not None:
-        assert isinstance(cuts, str)
-        evt_sel_mask = get_event_selection_mask(mc_info, cut_name=cuts)
-        mc_info = mc_info[evt_sel_mask]
-        pred = pred[evt_sel_mask]
-        true = true[evt_sel_mask]
+    dsets = get_mc_info_and_other_datasets(pred_file, 'mc_info', ('pred', 'true'), cuts=cuts)
+    mc_info, pred, true = dsets[0], dsets[1], dsets[2]
 
     for prop_name in properties:
         for ic in ic_list:
@@ -766,7 +781,7 @@ def make_1d_reco_err_to_reco_residual_plot(pred_file, savefolder, savename, cuts
             prop_true, prop_pred, prop_pred_err = get_prop_true_pred_and_prop_pred_sigma(pred_ic, true_ic, mc_info_ic,
                                                                                          properties, prop_name)
 
-            n_x_bins = 50
+            n_x_bins = 35
             title = ic_list[ic]['title'] + ': ' + prop_name
             unit = properties[prop_name]['unit']
 
@@ -809,7 +824,7 @@ def get_prop_true_pred_and_prop_pred_sigma(pred, true, mc_info, properties, prop
 
     """
 
-    if prop_name == 'azimuth' or prop_name == 'zenith':
+    if 'azimuth' in prop_name or 'zenith' in prop_name:
 
         dx_true, dx_pred = true[properties['dir_x']['col_name_true']], pred[properties['dir_x']['col_name_pred']]
         dy_true, dy_pred = true[properties['dir_y']['col_name_true']], pred[properties['dir_y']['col_name_pred']]
@@ -828,27 +843,40 @@ def get_prop_true_pred_and_prop_pred_sigma(pred, true, mc_info, properties, prop
             dx_pred_err = np.clip(np.copy(dx_pred_err), 0, None) * correction  # copy maybe not necessary
             dy_pred_err = np.clip(np.copy(dy_pred_err), 0, None) * correction
 
+            # normalize
+            ax = np.newaxis
+            dir_conc = np.concatenate([dx_pred[:, ax], dy_pred[:, ax], dz_pred[:, ax]], axis=1)
+            norm = np.linalg.norm(dir_conc, axis=1)
+            dx_pred = np.divide(dx_pred, norm)
+            dy_pred = np.divide(dy_pred, norm)
+
             # error propagation of atan2 with correlations between y and x neglected (covariance term = 0)
             azimuth_pred_err = np.sqrt((dx_pred / (dx_pred ** 2 + dy_pred ** 2)) ** 2 * dy_pred_err ** 2 +
                                        (-dy_pred / (dx_pred ** 2 + dy_pred ** 2)) ** 2 * dx_pred_err ** 2)
 
-            # clip every predicted standard deviation to pi if larger than pi
+            # # clip every predicted standard deviation to pi if larger than pi
             n = np.count_nonzero(azimuth_pred_err > math.pi)
+            azimuth_pred_err = np.clip(azimuth_pred_err, None, math.pi)
             percentage_true = np.sum(n) / float(azimuth_pred_err.shape[0]) * 100
             print('Clipped ' + str(n) + ' predicted azimuth standard deviations to pi ('
                   + str(percentage_true) + '% of all events)')
 
-            azimuth_pred_err = np.clip(azimuth_pred_err, None, math.pi)
-
             # # If we don't want to neglect the convariance term , since y and x are correlated:
             # # tested: doesn't really make a difference
             # mean_dx, mean_dy = np.mean(dx_pred), np.mean(dy_pred)
-            # covariance_xy = 1/float(dx_pred.shape[0]) * np.sum((dx_pred - mean_dx) * (dy_pred - mean_dy))
-            # test = np.abs(2 * (dx_pred / (dx_pred ** 2 + dy_pred ** 2)) * (-dy_pred / (dx_pred ** 2 + dy_pred ** 2)) * covariance_xy)
-            # label_std_pred = np.sqrt(np.abs(( dx_pred / (dx_pred ** 2 + dy_pred ** 2)) ** 2 * dy_std_pred ** 2 +
-            #                          (-dy_pred / (dx_pred ** 2 + dy_pred ** 2)) ** 2 * dx_std_pred ** 2 +
+            # covariance_xy = 1/dx_pred.shape[0] * np.sum((dx_pred - mean_dx) * (dy_pred - mean_dy))
+            # # covariance_xy = np.clip(covariance_xy, 0, None)
+            # test = 2 * (dx_pred / (dx_pred ** 2 + dy_pred ** 2)) * (-dy_pred / (dx_pred ** 2 + dy_pred ** 2)) * covariance_xy
+            # azimuth_pred_err = np.sqrt(np.abs((dx_pred / (dx_pred ** 2 + dy_pred ** 2)) ** 2 * dy_pred_err ** 2 +
+            #                          (-dy_pred / (dx_pred ** 2 + dy_pred ** 2)) ** 2 * dx_pred_err ** 2 +
             #                          2 * (dx_pred / (dx_pred ** 2 + dy_pred ** 2)) * (-dy_pred / (dx_pred ** 2 + dy_pred ** 2)) * covariance_xy))
-            # label_std_pred = np.clip(label_std_pred, None, math.pi/float(2))
+            # azimuth_pred_err = np.clip(azimuth_pred_err, None, math.pi/float(2))
+
+            # print('----- AZIMUTH -----')
+            # print(np.amin(azimuth_true - azimuth_pred), np.amax(azimuth_true - azimuth_pred))
+            # print(np.amin(azimuth_pred_err), np.amax(azimuth_pred_err))
+            # print(azimuth_pred_err)
+            # print('----- AZIMUTH -----')
 
             prop_true, prop_pred, prop_pred_err = azimuth_true, azimuth_pred, azimuth_pred_err
 
@@ -858,17 +886,55 @@ def get_prop_true_pred_and_prop_pred_sigma(pred, true, mc_info, properties, prop
 
             # clip std prediction to 0 (maybe not really necessary) and apply correction
             dz_pred_err = np.clip(np.copy(dz_pred_err), 0, None) * correction
-            dz_pred = np.clip(dz_pred, -0.999, 0.999)
+            # dz_pred = np.clip(np.copy(dz_pred), -0.999, 0.999)
 
-            # error propagation with correlations neglected (covariance term = 0)
-            zenith_pred_err = np.sqrt((-1 / np.sqrt((1 - dz_pred ** 2))) ** 2 * dz_pred_err ** 2)  # zen = arccos(z/norm(r))
+            # normalize
+            ax = np.newaxis
+            dir_conc = np.concatenate([dx_pred[:, ax], dy_pred[:, ax], dz_pred[:, ax]], axis=1)
+            norm = np.linalg.norm(dir_conc, axis=1)
+            dx_pred = np.divide(dx_pred, norm)
+            dy_pred = np.divide(dy_pred, norm)
+            dz_pred = np.divide(dz_pred, norm)
 
-            # # If we don't want to neglect the convariance term:
-            # dx_std_pred, dy_std_pred = np.clip(dx_std_pred, 0, None) * correction, np.clip(dy_std_pred, 0, None) * correction
-            # dx_pred, dy_pred = np.clip(dx_pred, -0.999, 0.999), np.clip(dy_pred, -0.999, 0.999)
-            # label_std_pred = np.sqrt( (np.sqrt(dx_pred ** 2 + dy_pred ** 2) / (dx_pred ** 2 + dy_pred ** 2 + dz_pred ** 2))**2 * dz_std_pred ** 2 +
-            #                           ((- dx_pred * dz_pred) / (np.sqrt(dx_pred ** 2 + dy_pred ** 2) * (dx_pred ** 2 + dy_pred ** 2 + dz_pred ** 2))) ** 2 * dx_std_pred ** 2 +
-            #                           ((- dy_pred * dz_pred) / (np.sqrt(dx_pred ** 2 + dy_pred ** 2) * (dx_pred ** 2 + dy_pred ** 2 + dz_pred ** 2))) ** 2 * dy_std_pred ** 2)
+            # ---- error propagation of zen = arccos(z/norm(r)) with neglecting the norm(r) ---- #
+            # zenith_pred_err = np.sqrt((-1 / np.sqrt(1 - dz_pred ** 2)) ** 2 * dz_pred_err ** 2)  # zen = arccos(z/norm(r))
+            # zenith_pred_err = np.clip(zenith_pred_err, 0, 0.6)
+
+            # ---- error propagation of zen = arccos(z/norm(r)), keeping in mind the norm(r) with errors of x and y ---- #
+            # dx_pred_err = np.clip(np.copy(dx_pred_err), 0, None) * correction
+            # dy_pred_err = np.clip(np.copy(dy_pred_err), 0, None) * correction
+            #
+            # f = - (1 / np.sqrt(dx_pred ** 2 + dy_pred ** 2 + dz_pred ** 2) - dz_pred ** 2 / (dx_pred ** 2 + dy_pred ** 2 + dz_pred ** 2) ** 1.5)\
+            #        / np.sqrt(1 - dz_pred ** 2 / (dx_pred ** 2 + dy_pred ** 2 + dz_pred ** 2))
+            # s = dx_pred * dz_pred / ((dx_pred ** 2 + dy_pred ** 2 + dz_pred ** 2) ** 1.5 * np.sqrt(1 - dz_pred ** 2 / (dx_pred ** 2 + dy_pred ** 2 + dz_pred ** 2)))
+            # t = dy_pred * dz_pred / ((dx_pred ** 2 + dy_pred ** 2 + dz_pred ** 2) ** 1.5 * np.sqrt(1 - dz_pred ** 2 / (dx_pred ** 2 + dy_pred ** 2 + dz_pred ** 2)))
+            #
+            # zenith_pred_err = np.sqrt(f ** 2 * dz_pred_err + s ** 2 * dx_pred_err + t ** 2 * dy_pred_err)
+
+            # ---- error propagation of arctan2(z, sqrt(x**2 + y**2)), neglecting errors of x and y ---- #
+            # zenith_pred_err = np.sqrt((np.sqrt(dx_pred ** 2 + dy_pred ** 2) / (
+            #                            dx_pred ** 2 + dy_pred ** 2 + dz_pred ** 2)) ** 2 * dz_pred_err ** 2)
+
+            # ---- error propagation of arctan2(z, sqrt(x**2 + y**2)), keeping in mind the norm(r) with errors of x and y ---- #
+            dx_pred_err = np.clip(np.copy(dx_pred_err), 0, None) * correction
+            dy_pred_err = np.clip(np.copy(dy_pred_err), 0, None) * correction
+            zenith_pred_err = np.sqrt(
+                                      (np.sqrt(dx_pred ** 2 + dy_pred ** 2) / (dx_pred ** 2 + dy_pred ** 2 + dz_pred ** 2)) ** 2 * dz_pred_err ** 2 +
+                                      ((-dy_pred * dz_pred) / (np.sqrt(dx_pred ** 2 + dy_pred ** 2) * (dx_pred ** 2 + dy_pred ** 2 + dz_pred ** 2))) ** 2 * dy_pred_err ** 2 +
+                                      ((-dx_pred * dz_pred) / (np.sqrt(dx_pred ** 2 + dy_pred ** 2) * (dx_pred ** 2 + dy_pred ** 2 + dz_pred ** 2))) ** 2 * dx_pred_err ** 2)
+
+            # ---- error propagation of arctan2(z, sqrt(x**2 + y**2)) with neglecting errors of x and y ---- #
+            # zenith_pred_err = np.sqrt((1 / (dz_pred ** 2 + 1)) ** 2 * dz_pred_err ** 2)
+            # zenith_pred_err = np.clip(zenith_pred_err, 0, 0.6)
+
+            # print('----- ZENITH -----')
+            # print(np.amin(zenith_true - zenith_pred), np.amax(zenith_true - zenith_pred))
+            # print(np.amin(zenith_pred_err), np.amax(zenith_pred_err))
+            # print(zenith_pred_err)
+            # print('----- ZENITH -----')
+
+            if 'cos' in prop_name:
+                zenith_true, zenith_pred = np.cos(zenith_true + math.pi/2), np.cos(zenith_pred + math.pi/2)
 
             prop_true, prop_pred, prop_pred_err = zenith_true, zenith_pred, zenith_pred_err
 
@@ -887,7 +953,7 @@ def get_prop_true_pred_and_prop_pred_sigma(pred, true, mc_info, properties, prop
         prop_pred_err = pred[properties[prop_name]['col_name_pred_err']]
 
         prop_pred_err = prop_pred_err * 1.253  # sqrt(pi/2) magic number correction with mse training
-        prop_pred_err = np.abs(prop_pred_err)  # TODO necessary? -> rather set to zero, regarding the loss function?
+        prop_pred_err = np.clip(prop_pred_err, 0, None)  # TODO necessary? -> rather set to zero, regarding the loss function?
 
     return prop_true, prop_pred, prop_pred_err
 
@@ -928,14 +994,14 @@ def plot_1d_reco_err_to_reco_residual_for_prop(prop_true, prop_pred, prop_pred_e
     x, y = [], []
     for i in range(x_bins_std_pred.shape[0] - 1):  # same as n_x_bins
         prop_std_pred_low, prop_std_pred_high = x_bins_std_pred[i], x_bins_std_pred[i+1]
-        prop_std_pred_mean = (prop_std_pred_low + prop_std_pred_high) / float(2)
+        prop_std_pred_mean = (prop_std_pred_low + prop_std_pred_high) / 2
 
         prop_std_pred_boolean_mask = np.logical_and(prop_std_pred_low < prop_pred_err, prop_pred_err <= prop_std_pred_high)
-        if np.count_nonzero(prop_std_pred_boolean_mask) < 100:
+        if np.count_nonzero(prop_std_pred_boolean_mask) < 5000:
             continue
 
         if prop_name == 'azimuth':
-            # if abs(residual_azimuth) <= pi, take az_true - az_pred ; if residual_azimuth > pi take
+            # if abs(residual_azimuth) <= pi, take az_true - az_pred ; if residual_azimuth > pi take the following:
             all_residuals = prop_true[prop_std_pred_boolean_mask] - prop_pred[prop_std_pred_boolean_mask]
             larger_pi = np.abs(all_residuals) > math.pi
             sign_larger_pi = np.sign(all_residuals[larger_pi])  # loophole for residual == 0, but doesn't matter below
@@ -951,6 +1017,13 @@ def plot_1d_reco_err_to_reco_residual_for_prop(prop_true, prop_pred, prop_pred_e
         y.append(residuals_std)
 
     plt.scatter(x, y, s=20, lw=0.75, c='blue', marker='+')
+    xlim, ylim = ax.get_xlim(), ax.get_ylim()
+    if xlim != ylim:
+        max_val, idx = max((xlim, ylim)), (xlim, ylim).index(max((xlim, ylim)))
+        if idx == 0:  # max of x axis is larger
+            ax.set_ylim(xlim)
+        else:
+            ax.set_xlim(ylim)
 
     title = plt.title(title)
     title.set_position([.5, 1.04])
@@ -979,7 +1052,6 @@ def make_2d_true_reco_plot_different_sigmas(pred_file, savefolder, savename, cut
         load_event_selection_file() function.
 
     """
-    fig, ax = plt.subplots()
     pdf_plots = mpl.backends.backend_pdf.PdfPages(savefolder + '/' + savename + '.pdf')
 
     ic_list = {'muon-CC': {'title': 'Track like (' + r'$\nu_{\mu}-CC$)'},
@@ -988,16 +1060,19 @@ def make_2d_true_reco_plot_different_sigmas(pred_file, savefolder, savename, cut
                'tau-CC': {'title': 'Tau like (' + r'$\nu_{\tau}-CC$)'}}
 
     properties = {'energy': {'bins': np.linspace(1, 100, 100), 'axis_prop_info': ('energy', 'GeV'),
-                             'col_name_pred': 'pred_energy', 'col_name_true': 'true_energy', 'col_name_pred_err': 'pred_err_energy',},
-                  'azimuth': {'bins': np.linspace(-math.pi, math.pi, 100), 'axis_prop_info': ('azimuth', 'rad'),
+                             'col_name_pred': 'pred_energy', 'col_name_true': 'true_energy', 'col_name_pred_err': 'pred_err_energy'},
+                  'azimuth': {'bins': np.linspace(-math.pi, math.pi, 50), 'axis_prop_info': ('azimuth', 'rad'),
                               'col_name_pred': None, 'col_name_true': None, 'col_name_pred_err': None},
-                  'zenith': {'bins': np.linspace(-math.pi/float(2), math.pi/float(2), 100), 'axis_prop_info': ('azimuth', 'rad'),
+                  'zenith': {'bins': np.linspace(-math.pi/float(2), math.pi/float(2), 50), 'axis_prop_info': ('zenith', 'rad'),
                              'col_name_pred': None, 'col_name_true': None, 'col_name_pred_err': None},
+                  'cos_zenith': {'bins': np.linspace(-1, 1, 50), 'axis_prop_info': ('cos(zenith)', 'rad'),
+                                 'col_name_pred': None, 'col_name_true': None, 'col_name_pred_err': None},
                   'dir_x': {'col_name_pred': 'pred_dir_x', 'col_name_true': 'true_dir_x',
                             'col_name_pred_err': 'pred_err_dir_x', 'unit': '[rad]'},
                   'dir_y': {'col_name_pred': 'pred_dir_y', 'col_name_true': 'true_dir_y',
                             'col_name_pred_err': 'pred_err_dir_y', 'unit': '[rad]'},
-                  'dir_z': {'col_name_pred': 'pred_dir_z', 'col_name_true': 'true_dir_z',
+                  'dir_z': {'bins': np.linspace(-1, 1, 50), 'axis_prop_info': ('dir_z', ''),
+                            'col_name_pred': 'pred_dir_z', 'col_name_true': 'true_dir_z',
                             'col_name_pred_err': 'pred_err_dir_z', 'unit': '[rad]'},
                   'vtx_x': {'col_name_pred': 'pred_vtx_x', 'col_name_true': 'true_vtx_x',
                             'col_name_pred_err': 'pred_err_vtx_x', 'unit': '[rad]'},
@@ -1009,16 +1084,11 @@ def make_2d_true_reco_plot_different_sigmas(pred_file, savefolder, savename, cut
                             'col_name_pred_err': 'pred_err_vtx_t', 'unit': '[rad]'}
                   }
 
-    mc_info, pred, true = pred_file['mc_info'], pred_file['pred'], pred_file['true']
-    if cuts is not None:
-        assert isinstance(cuts, str)
-        evt_sel_mask = get_event_selection_mask(mc_info, cut_name=cuts)
-        mc_info = mc_info[evt_sel_mask]
-        pred = pred[evt_sel_mask]
-        true = true[evt_sel_mask]
+    dsets = get_mc_info_and_other_datasets(pred_file, 'mc_info', ('pred', 'true'), cuts=cuts)
+    mc_info, pred, true = dsets[0], dsets[1], dsets[2]
 
     for prop_name in properties:
-        if prop_name not in ['energy', 'zenith', 'azimuth']:
+        if prop_name not in ['zenith', 'cos_zenith', 'azimuth', 'dir_z']:
             continue
 
         for ic in ic_list:
@@ -1030,20 +1100,19 @@ def make_2d_true_reco_plot_different_sigmas(pred_file, savefolder, savename, cut
             pred_ic, true_ic = pred[is_ic], true[is_ic]
             prop_true, prop_pred, prop_pred_err = get_prop_true_pred_and_prop_pred_sigma(pred_ic, true_ic, mc_info_ic,
                                                                                          properties, prop_name)
-
             bins = properties[prop_name]['bins']
             title = ic_list[ic]['title']
             percentage_of_evts = [1.0, 0.8, 0.5, 0.2]
 
-            plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, prop_pred_err, prop_name, properties,
-                                                     percentage_of_evts, title, bins, fig, ax, pdf_plots)
+            plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, mc_info_ic, prop_pred_err, prop_name, properties,
+                                                     percentage_of_evts, title, bins, pdf_plots)
 
     plt.close()
     pdf_plots.close()
 
 
-def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, prop_pred_err, prop_name, properties,
-                                             percentage_of_evts, title, bins, fig, ax, pdf_plots):
+def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, mc_info, prop_pred_err, prop_name, properties,
+                                             percentage_of_evts, title, bins, pdf_plots):
     """
     Plots a 2d true to reco plot for a certain property, and selects only
     the best percentage of events based on the predicted errors by a nn.
@@ -1054,6 +1123,8 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, prop_pred_err
         Array which contains the true values of the specified property.
     prop_pred : ndarray(ndim=1)
         Array which contains the predicted values of the specified property.
+    mc_info : h5py.dataset.Dataset/ndarray(ndim=2)
+        The mc_info dataset of an OrcaNet nn prediction file.
     prop_pred_err : ndarray(ndim=1)
         Array which contains the predicted error values of the specified property, multiplied by the magic number.
     prop_name : str
@@ -1066,15 +1137,14 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, prop_pred_err
         Title that should be used for the plot.
     bins : ndarray(ndim=1)
         Bins that should be used for both the X and Y axis.
-    fig : mpl figure
-        Matplotlib instance of a figure.
-    ax : mpl.axes
-        Axes object that refers to ax of an existing plt.sublots object.
     pdf_plots : mpl.backends.backend_pdf.PdfPages
         Instance of a matplotlib PdfPages object, to which the plot should be saved.
 
     """
     cbar_max = None
+    dict_width = {}
+
+    fig, ax = plt.subplots()
     for i, percentage in enumerate(percentage_of_evts):
 
         n_total_evt = prop_pred_err.shape[0]
@@ -1087,7 +1157,8 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, prop_pred_err
         else:
             indices_events_to_keep = sorted(prop_pred_err.argsort()[:n_events_to_keep])  # select n minimum values in array
 
-        hist_2d_prop = np.histogram2d(prop_true[indices_events_to_keep], prop_pred[indices_events_to_keep], bins)
+        prop_true_left, prop_pred_left = prop_true[indices_events_to_keep], prop_pred[indices_events_to_keep]
+        hist_2d_prop = np.histogram2d(prop_true_left, prop_pred_left, bins)
         bin_edges_prop = hist_2d_prop[1]
 
         if i == 0:
@@ -1112,8 +1183,30 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, prop_pred_err
         # plt.tight_layout()
         pdf_plots.savefig(fig)
 
+        # --- Collect info for 4th plot --- #
+        e_ranges = ((3, 5), (5, 10), (10, 20), (1, 100))
+
+        for e_range in e_ranges:
+
+            if str(percentage) not in dict_width:
+                dict_width[str(percentage)] = dict()
+            if str(e_range) not in dict_width[str(percentage)]:
+                dict_width[str(percentage)][str(e_range)] = dict()
+
+            if e_range == (1, 100):
+                dict_width[str(percentage)][str(e_range)]['res'] = prop_true_left - prop_pred_left
+            else:
+                e_low, e_high = e_range[0], e_range[1]
+                e_cut_mask = np.logical_and(mc_info[indices_events_to_keep]['energy'] >= e_low, mc_info[indices_events_to_keep]['energy'] <= e_high)
+                dict_width[str(percentage)][str(e_range)]['res'] = prop_true_left[e_cut_mask] - prop_pred_left[e_cut_mask]
+
+            dict_width[str(percentage)][str(e_range)]['std'] = np.std(dict_width[str(percentage)][str(e_range)]['res'])
+
+        # --- Collect info for 4th plot --- #
+
         if i > 0:
-            # 1st plot, plot transparency of 100%
+
+            # ---- 1st plot, plot transparency of 100% ---- #
             hist_2d_prop_all = np.histogram2d(prop_true, prop_pred, bins)
             bin_edges_prop_all = hist_2d_prop_all[1]
 
@@ -1127,7 +1220,7 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, prop_pred_err
             cbar.remove()
             plt.cla()
 
-            # 2nd plot
+            # ---- 2nd plot ---- #
             # only divide nonzero bins of hist_2d_prop_all
             hist_2d_prop_all = np.histogram2d(prop_true, prop_pred, bins)
             non_zero = hist_2d_prop_all[0] > 0
@@ -1147,9 +1240,133 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, prop_pred_err
             cbar_2.remove()
             plt.cla()
 
+            # ---- 3rd plot, significance ---- #
+
+            hist_2d_prop_all = np.histogram2d(prop_true, prop_pred, bins)
+            n_left, n_all = hist_2d_prop[0], hist_2d_prop_all[0]
+
+            significance = (n_left - n_all * percentage) / np.sqrt(n_all * percentage)
+
+            # replace nans with zeros
+            # significance[np.isnan(significance)] = 0
+
+            prop_true_to_reco = ax.pcolormesh(bin_edges_prop, bin_edges_prop, significance.T)
+
+            plot_line_through_the_origin(prop_name, prop_name)
+
+            title_plot = plt.title('OrcaNet: ' + title + ', ' + str(int(percentage * 100)) + '% of total events')
+            title_plot.set_position([.5, 1.04])
+            cbar = fig.colorbar(prop_true_to_reco, ax=ax)
+            cbar.ax.set_ylabel(r'Discarding Significance $S_i$')
+
+            axis_prop_info = properties[prop_name]['axis_prop_info']
+            ax.set_xlabel('True ' + axis_prop_info[0] + ' [' + axis_prop_info[1] + ']')
+            ax.set_ylabel('Reconstructed ' + axis_prop_info[0] + ' [' + axis_prop_info[1] + ']')
+            plt.xlim(bins[0], bins[-1])
+            plt.ylim(bins[0], bins[-1])
+
+            pdf_plots.savefig(fig)
+
+            # Plot contours
+            # Convert bin_edges to center bin coordinates, because F matplotlib...
+            bin_edges_prop_centered = np.zeros(bin_edges_prop.shape[0] - 1)
+            for j in range(bin_edges_prop.shape[0] - 1):
+                bin_edges_prop_centered[j] = (bin_edges_prop[j] + bin_edges_prop[j+1]) / 2
+
+            # ---- Rectangular contours!!
+
+            # significance = significance.T
+            # resolution = 100
+            # f = lambda x, y: significance[int(y), int(x)]
+            # g = np.vectorize(f)
+            #
+            # x = np.linspace(0, significance.shape[1], significance.shape[1] * resolution)
+            # y = np.linspace(0, significance.shape[0], significance.shape[0] * resolution)
+            # X2, Y2 = np.meshgrid(x[:-1], y[:-1])
+            # significance_high_res = g(X2, Y2)
+            #
+            # bins_new = np.linspace(min(bin_edges_prop), max(bin_edges_prop), significance.shape[0] * resolution)
+            # bins_new_c = np.zeros(bins_new.shape[0] - 1)
+            #
+            # for j in range(bins_new.shape[0] - 1):
+            #     bins_new_c[j] = (bins_new[j] + bins_new[j+1]) / 2
+            #
+            # cont = plt.contour(bins_new_c, bins_new_c, significance_high_res,
+            #                    colors='red', linestyles='solid', antialiased=True, linewidths=0.8,
+            #                    levels=np.array([-2, 2], dtype=np.int8))
+
+            # ---- Rectangular contours!!
+
+            cont = plt.contour(bin_edges_prop_centered, bin_edges_prop_centered, significance.T,
+                               colors='red', linestyles='solid', antialiased=True, linewidths=0.8,
+                               levels=np.array([-2, 2], dtype=np.int8))
+
+            # Define a class that forces representation of float to look a certain way
+            # This remove trailing zero so '1.0' becomes '1'
+            class nf(float):
+                def __repr__(self):
+                    s = f'{self:.1f}'
+                    return f'{self:.0f}' if s[-1] == '0' else s
+
+            cont.levels = [nf(val) for val in cont.levels]
+            ax.clabel(cont, cont.levels, inline=1, fmt='%r', fontsize=7)
+
+            pdf_plots.savefig(fig)
+            plt.cla()
+            cbar.remove()
+
         if i == 0:
             cbar.remove()
         plt.cla()
+
+    # ---- 4th plot, true-reco 1d to calculate the std deviation of the distribution ---- #
+    plt.close()
+    fig, ax = plt.subplots()
+
+    axis_prop_info = properties[prop_name]['axis_prop_info']
+    hist = None
+    for i, key in enumerate(dict_width):
+        if i == 0:
+            hist = plt.hist(dict_width[key]['(1, 100)']['res'], bins=100,
+                            range=(np.amin(dict_width[key]['(1, 100)']['res']) - np.amin(dict_width[key]['(1, 100)']['res']) * 0.5,
+                                   np.amax(dict_width[key]['(1, 100)']['res']) + np.amin(dict_width[key]['(1, 100)']['res']) * 0.5),
+                            label=str(int(float(key) * 100)) + '%', histtype='step', density=True)
+        else:
+            hist = plt.hist(dict_width[key]['(1, 100)']['res'], bins=hist[1], label=str(int(float(key) * 100)) + '%', histtype='step', density=True)
+
+    ax.set_yscale('log')
+    ax.set_xlabel(r'True %s $-$ Reco %s' % (axis_prop_info[0], axis_prop_info[0]))
+    ax.set_ylabel('Normed Quantity [a.u.]')
+    ax.legend(loc='upper right')
+    plt.grid(True, zorder=0, linestyle='dotted')
+
+    pdf_plots.savefig(fig)
+
+    plt.close()
+    fig, ax = plt.subplots()
+
+    percentages, widths = [], {}
+    for key in dict_width:  # loop over percentage str keys
+        percentages.append(float(key) * 100)
+
+        for key_2 in dict_width[key]:  # loop over e_range str keys
+            if key_2 not in widths:
+                widths[key_2] = []
+
+            widths[key_2] = widths[key_2] + [dict_width[key][key_2]['std']]
+
+    for key in widths:
+        if key == '(1, 100)':
+            continue
+
+        plt.plot(100 - np.array(percentages), np.array(widths[key]), label=key, marker='x')
+
+    ax.set_xlabel('Fraction of discarded events [%]')
+    ax.set_ylabel(r'Standard deviation of True %s $-$ Reco %s' % (axis_prop_info[0], axis_prop_info[0]))
+    ax.legend(loc='upper right')
+    plt.grid(True, zorder=0, linestyle='dotted')
+
+    pdf_plots.savefig(fig)
 
 
 # --------------------------- Code for error plots --------------------------- #

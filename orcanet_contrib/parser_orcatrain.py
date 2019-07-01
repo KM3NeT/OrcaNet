@@ -72,7 +72,7 @@ def orca_train(output_folder, list_file, config_file, model_file,
         # adapted to the datasets in the orga instance. Its modifiers will
         # be taken into account for this
         builder = ModelBuilder(model_file)
-        model = builder.build(orga)
+        model = builder.build(orga, log_comp_opts=True)
 
     elif recompile_model is True:
         builder = ModelBuilder(model_file)
@@ -81,7 +81,8 @@ def orca_train(output_folder, list_file, config_file, model_file,
         model = ks.models.load_model(path_of_model,
                                      custom_objects=orga.cfg.custom_objects)
         print("Recompiling the saved model")
-        model = builder.compile_model(model)
+        model = builder.compile_model(model, custom_objects=orga.cfg.custom_objects)
+        builder.log_model_properties(orga)
 
     else:
         model = None

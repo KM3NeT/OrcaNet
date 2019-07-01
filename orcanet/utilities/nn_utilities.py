@@ -115,7 +115,7 @@ def load_zero_center_data(orga, logging=False):
         { "input_A" : ndarray, "input_B" : ndarray }
 
     """
-    all_train_files = orga.io.get_local_files("train")
+    all_train_files = orga.cfg.get_files("train")
     zero_center_folder = orga.cfg.zero_center_folder
     if not zero_center_folder.endswith("/"):
         zero_center_folder += "/"

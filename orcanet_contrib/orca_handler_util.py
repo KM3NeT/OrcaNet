@@ -125,6 +125,16 @@ def orca_sample_modifiers(name):
             xs_layer['yzt-x'] = np.transpose(xs_files['xyz-t'], xyzt_permute['yzt-x'])
             return xs_layer
 
+    elif name == 'xyz-t_and_xyz-c_single_input_and_yzt-x':
+        def sample_modifier(xs_files):
+            # Concatenate xyz-t and xyz-c to a single input
+            xs_layer = dict()
+            xs_layer['xyz-t_and_xyz-c_single_input_net_0'] = np.concatenate(
+                [xs_files['xyz-t'], xs_files['xyz-c']], axis=-1)
+            # Transpose xyz-t to yzt-x and use that, too.
+            xs_layer['input_1_net_1'] = np.transpose(xs_files['xyz-t'], xyzt_permute['yzt-x'])
+            return xs_layer
+
     elif name == 'xyz-t_and_yzt-x_multi_input_single_train_tight-1_tight-2':
         def sample_modifier(xs_files):
             # Use xyz-t in two different time cuts, and also transpose them to yzt-x and use these, too.

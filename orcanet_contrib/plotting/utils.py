@@ -58,8 +58,7 @@ def select_ic(ptype, is_cc, interaction_channel):
     if interaction_channel not in list(ic_dict.keys()):
         raise ValueError('The interaction_channel ' + str(interaction_channel) + ' is not known.')
 
-    abs_ptype = np.abs(ptype)
-    is_ic = np.logical_and(abs_ptype == ic_dict[interaction_channel][0],
+    is_ic = np.logical_and(np.abs(ptype) == ic_dict[interaction_channel][0],
                            is_cc == ic_dict[interaction_channel][1])
 
     return is_ic
@@ -251,6 +250,118 @@ def test_in_nd():
     c = in_nd(a, b)
     it_works = np.all(c == [True, False, False])
     return it_works
+
+
+def get_cut_mask_for_events_that_exist_in_both_files(pred_file_1, pred_file_2, remove_duplicates=(False, False)):
+    """
+
+    """
+    ax = np.newaxis
+    # select pred_file_1 evts that are also in pred_file_2
+    print('Shape of mc_info pred_file_1 before selection: ' + str(pred_file_1['mc_info'].shape))
+    print('Shape of mc_info pred_file_2 before selection: ' + str(pred_file_2['mc_info'].shape))
+
+    mc_info_1, mc_info_2 = pred_file_1['mc_info'], pred_file_2['mc_info']
+
+    mc_info_id_1 = np.concatenate([mc_info_1['run_id'][:, ax], mc_info_1['event_id'][:, ax],
+                                   mc_info_1['prod_ident'][:, ax], mc_info_1['particle_type'][:, ax],
+                                   mc_info_1['is_cc'][:, ax]], axis=1)
+    mc_info_id_2 = np.concatenate([mc_info_2['run_id'][:, ax], mc_info_2['event_id'][:, ax],
+                                   mc_info_2['prod_ident'][:, ax], mc_info_2['particle_type'][:, ax],
+                                   mc_info_2['is_cc'][:, ax]], axis=1)
+
+    # boolean mask for file 1 that specifies, if events in 1 have been found in 2
+    mask_1_in_2 = in_nd(mc_info_id_1, mc_info_id_2)
+    mc_info_id_1_sel = mc_info_id_1[mask_1_in_2]
+
+    mask_2_in_1_sel = in_nd(mc_info_id_2, mc_info_id_1_sel)
+
+    print('Shape of mc_info pred_file_1 after selection: ' + str(mc_info_id_1_sel.shape))
+    print('Shape of mc_info pred_file_2 after selection: ' + str(mc_info_id_2[mask_2_in_1_sel].shape))
+
+    if remove_duplicates[0]:
+        # get rid of duplicates!
+        print('Shape of cut mc_info pred_file_1 before deselecting the few duplicates: ' + str(mc_info_id_1_sel.shape))
+        unq_1, idx_1, count_1 = np.unique(mc_info_id_1, axis=0,
+                                          return_counts=True, return_index=True)
+        # select only unique rows
+        mask_uq_1 = np.zeros(mc_info_id_1.shape[0], np.bool)
+        mask_uq_1[idx_1] = 1
+
+        mask_1_in_2_uq = np.logical_and(mask_1_in_2, mask_uq_1)
+
+        print('Shape of cut mc_info pred_file_1 after deselecting the few duplicates: ' + str(mc_info_id_1[mask_1_in_2_uq].shape))
+
+        mask_1_in_2 = mask_1_in_2_uq
+
+    if remove_duplicates[1]:
+        # get rid of duplicates!
+        print('Shape of cut mc_info pred_file_2 before deselecting the few duplicates: ' + str(mc_info_id_2[mask_2_in_1_sel].shape))
+        unq_2, idx_2, count_2 = np.unique(mc_info_id_2, axis=0,
+                                          return_counts=True, return_index=True)
+        # select only unique rows
+        mask_uq_2 = np.zeros(mc_info_id_2.shape[0], np.bool)
+        mask_uq_2[idx_2] = 1
+
+        mask_2_in_1_sel_uq = np.logical_and(mask_2_in_1_sel, mask_uq_2)
+
+        print('Shape of cut mc_info pred_file_2 after deselecting the few duplicates: ' + str(
+              mc_info_id_2[mask_2_in_1_sel_uq].shape))
+
+        mask_2_in_1_sel = mask_2_in_1_sel_uq
+
+    return mask_1_in_2, mask_2_in_1_sel
+
+
+def get_mc_info_and_other_datasets(pred_file, mc_info_key, dset_keys, cuts=None):
+    """
+    Gets the mc_info and pred_datasets from a h5py pred_file instance and applies some cuts if cuts is not None.
+
+    Parameters
+    ----------
+    pred_file : h5py.File
+        H5py file instance, which stores the regression predictions of a nn model.
+    mc_info_key : str
+        Key of the mc_info dataset in the pred_file.
+    dset_keys : tuple/str
+        Key of the pred dataset in the pred_file.
+    cuts : None/str
+        Specifies, if cuts should be used for the plot. Either None or a str, that is available in the
+        load_event_selection_file() function.
+
+    Returns
+    -------
+    mc_info : h5py.dataset.Dataset/ndarray(ndim=2)
+        The (cut) mc_info structured array of an OrcaNet nn prediction file.
+    pred : h5py.dataset.Dataset/ndarray(ndim=2)
+        The (cut) pred dataset of a nn OrcaNet classifier, which contains all predicted labels as single columns.
+
+    """
+    if not isinstance(dset_keys, tuple):
+        dset_keys = (dset_keys,)
+
+    preds = []
+    mc_info = pred_file[mc_info_key]
+    if cuts is not None:
+        if type(cuts) is np.ndarray:
+            mc_info = mc_info[cuts]
+            for key in dset_keys:
+                preds.append(pred_file[key][cuts])
+
+        else:
+            assert isinstance(cuts, str)
+            print('Event number before selection: ' + str(mc_info.shape))
+            evt_sel_mask = get_event_selection_mask(mc_info, cut_name=cuts)
+            mc_info = mc_info[evt_sel_mask]
+            print('Event number after selection: ' + str(mc_info.shape))
+            for key in dset_keys:
+                preds.append(pred_file[key][evt_sel_mask])
+
+    else:
+        for key in dset_keys:
+            preds.append(pred_file[key])
+
+    return (mc_info, ) + tuple(preds)
 
 
 # --------------------------- Code for making cuts --------------------------- #
