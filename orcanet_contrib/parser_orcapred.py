@@ -74,12 +74,16 @@ def orca_pred(output_folder, list_file, config_file, model_file,
                                       concatenate=True)[0]
 
     # make performance plots, only available for bg/ts/regression
-    dataset_modifier = toml.load(model_file)["orca_modifiers"][
+    dset_mod_available_plots = ['regression', 'bg_classifier', 'ts_classifier']
+    try:
+        dataset_modifier = toml.load(model_file)["orca_modifiers"][
             "dataset_modifier"]
-    dset_mod_available_plots = ['regression, bg_classifier, ts_classifier']
-    if any(x in dataset_modifier for x in dset_mod_available_plots):
-        plots_folder = orga.io.get_subfolder(name='plots')
-        make_performance_plots(pred_filepath_conc, dataset_modifier, plots_folder)
+        if any(x in dataset_modifier for x in dset_mod_available_plots):
+            plots_folder = orga.io.get_subfolder(name='plots')
+            make_performance_plots(pred_filepath_conc, dataset_modifier, plots_folder)
+
+    except KeyError:
+        pass
 
 
 def main():
@@ -88,12 +92,12 @@ def main():
     if args["--epoch"] == "None":
         epoch = None
     else:
-        epoch = args["--epoch"]
+        epoch = int(args["--epoch"])
 
     if args["--fileno"] == "None":
         fileno = None
     else:
-        fileno = args["--fileno"]
+        fileno = int(args["--fileno"])
 
     orca_pred(output_folder=args['FOLDER'],
               list_file=args['LIST'],

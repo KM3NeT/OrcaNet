@@ -290,7 +290,8 @@ def get_property_info_to_plot(mc_info, prop_dset, properties, prop_name, reco_en
 
 def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, savefolder, savename,
                                                reco_energy_correction=None, energy_bins=np.arange(1, 101, 2.5),
-                                               cuts=None, compare_2nd_reco=None):
+                                               cuts=None, compare_2nd_reco=None,
+                                               overlay=('KM3NeT Preliminary', (0.3, 0.95))):
     """
     Makes binned 1d plots that show
     1) X-axis: The true energy binned into bins
@@ -338,11 +339,13 @@ def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, s
     pdf_plots = mpl.backends.backend_pdf.PdfPages(savefolder + '/' + savename + '.pdf')
     title_prefix = 'CNN: '
 
-    properties = {'dirs_vector': {'sub_props': ['dir_x', 'dir_y', 'dir_z'], 'ylabel': ' error (dir)'},
-                  'dirs_spherical': {'sub_props': ['azimuth', 'zenith'], 'ylabel': ' error (dir)'},
-                  'energy': {'sub_props': ['energy'], 'ylabel': ' error (energy, GeV)', 'correct': 'median'},
-                  'vertex_vector': {'sub_props': ['vtx_x', 'vtx_y', 'vtx_z'], 'ylabel': ' error (vertex, m)'},
-                  'bjorkeny': {'sub_props': ['bjorkeny'], 'ylabel': ' error (bjorkeny)'}}
+    properties = {'dirs_vector': {'sub_props': ['dir_x', 'dir_y', 'dir_z'], 'ylabel': ' direction error'},
+                  'dirs_spherical': {'sub_props': ['azimuth', 'zenith'], 'ylabel': ' direction error [rad]'},
+                  'dirs_spherical_for_experts': {'sub_props': ['azimuth_corr', 'zenith'], 'ylabel': ' direction error [rad]'},
+                  'dirs_spherical_for_expert_experts': {'sub_props': ['space_angle', 'zenith'], 'ylabel': ' direction error [rad]'},
+                  'energy': {'sub_props': ['energy'], 'ylabel': ' energy error [GeV]', 'correct': 'median'},
+                  'vertex_vector': {'sub_props': ['vtx_x', 'vtx_y', 'vtx_z'], 'ylabel': ' vertex error [m]'},
+                  'bjorkeny': {'sub_props': ['bjorkeny'], 'ylabel': ' bjorkeny error'}}
 
     ic_list = {'muon-CC': {'title': 'Track like (' + r'$\nu_{\mu}-CC$)'},
                'elec-CC': {'title': 'Shower like (' + r'$\nu_{e}-CC$)'},
@@ -372,7 +375,11 @@ def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, s
                                                                  reco_energy_correction=reco_energy_correction)
 
             bins, perf = plot_data[0], plot_data[1]
-            ax.step(bins, perf, linestyle="-", where='post', label='DL ' + sub_prop)
+            if sub_prop == 'azimuth_corr':
+                label = 'DL azimuth'
+            else:
+                label = 'DL ' + sub_prop.replace('_', ' ')
+            ax.step(bins, perf, linestyle="-", where='post', label=label)
 
             if compare_2nd_reco is not None:
                 is_ic_2 = select_ic(mc_info_2['particle_type'], mc_info_2['is_cc'], ic)
@@ -380,8 +387,11 @@ def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, s
                 plot_data_2 = calc_plot_data_of_energy_dependent_label(mc_info_2, pred_2, sub_prop, mode, selection=is_ic_2,
                                                                        reco_energy_correction=None,
                                                                        energy_bins=energy_bins)
-
-                ax.step(bins, plot_data_2[1], linestyle="-", where='post', label='Std ' + sub_prop)
+                if sub_prop == 'azimuth_corr':
+                    label = 'Std azimuth'
+                else:
+                    label = 'Std ' + sub_prop.replace('_', ' ')
+                ax.step(bins, plot_data_2[1], linestyle="-", where='post', label=label)
 
         x_ticks_major = np.arange(0, 101, 10)
         ax.set_xticks(x_ticks_major)
@@ -399,7 +409,8 @@ def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, s
             if ic == 'elec-CC' and '(energy)' in y_label and reco_energy_correction is True:
                 y_label = mode_str + ' error (corrected energy)'
 
-        ax.set_xlabel('True energy (GeV)'), ax.set_ylabel(y_label)
+        ax.set_xlabel('True energy [GeV]'), ax.set_ylabel(y_label)
+        plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold')
         ax.grid(True)
         ax.legend(loc='upper right')
 
@@ -473,7 +484,15 @@ def calc_plot_data_of_energy_dependent_label(mc_info, pred, prop_name, mode, sel
         azimuth_pred = convert_vectorial_to_spherical_dir(pred, 'azimuth', 'pred_')
         azimuth_true = convert_vectorial_to_spherical_dir(mc_info, 'azimuth', '')
 
-        prop_pred, prop_true = azimuth_pred, azimuth_true
+        if 'corr' in prop_name:
+            zenith_pred = convert_vectorial_to_spherical_dir(pred, 'zenith', 'pred_')
+            zenith_true = convert_vectorial_to_spherical_dir(mc_info, 'zenith', '')
+            pi = math.pi
+
+            prop_pred, prop_true = azimuth_pred * np.sin(zenith_pred + pi/2), azimuth_true * np.sin(zenith_true + pi/2)
+
+        else:
+            prop_pred, prop_true = azimuth_pred, azimuth_true
 
     elif 'zenith' in prop_name:
         # atan2(z, sqrt(x**2 + y**2))
@@ -481,6 +500,25 @@ def calc_plot_data_of_energy_dependent_label(mc_info, pred, prop_name, mode, sel
         zenith_true = convert_vectorial_to_spherical_dir(mc_info, 'zenith', '')
 
         prop_pred, prop_true = zenith_pred, zenith_true
+
+    elif 'space_angle' in prop_name:
+        zenith_pred = convert_vectorial_to_spherical_dir(pred, 'zenith', 'pred_')
+        zenith_true = convert_vectorial_to_spherical_dir(mc_info, 'zenith', '')
+
+        azimuth_pred = convert_vectorial_to_spherical_dir(pred, 'azimuth', 'pred_')
+        azimuth_true = convert_vectorial_to_spherical_dir(mc_info, 'azimuth', '')
+
+        azimuth_pred += math.pi
+        azimuth_true += math.pi
+        zenith_pred += math.pi/2
+        zenith_true += math.pi/2
+
+        space_angle_inner_value = np.sin(zenith_true) * np.sin(zenith_pred) * np.cos(azimuth_true - azimuth_pred)\
+                      + np.cos(zenith_true) * np.cos(zenith_pred)
+
+        space_angle = np.arccos(space_angle_inner_value)
+
+        prop_pred, prop_true = space_angle, np.zeros(space_angle.shape)
 
     elif 'energy' in prop_name:
         if reco_energy_correction is not None:
@@ -1112,7 +1150,8 @@ def make_2d_true_reco_plot_different_sigmas(pred_file, savefolder, savename, cut
 
 
 def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, mc_info, prop_pred_err, prop_name, properties,
-                                             percentage_of_evts, title, bins, pdf_plots):
+                                             percentage_of_evts, title, bins, pdf_plots,
+                                             overlay=('KM3NeT Preliminary', (0.65, 0.65))):
     """
     Plots a 2d true to reco plot for a certain property, and selects only
     the best percentage of events based on the predicted errors by a nn.
@@ -1359,12 +1398,16 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, mc_info, prop
         if key == '(1, 100)':
             continue
 
-        plt.plot(100 - np.array(percentages), np.array(widths[key]), label=key, marker='x')
+        labels = {'(1, 100)': '1-100 GeV', '(3, 5)': '3-5 GeV', '(5, 10)': '5-10 GeV',
+                  '(10, 20)': '10-20 GeV'}
+        plt.plot(100 - np.array(percentages), np.array(widths[key]), label=labels[key], marker='x')
 
     ax.set_xlabel('Fraction of discarded events [%]')
-    ax.set_ylabel(r'Standard deviation of True %s $-$ Reco %s' % (axis_prop_info[0], axis_prop_info[0]))
+    ax.set_ylabel(r'$\sigma$ of %s_{\text{True}} $-$ %s_{\text{Reco}}' % (axis_prop_info[0], axis_prop_info[0]))
     ax.legend(loc='upper right')
     plt.grid(True, zorder=0, linestyle='dotted')
+
+    plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold')
 
     pdf_plots.savefig(fig)
 

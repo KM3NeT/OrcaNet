@@ -131,6 +131,12 @@ def make_performance_plots(pred_filepath, dataset_modifier, plots_folder):
             make_1d_property_errors_metric_over_energy(pred_file, 'dirs_spherical', (None, 'median_relative'), main_perf_plots_path + '/1d/dir',
                                                        'e_true_to_median_relative_error_dirs_spherical', cuts=(cuts['mask_file_1'], cuts['mask_file_2']),
                                                        compare_2nd_reco=pred_file_2)
+            make_1d_property_errors_metric_over_energy(pred_file, 'dirs_spherical_for_experts', (None, 'median'), main_perf_plots_path + '/1d/dir',
+                                                       'e_true_to_median_error_dirs_spherical_az_corr', cuts=(cuts['mask_file_1'], cuts['mask_file_2']),
+                                                       compare_2nd_reco=pred_file_2)
+            make_1d_property_errors_metric_over_energy(pred_file, 'dirs_spherical_for_expert_experts', (None, 'median'), main_perf_plots_path + '/1d/dir',
+                                                       'e_true_to_median_error_dirs_spherical_space_angle', cuts=(cuts['mask_file_1'], cuts['mask_file_2']),
+                                                       compare_2nd_reco=pred_file_2)
             make_1d_property_errors_metric_over_energy(pred_file, 'dirs_spherical', ('rel_std_div', None), main_perf_plots_path + '/1d/dir',
                                                        'e_true_to_rel_std_div_dirs_spherical', cuts=(cuts['mask_file_1'], cuts['mask_file_2']),
                                                        compare_2nd_reco=pred_file_2)
@@ -186,7 +192,7 @@ def make_performance_plots(pred_filepath, dataset_modifier, plots_folder):
 
         if 'errors' in dataset_modifier:
             print('Generating plots for error performance investigations')
-            make_1d_reco_err_div_by_std_dev_plot(pred_file, main_perf_plots_path + '/1d/errors', 'reco_err_div_by_std_dev', cuts=cuts['from_npy_str'])
+            make_1d_reco_err_div_by_std_dev_plot(pred_file, main_perf_plots_path + '/1d/errors', 'reco_err_div_by_std_dev', cuts=None)
             make_1d_reco_err_to_reco_residual_plot(pred_file, main_perf_plots_path + '/1d/errors', 'reco_err_to_true_reco_residual', cuts=None)
             make_2d_true_reco_plot_different_sigmas(pred_file, main_perf_plots_path + '/2d/errors', 'true_reco_plot_different_sigmas', cuts=None)
 
