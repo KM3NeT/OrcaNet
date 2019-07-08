@@ -180,7 +180,8 @@ def make_contamination_to_neutrino_efficiency_plot(pred_file_1, pred_file_2, dat
         pdf_plots.close()
 
 
-def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl, pred_std, pdf_plots):
+def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl, pred_std, pdf_plots,
+                                                overlay=('KM3NeT Preliminary', (0.2, 0.7))):
     """
     Make muon/random-noise contamination plots vs neutrino efficiency.
 
@@ -214,7 +215,7 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
         ax.set_xlim(left=0, right=20)
         ax.set_xlabel('Muon contamination [%]'), ax.set_ylabel('Neutrino Efficiency [%]')
         ax.grid(True)
-        ax.legend(loc='upper right')
+        ax.legend(loc='center right')
         plt.title('E-range:' + str(tpl) + ', weighted for an atmospheric flux')
 
         pdf_plots.savefig(fig)
@@ -229,7 +230,7 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
         ax.set_xlim(left=0, right=5)
         ax.set_xlabel('Random noise contamination [%]'), ax.set_ylabel('Neutrino Efficiency [%]')
         ax.grid(True)
-        ax.legend(loc='upper right')
+        ax.legend(loc='center right')
         plt.title('E-range:' + str(tpl) + ', weighted for 10kHz noise')
 
         pdf_plots.savefig(fig)
@@ -262,10 +263,16 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
         ax.set_xlim(left=0, right=20)
         ax.set_xlabel('Muon contamination [%]'), ax.set_ylabel('Neutrino Efficiency [%]')
         ax.grid(True)
-        ax.legend(loc='upper right')
+        ax.legend(loc='center right')
         plt.title('E-range:' + str(tpl) + ', weighted for an atmospheric flux')
+        plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold')
 
         pdf_plots.savefig(fig)
+
+        # Just because we want a plot from 85 to 105
+        ax.set_ylim(bottom=85, top=ax.get_ylim()[1])
+        pdf_plots.savefig(fig)
+
         plt.close()
 
         # Random noise contamination
@@ -294,8 +301,9 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
         ax.set_xlim(left=0, right=5)
         ax.set_xlabel('Random noise contamination [%]'), ax.set_ylabel('Neutrino Efficiency [%]')
         ax.grid(True)
-        ax.legend(loc='upper right')
+        ax.legend(loc='center right')
         plt.title('E-range:' + str(tpl) + ', weighted for 10kHz noise')
+        plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold')
 
         pdf_plots.savefig(fig)
         plt.close()

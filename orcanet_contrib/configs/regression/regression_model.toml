@@ -37,15 +37,15 @@ architecture_args = {output_names=['e', 'dx', 'dy', 'dz', 'by', 'vx', 'vy', 'vz'
 optimizer = "adam"
 
 [compile.losses]
-dx = {function="mean_absolute_error", weight=20}
-dy = {function="mean_absolute_error", weight=20}
-dz = {function='mean_absolute_error', weight=25}
-vx = {function='mean_absolute_error', weight=0.1}
-vy = {function='mean_absolute_error', weight=0.1}
-vz = {function='mean_absolute_error', weight=0.1}
+dx = {function="mean_absolute_error", weight=30}
+dy = {function="mean_absolute_error", weight=30}
+dz = {function='mean_absolute_error', weight=40}
+vx = {function='mean_absolute_error', weight=1}
+vy = {function='mean_absolute_error', weight=1}
+vz = {function='mean_absolute_error', weight=1}
 vt = {function='mean_absolute_error', weight=1e-20}
-e  = {function='mean_absolute_error', weight=1}
-by = {function='mean_absolute_error', weight=10}
+e  = {function='mean_absolute_error', weight=2.5}
+by = {function='mean_absolute_error', weight=30}
 dx_err = {function='loss_uncertainty_mse'}
 dy_err = {function='loss_uncertainty_mse'}
 dz_err = {function='loss_uncertainty_mse', weight=1.25}
@@ -53,7 +53,7 @@ vx_err = {function='loss_uncertainty_mse', weight=5e-4}
 vy_err = {function='loss_uncertainty_mse', weight=5e-4}
 vz_err = {function='loss_uncertainty_mse', weight=5e-4}
 vt_err = {function='loss_uncertainty_mse', weight=5e-20}
-e_err  = {function='loss_uncertainty_mse', weight=5e-3}
+e_err  = {function='loss_uncertainty_mse', weight=3e-3}
 by_err = {function='loss_uncertainty_mse'}
 
 # ----------------------------------------------------------------------
