@@ -360,7 +360,7 @@ def make_e_to_acc_plot_with_diff(pred_file_1, pred_file_2, savefolder, cuts=None
 
     axes.legend(loc='lower right', ncol=2)
     plt.xlabel('Energy [GeV]')
-    plt.ylabel('Relative Improvement [%]')
+    plt.ylabel('Relative improvement [%]')
     plt.grid(True, zorder=0, linestyle='dotted')
 
     plt.savefig(savefolder + '/ts_e_to_acc_3-100GeV_diff_only.pdf')

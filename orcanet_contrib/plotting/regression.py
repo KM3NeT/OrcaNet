@@ -169,9 +169,9 @@ def get_make_2d_energy_resolution_plot_properties_dict():
                   'vtx_z_true': {'dset_key': 'mc_info', 'col_name': 'vertex_pos_z', 'bins': 50,
                                  'title_name': 'true vtx-z', 'ax_label': 'True vtx-z'},
                   'vtx_long_reco_mc': {'dset_key': 'pred', 'col_name': None, 'bins': 150, 'lim': (-30, 30),
-                                       'title_name': 'vtx long', 'ax_label': 'Vtx longitudinal distance [m]'},
+                                       'title_name': 'vtx long', 'ax_label': 'Vertex longitudinal distance [m]'},
                   'vtx_perp_reco_mc': {'dset_key': 'pred', 'col_name': None, 'bins': 150, 'lim': (0, 30),
-                                       'title_name': 'vtx perp', 'ax_label': 'Vtx perpendicular distance [m]'}
+                                       'title_name': 'vtx perp', 'ax_label': 'Vertex perpendicular distance [m]'}
                   }
 
     return properties
@@ -343,7 +343,7 @@ def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, s
                   'dirs_spherical': {'sub_props': ['azimuth', 'zenith'], 'ylabel': ' direction error [rad]'},
                   'dirs_spherical_for_experts': {'sub_props': ['azimuth_corr', 'zenith'], 'ylabel': ' direction error [rad]'},
                   'dirs_spherical_for_expert_experts': {'sub_props': ['space_angle', 'zenith'], 'ylabel': ' direction error [rad]'},
-                  'energy': {'sub_props': ['energy'], 'ylabel': ' energy error [GeV]', 'correct': 'median'},
+                  'energy': {'sub_props': ['energy'], 'ylabel': ' energy error', 'correct': 'median'},
                   'vertex_vector': {'sub_props': ['vtx_x', 'vtx_y', 'vtx_z'], 'ylabel': ' vertex error [m]'},
                   'bjorkeny': {'sub_props': ['bjorkeny'], 'ylabel': ' bjorkeny error'}}
 
@@ -758,7 +758,7 @@ def plot_1d_reco_err_div_by_std_for_label(prop_pred, prop_pred_err, prop_true, f
     # print(np.std(pred_err_div_by_std[exclude_outliers]))
     plt.hist(pred_err_div_by_std[exclude_outliers], bins=100, label=label)
 
-    title = plt.title('Gaussian Likelihood errors for ' + label)
+    title = plt.title('Gaussian likelihood errors for ' + label)
     title.set_position([.5, 1.04])
     ax.set_xlabel(r'$(y_{\mathrm{true}} - y_{\mathrm{pred}})/ \sigma_{\mathrm{pred}}$'), ax.set_ylabel('Counts [#]')
     ax.grid(True)
@@ -1375,7 +1375,7 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, mc_info, prop
 
     ax.set_yscale('log')
     ax.set_xlabel(r'True %s $-$ Reco %s' % (axis_prop_info[0], axis_prop_info[0]))
-    ax.set_ylabel('Normed Quantity [a.u.]')
+    ax.set_ylabel('Normed quantity [a.u.]')
     ax.legend(loc='upper right')
     plt.grid(True, zorder=0, linestyle='dotted')
 
@@ -1403,7 +1403,7 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, mc_info, prop
         plt.plot(100 - np.array(percentages), np.array(widths[key]), label=labels[key], marker='x')
 
     ax.set_xlabel('Fraction of discarded events [%]')
-    ax.set_ylabel(r'$\sigma$ of %s_{\text{True}} $-$ %s_{\text{Reco}}' % (axis_prop_info[0], axis_prop_info[0]))
+    ax.set_ylabel(r'$\sigma$ of $\mathrm{%s}_{\mathrm{true}}$ $-$ $\mathrm{%s}_{\mathrm{reco}}$' % (axis_prop_info[0], axis_prop_info[0]))
     ax.legend(loc='upper right')
     plt.grid(True, zorder=0, linestyle='dotted')
 

@@ -50,7 +50,7 @@ def make_prob_hists_bg_classifier(pred_file, savefolder, bg_classes=('not_neutri
         plt.minorticks_on()
 
         plt.xlabel(xlabel_prefix + ' ' + bg_class + ' probability')
-        plt.ylabel('Normed Quantity')
+        plt.ylabel('Normed quantity')
         title = plt.title('Probability to be classified as ' + bg_class)
         title.set_position([.5, 1.04])
 
@@ -181,7 +181,7 @@ def make_contamination_to_neutrino_efficiency_plot(pred_file_1, pred_file_2, dat
 
 
 def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl, pred_std, pdf_plots,
-                                                overlay=('KM3NeT Preliminary', (0.2, 0.7))):
+                                                overlay=('KM3NeT Preliminary', (0.65, 0.15))):
     """
     Make muon/random-noise contamination plots vs neutrino efficiency.
 
@@ -213,7 +213,7 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
         ax.plot(np.array(muon_cont_weighted_std), np.array(neutrino_eff_weighted_std), label='RF')
 
         ax.set_xlim(left=0, right=20)
-        ax.set_xlabel('Muon contamination [%]'), ax.set_ylabel('Neutrino Efficiency [%]')
+        ax.set_xlabel('Muon contamination [%]'), ax.set_ylabel('Neutrino efficiency [%]')
         ax.grid(True)
         ax.legend(loc='center right')
         plt.title('E-range:' + str(tpl) + ', weighted for an atmospheric flux')
@@ -228,7 +228,7 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
         ax.plot(np.array(rn_cont_weighted_std), np.array(neutrino_eff_weighted_std), label='RF')
 
         ax.set_xlim(left=0, right=5)
-        ax.set_xlabel('Random noise contamination [%]'), ax.set_ylabel('Neutrino Efficiency [%]')
+        ax.set_xlabel('Random noise contamination [%]'), ax.set_ylabel('Neutrino efficiency [%]')
         ax.grid(True)
         ax.legend(loc='center right')
         plt.title('E-range:' + str(tpl) + ', weighted for 10kHz noise')
@@ -261,7 +261,7 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
         plt.errorbar(dpoints_muon_cont_std, dpoints_neutr_eff_std, xerr=dpoints_muon_cont_err_std, fmt='.', markersize=4, label='RF', linewidth=0.7)
 
         ax.set_xlim(left=0, right=20)
-        ax.set_xlabel('Muon contamination [%]'), ax.set_ylabel('Neutrino Efficiency [%]')
+        ax.set_xlabel('Muon contamination [%]'), ax.set_ylabel('Neutrino efficiency [%]')
         ax.grid(True)
         ax.legend(loc='center right')
         plt.title('E-range:' + str(tpl) + ', weighted for an atmospheric flux')
@@ -299,7 +299,7 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
         plt.errorbar(dpoints_rn_cont_std, dpoints_neutr_eff_std, xerr=dpoints_rn_cont_err_std, fmt='.', markersize=4, label='RF', linewidth=0.7)
 
         ax.set_xlim(left=0, right=5)
-        ax.set_xlabel('Random noise contamination [%]'), ax.set_ylabel('Neutrino Efficiency [%]')
+        ax.set_xlabel('Random noise contamination [%]'), ax.set_ylabel('Neutrino efficiency [%]')
         ax.grid(True)
         ax.legend(loc='center right')
         plt.title('E-range:' + str(tpl) + ', weighted for 10kHz noise')
