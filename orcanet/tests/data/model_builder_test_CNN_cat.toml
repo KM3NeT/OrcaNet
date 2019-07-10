@@ -22,6 +22,7 @@ activation = "relu"
 
 [compile]
 optimizer = "adam"
+epsilon=0.2
 
 [compile.losses]
 ts_output = {function="categorical_crossentropy", metrics=['acc']}

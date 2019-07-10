@@ -325,15 +325,18 @@ def orca_dataset_modifiers(name):
         # y_pred = {"foo": ndarray, "bar": ndarray}
         # --> dtypes = [foo_1, foo_2, ..., bar_1, bar_2, ... ]
 
-        def dataset_modifier(mc_info, y_true, y_pred):
+        def dataset_modifier(info_blob):
+            y_pred = info_blob["y_pred"]
+            y_true = info_blob["y_true"]
+            y_values = info_blob["y_values"]
             datasets = dict()
             datasets["pred"] = dict_to_recarray(y_pred)
 
             if y_true is not None:
                 datasets["true"] = dict_to_recarray(y_true)
 
-            if mc_info is not None:
-                datasets['mc_info'] = mc_info  # is already a structured array
+            if y_values is not None:
+                datasets['mc_info'] = y_values  # is already a structured array
 
             return datasets
 

@@ -102,7 +102,8 @@ class TestIntegration(TestCase):
             lr = 0.001 * (epoch + 0.1*fileno)
             return lr
 
-        def test_modifier(xs):
+        def test_modifier(info_blob):
+            xs = info_blob["x_values"]
             xs = {key: xs[key] for key in xs}
             return xs
 
@@ -161,7 +162,8 @@ def make_dummy_data(filepath1, filepath2, shape):
         h5f.close()
 
 
-def label_modifier(y_values):
+def label_modifier(info_blob):
+    y_values = info_blob["y_values"]
     ys = dict()
 
     ys['dx'], ys['dx_err'] = y_values['dir_x'], y_values['dir_x']

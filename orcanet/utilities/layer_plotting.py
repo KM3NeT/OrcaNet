@@ -28,11 +28,6 @@ def plot_activations(model, samples, layer_name, mode='test', bins=100):
     bins : int
         Number of bins of the histogram.
 
-    Returns
-    -------
-    fig : plt figure
-        The plot of the activations of the given layer.
-
     """
 
     layer = model.get_layer(layer_name)
@@ -41,13 +36,10 @@ def plot_activations(model, samples, layer_name, mode='test', bins=100):
     else:
         activations = get_layer_output(model, samples, layer.name, mode)
 
-    fig, ax = plt.subplots()
-    ax.hist(activations.flatten(), bins=bins)
-    ax.set_title('Activations for layer ' + str(layer_name))
-    ax.set_xlabel('Activation (layer output)')
-    ax.set_ylabel('Quantity [#]')
-
-    return fig
+    plt.hist(activations.flatten(), bins=bins)
+    plt.title('Activations for layer ' + str(layer_name))
+    plt.xlabel('Activation (layer output)')
+    plt.ylabel('Quantity [#]')
 
 
 def plot_weights(model, layer_name, bins=100):
@@ -65,20 +57,17 @@ def plot_weights(model, layer_name, bins=100):
     bins : int
         Number of bins of the histogram.
 
-    Returns
-    -------
-    fig : plt figure or None
-        The plot of the weights of the given layer. None if the layer
-        has no weights.
+    Raises
+    ------
+    ValueError
+        If there are no weights in the given layer.
 
     """
     layer = model.get_layer(layer_name)
     layer_weights = layer.get_weights()
 
     if not layer_weights:
-        return None
-
-    fig, ax = plt.subplots()
+        raise ValueError("Layer contains no weights")
 
     # layer_weights is a list of np arrays; flatten it
     weights = np.array([])
@@ -86,10 +75,9 @@ def plot_weights(model, layer_name, bins=100):
         w_temp_flattened = np.array(w_temp.flatten(), dtype=np.float64)
         weights = np.concatenate((weights, w_temp_flattened), axis=0)
 
-    ax.hist(weights, bins=bins)
-    ax.set_title('Weights for layer ' + str(layer_name))
-    ax.set_xlabel('Weight')
-    ax.set_ylabel('Quantity [#]')
-    fig.tight_layout()
+    plt.hist(weights, bins=bins)
+    plt.title('Weights for layer ' + str(layer_name))
+    plt.xlabel('Weight')
+    plt.ylabel('Quantity [#]')
+    plt.tight_layout()
 
-    return fig

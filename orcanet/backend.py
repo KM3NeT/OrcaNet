@@ -5,15 +5,14 @@ Code for training and validating NN's, as well as evaluating them.
 """
 
 import h5py
-from contextlib import ExitStack
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
-from orcanet.utilities.layer_plotting import (
-    plot_activations, plot_weights)
+from orcanet.utilities.layer_plotting import plot_activations, plot_weights
 from orcanet.logging import BatchLogger
 from orcanet.in_out import h5_get_number_of_rows
+from orcanet.h5_generator import get_h5_generator
 
 # for debugging
 # from tensorflow.python import debug as tf_debug
@@ -59,7 +58,7 @@ def train_model(orga, model, epoch, batch_logger=False):
         except TypeError:
             callbacks.append(orga.cfg.callback_train)
 
-    training_generator = hdf5_batch_generator(
+    training_generator = get_h5_generator(
         orga, files_dict, f_size=f_size,
         zero_center=orga.cfg.zero_center_folder is not None,
         shuffle=orga.cfg.shuffle_train)
@@ -107,7 +106,7 @@ def validate_model(orga, model):
         if orga.cfg.n_events is not None:
             f_size = orga.cfg.n_events  # for testing purposes
 
-        val_generator = hdf5_batch_generator(
+        val_generator = get_h5_generator(
             orga, files_dict, f_size=f_size,
             zero_center=orga.cfg.zero_center_folder is not None)
 
@@ -159,213 +158,6 @@ def weighted_average(histories, f_sizes):
     return wgtd_average.tolist()
 
 
-def hdf5_batch_generator(orga, files_dict, f_size=None, zero_center=False,
-                         yield_mc_info=False, shuffle=False):
-    """
-    Initialize the hdf5_batch_generator_base with the paramters in orga.cfg.
-
-    Parameters
-    ----------
-    orga : object Organizer
-        Contains all the configurable options in the OrcaNet scripts.
-    files_dict : dict
-        Pathes of the files to train on.
-        Keys: The name of every input (from the toml list file, can be multiple).
-        Values: The filepath of a single h5py file to read samples from.
-    f_size : int or None
-        Specifies the number of samples to be read from the .h5 file.
-        If none, the whole .h5 file will be used.
-    zero_center : bool
-        Whether to use zero centering.
-        Requires orga.zero_center_folder to be set.
-    yield_mc_info : bool
-        Specifies if mc-infos (y_values) should be yielded as well. The
-        mc-infos are used for evaluation after training and testing is finished.
-    shuffle : bool
-        Randomize the order in which batches are read from the file.
-        Significantly reduces read out speed.
-
-    Yields
-    ------
-    xs : dict
-        Data for the model train on.
-            Keys : str  The name(s) of the input layer(s) of the model.
-            Values : ndarray    A batch of samples for the corresponding input.
-    ys : dict or None
-        Labels for the model to train on.
-            Keys : str  The name(s) of the output layer(s) of the model.
-            Values : ndarray    A batch of labels for the corresponding output.
-        Will be None if there are no labels in the file.
-    mc_info : ndarray, optional
-        Mc info from the file. Only yielded if yield_mc_info is True.
-
-    """
-    if orga.cfg.label_modifier is not None:
-        label_modifier = orga.cfg.label_modifier
-    else:
-        assert orga._auto_label_modifier is not None, \
-            "Auto label modifier has not been set up (can be done with " \
-            "nn_utilities.get_auto_label_modifier)"
-        label_modifier = orga._auto_label_modifier
-
-    # get xs_mean or load/create if not stored yet
-    if zero_center:
-        xs_mean = orga.get_xs_mean()
-    else:
-        xs_mean = None
-
-    generator = hdf5_batch_generator_base(
-        files_dict=files_dict,
-        batchsize=orga.cfg.batchsize,
-        key_samples=orga.cfg.key_samples,
-        key_mc_info=orga.cfg.key_mc_info,
-        sample_modifier=orga.cfg.sample_modifier,
-        label_modifier=label_modifier,
-        xs_mean=xs_mean,
-        max_queue_size=orga.cfg.max_queue_size,
-        f_size=f_size,
-        yield_mc_info=yield_mc_info,
-        shuffle=shuffle,
-    )
-
-    for batch in generator:
-        yield(batch)
-
-
-def hdf5_batch_generator_base(
-        files_dict,
-        batchsize=64,
-        key_samples="x",
-        key_mc_info="y",
-        sample_modifier=None,
-        label_modifier=None,
-        xs_mean=None,
-        max_queue_size=10,
-        f_size=None,
-        yield_mc_info=False,
-        shuffle=False):
-    """
-    Yields batches of input data from h5 files.
-
-    This will go through one file, or multiple files in parallel, and yield
-    one batch of data, which can then be used as an input to a model.
-    Since multiple filepaths can be given to read out in parallel,
-    this can also be used for models with multiple inputs.
-
-    Parameters
-    ----------
-    files_dict : dict
-        Pathes of the files to train on.
-        Keys: The name of every input (from the toml list file, can be multiple).
-        Values: The filepath of a single h5py file to read samples from.
-    batchsize : int
-        Batchsize that will be used for the training and validation of
-        the network.
-    key_samples : str
-        The name of the datagroup in the h5 input files which contains
-        the samples for the network.
-    key_mc_info : str
-        The name of the datagroup in the h5 input files which contains
-        the info for the labels.
-    sample_modifier : function or None
-        Operation to be performed on batches of samples read from the input
-        files before they are fed into the model.
-    label_modifier : function or None
-        Operation to be performed on batches of labels read from the input files
-        before they are fed into the model.
-    xs_mean : ndarray or None
-        Zero center image to be subtracted from data as preprocessing.
-    max_queue_size : int
-        max_queue_size option of the keras training and evaluation generator
-        methods. How many batches get preloaded
-        from the generator.
-    f_size : int or None
-        Specifies the number of samples to be read from the .h5 file.
-        If none, the whole .h5 file will be used.
-    yield_mc_info : bool
-        Specifies if mc-infos (y_values) should be yielded as well. The
-        mc-infos are used for evaluation after training and testing is finished.
-    shuffle : bool
-        Randomize the order in which batches are read from the file.
-        Significantly reduces read out speed.
-
-    Yields
-    ------
-    xs : dict
-        Data for the model train on.
-            Keys : str  The name(s) of the input layer(s) of the model.
-            Values : ndarray    A batch of samples for the corresponding input.
-    ys : dict or None
-        Labels for the model to train on.
-            Keys : str  The name(s) of the output layer(s) of the model.
-            Values : ndarray    A batch of labels for the corresponding output.
-        Will be None if there are no labels in the file.
-    mc_info : ndarray, optional
-        Mc info from the file. Only yielded if yield_mc_info is True.
-
-    """
-    # If the batchsize is larger than the f_size, make batchsize smaller
-    # or nothing would be yielded
-    if f_size is not None:
-        if f_size < batchsize:
-            batchsize = f_size
-
-    with ExitStack() as stack:
-        # a dict with the names of list inputs as keys, and the opened
-        # h5 files as values
-        files = {}
-        file_lengths = []
-        # open the files and make sure they have the same length
-        for input_key in files_dict:
-            files[input_key] = stack.enter_context(
-                h5py.File(files_dict[input_key], 'r'))
-            file_lengths.append(len(files[input_key][key_samples]))
-
-        if not file_lengths.count(file_lengths[0]) == len(file_lengths):
-            raise ValueError("All data files must have the same length! "
-                             "Given were:\n " + str(file_lengths))
-
-        if f_size is None:
-            f_size = file_lengths[0]
-        total_no_of_batches = int(np.ceil(f_size/batchsize))
-        # positions of the samples in the file
-        sample_pos = np.arange(total_no_of_batches) * batchsize
-        if shuffle:
-            np.random.shuffle(sample_pos)
-        # append some samples due to preloading by the fit_generator method
-        sample_pos = np.append(sample_pos, sample_pos[:max_queue_size])
-
-        for sample_n in sample_pos:
-            # A dict with every input name as key, and a batch of data as values
-            xs = {}
-            # Read one batch of samples from the files and zero center
-            for input_key in files:
-                xs[input_key] = files[input_key][key_samples][
-                                sample_n: sample_n + batchsize]
-                if xs_mean is not None:
-                    xs[input_key] = np.subtract(xs[input_key],
-                                                xs_mean[input_key])
-
-            # Modify the samples and labels before feeding them into the network
-            if sample_modifier is not None:
-                xs = sample_modifier(xs)
-
-            # Get labels for the nn. Since the labels are hopefully the same
-            # for all the files, use the ones from the first TODO add check
-            first_file = list(files.values())[0]
-            if key_mc_info in first_file:
-                y_values = first_file[key_mc_info][sample_n:sample_n + batchsize]
-                ys = label_modifier(y_values)
-            else:
-                y_values = None
-                ys = None
-
-            if not yield_mc_info:
-                yield xs, ys
-            else:
-                yield xs, ys, y_values
-
-
 def save_actv_wghts_plot(orga, model, epoch, samples=1):
     """
     Plots the weights of a model and the activations for samples from
@@ -386,37 +178,41 @@ def save_actv_wghts_plot(orga, model, epoch, samples=1):
     plt.ioff()
 
     file = next(orga.io.yield_files("val"))
-    generator = hdf5_batch_generator(
+    generator = get_h5_generator(
         orga, file, f_size=samples,
         zero_center=orga.cfg.zero_center_folder is not None,
-        yield_mc_info=True)
-    xs, ys, y_values = next(generator)
+        keras_mode=True)
+    xs, ys = next(generator)
 
     pdf_name_act = "{}/activations_epoch_{}_file_{}.pdf".format(
         orga.io.get_subfolder("activations", create=True), epoch[0], epoch[1])
 
     with PdfPages(pdf_name_act) as pdf:
         for layer in model.layers:
-            fig = plot_activations(model, xs, layer.name, mode='test')
-            pdf.savefig(fig)
-            plt.close(fig)
+            plot_activations(model, xs, layer.name, mode='test')
+            pdf.savefig()
+            plt.clf()
+        plt.close()
 
     pdf_name_wght = "{}/weights_epoch_{}_file_{}.pdf".format(
         orga.io.get_subfolder("activations", create=True), epoch[0], epoch[1])
 
     with PdfPages(pdf_name_wght) as pdf:
         for layer in model.layers:
-            fig = plot_weights(model, layer.name)
-            if fig is not None:
-                pdf.savefig(fig)
-                plt.close(fig)
+            try:
+                fig = plot_weights(model, layer.name)
+            except ValueError:
+                continue
+            pdf.savefig(fig)
+            plt.clf()
+        plt.close()
 
 
 def h5_inference(orga, model, files_dict, output_path, samples=None):
     """
     Let a model predict on all samples in a h5 file, and save it as a h5 file.
 
-    Per default, the h5 file will contain a datagroup mc_info straight from
+    Per default, the h5 file will contain a datagroup y_values straight from
     the given files, as well as two datagroups per output layer of the network,
     which have the labels and the predicted values in them as numpy arrays,
     respectively.
@@ -441,11 +237,11 @@ def h5_inference(orga, model, files_dict, output_path, samples=None):
 
     file_size = h5_get_number_of_rows(
         list(files_dict.values())[0],
-        datasets=[orga.cfg.key_samples])
-    generator = hdf5_batch_generator(
+        datasets=[orga.cfg.key_x_values])
+    generator = get_h5_generator(
         orga, files_dict,
         zero_center=orga.cfg.zero_center_folder is not None,
-        yield_mc_info=True)
+        keras_mode=False)
 
     if samples is None:
         steps = int(file_size / batchsize)
@@ -460,11 +256,10 @@ def h5_inference(orga, model, files_dict, output_path, samples=None):
             if s % 1000 == 0:
                 print('Predicting in step {}/{} ({:0.2%})'.format(
                     s, steps, s/steps))
-            # y_true is a dict of ndarrays, mc_info is a structured
-            # array, y_pred is a list of ndarrays
-            xs, y_true, mc_info = next(generator)
 
-            y_pred = model.predict_on_batch(xs)
+            info_blob = next(generator)
+
+            y_pred = model.predict_on_batch(info_blob["xs"])
             if not isinstance(y_pred, list):
                 # if only one output, transform to a list
                 y_pred = [y_pred]
@@ -472,10 +267,12 @@ def h5_inference(orga, model, files_dict, output_path, samples=None):
             y_pred = {out: y_pred[i] for i, out in
                       enumerate(model.output_names)}
 
+            info_blob["y_pred"] = y_pred
+
             if orga.cfg.dataset_modifier is None:
-                datasets = get_datasets(mc_info, y_true, y_pred)
+                datasets = get_datasets(info_blob)
             else:
-                datasets = orga.cfg.dataset_modifier(mc_info, y_true, y_pred)
+                datasets = orga.cfg.dataset_modifier(info_blob)
 
             # TODO maybe add attr to data, like used files or orcanet version number?
             if s == 0:  # create datasets in the first step
@@ -499,7 +296,7 @@ def make_model_prediction(orga, model, epoch, fileno, samples=None):
     """
     Let a model predict on all validation samples, and save it as a h5 file.
 
-    Per default, the h5 file will contain a datagroup mc_info straight from
+    Per default, the h5 file will contain a datagroup y_values straight from
     the given files, as well as two datagroups per output layer of the network,
     which have the labels and the predicted values in them as numpy arrays,
     respectively.
@@ -533,7 +330,7 @@ def make_model_prediction(orga, model, epoch, fileno, samples=None):
         h5_inference(orga, model, files_dict, pred_filepath, samples=samples)
 
 
-def get_datasets(mc_info, y_true, y_pred):
+def get_datasets(info_blob):
     """
     Get the dataset names and numpy array contents.
 
@@ -543,15 +340,19 @@ def get_datasets(mc_info, y_true, y_pred):
 
     Parameters
     ----------
-    mc_info : ndarray or None
-        A structured array containing infos for every event, right from
-        the input files.
-        Can also be None, e.g. for when there is no mc_info.
-    y_true : dict or None
-        The labels for each output layer of the network.
-        Can also be None, e.g. for when there is no mc_info.
-    y_pred : dict
-        The predictions of each output layer of the network.
+    info_blob : dict
+        Contains the following infos as keys/values:
+        xs : ndarray
+            Input to the network, after sample modifier has been applied.
+        y_values : ndarray or None
+            A structured array containing infos for every event, right from
+            the input files.
+            Can also be None, e.g. for when there are no y_values.
+        ys : dict or None
+            The labels for each output layer of the network.
+            Can also be None, e.g. for when there are no y_values.
+        y_pred : dict
+            The predictions of each output layer of the network.
 
     Returns
     -------
@@ -561,13 +362,15 @@ def get_datasets(mc_info, y_true, y_pred):
 
     """
     datasets = dict()
-    if mc_info is not None:
-        datasets["mc_info"] = mc_info
+    if "y_values" in info_blob:
+        datasets["y_values"] = info_blob["y_values"]
 
-    if y_true is not None:
+    if "ys" in info_blob:
+        y_true = info_blob["ys"]
         for out_layer_name in y_true:
             datasets["label_" + out_layer_name] = y_true[out_layer_name]
 
+    y_pred = info_blob["y_pred"]
     for out_layer_name in y_pred:
         datasets["pred_" + out_layer_name] = y_pred[out_layer_name]
 

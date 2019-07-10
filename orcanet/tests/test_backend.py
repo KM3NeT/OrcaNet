@@ -9,191 +9,13 @@ from keras.layers import Dense, Input, Concatenate, Flatten
 from keras.callbacks import LambdaCallback
 
 from orcanet.core import Organizer
-from orcanet.backend import hdf5_batch_generator, get_datasets, train_model, validate_model, make_model_prediction, weighted_average
+from orcanet.backend import get_datasets, train_model, validate_model, make_model_prediction, weighted_average
 from orcanet.utilities.nn_utilities import get_auto_label_modifier
-
-
-class TestBatchGenerator(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.temp_dir = os.path.join(os.path.dirname(__file__), ".temp",
-                                    "test_backend")
-        os.mkdir(cls.temp_dir)
-
-        # make some dummy data
-        cls.n_bins = {'input_A': (2, 3), 'input_B': (2, 3)}
-        cls.train_sizes = [3, 5]
-        cls.train_A_file_1 = {
-            "path": os.path.join(cls.temp_dir, "input_A_train_1.h5"),
-            "shape": cls.n_bins["input_A"],
-            "size": cls.train_sizes[0],
-        }
-
-        cls.train_B_file_1 = {
-            "path":  os.path.join(cls.temp_dir, "input_B_train_1.h5"),
-            "shape": cls.n_bins["input_B"],
-            "size": cls.train_sizes[0],
-        }
-
-        cls.filepaths_file_1 = {
-            "input_A": cls.train_A_file_1["path"],
-            "input_B": cls.train_B_file_1["path"],
-        }
-
-        cls.train_A_file_1_ctnt = save_dummy_h5py(**cls.train_A_file_1)
-        cls.train_B_file_1_ctnt = save_dummy_h5py(**cls.train_B_file_1)
-
-    def setUp(self):
-        self.data_folder = os.path.join(os.path.dirname(__file__), "data")
-        self.output_folder = self.data_folder + "/dummy_model"
-
-        list_file = self.data_folder + "/in_out_test_list.toml"
-        config_file = None
-
-        self.orga = Organizer(self.output_folder, list_file, config_file)
-        self.batchsize = 2
-        self.orga.cfg.batchsize = self.batchsize
-        self.orga.cfg.label_modifier = label_modifier
-
-    @classmethod
-    def tearDownClass(cls):
-        shutil.rmtree(cls.temp_dir)
-
-    def test_batch(self):
-        filepaths = self.filepaths_file_1
-        gene = hdf5_batch_generator(self.orga, filepaths)
-
-        target_xs_batch_1 = {
-            "input_A": self.train_A_file_1_ctnt[0][:2],
-            "input_B": self.train_B_file_1_ctnt[0][:2],
-        }
-
-        target_ys_batch_1 = label_modifier(self.train_A_file_1_ctnt[1][:2])
-
-        target_xs_batch_2 = {
-            "input_A": self.train_A_file_1_ctnt[0][2:],
-            "input_B": self.train_B_file_1_ctnt[0][2:],
-        }
-
-        target_ys_batch_2 = label_modifier(self.train_A_file_1_ctnt[1][2:])
-
-        xs, ys = next(gene)
-        assert_dict_arrays_equal(xs, target_xs_batch_1)
-        assert_dict_arrays_equal(ys, target_ys_batch_1)
-
-        xs, ys = next(gene)
-        assert_dict_arrays_equal(xs, target_xs_batch_2)
-        assert_dict_arrays_equal(ys, target_ys_batch_2)
-
-        # appended batches
-        xs, ys = next(gene)
-        assert_dict_arrays_equal(xs, target_xs_batch_1)
-        assert_dict_arrays_equal(ys, target_ys_batch_1)
-
-        xs, ys = next(gene)
-        assert_dict_arrays_equal(xs, target_xs_batch_2)
-        assert_dict_arrays_equal(ys, target_ys_batch_2)
-
-        with self.assertRaises(StopIteration):
-            next(gene)
-
-    def test_batch_zero_center(self):
-        filepaths = self.filepaths_file_1
-
-        xs_mean = {name: np.ones(shape) * 0.5 for name, shape in self.n_bins.items()}
-
-        self.orga.get_xs_mean = MagicMock(return_value=xs_mean)
-        gene = hdf5_batch_generator(self.orga, filepaths, zero_center=True)
-
-        target_xs_batch_1 = {
-            "input_A": np.subtract(self.train_A_file_1_ctnt[0][:2], xs_mean["input_A"]),
-            "input_B": np.subtract(self.train_B_file_1_ctnt[0][:2], xs_mean["input_B"]),
-        }
-
-        target_ys_batch_1 = label_modifier(self.train_A_file_1_ctnt[1][:2])
-
-        target_xs_batch_2 = {
-            "input_A": np.subtract(self.train_A_file_1_ctnt[0][2:], xs_mean["input_A"]),
-            "input_B": np.subtract(self.train_B_file_1_ctnt[0][2:], xs_mean["input_B"]),
-        }
-
-        target_ys_batch_2 = label_modifier(self.train_A_file_1_ctnt[1][2:])
-
-        xs, ys = next(gene)
-        assert_dict_arrays_equal(xs, target_xs_batch_1)
-        assert_dict_arrays_equal(ys, target_ys_batch_1)
-
-        xs, ys = next(gene)
-        assert_dict_arrays_equal(xs, target_xs_batch_2)
-        assert_dict_arrays_equal(ys, target_ys_batch_2)
-
-    def test_batch_sample_modifier(self):
-        filepaths = self.filepaths_file_1
-
-        def sample_modifier(xs_in):
-            mod = {name: val*2 for name, val in xs_in.items()}
-            return mod
-
-        self.orga.cfg.sample_modifier = sample_modifier
-        gene = hdf5_batch_generator(self.orga, filepaths)
-
-        target_xs_batch_1 = {
-            "input_A": self.train_A_file_1_ctnt[0][:2]*2,
-            "input_B": self.train_B_file_1_ctnt[0][:2]*2,
-        }
-
-        target_ys_batch_1 = label_modifier(self.train_A_file_1_ctnt[1][:2])
-
-        target_xs_batch_2 = {
-            "input_A": self.train_A_file_1_ctnt[0][2:]*2,
-            "input_B": self.train_B_file_1_ctnt[0][2:]*2,
-        }
-
-        target_ys_batch_2 = label_modifier(self.train_A_file_1_ctnt[1][2:])
-
-        xs, ys = next(gene)
-        assert_dict_arrays_equal(xs, target_xs_batch_1)
-        assert_dict_arrays_equal(ys, target_ys_batch_1)
-
-        xs, ys = next(gene)
-        assert_dict_arrays_equal(xs, target_xs_batch_2)
-        assert_dict_arrays_equal(ys, target_ys_batch_2)
-
-    def test_batch_mc_infos(self):
-        filepaths = self.filepaths_file_1
-
-        gene = hdf5_batch_generator(self.orga, filepaths, yield_mc_info=True)
-
-        target_xs_batch_1 = {
-            "input_A": self.train_A_file_1_ctnt[0][:2],
-            "input_B": self.train_B_file_1_ctnt[0][:2],
-        }
-
-        target_ys_batch_1 = label_modifier(self.train_A_file_1_ctnt[1][:2])
-        target_mc_info_batch_1 = self.train_A_file_1_ctnt[1][:2]
-
-        target_xs_batch_2 = {
-            "input_A": self.train_A_file_1_ctnt[0][2:],
-            "input_B": self.train_B_file_1_ctnt[0][2:],
-        }
-
-        target_ys_batch_2 = label_modifier(self.train_A_file_1_ctnt[1][2:])
-        target_mc_info_batch_2 = self.train_A_file_1_ctnt[1][2:]
-
-        xs, ys, mc_info = next(gene)
-        assert_dict_arrays_equal(xs, target_xs_batch_1)
-        assert_dict_arrays_equal(ys, target_ys_batch_1)
-        assert_equal_struc_array(mc_info, target_mc_info_batch_1)
-
-        xs, ys, mc_info = next(gene)
-        assert_dict_arrays_equal(xs, target_xs_batch_2)
-        assert_dict_arrays_equal(ys, target_ys_batch_2)
-        assert_equal_struc_array(mc_info, target_mc_info_batch_2)
 
 
 class TestFunctions(TestCase):
     def test_get_datasets(self):
-        mc_info = "mc_info gets simply passed forward"
+        y_values = "y_values gets simply passed forward"
         y_true = {
             "out_A": 1,
             "out_B": 2,
@@ -203,13 +25,19 @@ class TestFunctions(TestCase):
             "out_pred_B": 4,
         }
         target = {
-            "mc_info": mc_info,
+            "y_values": y_values,
             "label_out_A": 1,
             "label_out_B": 2,
             "pred_out_pred_A": 3,
             "pred_out_pred_B": 4,
         }
-        datasets = get_datasets(mc_info, y_true, y_pred)
+        info_blob = {
+            "y_values": y_values,
+            "ys": y_true,
+            "y_pred": y_pred,
+        }
+
+        datasets = get_datasets(info_blob)
         self.assertDictEqual(datasets, target)
 
     def test_weighted_average(self):
@@ -395,30 +223,33 @@ class TestTrainValidatePredict(TestCase):
             os.remove(self.pred_filepath)
 
         target_datasets = [
-            'label_mc_A', 'label_mc_B', 'mc_info', 'pred_mc_A', 'pred_mc_B'
+            'label_mc_A', 'label_mc_B', 'pred_mc_A', 'pred_mc_B', 'y_values'
         ]
         target_shapes = [
-            (500,), (500,), (500,), (500, 1), (500, 1),
+            (500,), (500,), (500, 1), (500, 1), (500,)
         ]
         target_contents = [
             np.zeros(target_shapes[0]),
             np.ones(target_shapes[1]),
-            self.train_A_file_1_ctnt[1],
+            np.ones(target_shapes[2]) * 18,
             np.ones(target_shapes[3]) * 18,
-            np.ones(target_shapes[4]) * 18,
+            self.train_A_file_1_ctnt[1],
         ]
+        shapes_dict = dict(zip(target_datasets, target_shapes))
+        contents_dict = dict(zip(target_datasets, target_contents))
+
         target_mc_names = ('mc_A', 'mc_B')
 
         datasets = list(file_cntn.keys())
         shapes = [file_cntn[key].shape for key in datasets]
-        mc_dtype_names = file_cntn["mc_info"].dtype.names
+        mc_dtype_names = file_cntn["y_values"].dtype.names
 
         self.assertSequenceEqual(datasets, target_datasets)
         self.assertSequenceEqual(shapes, target_shapes)
         self.assertSequenceEqual(mc_dtype_names, target_mc_names)
         for i, key in enumerate(target_datasets):
             value = file_cntn[key]
-            target = target_contents[i]
+            target = contents_dict[key]
             np.testing.assert_array_equal(value, target)
 
 
@@ -455,13 +286,6 @@ def save_dummy_h5py(path, shape, size, mode="asc"):
         h5f.create_dataset('x', data=xs, dtype='<f8')
         h5f.create_dataset('y', data=ys, dtype=dtypes)
     return xs, ys
-
-
-def label_modifier(y_values):
-    ys = dict()
-    for name in y_values.dtype.names:
-        ys[name] = y_values[name]
-    return ys
 
 
 def assert_dict_arrays_equal(a, b):

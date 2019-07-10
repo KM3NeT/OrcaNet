@@ -15,7 +15,7 @@ Arguments:
             found in examples/config_file.toml. The possible parameters
             are listed in core.py in the class Configuration.
     MODEL   Path to a .toml file with infos about a model.
-            An example can be found in examples/model_file.toml.
+            An example can be found in examples/explanation.toml.
 
 Options:
     -h --help        Show this screen.

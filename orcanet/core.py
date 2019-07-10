@@ -55,7 +55,7 @@ class Organizer:
         list_file : str, optional
             Path to a toml list file with pathes to all the h5 files that should
             be used for training and validation.
-            Will be used to extract of samples or labels.
+            Will be used to extract samples and labels.
         config_file : str, optional
             Path to a toml config file with settings that are used instead of
             the default ones.
@@ -281,7 +281,7 @@ class Organizer:
         Load the model with the lowest validation loss, let it predict on
         all samples of the validation set
         in the toml list, and save this prediction together with all the
-        mc_info as a h5 file in the predictions subfolder.
+        y_values as a h5 file in the predictions subfolder.
 
         Parameters
         ----------
@@ -348,7 +348,7 @@ class Organizer:
         Load the model with the lowest validation loss, let
         it predict on all samples of the inference set
         in the toml list, and save this prediction as a h5 file in the
-        predictions subfolder. Mc_info will only be added if it is in
+        predictions subfolder. y values will only be added if they are in
         the input file, so this can be used on un-labelled data as well.
 
         Parameters
@@ -601,18 +601,18 @@ class Configuration(object):
         For orga.predict: Function that determines which datasets get created
         in the resulting h5 file. If none, every output layer will get one
         dataset each for both the label and the prediction, and one dataset
-        containing the mc_info from the validation files.
-    key_samples : str
+        containing the y_values from the validation files.
+    key_x_values : str
         The name of the datagroup in the h5 input files which contains
         the samples for the network.
-    key_mc_info : str
+    key_y_values : str
         The name of the datagroup in the h5 input files which contains
         the info for the labels.
     label_modifier : function or None
-        Operation to be performed on batches of labels read from the input files
-        before they are fed into the model. If None is given, all labels with
-        the same name as the output layers will be passed to the model as a dict,
-        with the keys being the dtype names.
+        Operation to be performed on batches of y_values read from the input
+        files before they are fed into the model as labels. If None is given,
+        all y_values with the same name as the output layers will be passed
+        to the model as a dict, with the keys being the dtype names.
     learning_rate : float, tuple, function or str
         The learning rate for the training.
         If it is a float: The learning rate will be constantly this value.
@@ -632,8 +632,8 @@ class Configuration(object):
         For testing purposes. If not the whole .h5 file should be used for
         training, define the number of samples.
     sample_modifier : function or None
-        Operation to be performed on batches of samples read from the input
-        files before they are fed into the model.
+        Operation to be performed on batches of x_values read from the input
+        files before they are fed into the model as samples.
     shuffle_train : bool
         If true, the order in which batches are read out from the files during
         training are randomized each time they are read out.
@@ -667,7 +667,7 @@ class Configuration(object):
 
     """
     # TODO add a clober script that properly deletes models + logfiles
-    def __init__(self, output_folder, list_file=None, config_file=None):
+    def __init__(self, output_folder, list_file=None, config_file=None, **kwargs):
         """
         Set the attributes of the Configuration object.
 
@@ -685,6 +685,8 @@ class Configuration(object):
         config_file : str or None
             Path to a toml config file with attributes that are used instead of
             the default ones.
+        kwargs
+            Overwrites the values given in the config file.
 
         """
         self.batchsize = 64
@@ -698,8 +700,8 @@ class Configuration(object):
         self.dataset_modifier = None
         self.label_modifier = None
 
-        self.key_samples = "x"
-        self.key_mc_info = "y"
+        self.key_x_values = "x"
+        self.key_y_values = "y"
         self.custom_objects = None
         self.shuffle_train = False
 
@@ -734,6 +736,14 @@ class Configuration(object):
             self.import_list_file(list_file)
         if config_file is not None:
             self.update_config(config_file)
+
+        # set given kwargs:
+        for key, val in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, val)
+            else:
+                raise AttributeError(
+                    "Unknown attribute {}".format(key))
 
     def import_list_file(self, list_file):
         """
@@ -849,3 +859,13 @@ class Configuration(object):
     def default_values(self):
         """ The default values for all settings. """
         return self._default_values
+
+    @property
+    def key_samples(self):
+        """ Backward compatibility """
+        return self.key_x_values
+
+    @property
+    def key_labels(self):
+        """ Backward compatibility """
+        return self.key_y_values

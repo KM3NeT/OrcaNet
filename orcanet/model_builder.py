@@ -25,6 +25,7 @@ class ModelBuilder:
     ----------
     body_arch : str
         Name of the architecture of the model (see self.build).
+        Default: single.
     body_configs : list
         List with keywords for building each layer block in the model.
     body_args : dict
@@ -44,6 +45,8 @@ class ModelBuilder:
         Format: { layer_name : { loss_function:, weight:, metrics: } }
         The loss_function is a string or a function, the weight is a float
         and metrics is a list of functions/strings.
+    optimizer_args : dict
+        Kwargs for the optimizer.
 
     """
     def __init__(self, model_file):
@@ -60,7 +63,11 @@ class ModelBuilder:
 
         try:
             body = file_content["body"]
-            self.body_arch = body.pop("architecture")
+            if "architecture" in body:
+                self.body_arch = body.pop("architecture")
+            else:
+                self.body_arch = "single"
+
             self.body_configs = body.pop('blocks')
             self.body_args = body
 
@@ -70,8 +77,9 @@ class ModelBuilder:
             self.head_args = head
 
             compile_sect = file_content["compile"]
-            self.optimizer = compile_sect["optimizer"]
-            self.compile_opt = compile_sect["losses"]
+            self.optimizer = compile_sect.pop("optimizer")
+            self.compile_opt = compile_sect.pop("losses")
+            self.optimizer_args = compile_sect
 
         except KeyError as e:
             if len(e.args) == 1:
@@ -241,10 +249,9 @@ class ModelBuilder:
 
         """
         if self.optimizer == 'adam':
-            optimizer = ks.optimizers.Adam(beta_1=0.9, beta_2=0.999, epsilon=0.1,
-                                           decay=0.0)  # epsilon=1 for deep networks
+            optimizer = get_adam(**self.optimizer_args)
         elif self.optimizer == 'sgd':
-            optimizer = ks.optimizers.SGD(momentum=0.9, decay=0, nesterov=True)
+            optimizer = get_sgd(**self.optimizer_args)
         else:
             raise NameError('Unknown optimizer name ({})'.format(self.optimizer))
 
@@ -288,6 +295,22 @@ class ModelBuilder:
             lines.append(key + ': ' + str(self.compile_opt[key]))
         lines.append('\n')
         orga.io.print_log(lines)
+
+
+def get_adam(beta_1=0.9, beta_2=0.999, epsilon=0.1, decay=0.0, **kwargs):
+    # epsilon=1 for deep networks
+    return ks.optimizers.Adam(beta_1=beta_1,
+                              beta_2=beta_2,
+                              epsilon=epsilon,
+                              decay=decay,
+                              **kwargs)
+
+
+def get_sgd(momentum=0.9, decay=0, nesterov=True, **kwargs):
+    return ks.optimizers.SGD(momentum=momentum,
+                             decay=decay,
+                             nesterov=nesterov,
+                             **kwargs)
 
 
 def change_dropout_rate(model, before_concat, after_concat=None):

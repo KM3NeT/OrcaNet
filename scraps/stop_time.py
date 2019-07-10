@@ -57,14 +57,14 @@ def generate_batches_from_hdf5_file_tweak(cfg, files_dict, f_size=None, zero_cen
         Data for the model train on.
     ys : dict
         Labels for the model to train on.
-    mc_info : ndarray, optional
-        Mc info from the file. Only yielded if yield_mc_info is True.
+    y_values : ndarray, optional
+        y_values from the file. Only yielded if yield_mc_info is True.
 
     """
     batchsize = cfg.batchsize
     # name of the datagroups in the file
     samples_key = cfg.key_samples
-    mc_key = cfg.key_mc_info
+    mc_key = cfg.key_y_values
 
     # If the batchsize is larger than the f_size, make batchsize smaller or nothing would be yielded
     if f_size is not None:
@@ -144,7 +144,7 @@ def test_generators(batches, intermediate_log, functions, func_kwargs):
 
     list_file = "/home/woody/capn/mppi013h/Code/OrcaNet/test/time_test_list.toml"
     zero_center_folder = "/home/woody/capn/mppi013h/Code/work/zero_center_folder/"
-    modelfile = "/home/woody/capn/mppi013h/Code/OrcaNet/examples/settings_files/model_file.toml"
+    modelfile = "/home/woody/capn/mppi013h/Code/OrcaNet/examples/settings_files/explanation.toml"
 
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
     orca = Organizer("./test/", list_file)

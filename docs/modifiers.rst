@@ -14,9 +14,50 @@ set in the toml list file to be named.
 This makes it easy to assure that the right data is fed into the right layer of
 the network, especially if there are multiple inputs or outputs.
 
+All modifiers take a dict ``info_blob`` as an input, which contains a subset of
+the following keys:
+
+**Possible keys in the info_blob dict**
+    ``x_values`` : dict
+        One batch of data from the ``key_x_values`` datagroup of the h5 file.
+
+        Keys: Input set names from the toml list file.
+
+        Values: Numpy array with x values from the respective file.
+    ``y_values`` : ndarray
+        One batch of data from the ``key_y_values`` datagroup of the h5 file.
+        If the content of the datagroup is a structured array, this will
+        also be a structured array.
+    ``xs`` : dict
+        One batch of data, resulting from applying the sample modifier on ``x_values``.
+
+        Keys: Name of an input layer of the network.
+
+        Values: Numpy array with samples for the respective layer.
+    ``ys`` : dict
+        One batch of data, resulting from applying the label modifier on ``y_values``, aka
+        the true values the model will try to reproduce.
+
+        Keys: The names of the output layers of the model.
+
+        Values: One batch of labels as a numpy array.
+    ``y_pred`` : dict
+        One batch of data, resulting from applying the model on ``xs``, aka the
+        model prediction for this batch of input data.
+
+        Keys: The names of the output layers of the model.
+
+        Values: One batch of predictions from the respective output layer of the
+        model as a numpy array.
+
+
+For each modifier, a different subset of these entries will be available in the
+``info_blob``.
+See below for which keys are accessible for which modifiers.
+
 **Hint:** If you have come up with a new modifier, it might be smart to test if it
 actually does what it should with the data.
-You can get a batch of samples ``xs`` and ``mc_info`` data directly from
+You can get a ``info_blob`` containing ``x_values`` and ``y_values`` from
 the files in your toml list (i.e. before any modifiers have been
 applied) like this:
 
@@ -25,15 +66,15 @@ applied) like this:
     from orcanet.core import Organizer
 
     orga = Organizer(output_folder, list_file)
-    xs, mc_info = orga.io.get_batch()
+    info_blob = orga.io.get_batch()
 
 This will be exactly what is fed into your modifier when OrcaNet is run, so
-testing your new modifier on these will allow you to make sure it works.
+testing your new modifier on these will allow you to make sure they work.
 
 Label modifier
 --------------
 The label modifier is used to generate the labels for the model from the
-``mc_info`` data of the h5 input files. Unless the label for the model
+``y_values`` data of the h5 input files. Unless the label for the model
 is directly stored in the h5py files, the definition of a label modifier
 is mandatory.
 
@@ -41,24 +82,18 @@ It must be of the following form:
 
 .. code-block:: python
 
-    def my_label_modifier(mc_info):
+    def my_label_modifier(info_blob):
         ...
-        return y_true
+        return ys
 
-**Parameters**:
+**Contents of info_blob**:
 
-    ``mc_info``: ``numpy array``
-        One batch of data read from the ``key_mc_info`` datagroup in the h5 input
-        files.
-        If the content of the datagroup is a structured array, this will
-        also be a structured array.
+    ``x_values``, ``y_values``, ``xs``
 
 **Returns**:
 
-    ``y_true``: ``dict``
-        Keys: The names of the output layers of the model.
+    ``ys`` : dict (see above)
 
-        Values: One batch of labels as a numpy array.
 
 It can be set via
 
@@ -67,7 +102,7 @@ It can be set via
     orga.cfg.label_modifier = my_label_modifier
 
 **Hint:** If no label modifier is given, the names of the output layers of
-the model have to appear as names of the dtypes in the ``mc_info`` data.
+the model have to appear as names of the dtypes in the ``y_values`` recarray.
 Then, each output layer will get data from the matching dataset.
 
 Example
@@ -99,8 +134,9 @@ modifier:
 
 .. code-block:: python
 
-    def label_modifier(mc_info):
-        particle = mc_info["particle"]
+    def label_modifier(info_blob):
+        y_values = info_blob["y_values"]
+        particle = y_values["particle"]
         # Create the label array for the output layer of shape (batchsize, 2)
         ntr_cat = np.zeros(particle.shape + (2, ))
         # If particle is 1, its a neutrino, so we want to have [1,0]
@@ -109,40 +145,30 @@ modifier:
         ntr_cat[:, 1] = particle != 1
         # Make a dict to get the label to the correct output layer
         # the output layer is called "classification" in this model
-        y_true = dict()
-        y_true["classification"] = ntr_cat
-        return y_true
+        ys = dict()
+        ys["classification"] = ntr_cat
+        return ys
 
 Sample modifier
 ---------------
-The sample modifier is used to lead the samples read from the h5 input
-file to the input layers of the network.
+The sample modifier function is applied to the ``x_values`` dict before it is
+fed into the input layers of the network.
 It must be of the following form:
 
 .. code-block:: python
 
-    def my_sample_modifier(xs_files):
+    def my_sample_modifier(info_blob):
         ...
-        return xs_layer
+        return xs
 
-**Parameters**:
+**Contents of info_blob**:
 
-    ``xs_files``: ``dict``
-        One batch of data read from the ``key_samples`` datagroup in the h5 input
-        files.
-
-        Keys: Input set names from the toml list file.
-
-        Values: Numpy array with samples from the respective file.
+    ``x_values``, ``y_values``
 
 **Returns**
 
-    ``xs_layer``: ``dict``
-        One batch of data on which the model will be trained on.
+    ``xs`` : dict (see above)
 
-        Keys: Name of an input layer of the network.
-
-        Values: Numpy array with samples for the respective layer.
 
 It can be set via
 
@@ -151,7 +177,8 @@ It can be set via
     orga.cfg.sample_modifier = my_sample_modifier
 
 **Hint:** If no sample modifier is given, the names of the input sets in the
-toml list file and the names of the input layers of the model have to be
+toml list file (= the keys of ``x_values``) and the names of the input layers of
+the model have to be
 identical. Then, each input layer will get data from the toml input set
 with the same name.
 
@@ -186,15 +213,16 @@ The following sample modifier will perform this operation:
 
 .. code-block:: python
 
-    def sample_modifier(xs_files):
-        xs_layer = dict()
+    def sample_modifier(info_blob):
+        x_values = info_blob["x_values"]
+        xs = dict()
 
-        xs_layer["input_layer_xy"] = xs_files["xy"]
+        xs["input_layer_xy"] = x_values["xy"]
 
-        yz_data = xs_files["yz"]
-        xs_layer["input_layer_zy"] = np.swapaxes(yz_data, 1, 2)  # Axis 0 is the batchsize!
+        yz_data = x_values["yz"]
+        xs["input_layer_zy"] = np.swapaxes(yz_data, 1, 2)  # Axis 0 is the batchsize!
 
-        return xs_layer
+        return xs
 
 Dataset modifier
 ----------------
@@ -206,30 +234,14 @@ It must be of the following form:
 
 .. code-block:: python
 
-    def my_dataset_modifier(mc_info, y_true, y_pred)
+    def my_dataset_modifier(info_blob)
         ...
         return datasets
 
-**Parameters**
+**Contents of info_blob**:
 
-    ``mc_info``: ``numpy structured array``
-        One batch of data read from the ``key_mc_info`` datagroup in the h5 input
-        files.
-        If the content of the datagroup is a structured array, this will
-        also be a structured array.
-    ``y_true``: ``dict``
-        The labels given to the model.
+    ``y_values``, ``xs``, ``ys``, ``y_pred``
 
-        Keys: The names of the output layers of the model.
-
-        Values: One batch of labels as a numpy array.
-    ``y_pred``: ``dict``
-        The predictions of the model.
-
-        Keys: The names of the output layers of the model.
-
-        Values: One batch of predictions from the respective output layer of the
-        model as a numpy array.
 
 **Returns**
 
@@ -248,4 +260,4 @@ It can be set via
     orga.cfg.dataset_modifier = my_dataset_modifier
 
 **Hint:** If no dataset modifier is given, the following datasets will be
-created: mc_info, and two sets for every output layer (label and pred).
+created: y_values, and two sets for every output layer (label and pred).

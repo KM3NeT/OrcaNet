@@ -245,9 +245,13 @@ class HistoryHandler:
         for file in files:
             if not (file.startswith("log_epoch_") and file.endswith(".txt")):
                 continue
-            # file is sth like "log_epoch_1_file_2.txt", extract the 1 and 2:
+            filepath = os.path.join(self.train_log_folder, file)
+            if os.path.getsize(filepath) == 0:
+                continue
+
+            # file is sth like "log_epoch_1_file_2.txt", extract epoch & fileno:
             epoch, file_no = [int(file.split(".")[0].split("_")[i]) for i in [2, 4]]
-            file_data = self._load_txt(self.train_log_folder + "/" + file)
+            file_data = self._load_txt(filepath)
             train_file_data.append([[epoch, file_no], file_data])
 
         # sort so that earlier epochs come first

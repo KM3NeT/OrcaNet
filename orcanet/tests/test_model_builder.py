@@ -42,6 +42,7 @@ class TestModel(TestCase):
         self.assertEqual(model.input_shape[1:], self.input_shapes["input_A"])
         self.assertEqual(model.output_shape[1:], (2, ))
         self.assertEqual(len(model.layers), 14)
+        self.assertEqual(model.optimizer.epsilon, 0.2)
 
     def test_merge_models(self):
         def build_model(inp_layer_name, inp_shape):

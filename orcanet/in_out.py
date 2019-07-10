@@ -467,7 +467,7 @@ class IOHandler(object):
         n_bins = {}
         for input_key in train_files:
             with h5py.File(train_files[input_key][0], "r") as f:
-                n_bins[input_key] = f[self.cfg.key_samples].shape[1:]
+                n_bins[input_key] = f[self.cfg.key_x_values].shape[1:]
         return n_bins
 
     def get_file_sizes(self, which):
@@ -495,7 +495,7 @@ class IOHandler(object):
         for n, file_no_set in enumerate(self.yield_files(which)):
             # the number of samples in the n-th file of all inputs
             file_sizes_full[n] = [h5_get_number_of_rows(
-                file, datasets=[self.cfg.key_mc_info, self.cfg.key_samples])
+                file, datasets=[self.cfg.key_y_values, self.cfg.key_x_values])
                 for file in file_no_set.values()]
             if not file_sizes_full[n].count(file_sizes_full[n][0]) == \
                     len(file_sizes_full[n]):
@@ -586,7 +586,9 @@ class IOHandler(object):
         """
         print("\nInput check\n-----------")
         # Get a batch of data to investigate the given modifier functions
-        xs, y_values = self.get_batch()
+        info_blob = self.get_batch()
+        x_values = info_blob["x_values"]
+        y_values = info_blob["y_values"]
         layer_inputs = get_inputs(model)
         # keys: name of layers, values: shape of input
         layer_inp_shapes = {key: layer_inputs[key].input_shape[1:]
@@ -601,7 +603,7 @@ class IOHandler(object):
         if self.cfg.sample_modifier is None:
             print("\nYou did not specify a sample modifier.")
         else:
-            modified_xs = self.cfg.sample_modifier(xs)
+            modified_xs = self.cfg.sample_modifier(info_blob)
             modified_shapes = {modi_key: modified_xs[modi_key].shape[1:]
                                for modi_key in modified_xs}
             print("\nAfter applying your sample modifier, they have the "
@@ -648,7 +650,7 @@ class IOHandler(object):
         print("\t" + ", ".join(str(name) for name in mc_names), end="\n\n")
 
         if self.cfg.label_modifier is not None:
-            label_names = tuple(self.cfg.label_modifier(y_values).keys())
+            label_names = tuple(self.cfg.label_modifier(info_blob).keys())
             print("The following {} labels get produced from them by your "
                   "label_modifier:".format(len(label_names)))
             print("\t" + ", ".join(str(name) for name in label_names), end="\n\n")
@@ -686,29 +688,33 @@ class IOHandler(object):
 
     def get_batch(self):
         """
-        For testing purposes, return a batch of samples and mc_infos.
+        For testing purposes, return a batch of x_values and y_values.
 
-        This will always be the first batchsize samples and mc_info from
+        This will always be the first batchsize samples and y_values from
         the first file, before any modifiers have been applied.
 
         Returns
         -------
-        xs : dict
-            Keys: Names of the input datasets from the list toml file.
-            Values: ndarray, a batch of samples.
-        mc_info : ndarray
-            From the mc_info datagroup of the input files.
+        info_blob : dict
+            X- and y-values from the files. Has the following entries:
+            x_values : dict
+                Keys: Names of the input datasets from the list toml file.
+                Values: ndarray, a batch of samples.
+            y_values : ndarray
+                From the y_values datagroup of the input files.
 
         """
-        # TODO gets mc_info only from first train file
+        # TODO gets y_values only from first train file
         files_dict = next(self.yield_files("train"))
-        xs = {}
+        x_values = {}
         for i, inp_name in enumerate(files_dict):
             with h5py.File(files_dict[inp_name], "r") as f:
-                xs[inp_name] = f[self.cfg.key_samples][:self.cfg.batchsize]
+                x_values[inp_name] = f[self.cfg.key_x_values][:self.cfg.batchsize]
                 if i == 0:
-                    mc_info = f[self.cfg.key_mc_info][:self.cfg.batchsize]
-        return xs, mc_info
+                    y_values = f[self.cfg.key_y_values][:self.cfg.batchsize]
+
+        info_blob = {"x_values": x_values, "y_values": y_values}
+        return info_blob
 
     def get_input_shapes(self):
         """
@@ -725,8 +731,8 @@ class IOHandler(object):
         if self.cfg.sample_modifier is None:
             input_shapes = self.get_n_bins()
         else:
-            xs, mc_info = self.get_batch()
-            xs_mod = self.cfg.sample_modifier(xs)
+            info_blob = self.get_batch()
+            xs_mod = self.cfg.sample_modifier(info_blob)
             input_shapes = {input_name: input_xs.shape[1:]
                             for input_name, input_xs in xs_mod.items()}
         return input_shapes

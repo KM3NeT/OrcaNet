@@ -15,13 +15,13 @@ batchsize=32
 #   If true, surpresses the tensorflow info logs which usually spam
 #   the terminal.
 
-# key_samples : str
+# key_x_values : str
 #   The name of the datagroup in the h5 input files which contains
-#   the samples for the network.
+#   the x values (samples) for the network.
 
-# key_mc_info : str
+# key_y_values : str
 #   The name of the datagroup in the h5 input files which contains
-#   the info for the labels.
+#   the y values (labels) for the network.
 
 # learning_rate : float or tuple or function
 #   The learning rate for the training.

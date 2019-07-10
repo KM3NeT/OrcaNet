@@ -1,5 +1,14 @@
 Unreleased changes
 ------------------
+BREAKING CHANGES:
+* All modifiers take a dict (info_blob) as an input now, which has the old values as keys, e.g. xs is now info_blob["xs"]
+* mc_info for the modifiers is now called y_values
+* key_mc_info is now called key_y_values
+* key_samples is now called key_x_values
+
+Other changes:
+* Rework generator
+* Added Resnet Blocks
 * Added summarize function + entry point to quickly and interactivly plot and compare training progresses.
 * Added cleanup method and option to automatically save a lot of disk space
 * Added Spatial dropout layer

@@ -208,8 +208,9 @@ class TestIOHandler(TestCase):
             "out_B": 1,
         }
 
-        def sample_modifier(samples):
-            return {'input_A': samples["input_A"], 'input_B': samples["input_B"]}
+        def sample_modifier(info_blob):
+            x_values = info_blob["x_values"]
+            return {'input_A': x_values["input_A"], 'input_B': x_values["input_B"]}
 
         self.io.cfg.label_modifier = get_dummy_label_modifier(
             output_shapes.keys())
@@ -225,8 +226,9 @@ class TestIOHandler(TestCase):
             "out_B": 1,
         }
 
-        def sample_modifier(samples):
-            return {'input_A': samples["input_A"]}
+        def sample_modifier(info_blob):
+            x_values = info_blob["x_values"]
+            return {'input_A': x_values["input_A"]}
 
         self.io.cfg.label_modifier = get_dummy_label_modifier(
             output_shapes.keys())
@@ -280,8 +282,9 @@ class TestIOHandler(TestCase):
         value = self.io.get_input_shapes()
         self.assertSequenceEqual(value, self.n_bins)
 
-        def sample_modifier(samples):
-            return {'input_A': samples["input_A"], }
+        def sample_modifier(info_blob):
+            x_values = info_blob["x_values"]
+            return {'input_A': x_values["input_A"], }
         self.io.cfg.sample_modifier = sample_modifier
 
         value = self.io.get_input_shapes()
@@ -297,7 +300,7 @@ class TestIOHandler(TestCase):
             "input_A": self.train_A_file_1_ctnt[0][:self.batchsize],
             "input_B": self.train_B_file_1_ctnt[0][:self.batchsize],
         }
-        assert_dict_arrays_equal(value[0], target)
+        assert_dict_arrays_equal(value["x_values"], target)
 
     def test_get_batch_ys(self):
         value = self.io.get_batch()
@@ -305,7 +308,7 @@ class TestIOHandler(TestCase):
             "input_A": self.train_A_file_1_ctnt[1][:self.batchsize],
             "input_B": self.train_B_file_1_ctnt[1][:self.batchsize],
         }
-        assert_equal_struc_array(value[1], target["input_A"])
+        assert_equal_struc_array(value["y_values"], target["input_A"])
 
     def test_get_all_epochs(self):
         epochs = self.io.get_all_epochs()
@@ -711,8 +714,9 @@ def build_dummy_model(input_shapes, output_shapes):
 
 
 def get_dummy_label_modifier(output_names):
-    def label_modifier(mc_info):
-        particle = mc_info["mc_A"]
+    def label_modifier(info_blob):
+        y_values = info_blob["y_values"]
+        particle = y_values["mc_A"]
         y_true = dict()
         for output_name in output_names:
             y_true[output_name] = particle

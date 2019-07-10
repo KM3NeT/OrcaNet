@@ -1,10 +1,9 @@
 from keras.models import Model
-from keras.layers import Dense, Flatten, Concatenate, Lambda, GlobalAveragePooling2D, Dropout
-from keras import backend as K
+import keras.layers as layers
+import keras.backend as K
 import inspect
 
-from orcanet.builder_util.layer_blocks import (
-    input_block, ConvBlock, DenseBlock)
+import orcanet.builder_util.layer_blocks as layer_blocks
 
 
 class BlockBuilder:
@@ -25,9 +24,11 @@ class BlockBuilder:
     def __init__(self, body_defaults=None, head_defaults=None):
         """ Set dicts with default values for the layers of the model.
         """
-        self._all_blocks = {
-            "conv_block": ConvBlock,
-            "dense_block": DenseBlock,
+        self.all_blocks = {
+            "conv_block": layer_blocks.ConvBlock,
+            "dense_block": layer_blocks.DenseBlock,
+            "resnet_block": layer_blocks.ResnetBlock,
+            "resnet_bneck_block": layer_blocks.ResnetBnetBlock,
         }
 
         self._check_arguments(body_defaults)
@@ -68,7 +69,7 @@ class BlockBuilder:
             raise TypeError(
                 "input_shapes must have length 1, not ", len(input_shape))
 
-        input_layer = input_block(input_shape)[0]
+        input_layer = layer_blocks.input_block(input_shape)[0]
 
         x = input_layer
         for layer_config in body_configs:
@@ -167,7 +168,7 @@ class BlockBuilder:
                           flatten=True):
         """ Small dense network for multiple categories. """
         if flatten:
-            x = Flatten()(layer)
+            x = layers.Flatten()(layer)
         else:
             x = layer
 
@@ -179,27 +180,31 @@ class BlockBuilder:
             x, {"type": "dense_block", "units": 32, "dropout": None},
             is_output=True)
 
-        out = Dense(units=categories, activation='softmax',
-                    kernel_initializer='he_normal', name=output_name)(x)
+        out = layers.Dense(
+            units=categories,
+            activation='softmax',
+            kernel_initializer='he_normal',
+            name=output_name)(x)
         return [out, ]
 
     @staticmethod
     def attach_output_gpool(layer, categories, output_name, dropout=None):
         """ Global Pooling + 1 dense layer (like in resnet). """
-        x = GlobalAveragePooling2D()(layer)
+        x = layers.GlobalAveragePooling2D()(layer)
         if dropout is not None:
-            x = Dropout(dropout)(x)
+            x = layers.Dropout(dropout)(x)
 
-        out = Dense(units=categories,
-                    activation='softmax',
-                    kernel_initializer='he_normal',
-                    name=output_name)(x)
+        out = layers.Dense(
+            units=categories,
+            activation='softmax',
+            kernel_initializer='he_normal',
+            name=output_name)(x)
         return [out, ]
 
     def attach_output_reg_err(self, layer, output_names, flatten=True):
         """ Double network for regression + error estimation. """
         if flatten:
-            flatten = Flatten()(layer)
+            flatten = layers.Flatten()(layer)
         else:
             flatten = layer
         outputs = []
@@ -214,11 +219,11 @@ class BlockBuilder:
             is_output=True)
 
         for name in output_names:
-            output_label = Dense(units=1, name=name)(x)
+            output_label = layers.Dense(units=1, name=name)(x)
             outputs.append(output_label)
 
         # Network for the errors of the labels
-        x_err = Lambda(lambda a: K.stop_gradient(a))(flatten)
+        x_err = layers.Lambda(lambda a: K.stop_gradient(a))(flatten)
 
         x_err = self.attach_block(
             x_err, {"type": "dense_block", "units": 128},
@@ -233,11 +238,13 @@ class BlockBuilder:
             is_output=True)
 
         for i, name in enumerate(output_names):
-            output_label_error = Dense(units=1, activation='linear',
-                                       name=name + '_err_temp')(x_err)
+            output_label_error = layers.Dense(
+                units=1,
+                activation='linear',
+                name=name + '_err_temp')(x_err)
             # Predicted label gets concatenated with its error (needed for loss function)
-            output_label_merged = Concatenate(name=name + '_err')([outputs[i],
-                                                                   output_label_error])
+            output_label_merged = layers.Concatenate(name=name + '_err')(
+                [outputs[i], output_label_error])
             outputs.append(output_label_merged)
 
         return outputs
@@ -271,11 +278,12 @@ class BlockBuilder:
     def _get_blocks(self, name=None):
         """ Get the block class/function depending on the name. """
         if name is None:
-            return self._all_blocks
-        elif name in self._all_blocks:
-            return self._all_blocks[name]
+            return self.all_blocks
+        elif name in self.all_blocks:
+            return self.all_blocks[name]
         else:
-            raise NameError("Unknown block type: " + str(name))
+            raise NameError("Unknown block type: {}, must be one of {}"
+                            "".format(name, self.all_blocks.keys()))
 
     def _check_arguments(self, defaults):
         """ Check if given defaults appear in at least one block. """
