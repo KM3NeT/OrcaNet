@@ -1,5 +1,11 @@
 Unreleased changes
 ------------------
+
+Version 0
+---------
+
+0.7 / 2019-07-15
+~~~~~~~~~~~~~~~~
 BREAKING CHANGES:
 * All modifiers take a dict (info_blob) as an input now, which has the old values as keys, e.g. xs is now info_blob["xs"]
 * mc_info for the modifiers is now called y_values
@@ -20,9 +26,6 @@ Other changes:
 * Add support for xyz-t + xyz-p (vertically stacked) and yzt-x double input, pre-trained model
 * New plots in orcanet_contrib for regression & ts and minor other stuff.
 
-
-Version 0
----------
 
 0.6 / 2019-05-27
 ~~~~~~~~~~~~~~~~
