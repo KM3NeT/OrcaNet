@@ -20,16 +20,16 @@ It is located in the core module, so it can be set up like this:
 
     organizer = Organizer(output_folder, list_file, config_file)
 
-- output_folder : str
+- ``output_folder`` : str
     The folder where everything will get saved to, i.e. this is where the
     trained models, the log files, the plots etc. will be saved.
     It will be created if it does not exist yet.
-- list_file : str or None
+- ``list_file`` : str, optional
     Path to a toml file containing a list of the files to be
     trained on. Only necessary for actions requiring a dataset, e.g.
     training, validating or predicting. See :ref:`input_page_orga`
     for the required format of this file.
-- config_file : str or None
+- ``config_file`` : str, optional
     Optional: Path to a toml file containing new values for the default
     parameters in the configuration member object. See
     :ref:`input_page_orga` for the required format of this file.

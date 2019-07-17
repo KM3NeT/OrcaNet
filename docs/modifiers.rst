@@ -14,18 +14,18 @@ set in the toml list file to be named.
 This makes it easy to assure that the right data is fed into the right layer of
 the network, especially if there are multiple inputs or outputs.
 
-All modifiers take a dict ``info_blob`` as an input, which contains a subset of
+All modifiers take a dict ``info_blob`` as input, which contains a subset of
 the following keys:
 
 **Possible keys in the info_blob dict**
     ``x_values`` : dict
-        One batch of data from the ``key_x_values`` datagroup of the h5 file.
+        One batch of data from the ``cfg.key_x_values`` datagroup of the h5 file.
 
         Keys: Input set names from the toml list file.
 
         Values: Numpy array with x values from the respective file.
     ``y_values`` : ndarray
-        One batch of data from the ``key_y_values`` datagroup of the h5 file.
+        One batch of data from the ``cfg.key_y_values`` datagroup of the h5 file.
         If the content of the datagroup is a structured array, this will
         also be a structured array.
     ``xs`` : dict

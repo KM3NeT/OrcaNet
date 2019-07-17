@@ -307,7 +307,8 @@ class IOHandler(object):
 
     def get_pred_files_list(self, epoch=None, fileno=None):
         """
-        Returns a sorted list with all .h5 files in the prediction folder.
+        Returns a sorted list with all pred .h5 files in the prediction folder.
+        Does not include the inference files.
 
         Parameters
         ----------
@@ -326,7 +327,7 @@ class IOHandler(object):
 
         pred_files_list = []
         for file in os.listdir(prediction_folder):
-            if not file.endswith(".h5"):
+            if not (file.startswith("pred_model_epoch") and file.endswith(".h5")):
                 continue
             pred_file = os.path.join(prediction_folder, file)
             p_epoch, p_file_no, p_val_file_no = split_name_of_predfile(pred_file)

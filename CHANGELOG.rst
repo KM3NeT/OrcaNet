@@ -4,6 +4,10 @@ Unreleased changes
 Version 0
 ---------
 
+0.7.1 / 2019-07-17
+~~~~~~~~~~~~~~~~~~
+* fix for error when using pred after inf
+
 0.7 / 2019-07-15
 ~~~~~~~~~~~~~~~~
 BREAKING CHANGES:

@@ -44,8 +44,8 @@ the ``model_file`` argument of
 
 Here is an example for the proper file format:
 
-.. literalinclude:: ../examples/model_file.toml
+.. literalinclude:: ../examples/model_files/explanation.toml
    :language: toml
    :linenos:
-   :caption: examples/model_file.toml
+   :caption: examples/model_files/explanation.toml
 
