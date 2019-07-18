@@ -16,8 +16,8 @@ A tuple (or list) of two floats: The first float gives the learning rate
 in epoch 1 file 1, and the second float gives the decrease of the
 learning rate per file.
 
-For example, if ``organizer.cfg.learning_rate`` = [0.1, 0.5] is used,
-the learning rates will be 0.1, 0.05, 0.025, 0.0125, ...
+For example, if ``organizer.cfg.learning_rate`` = [0.1, 0.4] is used,
+the learning rates will be 0.1, 0.06, 0.036, ...
 
 Function
 ********

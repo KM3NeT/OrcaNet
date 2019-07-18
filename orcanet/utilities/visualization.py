@@ -36,8 +36,10 @@ class TrainValPlotter:
                     train_label="training",
                     val_label="validation",
                     color=None,
-                    train_smooth_ksize=None,
-                    lw=0.5):
+                    smooth_sigma=None,
+                    tlw=0.5,
+                    vlw=0.5,
+                    vms=3):
         """
         Plot a training and optionally a validation line.
 
@@ -57,10 +59,14 @@ class TrainValPlotter:
             Label for the validation line in the legend.
         color : str, optional
             Color used for the train/val line.
-        train_smooth_ksize : int, optional
-            Smooth the train curve by averaging over a moving window of given size.
-        lw : float
-            Linewidth of plots.
+        smooth_sigma : int, optional
+            Apply gaussian blur to the train curve with given sigma.
+        tlw : float
+            Linewidth of train curve.
+        vlw : float
+            Linewidth of val curve.
+        vms : float
+            Markersize of the val curve.
 
         """
         if train_data is None and val_data is None:
@@ -68,21 +74,16 @@ class TrainValPlotter:
                 "Can not plot when no train and val data is given.")
 
         if train_data is not None:
-            self._xpoints_train = np.concatenate((self._xpoints_train,
-                                                  train_data[0]))
-            self._ypoints_train = np.concatenate((self._ypoints_train,
-                                                  train_data[1]))
+            epoch, y_data = train_data
+            if smooth_sigma is not None:
+                y_data = gaussian_smooth(y_data, smooth_sigma)
 
-            if train_smooth_ksize is not None:
-                kernel = np.ones(train_smooth_ksize) / train_smooth_ksize
-                epoch = np.convolve(train_data[0], kernel, 'valid')
-                y_data = np.convolve(train_data[1], kernel, 'valid')
-            else:
-                epoch, y_data = train_data
+            self._xpoints_train = np.concatenate((self._xpoints_train, epoch))
+            self._ypoints_train = np.concatenate((self._ypoints_train, y_data))
 
             train_plot = plt.plot(
                 epoch, y_data, color=color, ls='-',
-                zorder=3, label=train_label, lw=lw, alpha=0.5)
+                zorder=3, label=train_label, lw=tlw, alpha=0.5)
             train_color = train_plot[0].get_color()
         else:
             train_color = color
@@ -96,7 +97,7 @@ class TrainValPlotter:
             val_data_clean = skip_nans(val_data)
             # val plot always has the same color as the train plot
             plt.plot(val_data_clean[0], val_data_clean[1], color=train_color,
-                     marker='o', zorder=3, lw=lw, markersize=3, label=val_label)
+                     marker='o', zorder=3, lw=vlw, markersize=vms, label=val_label)
 
     def apply_layout(self,
                      title=None,
@@ -106,7 +107,8 @@ class TrainValPlotter:
                      legend=True,
                      x_lims=None,
                      y_lims="auto",
-                     x_ticks="auto"):
+                     x_ticks="auto",
+                     logy=False):
         """
         Apply given layout.
         Can caluclate good y_lims and x_ticks automatically.
@@ -129,9 +131,12 @@ class TrainValPlotter:
             Y limits of the data. "auto" for auto-calculation.
         x_ticks : List
             Positions of the major x ticks.
+        logy : bool
+            If true, make y axis log.
 
         """
-
+        if logy:
+            plt.yscale("log")
         if x_ticks is not None:
             if x_ticks == "auto":
                 all_x_points = np.concatenate((self._xpoints_train,
@@ -165,6 +170,20 @@ class TrainValPlotter:
 
         if grid:
             plt.grid(True, zorder=0, linestyle='dotted')
+
+
+def gaussian_smooth(y, sigma, truncate=4):
+    """ Smooth a 1d ndarray with a gaussian filter. """
+    # kernel_width = 2 * sigma * truncate + 1
+    kernel_x = np.arange(-truncate * sigma, truncate * sigma + 1)
+    kernel = _gauss(kernel_x, 0, sigma)
+    y = np.pad(np.asarray(y), int(len(kernel)/2), "edge")
+    blurred = np.convolve(y, kernel, "valid")
+    return blurred
+
+
+def _gauss(x, mu=0, sigma=1):
+    return (1/(np.sqrt(2*np.pi)*sigma)) * np.exp(-np.power(x - mu, 2.) / (2 * np.power(sigma, 2.)))
 
 
 def plot_history(train_data,

@@ -1,4 +1,4 @@
-from keras.models import Model
+import keras as ks
 import keras.layers as layers
 import keras.backend as K
 import inspect
@@ -75,7 +75,7 @@ class BlockBuilder:
         for layer_config in body_configs:
             x = self.attach_block(x, layer_config)
 
-        model_body = Model(input_layer, x)
+        model_body = ks.models.Model(input_layer, x)
         last_b_layer = model_body.layers[-1]
         last_b_layer.name = "BODYEND_" + last_b_layer.name
 
@@ -88,7 +88,7 @@ class BlockBuilder:
             outputs = self.attach_output_layers(x,
                                                 head_arch, **head_arch_args)
 
-        model = Model(inputs=input_layer, outputs=outputs)
+        model = ks.models.Model(inputs=input_layer, outputs=outputs)
         return model
 
     def attach_block(self, layer, layer_config, is_output=False):
@@ -151,8 +151,11 @@ class BlockBuilder:
             assert head_arch_args is not None, "No output_kwargs given"
             outputs = self.attach_output_cat(layer, **head_arch_args)
 
-        elif head_arch == "gpool":
-            outputs = self.attach_output_gpool(layer, **head_arch_args)
+        elif head_arch == "gpool" or head_arch == "gpool_categ":
+            outputs = self.attach_output_gpool_categ(layer, **head_arch_args)
+
+        elif head_arch == "gpool_reg":
+            outputs = self.attach_output_gpool_reg(layer, **head_arch_args)
 
         elif head_arch == "regression_error":
             # regression with error estimation, two outputs for each label
@@ -188,7 +191,7 @@ class BlockBuilder:
         return [out, ]
 
     @staticmethod
-    def attach_output_gpool(layer, categories, output_name, dropout=None):
+    def attach_output_gpool_categ(layer, categories, output_name, dropout=None):
         """ Global Pooling + 1 dense layer (like in resnet). """
         x = layers.GlobalAveragePooling2D()(layer)
         if dropout is not None:
@@ -199,6 +202,37 @@ class BlockBuilder:
             activation='softmax',
             kernel_initializer='he_normal',
             name=output_name)(x)
+        return [out, ]
+
+    def attach_output_gpool_reg(
+            self, layer, output_name, output_neurons=1, unit_list=None):
+        """
+        Global Pooling, followed by dense layer(s) for regression.
+
+        Parameters
+        ----------
+        layer
+        output_name : str
+            Name that will be given to the output layer of the network.
+        output_neurons : int
+            Number of neurons in the last layer. Default: 1.
+        unit_list : List, optional
+            A list of ints. Add additional Dense layers after the gpool
+            with this many units in them. E.g., [64, 32] would add
+            two Dense layers, the first with 64 neurons, the secound with
+            32 neurons.
+
+        """
+        x = layers.GlobalAveragePooling2D()(layer)
+
+        if unit_list is not None:
+            for units in unit_list:
+                x = self.attach_block(
+                    x, {"type": "dense_block", "units": units},
+                    is_output=True)
+
+        out = layers.Dense(units=output_neurons, name=output_name)(x)
+
         return [out, ]
 
     def attach_output_reg_err(self, layer, output_names, flatten=True):

@@ -104,7 +104,8 @@ class HistoryHandler:
         if "legend" not in kwargs:
             kwargs["legend"] = False
 
-        plot_history(train_data=None, val_data=val_data, **kwargs)
+        plot_history(train_data=None, val_data=val_data, logy=True,
+                     y_lims=None, **kwargs)
 
     def get_metrics(self):
         """

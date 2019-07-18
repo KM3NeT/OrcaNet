@@ -10,6 +10,10 @@ OrcaNet: A training organizer for Deep Learning in KM3NeT
 .. image:: https://git.km3net.de/ml/OrcaNet/badges/master/coverage.svg
     :target: https://ml.pages.km3net.de/OrcaNet/coverage
 
+.. image:: https://api.codacy.com/project/badge/Grade/6c81a8396eb34a9d88f07b6620535432
+    :alt: Codacy Badge
+    :target: https://www.codacy.com/app/sreck/OrcaNet?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=StefReck/OrcaNet&amp;utm_campaign=Badge_Grade
+
 
 OrcaNet is a deep learning framework based on Keras in order to simplify the 
 training process of neural networks for astroparticle physics. It incorporates 

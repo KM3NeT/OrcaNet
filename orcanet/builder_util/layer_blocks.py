@@ -1,6 +1,5 @@
+import keras as ks
 import keras.layers as layers
-from keras import backend
-from keras.regularizers import l2
 
 
 class ConvBlock:
@@ -79,7 +78,7 @@ class ConvBlock:
             raise ValueError('dim must be equal to 2 or 3.')
 
         if self.kernel_l2_reg is not None:
-            kernel_reg = l2(self.kernel_l2_reg)
+            kernel_reg = ks.regularizers.l2(self.kernel_l2_reg)
         else:
             kernel_reg = None
 
@@ -97,7 +96,7 @@ class ConvBlock:
                            kernel_regularizer=kernel_reg)(inputs)
 
         if self.batchnorm:
-            channel_axis = 1 if backend.image_data_format() == "channels_first" else -1
+            channel_axis = 1 if ks.backend.image_data_format() == "channels_first" else -1
             x = layers.BatchNormalization(axis=channel_axis)(x)
         if self.activation is not None:
             x = layers.Activation(self.activation)(x)
@@ -146,7 +145,7 @@ class DenseBlock:
 
     def __call__(self, inputs):
         if self.kernel_l2_reg is not None:
-            kernel_reg = l2(self.kernel_l2_reg)
+            kernel_reg = ks.regularizers.l2(self.kernel_l2_reg)
         else:
             kernel_reg = None
 
@@ -162,7 +161,7 @@ class DenseBlock:
             kernel_regularizer=kernel_reg)(inputs)
 
         if self.batchnorm:
-            channel_axis = 1 if backend.image_data_format() == "channels_first" else -1
+            channel_axis = 1 if ks.backend.image_data_format() == "channels_first" else -1
             x = layers.BatchNormalization(axis=channel_axis)(x)
         if self.activation is not None:
             x = layers.Activation(self.activation)(x)
@@ -344,5 +343,6 @@ def input_block(input_shapes):
     """
     inputs = []
     for input_name, input_shape in input_shapes.items():
-        inputs.append(layers.Input(shape=input_shape, name=input_name, dtype=backend.floatx()))
+        inputs.append(layers.Input(
+            shape=input_shape, name=input_name, dtype=ks.backend.floatx()))
     return inputs

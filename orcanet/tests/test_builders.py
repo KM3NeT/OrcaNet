@@ -1,7 +1,6 @@
 from unittest import TestCase
-from keras.layers import Input, Dense, Dropout, Activation, Convolution3D, BatchNormalization, MaxPooling3D,\
-                         Convolution2D, MaxPooling2D
 from keras.models import Model
+import keras.layers as layers
 
 from orcanet.builder_util.builders import BlockBuilder
 
@@ -35,7 +34,7 @@ class TestSequentialBuilder(TestCase):
         self.assertEqual(input_shape, model.input_shape[1:])
 
     def test_attach_layer_conv(self):
-        inp = Input((6, 6, 1))
+        inp = layers.Input((6, 6, 1))
         body_defaults = {
             "type": "conv_block",
             "conv_dim": 2,
@@ -52,15 +51,15 @@ class TestSequentialBuilder(TestCase):
         x = builder.attach_block(inp, layer_config)
         model = Model(inp, x)
 
-        self.assertIsInstance(model.layers[1], Convolution2D)
+        self.assertIsInstance(model.layers[1], layers.Convolution2D)
         kreg = model.layers[1].get_config()["kernel_regularizer"]["config"]
         self.assertAlmostEqual(kreg["l1"], 0.0)
         self.assertAlmostEqual(kreg["l2"], layer_config["kernel_l2_reg"])
 
-        self.assertIsInstance(model.layers[2], BatchNormalization)
-        self.assertIsInstance(model.layers[3], Activation)
-        self.assertIsInstance(model.layers[4], MaxPooling2D)
-        self.assertIsInstance(model.layers[5], Dropout)
+        self.assertIsInstance(model.layers[2], layers.BatchNormalization)
+        self.assertIsInstance(model.layers[3], layers.Activation)
+        self.assertIsInstance(model.layers[4], layers.MaxPooling2D)
+        self.assertIsInstance(model.layers[5], layers.Dropout)
         self.assertEqual(model.output_shape[1:], (3, 3, 2))
 
     def test_attach_output_layers_regression_output_shape_and_names(self):
@@ -69,7 +68,7 @@ class TestSequentialBuilder(TestCase):
             "output_names": ['out_A', 'out_B'],
         }
 
-        inp = Input((5, 1))
+        inp = layers.Input((5, 1))
         builder = BlockBuilder()
         x = builder.attach_output_layers(inp, head_arch, **head_arch_args)
         model = Model(inp, x)
@@ -88,7 +87,7 @@ class TestSequentialBuilder(TestCase):
         self.assertDictEqual(output_shapes, target_output_shapes)
 
     def test_attach_layer_dense(self):
-        inp = Input((3, 3, 1))
+        inp = layers.Input((3, 3, 1))
         body_defaults = {"type": "conv_block", "conv_dim": 2}
         layer_config = {"type": "dense_block", "units": 5, "dropout": 0.2, "batchnorm": True}
 
@@ -96,14 +95,14 @@ class TestSequentialBuilder(TestCase):
         x = builder.attach_block(inp, layer_config)
         model = Model(inp, x)
 
-        self.assertIsInstance(model.layers[1], Dense)
-        self.assertIsInstance(model.layers[2], BatchNormalization)
-        self.assertIsInstance(model.layers[3], Activation)
-        self.assertIsInstance(model.layers[4], Dropout)
+        self.assertIsInstance(model.layers[1], layers.Dense)
+        self.assertIsInstance(model.layers[2], layers.BatchNormalization)
+        self.assertIsInstance(model.layers[3], layers.Activation)
+        self.assertIsInstance(model.layers[4], layers.Dropout)
         self.assertEqual(model.output_shape[1:], (3, 3, 5))
 
     def test_attach_layer_wrong_layer_config_conv_block(self):
-        inp = Input((3, 3, 1))
+        inp = layers.Input((3, 3, 1))
         layer_config = {"type": "conv_block", "filters": 2, "units": 5}
         builder = BlockBuilder(None, None)
 
@@ -111,7 +110,7 @@ class TestSequentialBuilder(TestCase):
             builder.attach_block(inp, layer_config)
 
     def test_attach_layer_wrong_layer_config_dense_block(self):
-        inp = Input((3, 3, 1))
+        inp = layers.Input((3, 3, 1))
         layer_config = {"type": "dense_block", "filters": 2, "units": 5}
         builder = BlockBuilder(None, None)
 

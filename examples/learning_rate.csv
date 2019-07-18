@@ -4,9 +4,16 @@
 # learning_rate="learning_rate.csv"
 # in the configuration to use it.
 #
-# Columns are:
+# The file must have three columns, containing the epoch, the file number,
+# as well as the learning rate that will be used for the given epoch/file number pair.
+# Indices start from 1, i.e. in the following example,
+# the lr for the first epoch (= file 1 in epoch 1)
+# is set to 0.002 in the first row (the one starting with   1   1).
+# It will still be 0.002 for epoch 1 file 2, and will be changed to 0.001
+# in epoch 1 file 3.
+#
 # Epoch Fileno  LR
-0   1   0.002
-1   1   0.001
+1   1   0.002
+1   3   0.001
 2   1   0.0005
 2   3   0.0001

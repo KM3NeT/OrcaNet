@@ -7,7 +7,7 @@ import shutil
 import h5py
 from unittest import TestCase
 from keras.models import Model
-from keras.layers import Dense, Input, Concatenate
+import keras.layers as layers
 
 from orcanet.core import Organizer
 from orcanet.utilities.nn_utilities import load_zero_center_data, get_layer_output
@@ -101,16 +101,16 @@ class TestModel(TestCase):
     def setUp(self):
         self.layer_names = ["inp1", "inp2", "mid", "outp"]
 
-        inp1 = Input(shape=(2, ), name=self.layer_names[0])
-        inp2 = Input(shape=(3, ), name=self.layer_names[1])
+        inp1 = layers.Input(shape=(2, ), name=self.layer_names[0])
+        inp2 = layers.Input(shape=(3, ), name=self.layer_names[1])
 
-        conc = Concatenate()([inp1, inp2])
+        conc = layers.Concatenate()([inp1, inp2])
 
-        intermed = Dense(2,
+        intermed = layers.Dense(2,
                          name=self.layer_names[2],
                          bias_initializer="Ones",
                          kernel_initializer="Ones")(conc)
-        outp = Dense(1, name=self.layer_names[3])(intermed)
+        outp = layers.Dense(1, name=self.layer_names[3])(intermed)
 
         self.model = Model([inp1, inp2], outp)
 

@@ -6,41 +6,45 @@ from orcanet.utilities.visualization import TrainValPlotter
 
 
 class Summarizer:
+    """
+    Summarize one or more trainings by giving their orcanet folder(s).
+
+    - Plot the training and validation curves in a single plot and show them
+    - Print info about the best and worst epochs
+
+    Attributes
+    ----------
+    folders : str or List, optional
+        Path to a orcanet folder, or to multiple folder as a list.
+        Default: CWD.
+    metric : str
+        The metric to plot. Default: loss.
+    smooth : int, optional
+        Apply gaussian blur to the train curve with given sigma.
+    labels : List, optional
+        Labels for each folder.
+    noplot : bool
+        Dont plot the train/val curves [default: False].
+    width : float
+        Scaling of the width of the curves and the marker size [default: 1].
+
+    """
     def __init__(self, folders,
                  metric="loss",
-                 ksize=10,
+                 smooth=None,
                  labels=None,
-                 no_plot=False):
-        """
-        Summarize one or more trainings.
-
-        - Plot the training and validation curves in a single plot and show them
-        - Print info about the best and worst epochs
-
-        Parameters
-        ----------
-        folders : str or List, optional
-            Path to a folder, or to multiple folder as a list.
-            Default: CWD.
-        metric : str
-            The metric to plot. Default: loss.
-        ksize : int, optional
-            Size of the moving average window for smoothing the train line.
-        labels : List, optional
-            Labels for each folder.
-        no_plot : bool
-            Dont plot the train/val curves.
-
-        """
+                 noplot=False,
+                 width=1.):
         self.folders = folders
         self.metric = metric
-        self.ksize = ksize
+        self.smooth = smooth
         self.labels = labels
-        self.no_plot = no_plot
+        self.noplot = noplot
+        self.width = width
         self._tvp = None
 
-    def __call__(self):
-        if not self.no_plot:
+    def summarize(self):
+        if not self.noplot:
             self._tvp = TrainValPlotter()
 
         min_stats, max_stats = [], []
@@ -66,7 +70,7 @@ class Summarizer:
         for i, stat in enumerate(max_stats, 1):
             print("{} | \t{}\t{}\t{}".format(i, stat[2], stat[0], stat[1]))
 
-        if not self.no_plot:
+        if not self.noplot:
             self._tvp.apply_layout(x_label="Epoch",
                                    y_label=self._metric_name,
                                    grid=True,
@@ -139,12 +143,15 @@ class Summarizer:
         min_stat = [min_line[smry_met_name], label, min_line["Epoch"]]
         max_stat = [max_line[smry_met_name], label, max_line["Epoch"]]
 
-        if not self.no_plot:
+        if not self.noplot:
             self._tvp.plot_curves(train_data=train_data,
                                   val_data=val_data,
                                   train_label=train_label,
                                   val_label=val_label,
-                                  train_smooth_ksize=self.ksize)
+                                  smooth_sigma=self.smooth,
+                                  tlw=0.5*self.width,
+                                  vlw=0.5*self.width,
+                                  vms=3*self.width**0.5)
         return min_stat, max_stat
 
     def summarize_dirs(self):
@@ -180,20 +187,20 @@ class Summarizer:
 
 def main():
     parser = argparse.ArgumentParser(
-        description=Summarizer.__init__.__doc__,
+        description=str(Summarizer.__doc__),
         formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument('folder', type=str, nargs='*', default=None)
-    parser.add_argument('-metric', type=str, nargs="?", default="loss")
-    parser.add_argument('-ksize', nargs="?", type=int, default=None)
-    parser.add_argument('-labels', nargs="*", type=str, default=None)
-    parser.add_argument('-no_plot', action="store_true")
+    parser.add_argument('folders', type=str, nargs='*')
+    parser.add_argument('-metric', type=str, nargs="?")
+    parser.add_argument('-smooth', nargs="?", type=int)
+    parser.add_argument('-width', nargs="?", type=float)
+    parser.add_argument('-labels', nargs="*", type=str)
+    parser.add_argument('-noplot', action="store_true")
+    args = vars(parser.parse_args())
+    for key in list(args.keys()):
+        if args[key] is None:
+            args.pop(key)
 
-    args = parser.parse_args()
-    Summarizer(folders=args.folder,
-               metric=args.metric,
-               ksize=args.ksize,
-               labels=args.labels,
-               no_plot=args.no_plot)()
+    Summarizer(**args).summarize()
 
 
 if __name__ == '__main__':

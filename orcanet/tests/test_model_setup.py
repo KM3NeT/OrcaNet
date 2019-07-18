@@ -1,9 +1,7 @@
 from unittest import TestCase
-from keras.models import Model
-from keras.layers import Input, Concatenate, Dropout, Dense
 import numpy as np
-from keras import backend as K
-
+import keras as ks
+import keras.layers as layers
 from orcanet.model_builder import change_dropout_rate
 
 
@@ -11,23 +9,24 @@ class TestDropoutChange(TestCase):
 
     def setUp(self):
         def dropout_model(rate_before, rate_after):
-            inp1 = Input((5, 1))
-            x1 = Dropout(rate_before)(inp1)
-            x1 = Dense(5)(x1)
+            inp1 = layers.Input((5, 1))
+            x1 = layers.Dropout(rate_before)(inp1)
+            x1 = layers.Dense(5)(x1)
 
-            inp2 = Input((5, 1))
-            x2 = Dropout(rate_before)(inp2)
+            inp2 = layers.Input((5, 1))
+            x2 = layers.Dropout(rate_before)(inp2)
 
-            x = Concatenate(axis=-1)([x1, x2])
-            x = Dense(5)(x)
-            out = Dropout(rate_after)(x)
+            x = layers.Concatenate(axis=-1)([x1, x2])
+            x = layers.Dense(5)(x)
+            out = layers.Dropout(rate_after)(x)
 
-            model = Model([inp1, inp2], out)
+            model = ks.models.Model([inp1, inp2], out)
             return model
 
         def get_layer_output(model, samples, layer_no=-1):
-            l_out = K.function(model.input + [K.learning_phase(), ],
-                               [model.layers[layer_no].output])
+            l_out = ks.backend.function(
+                model.input + [ks.backend.learning_phase(), ],
+                [model.layers[layer_no].output])
             # output in train mode = 1
             layer_output = l_out(samples + [1, ])[0]
             return layer_output

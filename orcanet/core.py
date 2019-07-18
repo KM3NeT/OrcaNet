@@ -9,9 +9,7 @@ import toml
 import warnings
 import time
 from datetime import timedelta
-from keras.models import load_model
-from keras.utils import plot_model
-import keras.backend as kb
+import keras as ks
 
 import orcanet.backend as backend
 from orcanet.utilities.visualization import update_summary_plot
@@ -186,7 +184,7 @@ class Organizer:
         smry_logger = SummaryLogger(self, model)
 
         lr = self.io.get_learning_rate(next_epoch)
-        kb.set_value(model.optimizer.lr, lr)
+        ks.backend.set_value(model.optimizer.lr, lr)
 
         files_dict = self.io.get_file("train", next_epoch[1])
 
@@ -195,7 +193,7 @@ class Organizer:
         self.io.print_log(line)
         self.io.print_log("-" * len(line))
         self.io.print_log("Learning rate is at {}".format(
-            kb.get_value(model.optimizer.lr)))
+            ks.backend.get_value(model.optimizer.lr)))
         self.io.print_log('Inputs and files:')
         for input_name, input_file in files_dict.items():
             self.io.print_log("   {}: \t{}".format(input_name,
@@ -375,7 +373,7 @@ class Organizer:
         self._set_up(model)
 
         filenames = []
-        for f_number, files_dict in enumerate(self.io.yield_files("inference"), 1):
+        for files_dict in self.io.yield_files("inference"):
             # output filename is based on name of file in first input
             first_filename = os.path.basename(list(files_dict.values())[0])
             output_filename = "model_epoch_{}_file_{}_on_{}".format(
@@ -390,7 +388,8 @@ class Organizer:
                 continue
 
             start_time = time.time()
-            backend.h5_inference(self, model, files_dict, output_path)
+            backend.h5_inference(
+                self, model, files_dict, output_path, use_def_label=False)
             elapsed_s = int(time.time() - start_time)
             print('Finished on file {} in {}'.format(
                 first_filename, timedelta(seconds=elapsed_s)))
@@ -500,7 +499,8 @@ class Organizer:
         path_of_model = self.io.get_model_path(epoch, fileno)
         path_loc = self.io.get_model_path(epoch, fileno, local=True)
         self.io.print_log("Loading saved model: " + path_loc, logging=logging)
-        model = load_model(path_of_model, custom_objects=self.cfg.custom_objects)
+        model = ks.models.load_model(
+            path_of_model, custom_objects=self.cfg.custom_objects)
         return model
 
     def _get_model(self, model, logging=False):
@@ -516,7 +516,7 @@ class Organizer:
             elif isinstance(model, str):
                 # path to a saved model
                 self.io.print_log("Loading model from " + model, logging=logging)
-                model = load_model(model)
+                model = ks.models.load_model(model)
 
             if logging:
                 self._save_as_json(model)
@@ -524,7 +524,7 @@ class Organizer:
 
                 try:
                     plots_folder = self.io.get_subfolder("plots", create=True)
-                    plot_model(model, plots_folder + "/model_plot.png")
+                    ks.utils.plot_model(model, plots_folder + "/model_plot.png")
                 except OSError as e:
                     warnings.warn("Can not plot model: " + str(e))
 
@@ -536,7 +536,7 @@ class Organizer:
             elif isinstance(model, str):
                 # path to a saved model
                 self.io.print_log("Loading model from " + model, logging=logging)
-                model = load_model(model)
+                model = ks.models.load_model(model)
 
         return model
 

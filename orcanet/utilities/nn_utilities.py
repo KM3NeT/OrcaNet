@@ -7,7 +7,6 @@ import h5py
 import os
 import keras as ks
 from functools import reduce
-import keras.backend as K
 
 
 def get_auto_label_modifier(model):
@@ -80,8 +79,8 @@ def get_layer_output(model, samples, layer_name, mode="test"):
     else:
         xs = samples
 
-    get_output = K.function(
-        inp_tensors + [K.learning_phase(), ],
+    get_output = ks.backend.function(
+        inp_tensors + [ks.backend.learning_phase(), ],
         [model.get_layer(layer_name).output])
     layer_output = get_output(xs + [phase, ])[0]
     return layer_output

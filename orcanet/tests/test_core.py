@@ -1,9 +1,9 @@
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
-from keras.models import Model
-from keras.layers import Dense, Input
 import os
 import shutil
+from keras.models import Model
+import keras.layers as layers
 
 from orcanet.core import Organizer, Configuration
 
@@ -21,7 +21,7 @@ class TestOrganizer(TestCase):
     def tearDown(self):
         shutil.rmtree(self.temp_dir)
 
-    @patch('orcanet.core.plot_model')
+    @patch('orcanet.core.ks.utils.plot_model')
     def test_load_model_new_training(self, mock_plot_model):
         def plot_history(model, folder):
             pass
@@ -371,8 +371,8 @@ class TestConfiguration(TestCase):
 
 def build_test_model(compile=False):
     input_shape = (1,)
-    inp = Input(input_shape, name="inp")
-    outp = Dense(1, name="out")(inp)
+    inp = layers.Input(input_shape, name="inp")
+    outp = layers.Dense(1, name="out")(inp)
 
     test_model = Model(inp, outp)
     if compile:

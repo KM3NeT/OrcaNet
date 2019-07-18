@@ -3,10 +3,10 @@ from unittest.mock import MagicMock
 import os
 import h5py
 import numpy as np
-from keras.models import Model
-from keras.layers import Dense, Input, Concatenate, Flatten
 import shutil
 from pathlib import Path
+from keras.models import Model
+import keras.layers as layers
 
 from orcanet.core import Configuration
 from orcanet.in_out import IOHandler, split_name_of_predfile
@@ -701,13 +701,13 @@ def build_dummy_model(input_shapes, output_shapes):
     """
     inputs = {}
     for name, shape in input_shapes.items():
-        inputs[name] = Input(shape, name=name)
-    conc = Concatenate()(list(inputs.values()))
-    flat = Flatten()(conc)
+        inputs[name] = layers.Input(shape, name=name)
+    conc = layers.Concatenate()(list(inputs.values()))
+    flat = layers.Flatten()(conc)
 
     outputs = {}
     for name, shape in output_shapes.items():
-        outputs[name] = Dense(shape, name=name)(flat)
+        outputs[name] = layers.Dense(shape, name=name)(flat)
 
     model = Model(list(inputs.values()), list(outputs.values()))
     return model
