@@ -403,6 +403,8 @@ def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, s
             y_label = r'$\sigma / E_{true}$ for ' + property_name + ' reco'
         elif mode[0] == 'std_div':
             y_label = r'$\sigma$ for ' + property_name + ' reco'
+        elif mode[0] == 'std_div_mean':
+            y_label = r'$\sigma (\mathrm{reco} / \mathrm{reco}_\mathrm{mean})$ for ' + property_name + ' reco'
         else:
             mode_str = mode[1].replace('_', ' ').capitalize()
             y_label = mode_str + properties[property_name]['ylabel']
@@ -547,10 +549,9 @@ def calc_plot_data_of_energy_dependent_label(mc_info, pred, prop_name, mode, sel
         prop_pred, prop_true = pred['pred_' + prop_name], mc_info[prop_name]
 
     energy_true = mc_info['energy']
-    if mode[0] == 'rel_std_div':
-        energy_to_property_performance_plot_data = get_rel_std_div_plot_data(prop_pred, energy_true, energy_bins, e_relative=True)
-    elif mode[0] == 'std_div':
-        energy_to_property_performance_plot_data = get_rel_std_div_plot_data(prop_pred, energy_true, energy_bins, e_relative=False)
+    if mode[0] in ['rel_std_div', 'std_div', 'std_div_mean']:
+        energy_to_property_performance_plot_data = get_rel_std_div_plot_data(prop_pred, energy_true, energy_bins, mode=mode[0])
+
     else:
         metric = mode[1]
         err = np.abs(prop_pred - prop_true)
@@ -559,7 +560,7 @@ def calc_plot_data_of_energy_dependent_label(mc_info, pred, prop_name, mode, sel
     return energy_to_property_performance_plot_data
 
 
-def get_rel_std_div_plot_data(prop_pred, energy_true, energy_bins, e_relative=True):
+def get_rel_std_div_plot_data(prop_pred, energy_true, energy_bins, mode='std_div'):
     """
     Function that calculates the relative standard deviation of prop_pred in a certain energy range and returns
     it together with the energy_bins array from the input.
@@ -572,8 +573,7 @@ def get_rel_std_div_plot_data(prop_pred, energy_true, energy_bins, e_relative=Tr
         True MC energy values.
     energy_bins : ndarray(ndim=1)
         Array which specifies the energy bins that should be used for the x-binning.
-    e_relative : bool
-        If the calculcation should be relative to the true MC energy or not.
+    mode : str
 
     Returns
     -------
@@ -592,12 +592,16 @@ def get_rel_std_div_plot_data(prop_pred, energy_true, energy_bins, e_relative=Tr
         prop_pred_cut_boolean = np.logical_and(e_range_low < energy_true, energy_true <= e_range_high)
         prop_pred_cut = prop_pred[prop_pred_cut_boolean]
 
-        std_temp = np.std(prop_pred_cut)
-
-        if e_relative is True:
+        if mode == 'rel_std_div':
+            std_temp = np.std(prop_pred_cut)
             std.append(std_temp / e_range_mean)
-        else:
+        elif mode == 'std_div_mean':  # std(pred/pred_mean)
+            std.append(np.std(prop_pred_cut / np.mean(prop_pred_cut)))
+        elif mode == 'std_div':
+            std_temp = np.std(prop_pred_cut)
             std.append(std_temp)
+        else:
+            raise ValueError('The mode "' + '" is not known.')
 
     # fix for mpl
     std.append(std[-1])

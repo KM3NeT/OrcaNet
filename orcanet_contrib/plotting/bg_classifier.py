@@ -210,7 +210,7 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
         fig, ax = plt.subplots()
 
         ax.plot(np.array(muon_cont_weighted_dl), np.array(neutrino_eff_weighted_dl), label='CNN')
-        ax.plot(np.array(muon_cont_weighted_std), np.array(neutrino_eff_weighted_std), label='RF')
+        ax.plot(np.array(muon_cont_weighted_std), np.array(neutrino_eff_weighted_std_mu_cut), label='RF')
 
         ax.set_xlim(left=0, right=20)
         ax.set_xlabel('Muon contamination [%]'), ax.set_ylabel('Neutrino efficiency [%]')
@@ -225,7 +225,7 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
         fig, ax = plt.subplots()
 
         ax.plot(np.array(rn_cont_weighted_dl), np.array(neutrino_eff_weighted_dl), label='CNN')
-        ax.plot(np.array(rn_cont_weighted_std), np.array(neutrino_eff_weighted_std), label='RF')
+        ax.plot(np.array(rn_cont_weighted_std), np.array(neutrino_eff_weighted_std_rn_cut), label='RF')
 
         ax.set_xlim(left=0, right=5)
         ax.set_xlabel('Random noise contamination [%]'), ax.set_ylabel('Neutrino efficiency [%]')
@@ -253,7 +253,7 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
         dpoints_muon_cont_dl = np.array(muon_cont_weighted_dl)[idx_mupage_closest_dl]
         dpoints_muon_cont_err_dl = np.array(muon_cont_weighted_dl_err)[idx_mupage_closest_dl]
 
-        dpoints_neutr_eff_std = np.array(neutrino_eff_weighted_std)[idx_mupage_closest_std]
+        dpoints_neutr_eff_std = np.array(neutrino_eff_weighted_std_mu_cut)[idx_mupage_closest_std]
         dpoints_muon_cont_std = np.array(muon_cont_weighted_std)[idx_mupage_closest_std]
         dpoints_muon_cont_err_std = np.array(muon_cont_weighted_std_err)[idx_mupage_closest_std]
 
@@ -291,7 +291,7 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
         dpoints_rn_cont_dl = np.array(rn_cont_weighted_dl)[idx_rn_closest_dl]
         dpoints_rn_cont_err_dl = np.array(rn_cont_weighted_dl_err)[idx_rn_closest_dl]
 
-        dpoints_neutr_eff_std = np.array(neutrino_eff_weighted_std)[idx_rn_closest_std]
+        dpoints_neutr_eff_std = np.array(neutrino_eff_weighted_std_rn_cut)[idx_rn_closest_std]
         dpoints_rn_cont_std = np.array(rn_cont_weighted_std)[idx_rn_closest_std]
         dpoints_rn_cont_err_std = np.array(rn_cont_weighted_std_err)[idx_rn_closest_std]
 
@@ -347,11 +347,9 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
         n_neutrinos_total_e_cut_weighted_std = np.sum(w_1_y_std[is_neutrino_e_cut_std])
         assert np.round(n_neutrinos_total_e_cut_weighted_std, 5) == np.round(n_neutrinos_total_e_cut_weighted, 5)
 
-        # x_contamination_mupage_dl, y_neutrino_efficiency_dl, y_n_muons_dl = [], [], []
-        # x_contamination_mupage_std, y_neutrino_efficiency_std, y_n_muons_std = [], [], []
-
         neutrino_eff_weighted_dl, muon_cont_weighted_dl, rn_cont_weighted_dl = [], [], []
-        neutrino_eff_weighted_std, muon_cont_weighted_std, rn_cont_weighted_std = [], [], []
+        neutrino_eff_weighted_std_mu_cut, neutrino_eff_weighted_std_rn_cut = [], []
+        muon_cont_weighted_std, rn_cont_weighted_std = [], []
 
         muon_cont_weighted_dl_err, muon_cont_weighted_std_err = [], []
         rn_cont_weighted_dl_err, rn_cont_weighted_std_err = [], []
@@ -376,8 +374,8 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
                 n_rn_weighted_dl = np.sum(w_1_y[is_rn_dl][rn_sel_dl])
 
                 neutrino_eff_weighted_dl.append((n_neutrino_weighted_dl / n_neutrinos_total_e_cut_weighted) * 100)
-                muon_cont_weighted_dl.append((n_mupage_weighted_dl / n_neutrino_weighted_dl) * 100)
-                rn_cont_weighted_dl.append((n_rn_weighted_dl / n_neutrino_weighted_dl) * 100)
+                muon_cont_weighted_dl.append((n_mupage_weighted_dl / (n_neutrino_weighted_dl + n_mupage_weighted_dl)) * 100)
+                rn_cont_weighted_dl.append((n_rn_weighted_dl / (n_neutrino_weighted_dl + n_rn_weighted_dl)) * 100)
 
                 # we calculate n_mupage_weighted_dl / n_neutrino_weighted_dl
                 # errors on n_neutrino can be neglected, since statistics large
@@ -387,8 +385,8 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
                 n_rn_err_dl = np.sqrt(np.count_nonzero(rn_sel_dl))
                 # n_mupage_weighted_err_dl = n_mupage_weighted_dl * fract_n_mupage_err_to_n_mupage_dl
                 # muon_cont_weighted_dl_err.append((np.abs(1/np.count_nonzero(neutr_sel_dl)) * n_mupage_err_dl) * 100)
-                muon_cont_weighted_dl_err.append(((n_mupage_err_dl * 33.2137) / n_neutrino_weighted_dl) * 100)
-                rn_cont_weighted_dl_err.append(((n_rn_err_dl * 332.87896624) / n_neutrino_weighted_dl) * 100)
+                muon_cont_weighted_dl_err.append(((n_mupage_err_dl * 33.2137) / (n_neutrino_weighted_dl + n_mupage_weighted_dl)) * 100)
+                rn_cont_weighted_dl_err.append(((n_rn_err_dl * 332.87896624) / (n_neutrino_weighted_dl + n_rn_weighted_dl)) * 100)
 
             # std
 
@@ -397,19 +395,24 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
             # else:
             #     fract_n_mupage_err_to_n_mupage_std = 0
 
-            neutr_sel_std = muon_score_std[is_neutrino_e_cut_std] < cuts[i]
-            n_neutrino_weighted_std = np.sum(w_1_y_std[is_neutrino_e_cut_std][neutr_sel_std])
+            neutr_sel_std_muon = muon_score_std[is_neutrino_e_cut_std] < cuts[i]
+            neutr_sel_std_rn = rn_noise_score_std[is_neutrino_e_cut_std] < cuts[i]
 
-            if n_neutrino_weighted_std != 0:
+            n_neutrino_weighted_std_mu_cut = np.sum(w_1_y_std[is_neutrino_e_cut_std][neutr_sel_std_muon])
+            n_neutrino_weighted_std_rn_cut = np.sum(w_1_y_std[is_neutrino_e_cut_std][neutr_sel_std_rn])
+
+            if n_neutrino_weighted_std_mu_cut != 0:  # doesnt matter if mu or rn cut, never happens for RF reco anyways
                 mupage_sel_std = muon_score_std[is_mupage_std] < cuts[i]
                 rn_sel_std = rn_noise_score_std[is_rn_std] < cuts[i]
 
                 n_mupage_weighted_std = np.sum(w_1_y_std[is_mupage_std][mupage_sel_std])
                 n_rn_weighted_std = np.sum(w_1_y_std[is_rn_std][rn_sel_std])
 
-                neutrino_eff_weighted_std.append((n_neutrino_weighted_std / n_neutrinos_total_e_cut_weighted) * 100)
-                muon_cont_weighted_std.append((n_mupage_weighted_std / n_neutrino_weighted_std) * 100)
-                rn_cont_weighted_std.append((n_rn_weighted_std / n_neutrino_weighted_std) * 100)
+                neutrino_eff_weighted_std_mu_cut.append((n_neutrino_weighted_std_mu_cut / n_neutrinos_total_e_cut_weighted) * 100)
+                neutrino_eff_weighted_std_rn_cut.append((n_neutrino_weighted_std_rn_cut / n_neutrinos_total_e_cut_weighted) * 100)
+
+                muon_cont_weighted_std.append((n_mupage_weighted_std / (n_neutrino_weighted_std_mu_cut + n_mupage_weighted_std)) * 100)
+                rn_cont_weighted_std.append((n_rn_weighted_std / (n_neutrino_weighted_std_rn_cut + n_rn_weighted_std)) * 100)
 
                 # we calculate n_mupage_weighted_std / n_neutrino_weighted_std
                 # errors on n_neutrino can be neglected, since statistics large
@@ -419,12 +422,12 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
                 n_rn_err_std = np.sqrt(np.count_nonzero(rn_sel_std))
                 # n_mupage_weighted_err_std = n_mupage_weighted_std * fract_n_mupage_err_to_n_mupage_std
                 # muon_cont_weighted_std_err.append((np.abs(1/np.count_nonzero(neutr_sel_std)) * n_mupage_err_std) * 100)
-                muon_cont_weighted_std_err.append(((n_mupage_err_std * 33.2137) / n_neutrino_weighted_std) * 100)
-                rn_cont_weighted_std_err.append(((n_rn_err_std * 332.87896624) / n_neutrino_weighted_std) * 100)
+                muon_cont_weighted_std_err.append(((n_mupage_err_std * 33.2137) / (n_neutrino_weighted_std_mu_cut + n_mupage_weighted_std)) * 100)
+                rn_cont_weighted_std_err.append(((n_rn_err_std * 332.87896624) / (n_neutrino_weighted_std_rn_cut + n_rn_weighted_std)) * 100)
 
-        # remove all 0 entries with n_muons, only needed for dl, since standard reco cant go to 0 muons anyways
-        # idx_last_zero = np.amax(np.where(np.array(y_n_muons_dl) == 0))
-        # y_n_muons_dl = y_n_muons_dl[idx_last_zero:]
+        # # remove all 0 entries with n_muons, only needed for dl, since standard reco cant go to 0 muons anyways
+        # idx_last_zero = np.amax(np.where(np.array(muon_cont_weighted_dl) == 0))
+        # muon_cont_weighted_dl = muon_cont_weighted_dl[idx_last_zero:]
         # y_neutrino_efficiency_dl = y_neutrino_efficiency_dl[idx_last_zero:]
         # x_contamination_mupage_dl = x_contamination_mupage_dl[idx_last_zero:]
 

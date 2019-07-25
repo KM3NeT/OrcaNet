@@ -108,6 +108,9 @@ def make_performance_plots(pred_filepath, dataset_modifier, plots_folder):
             make_1d_property_errors_metric_over_energy(pred_file, 'energy', ('rel_std_div', None), main_perf_plots_path + '/1d/energy',
                                                        'e_true_to_rel_std_div_energy', reco_energy_correction=reco_energy_correction,
                                                        cuts=(cuts['mask_file_1'], cuts['mask_file_2']), compare_2nd_reco=pred_file_2)
+            make_1d_property_errors_metric_over_energy(pred_file, 'energy', ('std_div_mean', None), main_perf_plots_path + '/1d/energy',
+                                                       'e_true_to_std_div_mean', reco_energy_correction=reco_energy_correction,
+                                                       cuts=(cuts['mask_file_1'], cuts['mask_file_2']), compare_2nd_reco=pred_file_2)
 
         if 'dir' in dataset_modifier:
             print('Generating plots for directional performance investigations')
