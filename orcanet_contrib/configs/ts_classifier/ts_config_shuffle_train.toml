@@ -11,4 +11,4 @@ verbose_train = 1
 verbose_val = 1
 validate_interval = 2
 shuffle_train = true
-use_scratch_ssd = true
+#use_scratch_ssd = true

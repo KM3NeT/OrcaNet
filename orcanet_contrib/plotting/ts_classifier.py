@@ -6,6 +6,7 @@ Code for making plots for track-shower classifiers.
 
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 from orcanet_contrib.plotting.utils import get_event_selection_mask, select_ic
 
 
@@ -44,9 +45,9 @@ def get_latex_code_for_ptype_str(class_name):
 
 # -- Functions for making energy to accuracy plots -- #
 
-def make_e_to_acc_plot_ts(pred_file, title='', savefolder='', plot_range=(1, 100),
+def make_e_to_acc_plot_ts(pred_file, savefolder='', plot_range=(1, 100),
                           cuts=None, prob_threshold_shower=0.5, savename_prefix='', merge_nu_anu=False,
-                          save=False):
+                          save=False, title=True, no_taus=False):
     """
     Makes a track-shower step plot for energy to "Fraction of events classified as track" for different neutrino types.
 
@@ -54,8 +55,6 @@ def make_e_to_acc_plot_ts(pred_file, title='', savefolder='', plot_range=(1, 100
     ----------
     pred_file : h5py.File
         H5py file instance, which stores the track-shower classification predictions of a nn model.
-    title : str
-        Title that should be used for the plot.
     savefolder : str
         Path of the directory, where the plots should be saved to.
     plot_range : tuple(int,int)
@@ -65,9 +64,11 @@ def make_e_to_acc_plot_ts(pred_file, title='', savefolder='', plot_range=(1, 100
         load_event_selection_file() function.
     prob_threshold_shower : float
         Sets the lower threshold for when an event is classified as a shower based on the nn shower probability.
+    title : bool
+        If a title with "raction of events classified as track" should be set in the plot.
 
     """
-    def configure_and_save_plot(title):
+    def configure_and_save_plot():
         """ """
         axes.legend(loc='center right', ncol=2)
 
@@ -80,11 +81,12 @@ def make_e_to_acc_plot_ts(pred_file, title='', savefolder='', plot_range=(1, 100
         plt.ylabel('Fraction of events classified as track')
         plt.ylim((0, 1.05))
         plt.yticks(y_ticks_major)
-        title = plt.title(title)
-        title.set_position([.5, 1.04])
+        if title is True:
+            title_text = plt.title('Fraction of events classified as track')
+            title_text.set_position([.5, 1.04])
         plt.grid(True, zorder=0, linestyle='dotted')
 
-        plt.text(0.05, 0.92, 'KM3NeT Preliminary', transform=axes.transAxes, weight='bold')
+        plt.text(0.05, 0.92, 'KM3NeT', transform=axes.transAxes, weight='bold')
 
         plt.savefig(savefolder + '/' + savename_prefix + 'ts_e_to_acc_3-100GeV.pdf')
         plt.savefig(savefolder + '/' + savename_prefix + 'ts_e_to_acc_3-100GeV.png', dpi=600)
@@ -120,11 +122,13 @@ def make_e_to_acc_plot_ts(pred_file, title='', savefolder='', plot_range=(1, 100
         make_step_plot_e_acc_class('a_elec-CC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='--', color='r')
         make_step_plot_e_acc_class('elec-NC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='-', color='saddlebrown')
         make_step_plot_e_acc_class('a_elec-NC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='--', color='saddlebrown')
-        make_step_plot_e_acc_class('tau-CC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='-', color='g')
-        make_step_plot_e_acc_class('a_tau-CC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='--', color='g')
+
+        if no_taus is False:
+            make_step_plot_e_acc_class('tau-CC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='-', color='g')
+            make_step_plot_e_acc_class('a_tau-CC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='--', color='g')
 
         if save is True:
-            configure_and_save_plot(title)
+            configure_and_save_plot()
         plt.close()
 
     else:
@@ -133,10 +137,12 @@ def make_e_to_acc_plot_ts(pred_file, title='', savefolder='', plot_range=(1, 100
         be_and_1d_acc_per_e_bin['muon-CC_nu_anu'] = make_step_plot_e_acc_class('muon-CC_nu_anu', mc_info, nn_pred_correct, axes, plot_range=plot_range, linestyle='-', color='b')
         be_and_1d_acc_per_e_bin['elec-CC_nu_anu'] = make_step_plot_e_acc_class('elec-CC_nu_anu', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='-', color='r')
         be_and_1d_acc_per_e_bin['elec-NC_nu_anu'] = make_step_plot_e_acc_class('elec-NC_nu_anu', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='-', color='saddlebrown')
-        be_and_1d_acc_per_e_bin['tau-CC_nu_anu'] = make_step_plot_e_acc_class('tau-CC_nu_anu', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='-', color='g')
+
+        if no_taus is False:
+            be_and_1d_acc_per_e_bin['tau-CC_nu_anu'] = make_step_plot_e_acc_class('tau-CC_nu_anu', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='-', color='g')
 
         if save is True:
-            configure_and_save_plot(title)
+            configure_and_save_plot()
 
         return be_and_1d_acc_per_e_bin
 
@@ -297,7 +303,8 @@ def make_step_plot_e_acc_class(class_name, mc_info, nn_pred_correct, axes, inver
 
 
 def make_e_to_acc_plot_with_diff(pred_file_1, pred_file_2, savefolder, cuts=None,
-                                 prob_threshold_shower=0.5, plot_range=(1, 100)):
+                                 prob_threshold_shower=0.5, plot_range=(1, 100),
+                                 title=True, no_taus=False):
     """
     Same as make_e_to_acc_plot_ts, but with diff plot between pred_file_1 and pref_file_2 at the bottom.
 
@@ -321,21 +328,23 @@ def make_e_to_acc_plot_with_diff(pred_file_1, pred_file_2, savefolder, cuts=None
         plt.ylabel('Fraction of events classified as track')
         plt.ylim((0, 1.05))
         plt.yticks(y_ticks_major)
-        title = plt.title('Classified as track')
-        title.set_position([.5, 1.04])
+        if title is True:
+            title_text = plt.title('Fraction of events classified as track')
+            title_text.set_position([.5, 1.04])
         plt.grid(True, zorder=0, linestyle='dotted')
-
-        plt.text(0.05, 0.92, 'KM3NeT Preliminary', transform=axes.transAxes, weight='bold')
+        plt.text(0.05, 0.92, 'KM3NeT', transform=axes.transAxes, weight='bold')
 
     if cuts is None:
         cuts = (None, None)
 
     be_and_1d_acc_per_e_bin_1 = make_e_to_acc_plot_ts(pred_file_1, cuts=cuts[0],
                                                       prob_threshold_shower=prob_threshold_shower,
-                                                      plot_range=plot_range, merge_nu_anu=True, save=False)
+                                                      plot_range=plot_range, merge_nu_anu=True, save=False,
+                                                      no_taus=no_taus)
     be_and_1d_acc_per_e_bin_2 = make_e_to_acc_plot_ts(pred_file_2, cuts=cuts[1],
                                                       prob_threshold_shower=prob_threshold_shower,
-                                                      plot_range=plot_range, merge_nu_anu=True, save=False)
+                                                      plot_range=plot_range, merge_nu_anu=True, save=False,
+                                                      no_taus=no_taus)
 
     # Save diff only plot
     def get_gaps_track_shower(be_and_1d_acc_per_e_bin_1, be_and_1d_acc_per_e_bin_2, key_type_1, key_type_2):
@@ -362,6 +371,7 @@ def make_e_to_acc_plot_with_diff(pred_file_1, pred_file_2, savefolder, cuts=None
     plt.xlabel('Energy [GeV]')
     plt.ylabel('Relative improvement [%]')
     plt.grid(True, zorder=0, linestyle='dotted')
+    plt.text(0.85, 0.92, 'KM3NeT', transform=axes.transAxes, weight='bold')
 
     plt.savefig(savefolder + '/ts_e_to_acc_3-100GeV_diff_only.pdf')
     plt.savefig(savefolder + '/ts_e_to_acc_3-100GeV_diff_only.png', dpi=600)
@@ -407,7 +417,7 @@ def make_e_to_acc_plot_with_diff(pred_file_1, pred_file_2, savefolder, cuts=None
 
     axes_2.legend(loc='lower right', ncol=2)
     plt.xlabel('Energy [GeV]')
-    plt.ylabel('Rel. Improvement [%]')
+    plt.ylabel('Rel. improvement [%]')
     plt.grid(True, zorder=0, linestyle='dotted')
     plt.ylim((-25, 25))
 
@@ -426,7 +436,8 @@ def make_e_to_acc_plot_with_diff(pred_file_1, pred_file_2, savefolder, cuts=None
 
 # -- Functions for making probability plots -- #
 
-def make_ts_prob_hists(pred_file, savefolder, cuts=None):
+def make_ts_prob_hists(pred_file, savefolder, cuts=None, title=True,
+                       overlay=('KM3NeT', (0.05, 0.9)), no_taus=False):
     """
     Makes track-shower histograms for the nn class predictions (track, shower).
 
@@ -445,7 +456,7 @@ def make_ts_prob_hists(pred_file, savefolder, cuts=None):
         load_event_selection_file() function.
 
     """
-    def configure_and_save_plot(plot_title, savepath):
+    def configure_and_save_plot(plot_title, savepath, ts_class):
         """
         Configure a mpl plot with GridLines, Logscale etc.
 
@@ -465,10 +476,13 @@ def make_ts_prob_hists(pred_file, savefolder, cuts=None):
         plt.xticks(x_ticks_major)
         plt.minorticks_on()
 
-        plt.xlabel('OrcaNet probability')
-        plt.ylabel('Normed Quantity')
-        title = plt.title(plot_title)
-        title.set_position([.5, 1.04])
+        plt.xlabel('CNN ' + ts_class + ' probability')
+        plt.ylabel('Normed quantity')
+        if title is True:
+            title_text = plt.title(plot_title)
+            title_text.set_position([.5, 1.04])
+
+        plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=axes.transAxes, weight='bold')
 
         plt.savefig(savepath + '.pdf')
         plt.savefig(savepath + '.png', dpi=600)
@@ -493,10 +507,11 @@ def make_ts_prob_hists(pred_file, savefolder, cuts=None):
         make_prob_hist_class('a_elec-CC', mc_info, y_pred, ts_class, axes, color='r', linestyle='--')
         make_prob_hist_class('elec-NC', mc_info, y_pred, ts_class, axes, color='saddlebrown', linestyle='-')
         make_prob_hist_class('a_elec-NC', mc_info, y_pred, ts_class, axes, color='saddlebrown', linestyle='--')
-        make_prob_hist_class('tau-CC', mc_info, y_pred, ts_class, axes, color='g', linestyle='-')
-        make_prob_hist_class('a_tau-CC', mc_info, y_pred, ts_class, axes, color='g', linestyle='--')
+        if no_taus is False:
+            make_prob_hist_class('tau-CC', mc_info, y_pred, ts_class, axes, color='g', linestyle='-')
+            make_prob_hist_class('a_tau-CC', mc_info, y_pred, ts_class, axes, color='g', linestyle='--')
         configure_and_save_plot(plot_title='Probability to be classified as ' + ts_class + ', 3-40GeV',
-                                savepath=savefolder + '/ts_prob_' + ts_class)
+                                savepath=savefolder + '/ts_prob_' + ts_class, ts_class=ts_class)
         plt.cla()
 
     plt.close()
@@ -543,7 +558,8 @@ def make_prob_hist_class(class_name, mc_info, y_pred, ts_class, axes, plot_range
 # -- Functions for making probability plots -- #
 
 
-def plot_ts_separability(pred_file, savefolder, pred_file_2=None, cuts=None):
+def plot_ts_separability(pred_file, savefolder, pred_file_2=None, cuts=None,
+                         title=True, overlay=('KM3NeT', (0.05, 0.92))):
     """
     Calculates and plots the separability (1-correlation coefficient) plot for ts classifiers.
 
@@ -574,13 +590,11 @@ def plot_ts_separability(pred_file, savefolder, pred_file_2=None, cuts=None):
             mc_info = mc_info[evt_sel_mask]
             prob_track = prob_track[evt_sel_mask]
 
-    separabilities = calculcate_separability(mc_info, prob_track)
+    pdf_plots_dl = PdfPages(savefolder + '/separability_prob_hists_per_erange_dl.pdf')
+    separabilities = calculcate_separability(mc_info, prob_track, pdf_plots_dl)
+    pdf_plots_dl.close()
 
-    # plot the correlation coefficients
-    fig, axes = plt.subplots()
-    plt.plot(separabilities[:, 1], separabilities[:, 0], 'b', marker='o', lw=0.5, markersize=3,
-             label='CNN')
-
+    separabilities_2 = None
     if pred_file_2 is not None:
         mc_info_2 = pred_file_2['mc_info']
         prob_track_2 = pred_file_2['pred']['prob_track']
@@ -595,7 +609,15 @@ def plot_ts_separability(pred_file, savefolder, pred_file_2=None, cuts=None):
                 mc_info_2 = mc_info_2[evt_sel_mask_2]
                 prob_track_2 = prob_track_2[evt_sel_mask_2]
 
-        separabilities_2 = calculcate_separability(mc_info_2, prob_track_2)
+        pdf_plots_rf = PdfPages(savefolder + '/separability_prob_hists_per_erange_rf.pdf')
+        separabilities_2 = calculcate_separability(mc_info_2, prob_track_2, pdf_plots_rf)
+        pdf_plots_rf.close()
+
+    # plot the correlation coefficients
+    fig, axes = plt.subplots()
+    plt.plot(separabilities[:, 1], separabilities[:, 0], 'b', marker='o', lw=0.5, markersize=3,
+             label='CNN')
+    if separabilities_2 is not None:
         plt.plot(separabilities_2[:, 1], separabilities_2[:, 0], 'r', marker='o', lw=0.5,
                  markersize=3, label='RF')
 
@@ -604,8 +626,9 @@ def plot_ts_separability(pred_file, savefolder, pred_file_2=None, cuts=None):
     plt.grid(True, zorder=0, linestyle='dotted')
 
     axes.legend(loc='center right')
-    title = plt.title('Separability for track-shower classification')
-    title.set_position([.5, 1.04])
+    if title is True:
+        title = plt.title('Separability for track-shower classification')
+        title.set_position([.5, 1.04])
 
     plt.yticks(np.arange(0, 1.1, 0.1))
     # plt.xticks(np.arange(0, 110, 10))
@@ -613,7 +636,7 @@ def plot_ts_separability(pred_file, savefolder, pred_file_2=None, cuts=None):
     # plt.ylim(top=1)
 
     plt.xscale('log')
-    plt.text(0.05, 0.92, 'KM3NeT Preliminary', transform=axes.transAxes, weight='bold')
+    plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=axes.transAxes, weight='bold')
 
     plt.savefig(savefolder + '/ts_correlation_coefficients.pdf')
     plt.savefig(savefolder + '/ts_correlation_coefficients.png', dpi=600)
@@ -621,7 +644,8 @@ def plot_ts_separability(pred_file, savefolder, pred_file_2=None, cuts=None):
     plt.close()
 
 
-def calculcate_separability(mc_info, prob_track, bins=40, e_cut_range=np.logspace(0.3, 2, 18)):
+def calculcate_separability(mc_info, prob_track, pdf_pages, bin_edges=np.arange(-0.005, 1.005, (1 / 101) * 1.0),
+                            e_cut_range=np.logspace(0.3, 2, 18)):
     """
     Calculates the separability per energy bin by calculating the correlation factors (s=1-c).
 
@@ -655,11 +679,44 @@ def calculcate_separability(mc_info, prob_track, bins=40, e_cut_range=np.logspac
         is_muon_cc_and_e_cut = np.logical_and(is_muon_cc, e_cut_mask)
         is_elec_cc_and_e_cut = np.logical_and(is_elec_cc, e_cut_mask)
 
-        hist_prob_track_e_cut_muon_cc = np.histogram(prob_track[is_muon_cc_and_e_cut], bins=bins, density=True)
-        hist_prob_track_e_cut_elec_cc = np.histogram(prob_track[is_elec_cc_and_e_cut], bins=bins, density=True)
+        hist_prob_track_e_cut_muon_cc = np.histogram(prob_track[is_muon_cc_and_e_cut], bins=bin_edges)
+        hist_prob_track_e_cut_elec_cc = np.histogram(prob_track[is_elec_cc_and_e_cut], bins=bin_edges)
+
+        # just some plotting stuff
+        fig, axes = plt.subplots()
+        plt.bar(hist_prob_track_e_cut_muon_cc[1][:-1], hist_prob_track_e_cut_muon_cc[0],
+                width=np.diff(hist_prob_track_e_cut_muon_cc[1]), ec="k", align="edge", label='mu-cc', alpha=0.5)
+        plt.bar(hist_prob_track_e_cut_elec_cc[1][:-1], hist_prob_track_e_cut_elec_cc[0],
+                width=np.diff(hist_prob_track_e_cut_elec_cc[1]), ec="k", align="edge", label='e-cc', alpha=0.5)
+        plt.title('Erange ' + str(e_cut[0]) + ' - ' + str(e_cut[1]))
+        plt.xlabel('Track probability')
+        plt.ylabel('Quantity')
+        axes.legend(loc='upper center')
+
+        pdf_pages.savefig(fig)
+        plt.close()
+        # just some plotting stuff
+
+        hist_prob_track_e_cut_muon_cc = np.histogram(prob_track[is_muon_cc_and_e_cut], bins=bin_edges, density=True)
+        hist_prob_track_e_cut_elec_cc = np.histogram(prob_track[is_elec_cc_and_e_cut], bins=bin_edges, density=True)
+
+        # just some plotting stuff
+        fig, axes = plt.subplots()
+        plt.bar(hist_prob_track_e_cut_muon_cc[1][:-1], hist_prob_track_e_cut_muon_cc[0],
+                width=np.diff(hist_prob_track_e_cut_muon_cc[1]), ec="k", align="edge", label='mu-cc', alpha=0.5)
+        plt.bar(hist_prob_track_e_cut_elec_cc[1][:-1], hist_prob_track_e_cut_elec_cc[0],
+                width=np.diff(hist_prob_track_e_cut_elec_cc[1]), ec="k", align="edge", label='e-cc', alpha=0.5)
+        plt.title('Erange ' + str(e_cut[0]) + ' - ' + str(e_cut[1]))
+        plt.xlabel('Track probability')
+        plt.ylabel('Normed quantity')
+        axes.legend(loc='upper center')
+
+        pdf_pages.savefig(fig)
+        plt.close()
+        # just some plotting stuff
 
         c_enumerator = 0
-        for j in range(bins - 1):
+        for j in range(hist_prob_track_e_cut_muon_cc[0].shape[0]):
             c_enumerator += hist_prob_track_e_cut_muon_cc[0][j] * hist_prob_track_e_cut_elec_cc[0][j]
 
         sum_prob_muon_cc = np.sum(hist_prob_track_e_cut_muon_cc[0] ** 2)

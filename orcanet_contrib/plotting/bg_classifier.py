@@ -11,7 +11,9 @@ from orcanet_contrib.plotting.utils import get_mc_info_and_other_datasets
 
 
 def make_prob_hists_bg_classifier(pred_file, savefolder, bg_classes=('not_neutrino', 'neutrino'),
-                                  cuts=None, savename_prefix=None, x_ranges=((0, 1),), xlabel_prefix='OrcaNet'):
+                                  cuts=None, savename_prefix=None, x_ranges=((0, 1),),
+                                  xlabel_prefix='OrcaNet', title=True,
+                                  overlay=('KM3NeT', (0.75, 0.9))):
     """
     Function that makes plots for the reco probability distributions of the background classifier.
 
@@ -49,10 +51,16 @@ def make_prob_hists_bg_classifier(pred_file, savefolder, bg_classes=('not_neutri
 
         plt.minorticks_on()
 
-        plt.xlabel(xlabel_prefix + ' ' + bg_class + ' probability')
+        if xlabel_prefix == 'RF':
+            plt.xlabel(xlabel_prefix + ' ' + bg_class + ' score')
+        else:
+            plt.xlabel(xlabel_prefix + ' ' + bg_class + ' probability')
         plt.ylabel('Normed quantity')
-        title = plt.title('Probability to be classified as ' + bg_class)
-        title.set_position([.5, 1.04])
+        if title is True:
+            title_text = plt.title('Probability to be classified as ' + bg_class)
+            title_text.set_position([.5, 1.04])
+
+        plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=axes.transAxes, weight='bold')
 
         pdf_plots.savefig(fig)
 
@@ -141,15 +149,16 @@ def make_prob_hists_for_class(prob_class, ptype, is_cc, axes, x_range=(0, 1)):
     else:
         bins = 100
 
-    axes.hist(prob_class[is_mupage], density=True, bins=bins, range=(0, 1), color='b', label='mupage', histtype='step', linestyle='-', zorder=3)
-    axes.hist(prob_class[is_random_noise], density=True, bins=bins, range=(0, 1), color='r', label='random_noise', histtype='step', linestyle='-', zorder=3)
-    axes.hist(prob_class[is_neutrino], density=True, bins=bins, range=(0, 1), color='saddlebrown', label='neutrino', histtype='step', linestyle='-', zorder=3)
+    axes.hist(prob_class[is_mupage], density=True, bins=bins, range=(0, 1), color='b', label='atm. muons', histtype='step', linestyle='-', zorder=3)
+    axes.hist(prob_class[is_random_noise], density=True, bins=bins, range=(0, 1), color='r', label='random noise', histtype='step', linestyle='-', zorder=3)
+    axes.hist(prob_class[is_neutrino], density=True, bins=bins, range=(0, 1), color='saddlebrown', label='neutrinos', histtype='step', linestyle='-', zorder=3)
 
     if x_range != (0, 1):
         axes.set_xlim(x_range)
 
 
-def make_contamination_to_neutrino_efficiency_plot(pred_file_1, pred_file_2, dataset_modifier, savefolder, cuts=None):
+def make_contamination_to_neutrino_efficiency_plot(pred_file_1, pred_file_2, dataset_modifier, savefolder,
+                                                   cuts=None, title=True, overlay=('KM3NeT', (0.8, 0.15))):
     """
     Makes bg classifier plots like muon contamination vs neutrino efficiency, both weighted 1 year and non weighted.
 
@@ -175,13 +184,14 @@ def make_contamination_to_neutrino_efficiency_plot(pred_file_1, pred_file_2, dat
 
     if dataset_modifier == 'bg_classifier_2_class':
         pdf_plots = PdfPages(savefolder + '/muon_contamination_to_neutr_efficiency.pdf')
-        plot_contamination_to_neutr_eff_multi_e_cut(mc_info_1, mc_info_2, pred_1, pred_2, pdf_plots)
+        plot_contamination_to_neutr_eff_multi_e_cut(mc_info_1, mc_info_2, pred_1, pred_2, pdf_plots, overlay=overlay,
+                                                    title=title)
 
         pdf_plots.close()
 
 
 def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl, pred_std, pdf_plots,
-                                                overlay=('KM3NeT Preliminary', (0.65, 0.15))):
+                                                overlay=('KM3NeT', (0.8, 0.15)), title=True):
     """
     Make muon/random-noise contamination plots vs neutrino efficiency.
 
@@ -216,7 +226,8 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
         ax.set_xlabel('Muon contamination [%]'), ax.set_ylabel('Neutrino efficiency [%]')
         ax.grid(True)
         ax.legend(loc='center right')
-        plt.title('E-range:' + str(tpl) + ', weighted for an atmospheric flux')
+        if title is True:
+            plt.title('E-range:' + str(tpl) + ', weighted for an atmospheric flux')
 
         pdf_plots.savefig(fig)
         plt.close()
@@ -231,7 +242,8 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
         ax.set_xlabel('Random noise contamination [%]'), ax.set_ylabel('Neutrino efficiency [%]')
         ax.grid(True)
         ax.legend(loc='center right')
-        plt.title('E-range:' + str(tpl) + ', weighted for 10kHz noise')
+        if title is True:
+            plt.title('E-range:' + str(tpl) + ', weighted for 10kHz noise')
 
         pdf_plots.savefig(fig)
         plt.close()
@@ -264,13 +276,14 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
         ax.set_xlabel('Muon contamination [%]'), ax.set_ylabel('Neutrino efficiency [%]')
         ax.grid(True)
         ax.legend(loc='center right')
-        plt.title('E-range:' + str(tpl) + ', weighted for an atmospheric flux')
+        if title is True:
+            plt.title('E-range:' + str(tpl) + ', weighted for an atmospheric flux')
         plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold')
 
         pdf_plots.savefig(fig)
 
-        # Just because we want a plot from 85 to 105
-        ax.set_ylim(bottom=85, top=ax.get_ylim()[1])
+        # Just because we want a plot from 85 to 101
+        ax.set_ylim(bottom=87, top=ax.get_ylim()[1])
         pdf_plots.savefig(fig)
 
         plt.close()
@@ -302,10 +315,16 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
         ax.set_xlabel('Random noise contamination [%]'), ax.set_ylabel('Neutrino efficiency [%]')
         ax.grid(True)
         ax.legend(loc='center right')
-        plt.title('E-range:' + str(tpl) + ', weighted for 10kHz noise')
+        if title is True:
+            plt.title('E-range:' + str(tpl) + ', weighted for 10kHz noise')
         plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold')
 
         pdf_plots.savefig(fig)
+
+        # Just because we want a plot from 85 to 100.25
+        ax.set_ylim(bottom=95, top=100.25)
+        pdf_plots.savefig(fig)
+
         plt.close()
 
     ptype_dl, is_cc_dl = mc_info_dl['particle_type'], mc_info_dl['is_cc']

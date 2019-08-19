@@ -17,7 +17,7 @@ from orcanet_contrib.plotting.utils import correct_reco_energy, select_ic, get_e
 
 
 def make_2d_prop_to_prop_plot(pred_file, prop_1_name, prop_2_name, savefolder, savename, reco_energy_correction=None,
-                              cuts=None, title_prefix='OrcaNet: '):
+                              cuts=None, title_prefix='OrcaNet: ', overlay=('KM3NeT', (0.05, 0.92)), title=True):
     """
     Function that makes a 2d plot of property 1 vs property 2.
 
@@ -57,8 +57,11 @@ def make_2d_prop_to_prop_plot(pred_file, prop_1_name, prop_2_name, savefolder, s
             ax.set_ylim(properties[prop_2_name]['lim'][0], properties[prop_2_name]['lim'][1])
 
         plot_line_through_the_origin(prop_1_name, prop_2_name)
-        title = plt.title(title_prefix + ic_list[ic]['title'] + ', ' + title_name_prop_1 + ' vs. ' + title_name_prop_2)
-        title.set_position([.5, 1.04])
+        if title is True:
+            title_text = plt.title(title_prefix + ic_list[ic]['title'] + ', ' + title_name_prop_1 + ' vs. ' + title_name_prop_2)
+            title_text.set_position([.5, 1.04])
+
+        plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold')
         cbar = fig.colorbar(pcm_prop_1_prop_2, ax=ax)
         cbar.ax.set_ylabel('Number of events')
         x_label, y_label = properties[prop_1_name]['ax_label'], properties[prop_2_name]['ax_label']
@@ -290,7 +293,7 @@ def get_property_info_to_plot(mc_info, prop_dset, properties, prop_name, reco_en
 
 def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, savefolder, savename,
                                                reco_energy_correction=None, energy_bins=np.arange(1, 101, 2.5),
-                                               cuts=None, compare_2nd_reco=None,
+                                               cuts=None, compare_2nd_reco=None, title=True,
                                                overlay=('KM3NeT Preliminary', (0.3, 0.95))):
     """
     Makes binned 1d plots that show
@@ -396,8 +399,9 @@ def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, s
         x_ticks_major = np.arange(0, 101, 10)
         ax.set_xticks(x_ticks_major)
         ax.minorticks_on()
-        title = plt.title(title_prefix + ic_list[ic]['title'])
-        title.set_position([.5, 1.04])
+        if title is True:
+            title_text = plt.title(title_prefix + ic_list[ic]['title'])
+            title_text.set_position([.5, 1.04])
 
         if mode[0] == 'rel_std_div':
             y_label = r'$\sigma / E_{true}$ for ' + property_name + ' reco'
@@ -516,7 +520,7 @@ def calc_plot_data_of_energy_dependent_label(mc_info, pred, prop_name, mode, sel
         zenith_true += math.pi/2
 
         space_angle_inner_value = np.sin(zenith_true) * np.sin(zenith_pred) * np.cos(azimuth_true - azimuth_pred)\
-                      + np.cos(zenith_true) * np.cos(zenith_pred)
+                                  + np.cos(zenith_true) * np.cos(zenith_pred)
 
         space_angle = np.arccos(space_angle_inner_value)
 
@@ -554,7 +558,16 @@ def calc_plot_data_of_energy_dependent_label(mc_info, pred, prop_name, mode, sel
 
     else:
         metric = mode[1]
-        err = np.abs(prop_pred - prop_true)
+        if 'azimuth' in prop_name:  # TODO does not work with corrected azimuth
+            # if abs(residual_azimuth) <= pi, take az_true - az_pred ; if residual_azimuth > pi take the following:
+            err = prop_true - prop_pred
+            larger_pi = np.abs(err) > math.pi
+            sign_larger_pi = np.sign(err[larger_pi])  # loophole for residual == 0, but doesn't matter below
+            err[larger_pi] = sign_larger_pi * 2 * math.pi - (err[larger_pi])  # need same sign for 2pi compared to err value
+            err = np.abs(err)
+
+        else:
+            err = np.abs(prop_pred - prop_true)
         energy_to_property_performance_plot_data = bin_error_in_energy_bins(err, energy_true, energy_bins, metric=metric)
 
     return energy_to_property_performance_plot_data
@@ -771,7 +784,8 @@ def plot_1d_reco_err_div_by_std_for_label(prop_pred, prop_pred_err, prop_true, f
     ax.cla()
 
 
-def make_1d_reco_err_to_reco_residual_plot(pred_file, savefolder, savename, cuts=None):
+def make_1d_reco_err_to_reco_residual_plot(pred_file, savefolder, savename, cuts=None, title_flag=True,
+                                           overlay=('KM3NeT Preliminary', (0.3, 0.95))):
     """
     Makes a 1d plot which shows the true standard deviation of the error residuals (abs(true-pred)) versus
     the estimated uncertainty sigma_pred by a nn.
@@ -828,7 +842,8 @@ def make_1d_reco_err_to_reco_residual_plot(pred_file, savefolder, savename, cuts
             unit = properties[prop_name]['unit']
 
             plot_1d_reco_err_to_reco_residual_for_prop(prop_true, prop_pred, prop_pred_err, n_x_bins, fig,
-                                                       ax, title, pdf_plots, prop_name, unit)
+                                                       ax, title, pdf_plots, prop_name, unit, title_flag=title_flag,
+                                                       overlay=overlay)
 
     plt.close()
     pdf_plots.close()
@@ -1001,7 +1016,8 @@ def get_prop_true_pred_and_prop_pred_sigma(pred, true, mc_info, properties, prop
 
 
 def plot_1d_reco_err_to_reco_residual_for_prop(prop_true, prop_pred, prop_pred_err, n_x_bins, fig, ax, title,
-                                               pdf_plots, prop_name, unit):
+                                               pdf_plots, prop_name, unit, title_flag=True,
+                                               overlay=('KM3NeT Preliminary', (0.3, 0.95))):
     """
     Plots the true standard deviation of the error residuals (abs(true-pred)) versus
     the estimated uncertainty sigma_pred by a nn to a mpl ax and saves it to a mpl PdfPages instance.
@@ -1067,16 +1083,19 @@ def plot_1d_reco_err_to_reco_residual_for_prop(prop_true, prop_pred, prop_pred_e
         else:
             ax.set_xlim(ylim)
 
-    title = plt.title(title)
-    title.set_position([.5, 1.04])
+    if title_flag is True:
+        title = plt.title(title)
+        title.set_position([.5, 1.04])
     ax.set_xlabel(r'Estimated uncertainty $\sigma_{pred}$ ' + unit), ax.set_ylabel('Standard deviation of residuals ' + unit)
     ax.grid(True)
+    plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold')
 
     pdf_plots.savefig(fig)
     ax.cla()
 
 
-def make_2d_true_reco_plot_different_sigmas(pred_file, savefolder, savename, cuts=None):
+def make_2d_true_reco_plot_different_sigmas(pred_file, savefolder, savename, cuts=None, title_flag=True,
+                                            overlay=('KM3NeT Preliminary', (0.3, 0.95))):
     """
     Makes 2d true to reco plots of all properties in the properties dict, and selects only
     the best percentage of events based on the predicted errors by a nn.
@@ -1147,14 +1166,15 @@ def make_2d_true_reco_plot_different_sigmas(pred_file, savefolder, savename, cut
             percentage_of_evts = [1.0, 0.8, 0.5, 0.2]
 
             plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, mc_info_ic, prop_pred_err, prop_name, properties,
-                                                     percentage_of_evts, title, bins, pdf_plots)
+                                                     percentage_of_evts, title, bins, pdf_plots, title_flag=title_flag,
+                                                     overlay=overlay)
 
     plt.close()
     pdf_plots.close()
 
 
 def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, mc_info, prop_pred_err, prop_name, properties,
-                                             percentage_of_evts, title, bins, pdf_plots,
+                                             percentage_of_evts, title, bins, pdf_plots, title_flag=True,
                                              overlay=('KM3NeT Preliminary', (0.65, 0.65))):
     """
     Plots a 2d true to reco plot for a certain property, and selects only
@@ -1212,8 +1232,9 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, mc_info, prop
 
         plot_line_through_the_origin(prop_name, prop_name)
 
-        title_plot = plt.title('OrcaNet: ' + title + ', ' + str(int(percentage * 100)) + '% of total events')
-        title_plot.set_position([.5, 1.04])
+        if title_flag is True:
+            title_plot = plt.title('OrcaNet: ' + title + ', ' + str(int(percentage * 100)) + '% of total events')
+            title_plot.set_position([.5, 1.04])
         cbar = fig.colorbar(prop_true_to_reco, ax=ax)
         cbar.ax.set_ylabel('Number of events')
 
@@ -1222,6 +1243,7 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, mc_info, prop
         ax.set_ylabel('Reconstructed ' + axis_prop_info[0] + ' [' + axis_prop_info[1] + ']')
         plt.xlim(bins[0], bins[-1])
         plt.ylim(bins[0], bins[-1])
+        plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold')
 
         # plt.tight_layout()
         pdf_plots.savefig(fig)
@@ -1278,6 +1300,7 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, mc_info, prop
             title_plot.set_position([.5, 1.04])
             ax.set_xlabel('True ' + axis_prop_info[0] + ' [' + axis_prop_info[1] + ']')
             ax.set_ylabel('Reconstructed ' + axis_prop_info[0] + ' [' + axis_prop_info[1] + ']')
+            plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold')
 
             pdf_plots.savefig(fig)
             cbar_2.remove()
@@ -1307,6 +1330,7 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, mc_info, prop
             ax.set_ylabel('Reconstructed ' + axis_prop_info[0] + ' [' + axis_prop_info[1] + ']')
             plt.xlim(bins[0], bins[-1])
             plt.ylim(bins[0], bins[-1])
+            plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold')
 
             pdf_plots.savefig(fig)
 
@@ -1353,6 +1377,7 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, mc_info, prop
 
             cont.levels = [nf(val) for val in cont.levels]
             ax.clabel(cont, cont.levels, inline=1, fmt='%r', fontsize=7)
+            plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold')
 
             pdf_plots.savefig(fig)
             plt.cla()
@@ -1382,6 +1407,7 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, mc_info, prop
     ax.set_ylabel('Normed quantity [a.u.]')
     ax.legend(loc='upper right')
     plt.grid(True, zorder=0, linestyle='dotted')
+    plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold')
 
     pdf_plots.savefig(fig)
 
@@ -1410,7 +1436,6 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, mc_info, prop
     ax.set_ylabel(r'$\sigma$ of $\mathrm{%s}_{\mathrm{true}}$ $-$ $\mathrm{%s}_{\mathrm{reco}}$' % (axis_prop_info[0], axis_prop_info[0]))
     ax.legend(loc='upper right')
     plt.grid(True, zorder=0, linestyle='dotted')
-
     plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold')
 
     pdf_plots.savefig(fig)
