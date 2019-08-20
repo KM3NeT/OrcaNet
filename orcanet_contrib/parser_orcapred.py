@@ -2,7 +2,7 @@
 Use orga.predict with a parser.
 
 Usage:
-    parser_orcapred.py FOLDER LIST CONFIG MODEL [--epoch EPOCH] [--fileno FILENO]
+    parser_orcapred.py FOLDER LIST CONFIG MODEL [--epoch EPOCH] [--fileno FILENO] [--plots]
     parser_orcapred.py (-h | --help)
 
 Arguments:
@@ -21,6 +21,12 @@ Options:
     -h --help        Show this screen.
     --epoch=EPOCH    Use model of given epoch. [default: None]
     --fileno=FILENO  Use model of given fileno. [default: None]
+    --plots          Make plots based on the predictions.
+                     Only works for the dataset_modifiers
+                     'regression', 'bg_classifier' or 'ts_classifier'.
+                     Note that these plots have been designed for the
+                     needs of Michael Moser, so you will probably run
+                     into errors.
 
 """
 from matplotlib import use
@@ -35,7 +41,7 @@ from orcanet_contrib.orca_handler_util import update_objects
 
 
 def orca_pred(output_folder, list_file, config_file, model_file,
-              epoch=None, fileno=None):
+              epoch=None, fileno=None, use_plotting=False):
     """
     Run orga.predict with predefined ModelBuilder networks using a parser.
 
@@ -59,6 +65,12 @@ def orca_pred(output_folder, list_file, config_file, model_file,
         The epoch of the saved model to predict with.
     fileno : int, optional
         The filenumber of the saved model to predict with.
+    use_plotting : bool
+        If the plotting scripts available for the 'regression',
+         'bg_classifier' or 'ts_classifier' dataset_modifier
+         should be run. Expect that this does not work for you,
+         since these plotting scripts have been designed for the
+         work of me (Michael) only.
 
     """
     # Set up the Organizer with the input data
@@ -74,16 +86,11 @@ def orca_pred(output_folder, list_file, config_file, model_file,
                                       concatenate=True)[0]
 
     # make performance plots, only available for bg/ts/regression
-    dset_mod_available_plots = ['regression', 'bg_classifier', 'ts_classifier']
-    try:
+    if use_plotting is True:
         dataset_modifier = toml.load(model_file)["orca_modifiers"][
             "dataset_modifier"]
-        if any(x in dataset_modifier for x in dset_mod_available_plots):
-            plots_folder = orga.io.get_subfolder(name='plots')
-            make_performance_plots(pred_filepath_conc, dataset_modifier, plots_folder)
-
-    except KeyError:
-        pass
+        plots_folder = orga.io.get_subfolder(name='plots')
+        make_performance_plots(pred_filepath_conc, dataset_modifier, plots_folder)
 
 
 def main():
@@ -104,7 +111,8 @@ def main():
               config_file=args['CONFIG'],
               model_file=args['MODEL'],
               epoch=epoch,
-              fileno=fileno)
+              fileno=fileno,
+              use_plotting=args['--plots'])
 
 
 if __name__ == '__main__':

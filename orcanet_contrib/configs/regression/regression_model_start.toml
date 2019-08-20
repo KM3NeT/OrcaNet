@@ -1,0 +1,63 @@
+# Info for building an OrcaNet model.
+
+[body]
+architecture = "single"
+
+# default values for the trunk layers of the network:
+type = "conv_block"
+conv_dim = 3
+kernel_size = 3
+dropout = 0.0
+activation = 'relu'
+batchnorm=true
+
+
+# config of every layer block, will overwrite the default values above
+blocks = [
+          {filters=64},
+          {filters=64},
+          {filters=64},
+          {filters=64},
+          {filters=64},
+          {filters=64, pool_size=[2, 2, 2]},
+          {filters=128},
+          {filters=128},
+          {filters=128},
+          {filters=128, pool_size=[2, 2, 2]},
+          ]
+
+# ----------------------------------------------------------------------
+[head]
+architecture = "regression_error"
+architecture_args = {output_names=['e', 'dx', 'dy', 'dz', 'by', 'vx', 'vy', 'vz', 'vt']}
+
+
+# ----------------------------------------------------------------------
+[compile]
+optimizer = "adam"
+
+[compile.losses]
+dx = {function="mean_absolute_error", weight=10}
+dy = {function="mean_absolute_error", weight=10}
+dz = {function='mean_absolute_error', weight=15}
+vx = {function='mean_absolute_error', weight=0.1}
+vy = {function='mean_absolute_error', weight=0.1}
+vz = {function='mean_absolute_error', weight=0.1}
+vt = {function='mean_absolute_error', weight=1e-30}
+e  = {function='mean_absolute_error', weight=1}
+by = {function='mean_absolute_error', weight=10}
+dx_err = {function='loss_uncertainty_mse'}
+dy_err = {function='loss_uncertainty_mse'}
+dz_err = {function='loss_uncertainty_mse', weight=1.25}
+vx_err = {function='loss_uncertainty_mse', weight=5e-4}
+vy_err = {function='loss_uncertainty_mse', weight=5e-4}
+vz_err = {function='loss_uncertainty_mse', weight=5e-4}
+vt_err = {function='loss_uncertainty_mse', weight=1e-30}
+e_err  = {function='loss_uncertainty_mse', weight=3e-3}
+by_err = {function='loss_uncertainty_mse'}
+
+# ----------------------------------------------------------------------
+[orca_modifiers]
+sample_modifier = 'xyz-t_and_xyz-c_single_input'
+label_modifier = 'energy_dir_bjorken-y_vtx_errors'
+dataset_modifier = 'regression_energy_dir_bjorken-y_vtx_errors'

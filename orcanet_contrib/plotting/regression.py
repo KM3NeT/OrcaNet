@@ -17,7 +17,7 @@ from orcanet_contrib.plotting.utils import correct_reco_energy, select_ic, get_e
 
 
 def make_2d_prop_to_prop_plot(pred_file, prop_1_name, prop_2_name, savefolder, savename, reco_energy_correction=None,
-                              cuts=None, title_prefix='OrcaNet: ', overlay=('KM3NeT', (0.05, 0.92)), title=True):
+                              cuts=None, title_prefix='OrcaNet: ', overlay=('KM3NeT', (0.05, 0.92), 'k'), title=True):
     """
     Function that makes a 2d plot of property 1 vs property 2.
 
@@ -61,7 +61,8 @@ def make_2d_prop_to_prop_plot(pred_file, prop_1_name, prop_2_name, savefolder, s
             title_text = plt.title(title_prefix + ic_list[ic]['title'] + ', ' + title_name_prop_1 + ' vs. ' + title_name_prop_2)
             title_text.set_position([.5, 1.04])
 
-        plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold')
+        plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes,
+                 weight='bold', color=overlay[2], bbox=dict(facecolor='w', alpha=0.8))
         cbar = fig.colorbar(pcm_prop_1_prop_2, ax=ax)
         cbar.ax.set_ylabel('Number of events')
         x_label, y_label = properties[prop_1_name]['ax_label'], properties[prop_2_name]['ax_label']
@@ -73,7 +74,7 @@ def make_2d_prop_to_prop_plot(pred_file, prop_1_name, prop_2_name, savefolder, s
                 y_label = 'Corrected reconstructed energy (GeV)'
 
         ax.set_xlabel(x_label), ax.set_ylabel(y_label)
-        plt.tight_layout()
+        # plt.tight_layout()
 
         pdf_plots.savefig(fig)
         cbar.remove()
@@ -171,10 +172,14 @@ def get_make_2d_energy_resolution_plot_properties_dict():
                                  'title_name': 'true vtx-y', 'ax_label': 'True vtx-y'},
                   'vtx_z_true': {'dset_key': 'mc_info', 'col_name': 'vertex_pos_z', 'bins': 50,
                                  'title_name': 'true vtx-z', 'ax_label': 'True vtx-z'},
-                  'vtx_long_reco_mc': {'dset_key': 'pred', 'col_name': None, 'bins': 150, 'lim': (-30, 30),
-                                       'title_name': 'vtx long', 'ax_label': 'Vertex longitudinal distance [m]'},
-                  'vtx_perp_reco_mc': {'dset_key': 'pred', 'col_name': None, 'bins': 150, 'lim': (0, 30),
-                                       'title_name': 'vtx perp', 'ax_label': 'Vertex perpendicular distance [m]'}
+                  # 'vtx_long_reco_mc': {'dset_key': 'pred', 'col_name': None, 'bins': 150, 'lim': (-30, 30),
+                  #                      'title_name': 'vtx long', 'ax_label': 'Vertex longitudinal distance [m]'},
+                  # 'vtx_perp_reco_mc': {'dset_key': 'pred', 'col_name': None, 'bins': 150, 'lim': (0, 30),
+                  #                      'title_name': 'vtx perp', 'ax_label': 'Vertex perpendicular distance [m]'}
+                  'vtx_long_reco_mc': {'dset_key': 'pred', 'col_name': None, 'bins': 150, 'lim': (-90, 90),
+                                         'title_name': 'vtx long', 'ax_label': 'Vertex longitudinal distance [m]'},
+                  'vtx_perp_reco_mc': {'dset_key': 'pred', 'col_name': None, 'bins': 150, 'lim': (0, 90),
+                                         'title_name': 'vtx perp', 'ax_label': 'Vertex perpendicular distance [m]'}
                   }
 
     return properties
@@ -292,7 +297,7 @@ def get_property_info_to_plot(mc_info, prop_dset, properties, prop_name, reco_en
 
 
 def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, savefolder, savename,
-                                               reco_energy_correction=None, energy_bins=np.arange(1, 101, 2.5),
+                                               reco_energy_correction=None, energy_bins=np.arange(1, 101, 1),
                                                cuts=None, compare_2nd_reco=None, title=True,
                                                overlay=('KM3NeT Preliminary', (0.3, 0.95))):
     """
@@ -1243,7 +1248,8 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, mc_info, prop
         ax.set_ylabel('Reconstructed ' + axis_prop_info[0] + ' [' + axis_prop_info[1] + ']')
         plt.xlim(bins[0], bins[-1])
         plt.ylim(bins[0], bins[-1])
-        plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold')
+        plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold',
+                 bbox=dict(facecolor='w', alpha=0.8))
 
         # plt.tight_layout()
         pdf_plots.savefig(fig)
@@ -1296,11 +1302,13 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, mc_info, prop
             cbar_2 = fig.colorbar(corr_all_div_leftover, ax=ax)
             cbar_2.ax.set_ylabel('Fraction of leftover events')
 
-            title_plot = plt.title('OrcaNet: ' + title + ', ' + str(int(percentage * 100)) + '% of total events')
-            title_plot.set_position([.5, 1.04])
+            if title_flag is True:
+                title_plot = plt.title('OrcaNet: ' + title + ', ' + str(int(percentage * 100)) + '% of total events')
+                title_plot.set_position([.5, 1.04])
             ax.set_xlabel('True ' + axis_prop_info[0] + ' [' + axis_prop_info[1] + ']')
             ax.set_ylabel('Reconstructed ' + axis_prop_info[0] + ' [' + axis_prop_info[1] + ']')
-            plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold')
+            plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold',
+                     bbox=dict(facecolor='w', alpha=0.8))
 
             pdf_plots.savefig(fig)
             cbar_2.remove()
@@ -1320,8 +1328,9 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, mc_info, prop
 
             plot_line_through_the_origin(prop_name, prop_name)
 
-            title_plot = plt.title('OrcaNet: ' + title + ', ' + str(int(percentage * 100)) + '% of total events')
-            title_plot.set_position([.5, 1.04])
+            if title_flag is True:
+                title_plot = plt.title('OrcaNet: ' + title + ', ' + str(int(percentage * 100)) + '% of total events')
+                title_plot.set_position([.5, 1.04])
             cbar = fig.colorbar(prop_true_to_reco, ax=ax)
             cbar.ax.set_ylabel(r'Discarding Significance $S_i$')
 
@@ -1330,7 +1339,8 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, mc_info, prop
             ax.set_ylabel('Reconstructed ' + axis_prop_info[0] + ' [' + axis_prop_info[1] + ']')
             plt.xlim(bins[0], bins[-1])
             plt.ylim(bins[0], bins[-1])
-            plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold')
+            plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold',
+                     bbox=dict(facecolor='w', alpha=0.8))
 
             pdf_plots.savefig(fig)
 
@@ -1377,7 +1387,8 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, mc_info, prop
 
             cont.levels = [nf(val) for val in cont.levels]
             ax.clabel(cont, cont.levels, inline=1, fmt='%r', fontsize=7)
-            plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold')
+            plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold',
+                     bbox=dict(facecolor='w', alpha=0.8))
 
             pdf_plots.savefig(fig)
             plt.cla()
