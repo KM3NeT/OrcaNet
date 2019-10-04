@@ -135,6 +135,24 @@ def orca_sample_modifiers(name):
             xs_layer['input_1_net_1'] = np.transpose(xs_files['xyz-t'], xyzt_permute['yzt-x'])
             return xs_layer
 
+    elif name == 'xyz-t_and_xyz-c_single_input_and_yzt-x_two_timecuts':
+        def sample_modifier(xs_files):
+            # Concatenate xyz-t and xyz-c to a single input
+            xs_layer = dict()
+
+            # Inputs for first timecut
+            xs_layer['xyz-t_and_xyz-c_single_input_net_0'] = np.concatenate(
+                [xs_files['xyz-t_0'], xs_files['xyz-c_0']], axis=-1)
+            # Transpose xyz-t to yzt-x and use that, too.
+            xs_layer['input_1_net_1'] = np.transpose(xs_files['xyz-t_0'], xyzt_permute['yzt-x'])
+
+            # Inputs for second timecut
+            xs_layer['xyz-t_and_xyz-c_single_input_net_2'] = np.concatenate(
+                [xs_files['xyz-t_1'], xs_files['xyz-c_1']], axis=-1)
+            # Transpose xyz-t to yzt-x and use that, too.
+            xs_layer['xyz-t_net_3'] = np.transpose(xs_files['xyz-t_1'], xyzt_permute['yzt-x'])
+            return xs_layer
+
     elif name == 'xyz-t_and_yzt-x_multi_input_single_train_tight-1_tight-2':
         def sample_modifier(xs_files):
             # Use xyz-t in two different time cuts, and also transpose them to yzt-x and use these, too.

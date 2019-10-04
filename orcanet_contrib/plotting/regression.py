@@ -297,7 +297,7 @@ def get_property_info_to_plot(mc_info, prop_dset, properties, prop_name, reco_en
 
 
 def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, savefolder, savename,
-                                               reco_energy_correction=None, energy_bins=np.arange(1, 101, 1),
+                                               reco_energy_correction=None, energy_bins=np.arange(1, 101, 3),
                                                cuts=None, compare_2nd_reco=None, title=True,
                                                overlay=('KM3NeT Preliminary', (0.3, 0.95))):
     """
@@ -527,6 +527,7 @@ def calc_plot_data_of_energy_dependent_label(mc_info, pred, prop_name, mode, sel
         space_angle_inner_value = np.sin(zenith_true) * np.sin(zenith_pred) * np.cos(azimuth_true - azimuth_pred)\
                                   + np.cos(zenith_true) * np.cos(zenith_pred)
 
+        space_angle_inner_value = np.clip(-1, 1, space_angle_inner_value)
         space_angle = np.arccos(space_angle_inner_value)
 
         prop_pred, prop_true = space_angle, np.zeros(space_angle.shape)

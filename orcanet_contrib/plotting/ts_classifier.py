@@ -558,6 +558,170 @@ def make_prob_hist_class(class_name, mc_info, y_pred, ts_class, axes, plot_range
 # -- Functions for making probability plots -- #
 
 
+# def ts_separability_mc_statistics_effect_2(pred_file, savefolder, savename_suffix, cuts=None, title=True,
+#                                          overlay=('KM3NeT', (0.05, 0.92)),
+#                                          bin_edges=np.arange(-0.005, 1.005, (1 / 101) * 1.0)):
+#     mc_info = pred_file['mc_info']
+#     prob_track = pred_file['pred']['prob_track']
+#
+#     if cuts is not None:
+#         mc_info, prob_track = mc_info[cuts], prob_track[cuts]
+#         print('Sep.: Shape of mc_info after cut: ' + str(mc_info.shape))
+#
+#     percentages = [0.2, 0.4, 0.6, 0.8, 1]
+#     n_draws = 5
+#     np.random.seed(42)
+#
+#     for percentage in percentages:
+#
+#         # get the percentage by drawing n_draws times
+#         perc_per_draw = percentage ** (1 / n_draws)
+#         final_percentage = 1 * perc_per_draw ** n_draws
+#
+#         mask_draw_once = get_evt_mask(1, mc_info, final_percentage)
+#         mask_draw_multiple = get_evt_mask(n_draws, mc_info, perc_per_draw)
+#
+#         s_info_once = calculcate_separability(mc_info[mask_draw_once], prob_track[mask_draw_once], bin_edges=bin_edges)
+#         s_info_n = calculcate_separability(mc_info[mask_draw_multiple], prob_track[mask_draw_multiple], bin_edges=bin_edges)
+#         s_factors_temp_once = s_info_once[:, 0]
+#         s_factors_temp_n = s_info_n[:, 0]
+#
+#
+#
+#
+# def get_evt_mask(n_times, dset, percentage):
+#     """
+#
+#     Parameters
+#     ----------
+#     n_times
+#     dset
+#     percentage
+#
+#     Returns
+#     -------
+#
+#     """
+#     print('Getting a random event mask by drawing ' + str(n_times) + ' times with a percentage'
+#           ' of ' + str(percentage) + '. Yields a total remaining percentage of ' + str(1 * percentage ** n_times))
+#
+#     n_evts = dset.shape[0]
+#     idx_keep, idx_keep_temp = None, None
+#     for i in range(n_times):
+#
+#         if idx_keep is None:  # i == 0
+#             idx_keep = np.random.choice(n_evts, size=int(n_evts * percentage), replace=False)
+#             idx_keep.sort()
+#
+#         else:
+#             if idx_keep_temp is None:  # i == 1
+#                 idx_keep_temp = np.random.choice(idx_keep.shape[0], size=int(idx_keep.shape[0] * percentage),
+#                                                  replace=False)
+#                 idx_keep_temp.sort()
+#                 idx_keep = idx_keep[idx_keep_temp]
+#
+#             else:
+#                 idx_keep_temp = np.random.choice(idx_keep_temp.shape[0], size=int(idx_keep_temp.shape[0] * percentage),
+#                                                  replace=False)
+#                 idx_keep_temp.sort()
+#                 idx_keep = idx_keep[idx_keep_temp]
+#
+#     return idx_keep
+
+
+
+
+def ts_separability_mc_statistics_effect(pred_file, savefolder, savename_suffix, cuts=None, start=1.0,
+                                         bin_edges=np.arange(-0.005, 1.005, (1 / 101) * 1.0)):
+    """
+    Investigates the effect of limiting statistics for the separability curve.
+
+    Parameters
+    ----------
+    pred_file
+    savefolder
+    cuts
+    title
+    overlay
+
+    Returns
+    -------
+
+    """
+    mc_info = pred_file['mc_info']
+    prob_track = pred_file['pred']['prob_track']
+
+    if cuts is not None:
+        mc_info, prob_track = mc_info[cuts], prob_track[cuts]
+        print('Sep.: Shape of mc_info after cut: ' + str(mc_info.shape))
+
+    if start != 1:
+        idx_keep = np.random.choice(mc_info.shape[0], size=int(mc_info.shape[0] * start), replace=False)
+        idx_keep.sort()
+        mc_info, prob_track = mc_info[idx_keep], prob_track[idx_keep]
+
+    n_evts = mc_info.shape[0]
+    separabilities = {}
+    stds = {}
+    percentages = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+    average_n_times = 10
+    for j, percentage in enumerate(percentages):
+        print('Calculating separability for ' + str(percentage * 100) + ' % of total events')
+
+        # --- average n-times over this  --- #
+        s_factors = None
+        for i in range(average_n_times):
+
+            # set seed
+            np.random.seed(j * average_n_times + i)
+
+            idx_keep = np.random.choice(n_evts, size=int(n_evts * percentage), replace=False)
+            idx_keep.sort()
+
+            if i == 0:
+                print('Remaining event number: ' + str(idx_keep.shape[0]))
+
+            # 2d array, contains separabilities as col 0 and average_energy as col 1
+            s_info = calculcate_separability(mc_info[idx_keep], prob_track[idx_keep], bin_edges=bin_edges)
+            s_factors_temp = s_info[:, 0]
+
+            if s_factors is None:
+                s_factors = s_factors_temp
+            else:
+                s_factors = np.vstack((s_factors, s_factors_temp))
+
+        # after finished calculating s n-times, average over it
+        s_factors_averaged = np.mean(s_factors, axis=0)
+        std_s_factors = np.std(s_factors, axis=0)
+
+        # dict with lists for every e-bin
+        for i in range(s_factors_averaged.shape[0]):
+            if i not in separabilities:
+                separabilities[i] = []
+                stds[i] = []
+
+            s_temp = separabilities[i] + [s_factors_averaged[i]]
+            separabilities[i] = s_temp
+
+            std_temp = stds[i] + [std_s_factors[i]]
+            stds[i] = std_temp
+
+    # plot everything
+    fig, axes = plt.subplots()
+    for sep_e_bin in separabilities:
+
+        plt.errorbar(np.array(percentages) * 100, np.array(separabilities[sep_e_bin]), yerr=stds[sep_e_bin],
+                     color='k', marker='x', lw=0.5, markersize=3, capsize=1.5)
+
+    plt.xlabel('Percentage of kept events [%]')
+    plt.ylabel('Separability in a certain energy range')
+    plt.grid(True, zorder=0, linestyle='dotted')
+    plt.ylim(0.1, 1.025)
+
+    plt.savefig(savefolder + '/ts_correlation_coefficients_mc_statistics_' + savename_suffix + '.pdf')
+    plt.close()
+
+
 def plot_ts_separability(pred_file, savefolder, pred_file_2=None, cuts=None,
                          title=True, overlay=('KM3NeT', (0.05, 0.92))):
     """
@@ -591,7 +755,7 @@ def plot_ts_separability(pred_file, savefolder, pred_file_2=None, cuts=None,
             prob_track = prob_track[evt_sel_mask]
 
     pdf_plots_dl = PdfPages(savefolder + '/separability_prob_hists_per_erange_dl.pdf')
-    separabilities = calculcate_separability(mc_info, prob_track, pdf_plots_dl)
+    separabilities = calculcate_separability(mc_info, prob_track, pdf_pages=pdf_plots_dl)
     pdf_plots_dl.close()
 
     separabilities_2 = None
@@ -610,16 +774,16 @@ def plot_ts_separability(pred_file, savefolder, pred_file_2=None, cuts=None,
                 prob_track_2 = prob_track_2[evt_sel_mask_2]
 
         pdf_plots_rf = PdfPages(savefolder + '/separability_prob_hists_per_erange_rf.pdf')
-        separabilities_2 = calculcate_separability(mc_info_2, prob_track_2, pdf_plots_rf)
+        separabilities_2 = calculcate_separability(mc_info_2, prob_track_2, pdf_pages=pdf_plots_rf)
         pdf_plots_rf.close()
 
     # plot the correlation coefficients
     fig, axes = plt.subplots()
-    plt.plot(separabilities[:, 1], separabilities[:, 0], 'b', marker='o', lw=0.5, markersize=3,
-             label='CNN')
+    plt.errorbar(separabilities[:, 1], separabilities[:, 0], yerr=separabilities[:, 2], color='b', marker='x', lw=0.5,
+                 markersize=3, label='CNN', capsize=1.5)
     if separabilities_2 is not None:
-        plt.plot(separabilities_2[:, 1], separabilities_2[:, 0], 'r', marker='o', lw=0.5,
-                 markersize=3, label='RF')
+        plt.errorbar(separabilities_2[:, 1], separabilities_2[:, 0], yerr=separabilities_2[:, 2], color='r', marker='x', lw=0.5,
+                     markersize=3, label='RF', capsize=1.5)
 
     plt.xlabel('Energy [GeV]')
     plt.ylabel('Separability (1-c)')
@@ -644,7 +808,7 @@ def plot_ts_separability(pred_file, savefolder, pred_file_2=None, cuts=None,
     plt.close()
 
 
-def calculcate_separability(mc_info, prob_track, pdf_pages, bin_edges=np.arange(-0.005, 1.005, (1 / 101) * 1.0),
+def calculcate_separability(mc_info, prob_track, pdf_pages=None, bin_edges=np.arange(-0.005, 1.005, (1 / 101) * 2.0),
                             e_cut_range=np.logspace(0.3, 2, 18)):
     """
     Calculates the separability per energy bin by calculating the correlation factors (s=1-c).
@@ -679,56 +843,92 @@ def calculcate_separability(mc_info, prob_track, pdf_pages, bin_edges=np.arange(
         is_muon_cc_and_e_cut = np.logical_and(is_muon_cc, e_cut_mask)
         is_elec_cc_and_e_cut = np.logical_and(is_elec_cc, e_cut_mask)
 
-        hist_prob_track_e_cut_muon_cc = np.histogram(prob_track[is_muon_cc_and_e_cut], bins=bin_edges)
-        hist_prob_track_e_cut_elec_cc = np.histogram(prob_track[is_elec_cc_and_e_cut], bins=bin_edges)
-
-        # just some plotting stuff
-        fig, axes = plt.subplots()
-        plt.bar(hist_prob_track_e_cut_muon_cc[1][:-1], hist_prob_track_e_cut_muon_cc[0],
-                width=np.diff(hist_prob_track_e_cut_muon_cc[1]), ec="k", align="edge", label='mu-cc', alpha=0.5)
-        plt.bar(hist_prob_track_e_cut_elec_cc[1][:-1], hist_prob_track_e_cut_elec_cc[0],
-                width=np.diff(hist_prob_track_e_cut_elec_cc[1]), ec="k", align="edge", label='e-cc', alpha=0.5)
-        plt.title('Erange ' + str(e_cut[0]) + ' - ' + str(e_cut[1]))
-        plt.xlabel('Track probability')
-        plt.ylabel('Quantity')
-        axes.legend(loc='upper center')
-
-        pdf_pages.savefig(fig)
-        plt.close()
-        # just some plotting stuff
-
+        # --- just some plotting stuff --- #
         hist_prob_track_e_cut_muon_cc = np.histogram(prob_track[is_muon_cc_and_e_cut], bins=bin_edges, density=True)
         hist_prob_track_e_cut_elec_cc = np.histogram(prob_track[is_elec_cc_and_e_cut], bins=bin_edges, density=True)
 
-        # just some plotting stuff
-        fig, axes = plt.subplots()
-        plt.bar(hist_prob_track_e_cut_muon_cc[1][:-1], hist_prob_track_e_cut_muon_cc[0],
-                width=np.diff(hist_prob_track_e_cut_muon_cc[1]), ec="k", align="edge", label='mu-cc', alpha=0.5)
-        plt.bar(hist_prob_track_e_cut_elec_cc[1][:-1], hist_prob_track_e_cut_elec_cc[0],
-                width=np.diff(hist_prob_track_e_cut_elec_cc[1]), ec="k", align="edge", label='e-cc', alpha=0.5)
-        plt.title('Erange ' + str(e_cut[0]) + ' - ' + str(e_cut[1]))
-        plt.xlabel('Track probability')
-        plt.ylabel('Normed quantity')
-        axes.legend(loc='upper center')
+        if pdf_pages is not None:
 
-        pdf_pages.savefig(fig)
-        plt.close()
-        # just some plotting stuff
+            fig, axes = plt.subplots()
+            plt.bar(hist_prob_track_e_cut_muon_cc[1][:-1], hist_prob_track_e_cut_muon_cc[0],
+                    width=np.diff(hist_prob_track_e_cut_muon_cc[1]), ec="k", align="edge", label='mu-cc', alpha=0.5)
+            plt.bar(hist_prob_track_e_cut_elec_cc[1][:-1], hist_prob_track_e_cut_elec_cc[0],
+                    width=np.diff(hist_prob_track_e_cut_elec_cc[1]), ec="k", align="edge", label='e-cc', alpha=0.5)
+            plt.title('Erange ' + str(e_cut[0]) + ' - ' + str(e_cut[1]))
+            plt.xlabel('Track probability')
+            plt.ylabel('Normed quantity')
+            axes.legend(loc='upper center')
 
-        c_enumerator = 0
-        for j in range(hist_prob_track_e_cut_muon_cc[0].shape[0]):
-            c_enumerator += hist_prob_track_e_cut_muon_cc[0][j] * hist_prob_track_e_cut_elec_cc[0][j]
+            pdf_pages.savefig(fig)
+            plt.close()
+        # --- just some plotting stuff --- #
 
+        hist_prob_track_e_cut_muon_cc = np.histogram(prob_track[is_muon_cc_and_e_cut], bins=bin_edges)
+        hist_prob_track_e_cut_elec_cc = np.histogram(prob_track[is_elec_cc_and_e_cut], bins=bin_edges)
+
+        # --- just some plotting stuff --- #
+        if pdf_pages is not None:
+            # just some plotting stuff
+            fig, axes = plt.subplots()
+            plt.bar(hist_prob_track_e_cut_muon_cc[1][:-1], hist_prob_track_e_cut_muon_cc[0],
+                    width=np.diff(hist_prob_track_e_cut_muon_cc[1]), ec="k", align="edge", label='mu-cc', alpha=0.5)
+            plt.bar(hist_prob_track_e_cut_elec_cc[1][:-1], hist_prob_track_e_cut_elec_cc[0],
+                    width=np.diff(hist_prob_track_e_cut_elec_cc[1]), ec="k", align="edge", label='e-cc', alpha=0.5)
+            plt.title('Erange ' + str(e_cut[0]) + ' - ' + str(e_cut[1]))
+            plt.xlabel('Track probability')
+            plt.ylabel('Quantity')
+            axes.legend(loc='upper center')
+
+            pdf_pages.savefig(fig)
+            plt.yscale('log')
+            pdf_pages.savefig(fig)
+            plt.close()
+        # --- just some plotting stuff --- #
+
+        # --- Calculate the separability --- #
+
+        # Calculate denominator
         sum_prob_muon_cc = np.sum(hist_prob_track_e_cut_muon_cc[0] ** 2)
         sum_prob_elec_cc = np.sum(hist_prob_track_e_cut_elec_cc[0] ** 2)
         c_denominator = np.sqrt(sum_prob_muon_cc * sum_prob_elec_cc)
 
-        separability = 1 - (c_enumerator / c_denominator)
+        # Calculate enumerator
+        c_enumerator, separability_error = 0, 0
+        for j in range(hist_prob_track_e_cut_muon_cc[0].shape[0]):
+            n_mu_cc_bin = hist_prob_track_e_cut_muon_cc[0][j]
+            n_e_cc_bin = hist_prob_track_e_cut_elec_cc[0][j]
 
-        # average_energy = 10 ** ((np.log10(e_cut[1]) + np.log10(e_cut[0])) / 2)
+            c_enumerator += n_mu_cc_bin * n_e_cc_bin
+
+            # calculate errors
+            delta_n_mu_cc_bin = np.sqrt(n_mu_cc_bin)
+            delta_n_e_cc_bin = np.sqrt(n_e_cc_bin)
+
+            if delta_n_mu_cc_bin == 0:
+                print('Clipped zero mu-cc bin at pos ' + str(j) + ' in the errors to '
+                      '1 at e-range ' + str(e_cut[0]) + '-' + str(e_cut[1]))
+            if delta_n_e_cc_bin == 0:
+                print('Clipped zero e-cc bin at pos ' + str(j) + ' in the errors to'
+                      ' 1 at e-range ' + str(e_cut[0]) + '-' + str(e_cut[1]))
+            delta_n_mu_cc_bin = np.clip(delta_n_mu_cc_bin, 1, None)
+            delta_n_e_cc_bin = np.clip(delta_n_e_cc_bin, 1, None)
+
+            # first order errors of f = 1 - (x*y)/c (separability):
+            # (y/c)**2 * delta_x**2 + (x/c)**2 * delta_y**2
+            first_order_error = ((n_mu_cc_bin / c_denominator) ** 2 * delta_n_e_cc_bin ** 2 +
+                                 (n_e_cc_bin / c_denominator) ** 2 * delta_n_mu_cc_bin ** 2)
+
+            # second order errors of f = 1 - (x*y)/c (separability):
+            # 1/2! * 2 * (1/c)**2 * delta_x**2 * delta_y**2
+            second_order_error = (1/2 * 2 * (1 / c_denominator)**2 * delta_n_e_cc_bin ** 2 * delta_n_mu_cc_bin ** 2)
+
+            separability_error += np.sqrt(first_order_error + second_order_error)
+
+        separability = 1 - (c_enumerator / c_denominator)
         average_energy = np.mean(mc_energy[e_cut_mask])
 
-        separabilities.append((separability, average_energy))
+        separabilities.append((separability, average_energy, separability_error))
+        
 
     separabilities = np.array(separabilities)
     return separabilities

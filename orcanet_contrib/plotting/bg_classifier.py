@@ -377,11 +377,6 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
 
             # dl
 
-            # if np.count_nonzero(mupage_sel_dl) != 0:
-            #     fract_n_mupage_err_to_n_mupage_dl = n_mupage_err_dl / np.count_nonzero(mupage_sel_dl)
-            # else:
-            #     fract_n_mupage_err_to_n_mupage_dl = 0
-
             neutr_sel_dl = prob_not_neutrino[is_neutrino_e_cut_dl] < cuts[i]
             n_neutrino_weighted_dl = np.sum(w_1_y[is_neutrino_e_cut_dl][neutr_sel_dl])
 
@@ -402,17 +397,11 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
 
                 n_mupage_err_dl = np.sqrt(np.count_nonzero(mupage_sel_dl))
                 n_rn_err_dl = np.sqrt(np.count_nonzero(rn_sel_dl))
-                # n_mupage_weighted_err_dl = n_mupage_weighted_dl * fract_n_mupage_err_to_n_mupage_dl
-                # muon_cont_weighted_dl_err.append((np.abs(1/np.count_nonzero(neutr_sel_dl)) * n_mupage_err_dl) * 100)
+
                 muon_cont_weighted_dl_err.append(((n_mupage_err_dl * 33.2137) / (n_neutrino_weighted_dl + n_mupage_weighted_dl)) * 100)
                 rn_cont_weighted_dl_err.append(((n_rn_err_dl * 332.87896624) / (n_neutrino_weighted_dl + n_rn_weighted_dl)) * 100)
 
             # std
-
-            # if np.count_nonzero(mupage_sel_std) != 0:
-            #     fract_n_mupage_err_to_n_mupage_std = n_mupage_err_std / np.count_nonzero(mupage_sel_std)
-            # else:
-            #     fract_n_mupage_err_to_n_mupage_std = 0
 
             neutr_sel_std_muon = muon_score_std[is_neutrino_e_cut_std] < cuts[i]
             neutr_sel_std_rn = rn_noise_score_std[is_neutrino_e_cut_std] < cuts[i]
@@ -439,8 +428,7 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
 
                 n_mupage_err_std = np.sqrt(np.count_nonzero(mupage_sel_std))
                 n_rn_err_std = np.sqrt(np.count_nonzero(rn_sel_std))
-                # n_mupage_weighted_err_std = n_mupage_weighted_std * fract_n_mupage_err_to_n_mupage_std
-                # muon_cont_weighted_std_err.append((np.abs(1/np.count_nonzero(neutr_sel_std)) * n_mupage_err_std) * 100)
+
                 muon_cont_weighted_std_err.append(((n_mupage_err_std * 33.2137) / (n_neutrino_weighted_std_mu_cut + n_mupage_weighted_std)) * 100)
                 rn_cont_weighted_std_err.append(((n_rn_err_std * 332.87896624) / (n_neutrino_weighted_std_rn_cut + n_rn_weighted_std)) * 100)
 
