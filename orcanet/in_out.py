@@ -57,28 +57,9 @@ def get_subfolder(main_folder, name=None, create=False):
 
 
 def get_inputs(model):
+    """ Get names and keras layers of the inputs of the model, as a dict.
     """
-    Get the names and the keras layers of the inputs of the model.
-
-    Parameters
-    ----------
-    model : ks.model
-        A keras model.
-
-    Returns
-    -------
-    layers :dict
-        The input layers and names.
-
-    """
-    input_tensors = model.inputs
-    input_layers = {}
-    for layer_no, layer in enumerate(model.layers):
-        # in the case of a single input model, the layer after the input
-        # has the same input tensor as the input layer!!! (keras 2.2.4)
-        if layer.input in input_tensors and layer.name in model.input_names:
-            input_layers[layer.name] = layer
-    return input_layers
+    return {name: model.get_layer(name) for name in model.input_names}
 
 
 class IOHandler(object):
@@ -588,7 +569,6 @@ class IOHandler(object):
         print("\nInput check\n-----------")
         # Get a batch of data to investigate the given modifier functions
         info_blob = self.get_batch()
-        x_values = info_blob["x_values"]
         y_values = info_blob["y_values"]
         layer_inputs = get_inputs(model)
         # keys: name of layers, values: shape of input
@@ -765,19 +745,22 @@ class IOHandler(object):
 
     def get_learning_rate(self, epoch):
         """
-        Get the learning rate for the current epoch and file number.
+        Get the learning rate for a given epoch and file number.
 
-        The user learning rate can be None, a float, a tuple, or a function.
+        The user learning rate (cfg.learning_rate) can be None, a float,
+        a tuple, or a function.
 
         Parameters
         ----------
         epoch : tuple
-            Epoch and file number.
+            Epoch and file number. Both start at 1, i.e. the start of the
+            training is (1, 1), the next file is (1, 2), ...
+            This is also in the filename of the saved models.
 
         Returns
         -------
         lr : float
-            The learning rate.
+            The learning rate that will be used for the given epoch/fileno.
 
         """
         error_msg = "The learning rate must be either a float, a tuple of " \
@@ -800,7 +783,8 @@ class IOHandler(object):
             lr_table.sort()
 
             lr = None
-            for line_no, table_epoch in enumerate(lr_table):
+            # get lr from the table, one line before where the table is bigger
+            for table_epoch in lr_table:
                 if table_epoch[0] > tuple(epoch):
                     break
                 else:
@@ -823,7 +807,7 @@ class IOHandler(object):
             lr_init = float(user_lr[0])
             lr_decay = float(user_lr[1])
             if length != 2:
-                raise TypeError(
+                raise LookupError(
                     "{} (Your tuple has length {})".format(error_msg,
                                                            len(user_lr)))
 

@@ -4,11 +4,10 @@
 Scripts for making specific models.
 """
 
-import keras as ks
-from keras.layers import Concatenate, Flatten, BatchNormalization, Dropout
-from keras.models import Model
 import toml
 from datetime import datetime
+import keras as ks
+import keras.layers as layers
 
 from orcanet.builder_util.builders import BlockBuilder
 
@@ -208,9 +207,9 @@ class ModelBuilder:
             for layer in model.layers:
                 layer.trainable = trainable
                 layer.name = layer.name + '_net_' + str(i)
-                if isinstance(layer, BatchNormalization):
+                if isinstance(layer, layers.BatchNormalization):
                     layer.stateful = stateful
-                elif isinstance(layer, Flatten):
+                elif isinstance(layer, layers.Flatten):
                     flattens.append(layer.output)
                     flatten_found += 1
             if flatten_found != 1:
@@ -218,14 +217,14 @@ class ModelBuilder:
                     "Expected 1 Flatten layer but got " + str(flatten_found))
 
         # attach new head
-        x = Concatenate()(flattens)
+        x = layers.Concatenate()(flattens)
         builder = BlockBuilder(body_defaults=None,
                                head_defaults=self.head_args)
         output_layer = builder.attach_output_layers(x, self.head_arch,
                                                     flatten=False,
                                                     **self.head_arch_args)
 
-        model = Model(input_layers, output_layer)
+        model = ks.models.Model(input_layers, output_layer)
         if no_drop:
             model = change_dropout_rate(model, before_concat=0.)
 
@@ -275,6 +274,11 @@ class ModelBuilder:
                 metrics = layer_info['metrics']
             else:
                 metrics = []
+            if custom_objects is not None:
+                for i, metric in enumerate(metrics):
+                    if metric in custom_objects:
+                        metrics[i] = custom_objects[metric]
+
             loss_metrics[layer_name] = metrics
 
         model.compile(loss=loss_functions, optimizer=optimizer,
@@ -334,7 +338,7 @@ def change_dropout_rate(model, before_concat, after_concat=None):
     ch_bef, ch_aft, concat_found = 0, 0, 0
 
     for layer in model.layers:
-        if isinstance(layer, Dropout):
+        if isinstance(layer, layers.Dropout):
             if concat_found == 0:
                 layer.rate = before_concat
                 ch_bef += 1
@@ -342,7 +346,7 @@ def change_dropout_rate(model, before_concat, after_concat=None):
                 layer.rate = after_concat
                 ch_aft += 1
 
-        elif isinstance(layer, Concatenate):
+        elif isinstance(layer, layers.Concatenate):
             concat_found += 1
             if after_concat is None:
                 break

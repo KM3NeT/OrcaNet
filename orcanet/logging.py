@@ -107,11 +107,9 @@ def gen_line_str(data, widths=None, seperator=" | ", float_precision=4, minimum_
         The widths of the cells.
 
     """
-    cells, new_widths = gen_line_cells(data, widths,
-                                       float_precision, minimum_cell_width)
-
+    cells, new_widths = gen_line_cells(
+        data, widths, float_precision, minimum_cell_width)
     line = seperator.join(str(cell) for cell in cells)
-
     return line, new_widths
 
 
@@ -167,9 +165,9 @@ class SummaryLogger:
 
         """
         # Minimum width of the cells in characters.
-        self.minimum_cell_width = 9
+        self.minimum_cell_width = 11
         # Precision to which floats are rounded if they appear in data.
-        self.float_precision = 4
+        self.float_precision = 6
 
         self.logfile_name = orga.cfg.output_folder + 'summary.txt'
         self.temp_filepath = orga.cfg.output_folder + "/.temp_summary.txt"
@@ -239,7 +237,7 @@ class SummaryLogger:
 
     def _get_column_names(self):
         column_names = ["Epoch", "LR", ]
-        for i, metric_name in enumerate(self.metric_names):
+        for metric_name in self.metric_names:
             column_names.append("train_" + str(metric_name))
             column_names.append("val_" + str(metric_name))
         column_names = tuple(column_names)
@@ -271,7 +269,7 @@ class SummaryLogger:
 
             # make new summary file as a temp
             with open(self.temp_filepath, 'w') as temp_file:
-                for i, old_line in enumerate(lines):
+                for old_line in lines:
                     temp_file.write(old_line)
 
             # Remove original file
@@ -483,7 +481,7 @@ class BatchLogger(ks.callbacks.Callback):
     def _write_head(self):
         """ write column names for all losses / metrics """
         column_names = ['Batch', 'Batch_float']
-        for i, metric in enumerate(self.model.metrics_names):
+        for metric in self.model.metrics_names:
             column_names.append(metric)
         self._logger = TrainfileLogger(self.file, column_names)
         self._logger.level_file()

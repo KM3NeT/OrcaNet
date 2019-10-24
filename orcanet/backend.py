@@ -200,15 +200,15 @@ def save_actv_wghts_plot(orga, model, epoch, samples=1):
     with PdfPages(pdf_name_wght) as pdf:
         for layer in model.layers:
             try:
-                fig = plot_weights(model, layer.name)
+                plot_weights(model, layer.name)
             except ValueError:
                 continue
-            pdf.savefig(fig)
+            pdf.savefig()
             plt.clf()
         plt.close()
 
 
-def h5_inference(orga, model, files_dict, output_path, samples=None):
+def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_label=True):
     """
     Let a model predict on all samples in a h5 file, and save it as a h5 file.
 
@@ -227,9 +227,11 @@ def h5_inference(orga, model, files_dict, output_path, samples=None):
         Dict mapping model input names to h5 file paths.
     output_path : str
         Name of the output h5 file containing the predictions.
-    samples : int or None
-        Number of events that should be predicted.
-        If samples=None, the whole file will be used.
+    samples : int, optional
+        Dont use all events in the file, but instead only the given number.
+    use_def_label : bool
+        If True and no label modifier is given by user, use the default
+        label modifier instead of none.
 
     """
     batchsize = orga.cfg.batchsize
@@ -239,9 +241,11 @@ def h5_inference(orga, model, files_dict, output_path, samples=None):
         list(files_dict.values())[0],
         datasets=[orga.cfg.key_x_values])
     generator = get_h5_generator(
-        orga, files_dict,
+        orga,
+        files_dict,
         zero_center=orga.cfg.zero_center_folder is not None,
-        keras_mode=False)
+        keras_mode=False,
+        use_def_label=use_def_label)
 
     if samples is None:
         steps = int(file_size / batchsize)
@@ -264,9 +268,8 @@ def h5_inference(orga, model, files_dict, output_path, samples=None):
                 # if only one output, transform to a list
                 y_pred = [y_pred]
             # transform y_pred to dict
-            y_pred = {out: y_pred[i] for i, out in
-                      enumerate(model.output_names)}
-
+            y_pred = {
+                out: y_pred[i] for i, out in enumerate(model.output_names)}
             info_blob["y_pred"] = y_pred
 
             if orga.cfg.dataset_modifier is None:
@@ -337,6 +340,8 @@ def get_datasets(info_blob):
     Every output layer will get one dataset each for both the label and
     the prediction. E.g. if your model has an output layer called "energy",
     the datasets "label_energy" and "pred_energy" will be made.
+    If there are no labels (e.g. during orga.inference), the label dataset
+    will not be generated.
 
     Parameters
     ----------
@@ -365,7 +370,7 @@ def get_datasets(info_blob):
     if "y_values" in info_blob:
         datasets["y_values"] = info_blob["y_values"]
 
-    if "ys" in info_blob:
+    if info_blob.get("ys") is not None:
         y_true = info_blob["ys"]
         for out_layer_name in y_true:
             datasets["label_" + out_layer_name] = y_true[out_layer_name]

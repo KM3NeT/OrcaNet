@@ -3,10 +3,10 @@
 
 import numpy as np
 import os
-from keras.models import Model
-from keras.layers import Dense, Input, Flatten, Convolution3D
 from unittest import TestCase
 from unittest.mock import MagicMock
+from keras.models import Model
+import keras.layers as layers
 
 from orcanet.core import Organizer
 from orcanet.model_builder import ModelBuilder
@@ -46,10 +46,10 @@ class TestModel(TestCase):
 
     def test_merge_models(self):
         def build_model(inp_layer_name, inp_shape):
-            inp = Input(inp_shape, name=inp_layer_name)
-            x = Convolution3D(3, 3)(inp)
-            x = Flatten()(x)
-            out = Dense(1, name="out_0")(x)
+            inp = layers.Input(inp_shape, name=inp_layer_name)
+            x = layers.Convolution3D(3, 3)(inp)
+            x = layers.Flatten()(x)
+            out = layers.Dense(1, name="out_0")(x)
 
             model = Model(inp, out)
             return model
@@ -61,7 +61,7 @@ class TestModel(TestCase):
         merged_model = builder.merge_models([model1, model2])
 
         for layer in model1.layers + model2.layers:
-            if isinstance(layer, Dense):
+            if isinstance(layer, layers.Dense):
                 continue
             merged_layer = merged_model.get_layer(layer.name)
             for i in range(len(layer.get_weights())):

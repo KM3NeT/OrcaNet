@@ -23,6 +23,12 @@ def build_double_inp(compile=False):
     return test_model
 
 
+def get_xys():
+    x = {"inp_0": np.array([9, 3]), "inp_1": np.array([81, 18])}
+    y = {"out_0": np.array([1, 1]), "out_1": np.array([[0,0], [0,0]])}
+    return x, y
+
+
 def build_single_inp():
     inp = Input((2,), name="inp")
 

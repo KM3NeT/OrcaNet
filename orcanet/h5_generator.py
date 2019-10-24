@@ -59,8 +59,8 @@ class Hdf5BatchGenerator:
             If false, yield the info_blob containing the full sample and label
             info, both before and after the modifiers have been applied.
         shuffle : bool
-            Randomize the order in which batches are read from the file.
-            Significantly reduces read out speed.
+            Randomize the order in which batches are read from the file
+            (once during init). Can reduce read out speed.
 
         """
         self.files_dict = files_dict
@@ -78,16 +78,33 @@ class Hdf5BatchGenerator:
         # a dict with the names of list inputs as keys, and the opened
         # h5 files as values
         self._files = {}
+        # start index of each batch in the file
         self._sample_pos = None
+        # generator iteration counter
         self._i = 0
         self._total_f_size = None
+
+        self.open()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
 
     def __iter__(self):
         return self
 
     def __next__(self):
+        return self.next()
+
+    def __len__(self):
+        """ Number of batches in the Sequence (includes queue). """
+        return len(self._sample_pos)
+
+    def __getitem__(self, index):
         """
-        Read another batch of data from the files.
+        Gets batch number `index`.
 
         Returns
         -------
@@ -111,20 +128,10 @@ class Hdf5BatchGenerator:
             Blob containing, the x_values, y_values, xs and ys.
 
         """
-        if self._i == 0:
-            self.open_files()
-            self._store_file_length()
-            self._store_batch_indices()
-
-        try:
-            start_index = self._sample_pos[self._i]
-        except IndexError:
-            self.close_files()
-            raise StopIteration
-
+        file_index = self._sample_pos[index]
         info_blob = dict()
-        info_blob["x_values"] = self.get_x_values(start_index)
-        info_blob["y_values"] = self.get_y_values(start_index)
+        info_blob["x_values"] = self.get_x_values(file_index)
+        info_blob["y_values"] = self.get_y_values(file_index)
 
         # Modify the samples
         if self.sample_modifier is not None:
@@ -140,18 +147,30 @@ class Hdf5BatchGenerator:
             ys = None
         info_blob["ys"] = ys
 
-        self._i += 1
         if self.keras_mode:
             return xs, ys
         else:
             return info_blob
 
-    def open_files(self):
-        """ Open all files. """
+    def next(self):
+        """ Read another batch of data from the files.
+        """
+        try:
+            data = self[self._i]
+            self._i += 1
+            return data
+        except IndexError:
+            self.close()
+            raise StopIteration
+
+    def open(self):
+        """ Open all files and prepare for read out. """
         for input_key, file in self.files_dict.items():
             self._files[input_key] = h5py.File(file, 'r')
+        self._store_file_length()
+        self._store_batch_indices()
 
-    def close_files(self):
+    def close(self):
         """ Close all files again. """
         for f in list(self._files.values()):
             f.close()
@@ -203,6 +222,7 @@ class Hdf5BatchGenerator:
             y_values = first_file[self.key_y_values][
                        start_index:start_index + self._batchsize]
         except KeyError:
+            # can not look up y_values, lets hope we dont need them
             y_values = None
         return y_values
 
@@ -222,7 +242,7 @@ class Hdf5BatchGenerator:
         one if it would be larger than the size of the file.
         """
         if self._size < self.batchsize:
-            return self.f_size
+            return self._size
         else:
             return self.batchsize
 
@@ -235,7 +255,7 @@ class Hdf5BatchGenerator:
             lengths.append(len(f[self.key_x_values]))
 
         if not lengths.count(lengths[0]) == len(lengths):
-            self.close_files()
+            self.close()
             raise ValueError("All data files must have the same length! "
                              "Given were:\n " + str(lengths))
 
@@ -245,7 +265,8 @@ class Hdf5BatchGenerator:
         """
         Define the start indices of each batch in the h5 file and store this.
         """
-        total_no_of_batches = int(np.ceil(self._size / self._batchsize))
+        total_no_of_batches = int(
+            np.ceil(self._size / self._batchsize))  # w/o queue
         sample_pos = np.arange(total_no_of_batches) * self._batchsize
 
         if self.shuffle:
@@ -258,7 +279,7 @@ class Hdf5BatchGenerator:
 
 
 def get_h5_generator(orga, files_dict, f_size=None, zero_center=False,
-                     keras_mode=True, shuffle=False):
+                     keras_mode=True, shuffle=False, use_def_label=True):
     """
     Initialize the hdf5_batch_generator_base with the paramters in orga.cfg.
 
@@ -282,6 +303,9 @@ def get_h5_generator(orga, files_dict, f_size=None, zero_center=False,
     shuffle : bool
         Randomize the order in which batches are read from the file.
         Significantly reduces read out speed.
+    use_def_label : bool
+        If True and no label modifier is given by user, use the default
+        label modifier instead of none.
 
     Yields
     ------
@@ -300,11 +324,13 @@ def get_h5_generator(orga, files_dict, f_size=None, zero_center=False,
     """
     if orga.cfg.label_modifier is not None:
         label_modifier = orga.cfg.label_modifier
-    else:
+    elif use_def_label:
         assert orga._auto_label_modifier is not None, \
             "Auto label modifier has not been set up (can be done with " \
             "nn_utilities.get_auto_label_modifier)"
         label_modifier = orga._auto_label_modifier
+    else:
+        label_modifier = None
 
     # get xs_mean or load/create if not stored yet
     if zero_center:

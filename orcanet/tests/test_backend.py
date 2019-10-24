@@ -4,9 +4,8 @@ import os
 import shutil
 import h5py
 import numpy as np
-from keras.models import Model
-from keras.layers import Dense, Input, Concatenate, Flatten
-from keras.callbacks import LambdaCallback
+import keras as ks
+import keras.layers as layers
 
 from orcanet.core import Organizer
 from orcanet.backend import get_datasets, train_model, validate_model, make_model_prediction, weighted_average
@@ -178,7 +177,7 @@ class TestTrainValidatePredict(TestCase):
     def test_train(self):
         epoch = (1, 1)
         batch_nos = []
-        batch_print_callback = LambdaCallback(
+        batch_print_callback = ks.callbacks.LambdaCallback(
             on_batch_begin=lambda batch, logs: batch_nos.append(batch))
         self.orga.cfg.callback_train = batch_print_callback
 
@@ -317,17 +316,18 @@ def build_dummy_model(input_shapes, output_shapes):
     """
     inputs, flattend = [], []
     for name, shape in input_shapes.items():
-        inp = Input(shape, name=name)
-        flat = Flatten()(inp)
+        inp = layers.Input(shape, name=name)
+        flat = layers.Flatten()(inp)
         inputs.append(inp)
         flattend.append(flat)
 
-    conc = Concatenate()(flattend)
+    conc = layers.Concatenate()(flattend)
 
     outputs = []
     for name, shape in output_shapes.items():
-        outputs.append(Dense(shape, name=name, kernel_initializer="Ones",
-                             bias_initializer="Zeros")(conc))
+        outputs.append(layers.Dense(
+            shape, name=name, kernel_initializer="Ones",
+            bias_initializer="Zeros")(conc))
 
-    model = Model(inputs, outputs)
+    model = ks.models.Model(inputs, outputs)
     return model
