@@ -29,8 +29,7 @@ class Hdf5BatchGenerator:
             Keys: The name of every input (from the toml list file, can be multiple).
             Values: The filepath of a single h5py file to read data from.
         batchsize : int
-            Batchsize that will be used for the training and validation of
-            the network.
+            Batchsize that will be used for reading data from the files.
         key_x_values : str
             The name of the datagroup in the h5 input files which contains
             the samples for the network.
