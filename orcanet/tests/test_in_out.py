@@ -5,8 +5,8 @@ import h5py
 import numpy as np
 import shutil
 from pathlib import Path
-from keras.models import Model
-import keras.layers as layers
+from tensorflow.keras.models import Model
+import tensorflow.keras.layers as layers
 
 from orcanet.core import Configuration
 from orcanet.in_out import IOHandler, split_name_of_predfile

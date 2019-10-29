@@ -4,8 +4,8 @@ import os
 import shutil
 import h5py
 import numpy as np
-import keras as ks
-import keras.layers as layers
+import tensorflow.keras as ks
+import tensorflow.keras.layers as layers
 
 from orcanet.core import Organizer
 from orcanet.backend import get_datasets, train_model, validate_model, make_model_prediction, weighted_average

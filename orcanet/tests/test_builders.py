@@ -1,6 +1,6 @@
 from unittest import TestCase
-from keras.models import Model
-import keras.layers as layers
+from tensorflow.keras.models import Model
+import tensorflow.keras.layers as layers
 
 from orcanet.builder_util.builders import BlockBuilder
 

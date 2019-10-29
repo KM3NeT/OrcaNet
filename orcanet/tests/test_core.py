@@ -2,8 +2,8 @@ from unittest import TestCase
 from unittest.mock import MagicMock, patch
 import os
 import shutil
-from keras.models import Model
-import keras.layers as layers
+from tensorflow.keras.models import Model
+import tensorflow.keras.layers as layers
 
 from orcanet.core import Organizer, Configuration
 

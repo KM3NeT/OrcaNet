@@ -5,8 +5,8 @@ import numpy as np
 import os
 from unittest import TestCase
 from unittest.mock import MagicMock
-from keras.models import Model
-import keras.layers as layers
+from tensorflow.keras.models import Model
+import tensorflow.keras.layers as layers
 
 from orcanet.core import Organizer
 from orcanet.model_builder import ModelBuilder

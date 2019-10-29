@@ -1,6 +1,6 @@
-import keras as ks
-import keras.layers as layers
-import keras.backend as K
+import tensorflow.keras as ks
+import tensorflow.keras.layers as layers
+import tensorflow.keras.backend as K
 import inspect
 
 import orcanet.builder_util.layer_blocks as layer_blocks

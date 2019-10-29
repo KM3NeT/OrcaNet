@@ -1,7 +1,7 @@
 from unittest import TestCase
 import numpy as np
-import keras as ks
-import keras.layers as layers
+import tensorflow.keras as ks
+import tensorflow.keras.layers as layers
 from orcanet.model_builder import change_dropout_rate
 
 

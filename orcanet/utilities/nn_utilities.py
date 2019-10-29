@@ -5,7 +5,7 @@
 import numpy as np
 import h5py
 import os
-import keras as ks
+import tensorflow.keras as ks
 from functools import reduce
 
 
