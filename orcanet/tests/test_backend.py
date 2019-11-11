@@ -183,10 +183,11 @@ class TestTrainValidatePredict(TestCase):
 
         history = train_model(self.orga, self.model, epoch, batch_logger=False)
         target = {
-            'loss': 18.105025300188828,
-            'mc_A_loss': 9.569377424546753,
-            'mc_B_loss': 8.535647880004365,
+            'loss': 18.252520414646145,
+            'mc_A_loss': 9.569376,
+            'mc_B_loss': 8.535647,
         }
+        print(history, target)
         assert_dict_arrays_equal(history, target)
         self.assertSequenceEqual(batch_nos, list(range(int(self.file_sizes[0]/self.orga.cfg.batchsize))))
 

@@ -1,8 +1,9 @@
 import h5py
 import numpy as np
+import keras as ks
 
 
-class Hdf5BatchGenerator:
+class Hdf5BatchGenerator(ks.utils.Sequence):
     def __init__(self, files_dict,
                  batchsize=64,
                  key_x_values="x",
@@ -10,7 +11,6 @@ class Hdf5BatchGenerator:
                  sample_modifier=None,
                  label_modifier=None,
                  xs_mean=None,
-                 max_queue_size=10,
                  f_size=None,
                  keras_mode=True,
                  shuffle=False):
@@ -45,10 +45,6 @@ class Hdf5BatchGenerator:
             before they are fed into the model.
         xs_mean : ndarray or None
             Zero center image to be subtracted from data as preprocessing.
-        max_queue_size : int
-            max_queue_size option of the keras training and evaluation generator
-            methods. How many batches get preloaded
-            from the generator.
         f_size : int or None
             Specifies the number of samples to be read from the .h5 file.
             If none, the whole .h5 file will be used.
@@ -69,7 +65,6 @@ class Hdf5BatchGenerator:
         self.sample_modifier = sample_modifier
         self.label_modifier = label_modifier
         self.xs_mean = xs_mean
-        self.max_queue_size = max_queue_size
         self.f_size = f_size
         self.keras_mode = keras_mode
         self.shuffle = shuffle
@@ -79,23 +74,10 @@ class Hdf5BatchGenerator:
         self._files = {}
         # start index of each batch in the file
         self._sample_pos = None
-        # generator iteration counter
-        self._i = 0
+        # total number of samples per file
         self._total_f_size = None
 
         self.open()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        return self.next()
 
     def __len__(self):
         """ Number of batches in the Sequence (includes queue). """
@@ -150,17 +132,6 @@ class Hdf5BatchGenerator:
             return xs, ys
         else:
             return info_blob
-
-    def next(self):
-        """ Read another batch of data from the files.
-        """
-        try:
-            data = self[self._i]
-            self._i += 1
-            return data
-        except IndexError:
-            self.close()
-            raise StopIteration
 
     def open(self):
         """ Open all files and prepare for read out. """
@@ -270,9 +241,6 @@ class Hdf5BatchGenerator:
 
         if self.shuffle:
             np.random.shuffle(sample_pos)
-        # append some samples due to preloading by the fit_generator method
-        if self.max_queue_size is not None:
-            sample_pos = np.append(sample_pos, sample_pos[:self.max_queue_size])
 
         self._sample_pos = sample_pos
 
@@ -345,7 +313,6 @@ def get_h5_generator(orga, files_dict, f_size=None, zero_center=False,
         sample_modifier=orga.cfg.sample_modifier,
         label_modifier=label_modifier,
         xs_mean=xs_mean,
-        max_queue_size=orga.cfg.max_queue_size,
         f_size=f_size,
         keras_mode=keras_mode,
         shuffle=shuffle,

@@ -178,10 +178,10 @@ def save_actv_wghts_plot(orga, model, epoch, samples=1):
     plt.ioff()
 
     file = next(orga.io.yield_files("val"))
-    generator = get_h5_generator(
+    generator = iter(get_h5_generator(
         orga, file, f_size=samples,
         zero_center=orga.cfg.zero_center_folder is not None,
-        keras_mode=True)
+        keras_mode=True))
     xs, ys = next(generator)
 
     pdf_name_act = "{}/activations_epoch_{}_file_{}.pdf".format(
@@ -240,12 +240,12 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
     file_size = h5_get_number_of_rows(
         list(files_dict.values())[0],
         datasets=[orga.cfg.key_x_values])
-    generator = get_h5_generator(
+    generator = iter(get_h5_generator(
         orga,
         files_dict,
         zero_center=orga.cfg.zero_center_folder is not None,
         keras_mode=False,
-        use_def_label=use_def_label)
+        use_def_label=use_def_label))
 
     if samples is None:
         steps = int(file_size / batchsize)
