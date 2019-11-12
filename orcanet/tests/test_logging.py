@@ -257,7 +257,6 @@ def get_test_data(samples):
     MAE: 1/2
 
     """
-    dtypes = [('inp', '<f8'), ]
     xs = np.ones(samples,) * 0.5
-    ys = np.ones((samples, 1)).ravel().view(dtype=dtypes)
+    ys = np.ones((samples, 1))
     return xs, ys
