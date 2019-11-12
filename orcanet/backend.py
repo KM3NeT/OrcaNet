@@ -68,6 +68,7 @@ def train_model(orga, model, epoch, batch_logger=False):
         steps_per_epoch=int(f_size / orga.cfg.batchsize),
         verbose=orga.cfg.verbose_train,
         max_queue_size=orga.cfg.max_queue_size,
+        class_weight=orga.cfg.class_weight,
         callbacks=callbacks,
         initial_epoch=epoch[0] - 1,
         epochs=epoch[0],

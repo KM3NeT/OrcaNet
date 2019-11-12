@@ -591,6 +591,12 @@ class Configuration(object):
         the network.
     callback_train : keras callback or list or None
         Callback or list of callbacks to use during training.
+    class_weight : dict or None
+        class_weigth argument of fit_generator:
+        Optional dictionary mapping class indices (integers) to a weight
+        (float) value, used for weighting the loss function (during
+        training only). This can be useful to tell the model to
+        "pay more attention" to samples from an under-represented class.
     cleanup_models : bool
         If true, will only keep the best (in terms of val loss) and the most
         recent from all saved models in order to save disk space.
@@ -695,6 +701,7 @@ class Configuration(object):
         self.zero_center_folder = None
         self.validate_interval = None
         self.cleanup_models = False
+        self.class_weight = None
 
         self.sample_modifier = None
         self.dataset_modifier = None
