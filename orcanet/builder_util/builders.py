@@ -75,10 +75,6 @@ class BlockBuilder:
         for layer_config in body_configs:
             x = self.attach_block(x, layer_config)
 
-        model_body = ks.models.Model(input_layer, x)
-        last_b_layer = model_body.layers[-1]
-        last_b_layer.name = "BODYEND_" + last_b_layer.name
-
         if head_arch is None:
             outputs = x
 
