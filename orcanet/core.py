@@ -525,7 +525,7 @@ class Organizer:
                 try:
                     plots_folder = self.io.get_subfolder("plots", create=True)
                     ks.utils.plot_model(model, plots_folder + "/model_plot.png")
-                except OSError as e:
+                except ImportError as e:
                     warnings.warn("Can not plot model: " + str(e))
 
         else:
