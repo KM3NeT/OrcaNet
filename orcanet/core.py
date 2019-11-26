@@ -398,26 +398,36 @@ class Organizer:
 
     def cleanup_models(self):
         """
-        Delete all models except for the best (lowest val loss) and
-        the most recent one.
+        Delete all models except for the the most recent one (to continue
+        training), and the ones with the highest and lowest loss/metrics.
 
         """
         all_epochs = self.io.get_all_epochs()
-        latest_epoch = self.io.get_latest_epoch()
+        epochs_to_keep = {self.io.get_latest_epoch(), }
         try:
-            best_epoch = self.history.get_best_epoch_fileno(metric="val_loss")
+            for metric in self.history.get_metrics():
+                epochs_to_keep.add(
+                    self.history.get_best_epoch_fileno(
+                        metric=f"val_{metric}", mini=True))
+                epochs_to_keep.add(
+                    self.history.get_best_epoch_fileno(
+                        metric=f"val_{metric}", mini=False))
         except ValueError:
             # no best epoch exists
-            best_epoch = latest_epoch
+            pass
 
-        assert best_epoch in all_epochs, "best_epoch not in all_epochs"
-        assert latest_epoch in all_epochs, "latest_epoch not in all_epochs"
+        for epoch in epochs_to_keep:
+            if epoch not in all_epochs:
+                warnings.warn(
+                    f"ERROR: keeping_epoch {epoch} not in available epochs {all_epochs}, "
+                    f"skipping clean-up of models!")
+                return
 
         print("\nClean-up saved models:")
         for epoch in all_epochs:
             model_path = self.io.get_model_path(epoch[0], epoch[1])
             model_name = os.path.basename(model_path)
-            if epoch == best_epoch or epoch == latest_epoch:
+            if epoch in epochs_to_keep:
                 print("Keeping model {}".format(model_name))
             else:
                 print("Deleting model {}".format(model_name))
