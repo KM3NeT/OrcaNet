@@ -66,16 +66,11 @@ class ConvBlock:
         if self.dropout is not None and self.sdropout is not None:
             raise ValueError("Can only use either dropout or spatial "
                              "dropout, not both")
-        if self.conv_dim == 2:
-            convolution_nd = layers.Convolution2D
-            max_pooling_nd = layers.MaxPooling2D
-            s_dropout_nd = layers.SpatialDropout2D
-        elif self.conv_dim == 3:
-            convolution_nd = layers.Convolution3D
-            max_pooling_nd = layers.MaxPooling3D
-            s_dropout_nd = layers.SpatialDropout3D
-        else:
-            raise ValueError('dim must be equal to 2 or 3.')
+
+        dim_layers = _get_dimensional_layers(self.conv_dim)
+        convolution_nd = dim_layers["convolution"]
+        max_pooling_nd = dim_layers["max_pooling"]
+        s_dropout_nd = dim_layers["s_dropout"]
 
         if self.kernel_l2_reg is not None:
             kernel_reg = ks.regularizers.l2(self.kernel_l2_reg)
@@ -325,6 +320,80 @@ class ResnetBnetBlock:
         return x
 
 
+class InceptionBlock:
+    def __init__(self,
+                 conv_dim,
+                 filters_1x1,
+                 filters_pool,
+                 filters_3x3,
+                 filters_3x3dbl,
+                 batchnorm=False,
+                 dropout=None):
+        """
+        A GoogleNet Inception block (v2).
+        https://arxiv.org/pdf/1512.00567v3.pdf, see fig. 5.
+
+        Parameters
+        ----------
+        conv_dim : int
+            Specifies the dimension of the convolutional block, 2D/3D.
+        filters_1x1 : int
+            No. of filters for the 1x1 convolutional branch.
+        filters_pool : int
+            No. of filters for the pooling branch.
+        filters_3x3 : tuple
+            No. of filters for the 3x3 convolutional branch. First int
+            is the filters in the 1x1 conv, second int for the 3x3 conv.
+        filters_3x3dbl : tuple
+            No. of filters for the 3x3 convolutional branch. First int
+            is the filters in the 1x1 conv, second int for the two 3x3 convs.
+
+        """
+        self.filters_1x1 = filters_1x1  # 64
+        self.filters_pool = filters_pool  # 64
+        self.filters_3x3 = filters_3x3  # 48, 64
+        self.filters_3x3dbl = filters_3x3dbl  # 64, 96
+        self.conv_options = {
+            "conv_dim": conv_dim,
+            "dropout": dropout,
+            "batchnorm": batchnorm,
+        }
+
+    def __call__(self, inputs):
+        # 1x1 convolution
+        branch1x1 = ConvBlock(
+            filters=self.filters_1x1, kernel_size=(1, 1), **self.conv_options)(inputs)
+
+        # pooling
+        max_pooling_nd = _get_dimensional_layers(
+            self.conv_options["conv_dim"])["max_pooling"]
+        branch_pool = max_pooling_nd(
+            pool_size=(3, 3), strides=(1, 1),  padding='same')(inputs)
+        branch_pool = ConvBlock(
+            filters=self.filters_pool, kernel_size=(1, 1), **self.conv_options)(branch_pool)
+
+        # 3x3 convolution
+        branch3x3 = ConvBlock(
+            filters=self.filters_3x3[0], kernel_size=(1, 1), **self.conv_options)(inputs)
+        branch3x3 = ConvBlock(
+            filters=self.filters_3x3[1], kernel_size=(3, 3), **self.conv_options)(branch3x3)
+
+        # 5x5 convolution
+        branch3x3dbl = ConvBlock(
+            filters=self.filters_3x3dbl[0], kernel_size=(1, 1), **self.conv_options)(inputs)
+        branch3x3dbl = ConvBlock(
+            filters=self.filters_3x3dbl[1], kernel_size=(3, 3), **self.conv_options)(branch3x3dbl)
+        branch3x3dbl = ConvBlock(
+            filters=self.filters_3x3dbl[1], kernel_size=(3, 3), **self.conv_options)(branch3x3dbl)
+
+        # concatenate all branches
+        channel_axis = 1 if ks.backend.image_data_format() == "channels_first" else -1
+        x = layers.concatenate(
+            [branch1x1, branch_pool, branch3x3, branch3x3dbl],
+            axis=channel_axis)
+        return x
+
+
 def input_block(input_shapes):
     """
     Build input layers according to a dict mapping the layer names to shapes.
@@ -346,3 +415,17 @@ def input_block(input_shapes):
         inputs.append(layers.Input(
             shape=input_shape, name=input_name, dtype=ks.backend.floatx()))
     return inputs
+
+
+def _get_dimensional_layers(dim):
+    if dim not in (2, 3):
+        raise ValueError(f'Dimension must be 2 or 3, not {dim}')
+    dim_layers = {
+        "convolution": {
+            2: layers.Convolution2D, 3: layers.Convolution3D},
+        "max_pooling": {
+            2: layers.MaxPooling2D, 3: layers.MaxPooling3D},
+        "s_dropout": {
+            2: layers.SpatialDropout2D, 3: layers.SpatialDropout3D}
+    }
+    return {layer_type: dim_layers[layer_type][dim] for layer_type in dim_layers.keys()}
