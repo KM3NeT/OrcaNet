@@ -29,7 +29,7 @@ class BlockBuilder:
             "dense_block": layer_blocks.DenseBlock,
             "resnet_block": layer_blocks.ResnetBlock,
             "resnet_bneck_block": layer_blocks.ResnetBnetBlock,
-            "inception_block": layer_blocks.InceptionBlock,
+            "inception_block_v2": layer_blocks.InceptionBlockV2,
         }
 
         self._check_arguments(body_defaults)

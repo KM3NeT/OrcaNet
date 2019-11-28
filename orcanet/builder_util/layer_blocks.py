@@ -320,7 +320,7 @@ class ResnetBnetBlock:
         return x
 
 
-class InceptionBlock:
+class InceptionBlockV2:
     def __init__(self,
                  conv_dim,
                  filters_1x1,
@@ -378,7 +378,7 @@ class InceptionBlock:
         branch3x3 = ConvBlock(
             filters=self.filters_3x3[1], kernel_size=(3, 3), **self.conv_options)(branch3x3)
 
-        # 5x5 convolution
+        # double 3x3 convolution
         branch3x3dbl = ConvBlock(
             filters=self.filters_3x3dbl[0], kernel_size=(1, 1), **self.conv_options)(inputs)
         branch3x3dbl = ConvBlock(
