@@ -327,32 +327,46 @@ class InceptionBlockV2:
                  filters_pool,
                  filters_3x3,
                  filters_3x3dbl,
+                 strides=1,
                  batchnorm=False,
                  dropout=None):
         """
         A GoogleNet Inception block (v2).
         https://arxiv.org/pdf/1512.00567v3.pdf, see fig. 5.
+        Keras implementation, e.g.:
+        https://github.com/keras-team/keras-applications/blob/master/keras_applications/inception_resnet_v2.py
 
         Parameters
         ----------
         conv_dim : int
             Specifies the dimension of the convolutional block, 2D/3D.
-        filters_1x1 : int
+        filters_1x1 : int or None
             No. of filters for the 1x1 convolutional branch.
-        filters_pool : int
+            If None, dont make this branch.
+        filters_pool : int or None
             No. of filters for the pooling branch.
-        filters_3x3 : tuple
+            If None, dont make this branch.
+        filters_3x3 : tuple or None
             No. of filters for the 3x3 convolutional branch. First int
             is the filters in the 1x1 conv, second int for the 3x3 conv.
-        filters_3x3dbl : tuple
+            First should be chosen smaller for computational efficiency.
+            If None, dont make this branch.
+        filters_3x3dbl : tuple or None
             No. of filters for the 3x3 convolutional branch. First int
             is the filters in the 1x1 conv, second int for the two 3x3 convs.
+            First should be chosen smaller for computational efficiency.
+            If None, dont make this branch.
+        strides : int or tuple
+            Stride length of this block.
+            Like in the keras implementation, no 1x1 convs with stride > 1
+            will be used, instead they will be skipped.
 
         """
         self.filters_1x1 = filters_1x1  # 64
         self.filters_pool = filters_pool  # 64
         self.filters_3x3 = filters_3x3  # 48, 64
         self.filters_3x3dbl = filters_3x3dbl  # 64, 96
+        self.strides = strides
         self.conv_options = {
             "conv_dim": conv_dim,
             "dropout": dropout,
@@ -360,37 +374,52 @@ class InceptionBlockV2:
         }
 
     def __call__(self, inputs):
+        branches = []
         # 1x1 convolution
-        branch1x1 = ConvBlock(
-            filters=self.filters_1x1, kernel_size=(1, 1), **self.conv_options)(inputs)
+        if self.filters_1x1 and self.strides == 1:
+            branch1x1 = ConvBlock(
+                filters=self.filters_1x1, kernel_size=1,
+                strides=self.strides, **self.conv_options)(inputs)
+            branches.append(branch1x1)
 
         # pooling
-        max_pooling_nd = _get_dimensional_layers(
-            self.conv_options["conv_dim"])["max_pooling"]
-        branch_pool = max_pooling_nd(
-            pool_size=(3, 3), strides=(1, 1),  padding='same')(inputs)
-        branch_pool = ConvBlock(
-            filters=self.filters_pool, kernel_size=(1, 1), **self.conv_options)(branch_pool)
+        if self.filters_pool:
+            max_pooling_nd = _get_dimensional_layers(
+                self.conv_options["conv_dim"])["max_pooling"]
+            branch_pool = max_pooling_nd(
+                pool_size=3, strides=self.strides,  padding='same')(inputs)
+            if self.strides == 1:
+                branch_pool = ConvBlock(
+                    filters=self.filters_pool, kernel_size=1,
+                    **self.conv_options)(branch_pool)
+            branches.append(branch_pool)
 
         # 3x3 convolution
-        branch3x3 = ConvBlock(
-            filters=self.filters_3x3[0], kernel_size=(1, 1), **self.conv_options)(inputs)
-        branch3x3 = ConvBlock(
-            filters=self.filters_3x3[1], kernel_size=(3, 3), **self.conv_options)(branch3x3)
+        if self.filters_3x3:
+            branch3x3 = ConvBlock(
+                filters=self.filters_3x3[0], kernel_size=1,
+                **self.conv_options)(inputs)
+            branch3x3 = ConvBlock(
+                filters=self.filters_3x3[1], kernel_size=3,
+                strides=self.strides, **self.conv_options)(branch3x3)
+            branches.append(branch3x3)
 
         # double 3x3 convolution
-        branch3x3dbl = ConvBlock(
-            filters=self.filters_3x3dbl[0], kernel_size=(1, 1), **self.conv_options)(inputs)
-        branch3x3dbl = ConvBlock(
-            filters=self.filters_3x3dbl[1], kernel_size=(3, 3), **self.conv_options)(branch3x3dbl)
-        branch3x3dbl = ConvBlock(
-            filters=self.filters_3x3dbl[1], kernel_size=(3, 3), **self.conv_options)(branch3x3dbl)
+        if self.filters_3x3dbl:
+            branch3x3dbl = ConvBlock(
+                filters=self.filters_3x3dbl[0], kernel_size=1,
+                **self.conv_options)(inputs)
+            branch3x3dbl = ConvBlock(
+                filters=self.filters_3x3dbl[1], kernel_size=1,
+                **self.conv_options)(branch3x3dbl)
+            branch3x3dbl = ConvBlock(
+                filters=self.filters_3x3dbl[1], kernel_size=1,
+                strides=self.strides, **self.conv_options)(branch3x3dbl)
+            branches.append(branch3x3dbl)
 
         # concatenate all branches
         channel_axis = 1 if ks.backend.image_data_format() == "channels_first" else -1
-        x = layers.concatenate(
-            [branch1x1, branch_pool, branch3x3, branch3x3dbl],
-            axis=channel_axis)
+        x = layers.concatenate(branches, axis=channel_axis)
         return x
 
 
