@@ -31,7 +31,9 @@ class BlockBuilder:
             "resnet_block": layer_blocks.ResnetBlock,
             "resnet_bneck_block": layer_blocks.ResnetBnetBlock,
             "inception_block_v2": layer_blocks.InceptionBlockV2,
-            "cudnn_lstm": layers.CuDNNLSTM,
+            "lstm": layers.LSTM,
+            # TODO CudNNLSTM throws error, use LSTM for now
+            #   switch to tf.keras should fix this
         }
 
         self._check_arguments(body_defaults)
@@ -301,9 +303,7 @@ class BlockBuilder:
             raise KeyError("No layer block type specified")
 
         block = self._get_blocks(block_name)
-        args = inspect.getfullargspec(block).args
-        if "self" in args:
-            args.remove("self")
+        args = list(inspect.signature(block).parameters.keys())
 
         if defaults is not None:
             for key, val in defaults.items():
@@ -329,9 +329,9 @@ class BlockBuilder:
         # possible arguments for all blocks
         psb_args = ["type", ]
         for block in self._get_blocks().values():
-            args = inspect.getfullargspec(block).args
+            args = list(inspect.signature(block).parameters.keys())
             for arg in args:
-                if arg not in psb_args and arg != "self":
+                if arg not in psb_args and arg != "kwargs":
                     psb_args.append(arg)
 
         for t_def in defaults.keys():

@@ -117,12 +117,21 @@ class TestSequentialBuilder(TestCase):
         with self.assertRaises(TypeError):
             builder.attach_block(inp, layer_config)
 
-    """
     def test_attach_layer_cudnn_lstm(self):
-        inp = layers.Input((10, 1))
-        body_defaults = {"type": "conv_block", "conv_dim": 3, "return_state": False}
-        layer_config = {"type": "cudnn_lstm", "units": 5}
+        body_defaults = {"type": "conv_block", "conv_dim": 3, "recurrent_activation": "relu"}
+        layer_config = {"type": "lstm", "units": 5, "activation": "relu"}
         builder = BlockBuilder(body_defaults=body_defaults, head_defaults=None)
 
+        inp = layers.Input((10, 1))
         x = builder.attach_block(inp, layer_config)
-    """
+        model = Model(inp, x)
+
+        self.assertSequenceEqual(model.output_shape, (None, 5))
+        check_these_in_config = {
+            "units": 5,
+            "recurrent_activation": "relu",
+            "activation": "relu",
+        }
+        cfg = model.layers[-1].get_config()
+        for k, v in check_these_in_config.items():
+            self.assertEqual(cfg[k], v)
