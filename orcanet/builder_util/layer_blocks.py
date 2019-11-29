@@ -14,7 +14,8 @@ class ConvBlock:
                  activation='relu',
                  kernel_l2_reg=None,
                  batchnorm=False,
-                 kernel_initializer="he_normal"):
+                 kernel_initializer="he_normal",
+                 time_distributed=False):
         """
         2D/3D Convolutional block followed by BatchNorm, Activation,
         MaxPooling and/or Dropout.
@@ -26,15 +27,18 @@ class ConvBlock:
         filters : int
             Number of filters used for the convolutional layer.
         strides : int or tuple
-            The stride length of the convolution
+            The stride length of the convolution.
         kernel_size : int or tuple
             Kernel size which is used for all three dimensions.
-        pool_size : None or tuple
+        pool_size : None or int or tuple
             Specifies if a MaxPooling layer should be added. e.g. (1,1,2)
             -> sizes for a 3D conv block.
+        pool_padding : str
+            Padding option of the pooling layer.
         dropout : float or None
             Adds a dropout layer if the value is not None.
             Can not be used together with sdropout.
+            Hint: 0 will add a dropout layer, but with a rate of 0 (=no dropout).
         sdropout : float or None
             Adds a spatial dropout layer if the value is not None.
             Can not be used together with dropout.
@@ -47,6 +51,8 @@ class ConvBlock:
             Adds a batch normalization layer.
         kernel_initializer : string
             Initializer for the kernel weights.
+        time_distributed : bool
+            If True, apply the TimeDistributed Wrapper around all layers.
 
         """
         self.conv_dim = conv_dim
@@ -61,6 +67,7 @@ class ConvBlock:
         self.kernel_l2_reg = kernel_l2_reg
         self.batchnorm = batchnorm
         self.kernel_initializer = kernel_initializer
+        self.time_distributed = time_distributed
 
     def __call__(self, inputs):
         if self.dropout is not None and self.sdropout is not None:
@@ -82,27 +89,35 @@ class ConvBlock:
         else:
             use_bias = True
 
-        x = convolution_nd(filters=self.filters,
-                           kernel_size=self.kernel_size,
-                           strides=self.strides,
-                           padding='same',
-                           kernel_initializer=self.kernel_initializer,
-                           use_bias=use_bias,
-                           kernel_regularizer=kernel_reg)(inputs)
-
+        block_layers = list()
+        block_layers.append(convolution_nd(
+            filters=self.filters,
+            kernel_size=self.kernel_size,
+            strides=self.strides,
+            padding='same',
+            kernel_initializer=self.kernel_initializer,
+            use_bias=use_bias,
+            kernel_regularizer=kernel_reg)
+        )
         if self.batchnorm:
             channel_axis = 1 if ks.backend.image_data_format() == "channels_first" else -1
-            x = layers.BatchNormalization(axis=channel_axis)(x)
+            block_layers.append(layers.BatchNormalization(axis=channel_axis))
         if self.activation is not None:
-            x = layers.Activation(self.activation)(x)
+            block_layers.append(layers.Activation(self.activation))
         if self.pool_size is not None:
-            x = max_pooling_nd(pool_size=self.pool_size,
-                               padding=self.pool_padding)(x)
+            block_layers.append(max_pooling_nd(
+                pool_size=self.pool_size, padding=self.pool_padding))
         if self.dropout is not None:
-            x = layers.Dropout(self.dropout)(x)
+            block_layers.append(layers.Dropout(self.dropout))
         elif self.sdropout is not None:
-            x = s_dropout_nd(self.sdropout)(x)
+            block_layers.append(s_dropout_nd(self.sdropout))
 
+        x = inputs
+        for block_layer in block_layers:
+            if self.time_distributed:
+                x = layers.TimeDistributed(block_layer)(x)
+            else:
+                x = block_layer(x)
         return x
 
 

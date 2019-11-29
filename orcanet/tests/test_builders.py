@@ -117,3 +117,12 @@ class TestSequentialBuilder(TestCase):
         with self.assertRaises(TypeError):
             builder.attach_block(inp, layer_config)
 
+    """
+    def test_attach_layer_cudnn_lstm(self):
+        inp = layers.Input((10, 1))
+        body_defaults = {"type": "conv_block", "conv_dim": 3, "return_state": False}
+        layer_config = {"type": "cudnn_lstm", "units": 5}
+        builder = BlockBuilder(body_defaults=body_defaults, head_defaults=None)
+
+        x = builder.attach_block(inp, layer_config)
+    """

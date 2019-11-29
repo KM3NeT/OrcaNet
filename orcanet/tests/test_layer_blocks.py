@@ -79,3 +79,52 @@ class TestInceptionBlockV2(TestCase):
         )(self.inp_2d)
         self.assertEqual(
             Model(self.inp_2d, x).count_params(), 436)
+
+
+class TestCaonvBlock(TestCase):
+    def setUp(self):
+        self.inp_2d = layers.Input(shape=(9, 10, 1))
+        self.inp_3d = layers.Input(shape=(8, 9, 10, 1))
+
+    def test_2d(self):
+        x = layer_blocks.ConvBlock(
+            conv_dim=2,
+            filters=11,
+            dropout=0.2,
+            pool_size=2,
+        )(self.inp_2d)
+        model = Model(self.inp_2d, x)
+
+        self.assertEqual(model.count_params(), 110)
+        self.assertSequenceEqual(model.output_shape, (None, 4, 5, 11))
+        target_layers = (
+            layers.InputLayer,
+            layers.Conv2D,
+            layers.Activation,
+            layers.MaxPool2D,
+            layers.Dropout,
+        )
+        for layer, target_layer in zip(model.layers, target_layers):
+            self.assertIsInstance(layer, target_layer)
+
+    def test_2d_time_distributed(self):
+        x = layer_blocks.ConvBlock(
+            conv_dim=2,
+            filters=11,
+            dropout=0.2,
+            pool_size=2,
+            time_distributed=True,
+        )(self.inp_3d)
+        model = Model(self.inp_3d, x)
+
+        self.assertEqual(model.count_params(), 110)
+        self.assertSequenceEqual(model.output_shape, (None, 8, 4, 5, 11))
+        target_layers = (
+            layers.InputLayer,
+            layers.TimeDistributed,
+            layers.TimeDistributed,
+            layers.TimeDistributed,
+            layers.TimeDistributed,
+        )
+        for layer, target_layer in zip(model.layers, target_layers):
+            self.assertIsInstance(layer, target_layer)

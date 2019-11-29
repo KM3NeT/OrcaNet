@@ -16,7 +16,7 @@ from orcanet.utilities.visualization import update_summary_plot
 from orcanet.in_out import IOHandler
 from orcanet.history import HistoryHandler
 from orcanet.utilities.nn_utilities import load_zero_center_data, get_auto_label_modifier
-from orcanet.logging import log_start_training, SummaryLogger, log_start_validation
+import orcanet.logging as olog
 
 
 class Organizer:
@@ -172,7 +172,7 @@ class Organizer:
 
         if latest_epoch is None:
             self.io.check_connections(model)
-            log_start_training(self)
+            olog.log_start_training(self)
 
         model_path = self.io.get_model_path(*next_epoch)
         model_path_local = self.io.get_model_path(*next_epoch, local=True)
@@ -181,7 +181,7 @@ class Organizer:
                 "Can not train model in epoch {} file {}, this model has "
                 "already been saved!".format(*next_epoch))
 
-        smry_logger = SummaryLogger(self, model)
+        smry_logger = olog.SummaryLogger(self, model)
 
         lr = self.io.get_learning_rate(next_epoch)
         ks.backend.set_value(model.optimizer.lr, lr)
@@ -219,7 +219,7 @@ class Organizer:
 
         return history
 
-    def validate(self):
+    def validate(self, make_weight_plots=True):
         """
         Validate the most recent saved model on all validation files.
 
@@ -231,6 +231,9 @@ class Organizer:
         history : dict
             The history of the validation on all files. A record of validation
             loss values and metrics values.
+        make_weight_plots : bool
+            If true, generate and save plots of the activations and weights of
+            the network to the 'plots/' subfolder.
 
         """
         latest_epoch = self.io.get_latest_epoch()
@@ -248,9 +251,9 @@ class Organizer:
         self._set_up(model, logging=True)
 
         epoch_float = self.io.get_epoch_float(*latest_epoch)
-        smry_logger = SummaryLogger(self, model)
+        smry_logger = olog.SummaryLogger(self, model)
 
-        log_start_validation(self)
+        olog.log_start_validation(self)
 
         start_time = time.time()
         history = backend.validate_model(self, model)
@@ -258,14 +261,14 @@ class Organizer:
 
         self.io.print_log('Validation results:')
         for metric_name, loss in history.items():
-            self.io.print_log("   {}: \t{}".format(metric_name, loss))
-        self.io.print_log("Elapsed time: {}\n".format(timedelta(seconds=elapsed_s)))
+            self.io.print_log(f"   {metric_name}: \t{loss}")
+        self.io.print_log(f"Elapsed time: {timedelta(seconds=elapsed_s)}\n")
         smry_logger.write_line(epoch_float, "n/a", history_val=history)
 
         update_summary_plot(self)
-        backend.save_actv_wghts_plot(self, model,
-                                     latest_epoch,
-                                     samples=self.cfg.batchsize)
+        if make_weight_plots:
+            backend.save_actv_wghts_plot(
+                self, model, latest_epoch, samples=self.cfg.batchsize)
 
         if self.cfg.cleanup_models:
             self.cleanup_models()
@@ -300,7 +303,7 @@ class Organizer:
         """
         if fileno is None and epoch is None:
             epoch, fileno = self.history.get_best_epoch_fileno()
-            print("Automatically set epoch to epoch {} file {}.".format(epoch, fileno))
+            print(f"Automatically set epoch to epoch {epoch} file {fileno}.")
         elif fileno is None or epoch is None:
             raise ValueError(
                 "Either both or none of epoch and fileno must be None")

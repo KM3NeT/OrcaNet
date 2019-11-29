@@ -24,12 +24,14 @@ class BlockBuilder:
     def __init__(self, body_defaults=None, head_defaults=None):
         """ Set dicts with default values for the layers of the model.
         """
+        # dict with toml keyword vs block for all blocks that can be used
         self.all_blocks = {
             "conv_block": layer_blocks.ConvBlock,
             "dense_block": layer_blocks.DenseBlock,
             "resnet_block": layer_blocks.ResnetBlock,
             "resnet_bneck_block": layer_blocks.ResnetBnetBlock,
             "inception_block_v2": layer_blocks.InceptionBlockV2,
+            "cudnn_lstm": layers.CuDNNLSTM,
         }
 
         self._check_arguments(body_defaults)
