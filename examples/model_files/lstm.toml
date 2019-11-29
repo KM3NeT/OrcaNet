@@ -1,0 +1,23 @@
+# A small lstm network.
+[body]
+conv_dim = 2
+kernel_size = 3
+
+blocks = [
+    # here, input should be 3 dimensional, time on first axis!
+    {type="conv_block", filters=32, time_distributed=true},
+    {type="keras:Flatten"},  # TODO has to be time distributed gpool!
+    {type="keras:LSTM", units=10},
+]
+
+# ----------------------------------------------------------------------
+[head]
+architecture = "regression_error"
+architecture_args = {output_names=['a']}
+
+# ----------------------------------------------------------------------
+[compile]
+optimizer = "adam"
+
+[compile.losses]
+a = {function="mse"}

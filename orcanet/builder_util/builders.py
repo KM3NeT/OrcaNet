@@ -24,16 +24,13 @@ class BlockBuilder:
     def __init__(self, body_defaults=None, head_defaults=None):
         """ Set dicts with default values for the layers of the model.
         """
-        # dict with toml keyword vs block for all blocks that can be used
+        # dict with toml keyword vs block for all custom blocks
         self.all_blocks = {
             "conv_block": layer_blocks.ConvBlock,
             "dense_block": layer_blocks.DenseBlock,
             "resnet_block": layer_blocks.ResnetBlock,
             "resnet_bneck_block": layer_blocks.ResnetBnetBlock,
             "inception_block_v2": layer_blocks.InceptionBlockV2,
-            "lstm": layers.LSTM,
-            # TODO CudNNLSTM throws error, use LSTM for now
-            #   switch to tf.keras should fix this
         }
 
         self._check_arguments(body_defaults)
@@ -316,6 +313,8 @@ class BlockBuilder:
         """ Get the block class/function depending on the name. """
         if name is None:
             return self.all_blocks
+        elif name.startswith("keras:"):
+            return getattr(ks.layers, name.split("keras:")[1])
         elif name in self.all_blocks:
             return self.all_blocks[name]
         else:
@@ -336,4 +335,5 @@ class BlockBuilder:
 
         for t_def in defaults.keys():
             if t_def not in psb_args:
-                raise NameError("Unknown argument: " + str(t_def))
+                raise NameError(
+                    f"Unknown default argument: {t_def} (has to appear in a block)")

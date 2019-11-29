@@ -47,6 +47,20 @@ class TestSequentialBuilder(TestCase):
         orga.cfg.custom_objects = get_custom_objects()
         model = mb.build(orga)
 
+    def test_inception(self):
+        toml_file = "inception.toml"
+
+        model_file = os.path.join(self.example_dir, toml_file)
+        mb = orcanet.model_builder.ModelBuilder(model_file)
+        model = mb.build(self.get_orga(dims=2))
+
+    def test_lstm(self):
+        toml_file = "lstm.toml"
+
+        model_file = os.path.join(self.example_dir, toml_file)
+        mb = orcanet.model_builder.ModelBuilder(model_file)
+        model = mb.build(self.get_orga(dims=3))
+
 
 def get_input_shapes_3d():
     dims = (10, 10, 10, 1)

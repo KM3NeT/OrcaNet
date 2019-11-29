@@ -90,7 +90,7 @@ class ModelBuilder:
 
     def build(self, orga, log_comp_opts=False):
         """
-        Build the network.
+        Build the network using an instance of Organizer.
 
         Input layers will be adapted to the input files in the organizer.
         Can also add the matching modifiers and custom objects to the orga.
@@ -109,9 +109,36 @@ class ModelBuilder:
             The network.
 
         """
-        input_shapes = orga.io.get_input_shapes()
-        custom_objects = orga.cfg.custom_objects
+        model = self.build_with_input(
+            orga.io.get_input_shapes(),
+            compile_model=True,
+            custom_objects=orga.cfg.custom_objects,
+        )
+        if log_comp_opts:
+            self.log_model_properties(orga)
+        model.summary()
+        return model
 
+    def build_with_input(self, input_shapes, compile_model=True, custom_objects=None):
+        """
+        Build the network with given input shapes.
+
+        Parameters
+        ----------
+        input_shapes : dict
+            Keys: Name of the inputs of the model.
+            Values: Their shape without the batchsize.
+        compile_model : bool
+            Compile the model?
+        custom_objects : dict, optional
+            Custom objects to use during compiling.
+
+        Returns
+        -------
+        model : keras model
+            The network.
+
+        """
         if self.body_arch == "single":
             # Build a single input network
             if len(input_shapes) is not 1:
@@ -159,15 +186,9 @@ class ModelBuilder:
         else:
             raise NameError("Unknown architecture: ", self.body_arch)
 
-        """
-        if n_gpu is not None:
-            model, orga.cfg.batchsize = parallelize_model(model, n_gpu,
-                                                          orga.cfg.batchsize)
-        """
-        self.compile_model(model, custom_objects)
-        if log_comp_opts:
-            self.log_model_properties(orga)
-        model.summary()
+        if compile_model:
+            self.compile_model(model, custom_objects=custom_objects)
+
         return model
 
     def merge_models(self, model_list, trainable=False, stateful=True,

@@ -119,7 +119,7 @@ class TestSequentialBuilder(TestCase):
 
     def test_attach_layer_cudnn_lstm(self):
         body_defaults = {"type": "conv_block", "conv_dim": 3, "recurrent_activation": "relu"}
-        layer_config = {"type": "lstm", "units": 5, "activation": "relu"}
+        layer_config = {"type": "keras:LSTM", "units": 5, "activation": "relu"}
         builder = BlockBuilder(body_defaults=body_defaults, head_defaults=None)
 
         inp = layers.Input((10, 1))

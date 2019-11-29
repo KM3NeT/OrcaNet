@@ -343,6 +343,7 @@ class InceptionBlockV2:
                  filters_3x3,
                  filters_3x3dbl,
                  strides=1,
+                 activation="relu",
                  batchnorm=False,
                  dropout=None):
         """
@@ -386,6 +387,7 @@ class InceptionBlockV2:
             "conv_dim": conv_dim,
             "dropout": dropout,
             "batchnorm": batchnorm,
+            "activation": activation,
         }
 
     def __call__(self, inputs):
