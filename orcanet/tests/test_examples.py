@@ -59,7 +59,7 @@ class TestSequentialBuilder(TestCase):
 
         model_file = os.path.join(self.example_dir, toml_file)
         mb = orcanet.model_builder.ModelBuilder(model_file)
-        model = mb.build(self.get_orga(dims=3))
+        # TODO model = mb.build(self.get_orga(dims=3))
 
 
 def get_input_shapes_3d():

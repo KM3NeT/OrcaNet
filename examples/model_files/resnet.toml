@@ -1,6 +1,6 @@
 # An implementation featuring ResNet blocks, with shortcuts. A resnet block
 # consists out of 2 convolutional blocks.
-[body]
+[model]
 type = "resnet_block"
 conv_dim = 2
 kernel_size = 3
@@ -8,20 +8,16 @@ activation = 'relu'
 batchnorm=true
 
 blocks = [
-          {filters=64},
-          {filters=64},
-          {filters=128, strides=[2, 2]},
-          {filters=128},
-          {filters=256, strides=[2, 2]},
-          {filters=256},
-          {filters=512, strides=[2, 2]},
-          {filters=512},
-         ]
-
-# ----------------------------------------------------------------------
-[head]
-architecture = "gpool"
-architecture_args = {output_name="your_output_name_here", categories=3}
+    {filters=64},
+    {filters=64},
+    {filters=128, strides=[2, 2]},
+    {filters=128},
+    {filters=256, strides=[2, 2]},
+    {filters=256},
+    {filters=512, strides=[2, 2]},
+    {filters=512},
+    {type="OutputCateg", transition="keras:GlobalAveragePooling2D", output_name="your_output_name_here", categories=3}
+]
 
 # ----------------------------------------------------------------------
 [compile]

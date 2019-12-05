@@ -44,26 +44,26 @@ class TestModel(TestCase):
         self.assertEqual(len(model.layers), 14)
         self.assertEqual(model.optimizer.epsilon, 0.2)
 
-    def test_merge_models(self):
-        def build_model(inp_layer_name, inp_shape):
-            inp = layers.Input(inp_shape, name=inp_layer_name)
-            x = layers.Convolution3D(3, 3)(inp)
-            x = layers.Flatten()(x)
-            out = layers.Dense(1, name="out_0")(x)
-
-            model = Model(inp, out)
-            return model
-
-        model_file = os.path.join(self.data_folder, self.model_file)
-        builder = ModelBuilder(model_file)
-        model1 = build_model("inp_A", self.input_shapes["input_A"])
-        model2 = build_model("inp_B", self.input_shapes["input_A"])
-        merged_model = builder.merge_models([model1, model2])
-
-        for layer in model1.layers + model2.layers:
-            if isinstance(layer, layers.Dense):
-                continue
-            merged_layer = merged_model.get_layer(layer.name)
-            for i in range(len(layer.get_weights())):
-                self.assertTrue(np.array_equal(layer.get_weights()[i],
-                                               merged_layer.get_weights()[i]))
+    # def test_merge_models(self):
+    #     def build_model(inp_layer_name, inp_shape):
+    #         inp = layers.Input(inp_shape, name=inp_layer_name)
+    #         x = layers.Convolution3D(3, 3)(inp)
+    #         x = layers.Flatten()(x)
+    #         out = layers.Dense(1, name="out_0")(x)
+    #
+    #         model = Model(inp, out)
+    #         return model
+    #
+    #     model_file = os.path.join(self.data_folder, self.model_file)
+    #     builder = ModelBuilder(model_file)
+    #     model1 = build_model("inp_A", self.input_shapes["input_A"])
+    #     model2 = build_model("inp_B", self.input_shapes["input_A"])
+    #     merged_model = builder.merge_models([model1, model2])
+    #
+    #     for layer in model1.layers + model2.layers:
+    #         if isinstance(layer, layers.Dense):
+    #             continue
+    #         merged_layer = merged_model.get_layer(layer.name)
+    #         for i in range(len(layer.get_weights())):
+    #             self.assertTrue(np.array_equal(layer.get_weights()[i],
+    #                                            merged_layer.get_weights()[i]))

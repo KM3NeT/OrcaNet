@@ -2,11 +2,10 @@
 # compiled keras model, adapted to the input data given to the Organizer.
 # This is not required to use orca_train, as any model can be used for that.
 #
-# The model itself is defined by a "body" section, consisting of a
-# sequential arrangement of predefined layer blocks, and a "head" section,
-# which produces the output. E.g., the body might consist of convolutional
+# The model itself consists of a
+# sequence of predefined layer blocks. E.g., the model might consist of convolutional
 # layer blocks (convolution, BatchNorm, Activation, MaxPooling and/or Dropout),
-# and the head might be a flatten layer followed by some dense layer blocks,
+# and end with a special last block, e.g. a flatten layer followed by some dense layer blocks,
 # which produce a categorical output.
 #
 # Info for compiling the model is given in the section [compile]. This includes
@@ -14,15 +13,11 @@
 # of the network.
 
 # ----------------------------------------------------------------------
-[body]
-# The architecture to use. Currently available are:
-# - single: One input
-# Will default to single.
-architecture = "single"
-
-# default values for the trunk layers of the network:
-# Type of the block to be added; available: conv_block, dense_block
-# See orcanet/builder_util/layer_blocks.py for possible arguments.
+[model]
+# First, the default values for the layers blocks of the network:
+# Type of the block to be added
+# See orcanet/builder_util/layer_blocks.py for all available blokcs, as well
+# as possible arguments.
 type = "conv_block"
 # Specifies the dimension of convolutional blocks, either 2 or 3
 conv_dim = 3
@@ -39,39 +34,27 @@ batchnorm=true
 # l2 regularizer for the weights of the layer.
 # kernel_l2_reg = 0.00001
 
-# blocks in the body section of the resulting network.
+
+# Then, the blocks in the body section of the resulting network.
 # Each dict makes a new block. The default values above will be inserted
 # only if they are missing, i.e. the values below are not overwritten.
 blocks = [
-          {filters=64},
-          {filters=64},
-          {filters=64, pool_size=[2, 2, 2]},
-          {filters=64},
-          {filters=64},
-          {filters=64},
-          {filters=128, pool_size=[2, 2, 2]},
-          {filters=128},
-          {filters=128},
-          {filters=128},
-          ]
-
-
-# ----------------------------------------------------------------------
-[head]
-# The head is the last layers of the network.
-# Available architectures:
-# -categorical:      3 dense layer blocks + Softmax output (one-hot)
-# -regression_error: for each predicted quantity: 3 dense layer blocks +
-#                    4 dense layer blocks for respective error
-architecture = "regression_error"
-# additional arguments for the given head architecture
-architecture_args = {output_names=['e', 'dx', 'dy', 'dz', 'by', 'vx', 'vy', 'vz', 'vt']}
-
-# default values for the blocks in the head:
-# dropout = None
-# kernel_l2_reg = None
-# activation = "relu"
-
+    {filters=64},
+    {filters=64},
+    {filters=64, pool_size=[2, 2, 2]},
+    {filters=64},
+    {filters=64},
+    {filters=64},
+    {filters=128, pool_size=[2, 2, 2]},
+    {filters=128},
+    {filters=128},
+    {filters=128},
+    # This is the last layer of the network, in this case its a special output block
+    # called OutputRegErr. For each predicted quantity: 3 dense layer blocks +
+    # 4 dense layer blocks for respective error
+    # Other output blocks are also available.
+    {type="OutputRegErr", output_names=['e', 'dx', 'dy', 'dz', 'by', 'vx', 'vy', 'vz', 'vt'], flatten=true}
+]
 
 # ----------------------------------------------------------------------
 [compile]

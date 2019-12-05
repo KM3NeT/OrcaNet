@@ -1,3 +1,4 @@
+import keras.backend as K
 import keras as ks
 import keras.layers as layers
 
@@ -440,27 +441,123 @@ class InceptionBlockV2:
         return x
 
 
-def input_block(input_shapes):
-    """
-    Build input layers according to a dict mapping the layer names to shapes.
+class OutputReg:
+    def __init__(self, output_neurons,
+                 output_name,
+                 unit_list=None,
+                 transition="keras:GlobalAveragePooling2D",
+                 **kwargs):
+        """
+        Global Pooling, followed by dense layer(s) for regression.
 
-    Parameters
-    ----------
-    input_shapes : dict
-        Keys: Input layer names.
-        Values: Their shapes.
+        Parameters
+        ----------
+        output_name : str
+            Name that will be given to the output layer of the network.
+        output_neurons : int
+            Number of neurons in the last layer. Default: 1.
+        unit_list : List, optional
+            A list of ints. Add additional Dense layers after the gpool
+            with this many units in them. E.g., [64, 32] would add
+            two Dense layers, the first with 64 neurons, the secound with
+            32 neurons.
+        kwargs
+            Keywords for the dense blocks that get added if unit_list is
+            not None.
 
-    Returns
-    -------
-    inputs : List
-        A list of named keras input layers.
+        """
+        self.output_neurons = output_neurons
+        self.output_name = output_name
+        self.unit_list = unit_list
+        self.transition = transition
+        self.kwargs = kwargs
 
-    """
-    inputs = []
-    for input_name, input_shape in input_shapes.items():
-        inputs.append(layers.Input(
-            shape=input_shape, name=input_name, dtype=ks.backend.floatx()))
-    return inputs
+    def __call__(self, layer):
+        if self.transition is not None:
+            x = getattr(layers, self.transition.split("keras:")[-1])()(layer)
+        else:
+            x = layer
+
+        if self.unit_list is not None:
+            for units in self.unit_list:
+                x = DenseBlock(units=units, **self.kwargs)(x)
+
+        out = layers.Dense(
+            units=self.output_neurons,
+            activation=None,
+            name=self.output_name)(x)
+
+        return out
+
+
+class OutputCateg:
+    def __init__(self, categories,
+                 output_name,
+                 unit_list=None,
+                 transition="keras:GlobalAveragePooling2D",
+                 **kwargs):
+        self.categories = categories
+        self.output_name = output_name
+        self.unit_list = unit_list
+        self.transition = transition
+        self.kwargs = kwargs
+
+    def __call__(self, layer):
+        if self.transition is not None:
+            x = getattr(layers, self.transition.split("keras:")[-1])()(layer)
+        else:
+            x = layer
+
+        if self.unit_list is not None:
+            for units in self.unit_list:
+                x = DenseBlock(units=units, **self.kwargs)(x)
+
+        out = layers.Dense(
+            units=self.categories,
+            activation='softmax',
+            kernel_initializer='he_normal',
+            name=self.output_name)(x)
+
+        return out
+
+
+class OutputRegErr:
+    """ Double network for regression + error estimation. """
+    def __init__(self, output_names, flatten):
+        self.flatten = flatten
+        self.output_names = output_names
+
+    def __call__(self, layer):
+        if self.flatten:
+            flatten = layers.Flatten()(layer)
+        else:
+            flatten = layer
+        outputs = []
+
+        x = DenseBlock(units=128)(flatten)
+        x = DenseBlock(units=32)(x)
+
+        for name in self.output_names:
+            output_label = layers.Dense(units=1, name=name)(x)
+            outputs.append(output_label)
+
+        # Network for the errors of the labels
+        x_err = layers.Lambda(lambda a: K.stop_gradient(a))(flatten)
+
+        x_err = DenseBlock(units=128)(x_err)
+        x_err = DenseBlock(units=64)(x_err)
+        x_err = DenseBlock(units=32)(x_err)
+
+        for i, name in enumerate(self.output_names):
+            output_label_error = layers.Dense(
+                units=1,
+                activation='linear',
+                name=name + '_err_temp')(x_err)
+            # Predicted label gets concatenated with its error (needed for loss function)
+            output_label_merged = layers.Concatenate(name=name + '_err')(
+                [outputs[i], output_label_error])
+            outputs.append(output_label_merged)
+        return outputs
 
 
 def _get_dimensional_layers(dim):

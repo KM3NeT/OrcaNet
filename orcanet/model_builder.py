@@ -14,27 +14,18 @@ from orcanet.builder_util.builders import BlockBuilder
 
 class ModelBuilder:
     """
-    Can build models adapted to an Organizer instance from a toml file.
+    Builds a keras model from a toml file.
 
-    The input of the model will match the dimensions of the input
+    The input of the model can match the dimensions of the input
     data given to the Organizer taking into account the sample
     modifier.
 
     Attributes
     ----------
-    body_arch : str
-        Name of the architecture of the model (see self.build).
-        Default: single.
-    body_configs : list
+    configs : list
         List with keywords for building each layer block in the model.
-    body_args : dict
+    defaults : dict
         Default values for the layer blocks in the model.
-    head_arch : str
-        Determines the head architecture of the model.
-    head_arch_args : dict
-        Keyword arguments for the specific output_arch used.
-    head_args : dict
-        Default values for the head layer blocks in the model.
     optimizer : str
         Optimizer for training the model. Either "Adam" or "SGD".
     compile_opt : dict
@@ -61,19 +52,14 @@ class ModelBuilder:
         file_content = toml.load(model_file)
 
         try:
-            body = file_content["body"]
-            if "architecture" in body:
-                self.body_arch = body.pop("architecture")
+            if "model" in file_content:
+                model_args = file_content["model"]
+                self.configs = model_args.pop('blocks')
+                self.defaults = model_args
+
             else:
-                self.body_arch = "single"
-
-            self.body_configs = body.pop('blocks')
-            self.body_args = body
-
-            head = file_content["head"]
-            self.head_arch = head.pop("architecture")
-            self.head_arch_args = head.pop("architecture_args")
-            self.head_args = head
+                # legacy
+                self._compat_init(file_content)
 
             compile_sect = file_content["compile"]
             self.optimizer = compile_sect.pop("optimizer")
@@ -87,6 +73,26 @@ class ModelBuilder:
                 option = e.args
             raise KeyError("Missing parameter in toml model file: "
                            + str(option)) from None
+
+    def _compat_init(self, file_content):
+        # legacy
+        body = file_content["body"]
+        if "architecture" in body:
+            arch = body.pop("architecture")
+            if arch != "single":
+                raise ValueError("architecture keyword is deprecated")
+        self.configs = body.pop('blocks')
+        self.defaults = body
+
+        if "head" in file_content:
+            head = file_content["head"]
+            head_arch = head.pop("architecture")
+            head_arch_args = head.pop("architecture_args")
+            head_args = head
+
+            head_block_config = head_arch_args
+            head_block_config["type"] = head_arch
+            self.configs.append({**head_block_config, **head_args})
 
     def build(self, orga, log_comp_opts=False):
         """
@@ -139,117 +145,77 @@ class ModelBuilder:
             The network.
 
         """
-        if self.body_arch == "single":
-            # Build a single input network
-            if len(input_shapes) is not 1:
-                raise ValueError("Invalid input_shape for architecture {}: "
-                                 "Has length {}, but must be 1\n input_shapes "
-                                 "= {}".format(self.body_arch, len(input_shapes),
-                                               input_shapes))
-            builder = BlockBuilder(self.body_args, self.head_args)
-            model = builder.build(input_shapes, self.body_configs,
-                                  self.head_arch, self.head_arch_args)
-
-        elif self.body_arch == "multi":
-            # TODO flatten layer has to be added to each individual network
-            #  before concatenating. Maybe add a multi option in the attach head
-            #  functions?
-            """
-            # Build networks with an identical body,
-            # then concatenate and add head layers
-            builder = BlockBuilder(self.body_args, self.head_args)
-            mid_layers, input_layers = [], []
-            for input_name, input_shape in input_shapes.items():
-                model = builder.build({input_name: input_shape},
-                                      self.body_configs, head_arch=None)
-                assert len(model.inputs) == 1, "model input is not length 1 " \
-                                               "{}".format(model.inputs)
-                assert len(model.outputs) == 1, "model output is not length 1 " \
-                                                "{}".format(model.outputs)
-                input_layers.append(model.inputs[0])
-                mid_layers.append(model.outputs[0])
-            x = Concatenate()(mid_layers)
-            output_layer = builder.attach_output_layers(x, self.head_arch,
-                                                        **self.head_arch_args)
-            model = Model(input_layers, output_layer)
-            """
-            raise NotImplementedError
-
-        elif self.body_arch == "merge":
-            # Concatenate multiple models with a flatten layer to a single big one.
-            # block_config is a list of paths
-            model_list = []
-            for path in self.body_configs:
-                model_list.append(ks.models.load_model(path))
-            model = self.merge_models(model_list)
-
-        else:
-            raise NameError("Unknown architecture: ", self.body_arch)
+        if len(input_shapes) is not 1:
+            raise ValueError("Invalid input_shape"
+                             "Has length {}, but must be 1\n input_shapes "
+                             "= {}".format(len(input_shapes), input_shapes))
+        builder = BlockBuilder(self.defaults)
+        model = builder.build(input_shapes, self.configs)
 
         if compile_model:
             self.compile_model(model, custom_objects=custom_objects)
 
         return model
 
-    def merge_models(self, model_list, trainable=False, stateful=True,
-                     no_drop=True):
-        """
-        Concatenate two or more single input cnns to a big one.
-
-        It will explicitly look for a Flatten layer and cut after it,
-        Concatenate all models, and then add the head layers.
-
-        Parameters
-        ----------
-        model_list : list
-            List of keras models to stitch together.
-        trainable : bool
-            Whether the layers of the loaded models will be trainable.
-        stateful : bool
-            Whether the batchnorms of the loaded models will be stateful.
-        no_drop : bool
-            If true, rate of dropout layers from loaded models will
-            be set to zero.
-
-        Returns
-        -------
-        model : keras model
-            The uncompiled merged keras model.
-
-        """
-        # Get the input and Flatten layers in each of the given models
-        input_layers, flattens = [], []
-        for i, model in enumerate(model_list):
-            if len(model.inputs) != 1:
-                raise ValueError(
-                    "model input is not length 1 {}".format(model.inputs))
-            input_layers.append(model.input)
-            flatten_found = 0
-            for layer in model.layers:
-                layer.trainable = trainable
-                layer.name = layer.name + '_net_' + str(i)
-                if isinstance(layer, layers.BatchNormalization):
-                    layer.stateful = stateful
-                elif isinstance(layer, layers.Flatten):
-                    flattens.append(layer.output)
-                    flatten_found += 1
-            if flatten_found != 1:
-                raise TypeError(
-                    "Expected 1 Flatten layer but got " + str(flatten_found))
-
-        # attach new head
-        x = layers.Concatenate()(flattens)
-        builder = BlockBuilder(body_defaults=None,
-                               head_defaults=self.head_args)
-        output_layer = builder.attach_output_layers(x, self.head_arch,
-                                                    flatten=False,
-                                                    **self.head_arch_args)
-
-        model = ks.models.Model(input_layers, output_layer)
-        if no_drop:
-            model = change_dropout_rate(model, before_concat=0.)
-
-        return model
+    # def merge_models(self, model_list, trainable=False, stateful=True,
+    #                  no_drop=True):
+    #     """
+    #     Concatenate two or more single input cnns to a big one.
+    #
+    #     It will explicitly look for a Flatten layer and cut after it,
+    #     Concatenate all models, and then add the head layers.
+    #
+    #     Parameters
+    #     ----------
+    #     model_list : list
+    #         List of keras models to stitch together.
+    #     trainable : bool
+    #         Whether the layers of the loaded models will be trainable.
+    #     stateful : bool
+    #         Whether the batchnorms of the loaded models will be stateful.
+    #     no_drop : bool
+    #         If true, rate of dropout layers from loaded models will
+    #         be set to zero.
+    #
+    #     Returns
+    #     -------
+    #     model : keras model
+    #         The uncompiled merged keras model.
+    #
+    #     """
+    #     # Get the input and Flatten layers in each of the given models
+    #     input_layers, flattens = [], []
+    #     for i, model in enumerate(model_list):
+    #         if len(model.inputs) != 1:
+    #             raise ValueError(
+    #                 "model input is not length 1 {}".format(model.inputs))
+    #         input_layers.append(model.input)
+    #         flatten_found = 0
+    #         for layer in model.layers:
+    #             layer.trainable = trainable
+    #             layer.name = layer.name + '_net_' + str(i)
+    #             if isinstance(layer, layers.BatchNormalization):
+    #                 layer.stateful = stateful
+    #             elif isinstance(layer, layers.Flatten):
+    #                 flattens.append(layer.output)
+    #                 flatten_found += 1
+    #         if flatten_found != 1:
+    #             raise TypeError(
+    #                 "Expected 1 Flatten layer but got " + str(flatten_found))
+    #
+    #     # attach new head
+    #     x = layers.Concatenate()(flattens)
+    #     builder = BlockBuilder(body_defaults=None,
+    #                            head_defaults=self.head_args)
+    #     output_layer = builder.attach_output_layers(x, self.head_arch,
+    #                                                 flatten=False,
+    #                                                 **self.head_arch_args)
+    #
+    #     model = ks.models.Model(input_layers, output_layer)
+    #     if no_drop:
+    #         model = change_dropout_rate(model, before_concat=0.)
+    #
+    #     return model
 
     def compile_model(self, model, custom_objects=None):
         """
