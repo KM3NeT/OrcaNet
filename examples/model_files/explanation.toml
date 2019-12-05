@@ -53,7 +53,7 @@ blocks = [
     # called OutputRegErr. For each predicted quantity: 3 dense layer blocks +
     # 4 dense layer blocks for respective error
     # Other output blocks are also available.
-    {type="OutputRegErr", output_names=['e', 'dx', 'dy', 'dz', 'by', 'vx', 'vy', 'vz', 'vt'], flatten=true}
+    {type="OutputRegErr", output_names=['e', 'dx', 'dy', 'dz', 'by', 'vx', 'vy', 'vz', 'vt']}
 ]
 
 # ----------------------------------------------------------------------

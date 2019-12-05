@@ -445,22 +445,25 @@ class OutputReg:
     def __init__(self, output_neurons,
                  output_name,
                  unit_list=None,
-                 transition="keras:GlobalAveragePooling2D",
+                 transition=None,
                  **kwargs):
         """
-        Global Pooling, followed by dense layer(s) for regression.
+        Dense layer(s) for regression.
 
         Parameters
         ----------
+        output_neurons : int
+            Number of neurons in the last layer.
         output_name : str
             Name that will be given to the output layer of the network.
-        output_neurons : int
-            Number of neurons in the last layer. Default: 1.
         unit_list : List, optional
             A list of ints. Add additional Dense layers after the gpool
             with this many units in them. E.g., [64, 32] would add
             two Dense layers, the first with 64 neurons, the secound with
             32 neurons.
+        transition : str, optional
+            A layer that will be used as the first layer of this block.
+            Example: 'keras:GlobalAveragePooling2D', 'keras:Flatten'
         kwargs
             Keywords for the dense blocks that get added if unit_list is
             not None.
@@ -494,8 +497,30 @@ class OutputCateg:
     def __init__(self, categories,
                  output_name,
                  unit_list=None,
-                 transition="keras:GlobalAveragePooling2D",
+                 transition=None,
                  **kwargs):
+        """
+        Dense layer(s) for categorization.
+
+        Parameters
+        ----------
+        categories : int
+            Number of categories (= neurons in the last layer).
+        output_name : str
+            Name that will be given to the output layer of the network.
+        unit_list : List, optional
+            A list of ints. Add additional Dense layers after the gpool
+            with this many units in them. E.g., [64, 32] would add
+            two Dense layers, the first with 64 neurons, the secound with
+            32 neurons.
+        transition : str, optional
+            A layer that will be used as the first layer of this block.
+            Example: 'keras:GlobalAveragePooling2D', 'keras:Flatten'
+        kwargs
+            Keywords for the dense blocks that get added if unit_list is
+            not None.
+
+        """
         self.categories = categories
         self.output_name = output_name
         self.unit_list = unit_list
@@ -522,10 +547,23 @@ class OutputCateg:
 
 
 class OutputRegErr:
-    """ Double network for regression + error estimation. """
-    def __init__(self, output_names, flatten):
+    def __init__(self, output_names, flatten=True, **kwargs):
+        """
+        Double network for regression + error estimation.
+
+        Parameters
+        ----------
+        output_names : List
+            List of strs, the output names, each with one neuron + one err neuron.
+        flatten : bool
+            If True, start with a flatten layer.
+        kwargs
+            Keywords for the dense blocks.
+
+        """
         self.flatten = flatten
         self.output_names = output_names
+        self.kwargs = kwargs
 
     def __call__(self, layer):
         if self.flatten:
@@ -534,8 +572,8 @@ class OutputRegErr:
             flatten = layer
         outputs = []
 
-        x = DenseBlock(units=128)(flatten)
-        x = DenseBlock(units=32)(x)
+        x = DenseBlock(units=128, **self.kwargs)(flatten)
+        x = DenseBlock(units=32, **self.kwargs)(x)
 
         for name in self.output_names:
             output_label = layers.Dense(units=1, name=name)(x)
@@ -544,9 +582,9 @@ class OutputRegErr:
         # Network for the errors of the labels
         x_err = layers.Lambda(lambda a: K.stop_gradient(a))(flatten)
 
-        x_err = DenseBlock(units=128)(x_err)
-        x_err = DenseBlock(units=64)(x_err)
-        x_err = DenseBlock(units=32)(x_err)
+        x_err = DenseBlock(units=128, **self.kwargs)(x_err)
+        x_err = DenseBlock(units=64, **self.kwargs)(x_err)
+        x_err = DenseBlock(units=32, **self.kwargs)(x_err)
 
         for i, name in enumerate(self.output_names):
             output_label_error = layers.Dense(

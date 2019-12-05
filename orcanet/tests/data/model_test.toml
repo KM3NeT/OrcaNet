@@ -1,4 +1,4 @@
-[body]
+[model]
 architecture = "single"
 
 # default values for all the layers of the network
@@ -10,14 +10,8 @@ kernel_initializer = "Zeros"
 blocks = [
           {filters=2, pool_size=[2, 2, 2]},
           {filters=2},
+          {type="OutputRegErr", output_names=['dx', ], kernel_initializer="Zeros"}
           ]
-
-
-[head]
-kernel_initializer = "Zeros"
-architecture = "regression_error"
-architecture_args = {output_names=['dx', ]}
-
 
 [compile]
 optimizer = "sgd"
