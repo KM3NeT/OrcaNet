@@ -1,7 +1,7 @@
 # An implementation featuring ResNet blocks, with shortcuts. A resnet block
 # consists out of 2 convolutional blocks.
 [model]
-type = "resnet_block"
+type = "ResnetBlock"
 conv_dim = 2
 kernel_size = 3
 activation = 'relu'

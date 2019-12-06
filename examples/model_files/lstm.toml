@@ -5,8 +5,8 @@ kernel_size = 3
 
 blocks = [
     # here, input should be 3 dimensional, time on first axis!
-    {type="conv_block", filters=32, time_distributed=true},
-    {type="conv_block", filters=32, time_distributed=true, pool_type="global_average_pooling"},
+    {type="ConvBlock", filters=32, time_distributed=true},
+    {type="ConvBlock", filters=32, time_distributed=true, pool_type="global_average_pooling"},
     # starting a layer block type with 'keras:' allows access to default keras layers
     {type="keras:LSTM", units=10},
     {type="OutputReg", output_name='direction_xyz', transition=false, output_neurons=3}

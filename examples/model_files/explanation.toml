@@ -20,10 +20,10 @@
 # layer block has this parameter, its default is set to the given value
 # (kwargs are not resolved).
 #
-# Type of the block to be added
+# Type of the block to be added, mandatory for any block
 # See orcanet/builder_util/layer_blocks.py for all available blocks, as well
 # as their possible arguments.
-type = "conv_block"
+type = "ConvBlock"
 # Specifies the dimension of convolutional blocks, either 2 or 3
 conv_dim = 3
 # Kernel size of the convolution.

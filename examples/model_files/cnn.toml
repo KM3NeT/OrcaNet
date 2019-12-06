@@ -1,7 +1,7 @@
 # A simple sequential network, featuring 2D convolutions, batchnorms, and
 # pooling layers, as well as a categorical output
 [model]
-type = "conv_block"
+type = "ConvBlock"
 conv_dim = 2
 kernel_size = 3
 activation = 'relu'
