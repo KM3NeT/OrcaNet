@@ -8,6 +8,7 @@ class ConvBlock:
                  filters,
                  kernel_size=3,
                  strides=1,
+                 pool_type="max_pooling",
                  pool_size=None,
                  pool_padding="valid",
                  dropout=None,
@@ -32,8 +33,13 @@ class ConvBlock:
         kernel_size : int or tuple
             Kernel size which is used for all three dimensions.
         pool_size : None or int or tuple
-            Specifies if a MaxPooling layer should be added. e.g. (1,1,2)
-            -> sizes for a 3D conv block.
+            Specifies pool size for the pooling layer, e.g. (1,1,2)
+            -> sizes for a 3D conv block. If its None, no pooling will be added,
+            except for when global average pooling is used.
+        pool_type : str, optional
+            The type of pooling layer to add. Ignored if pool_size is None.
+            Can be max_pooling (default), average_pooling, or
+            global_average_pooling.
         pool_padding : str
             Padding option of the pooling layer.
         dropout : float or None
@@ -60,6 +66,7 @@ class ConvBlock:
         self.filters = filters
         self.kernel_size = kernel_size
         self.strides = strides
+        self.pool_type = pool_type
         self.pool_size = pool_size
         self.pool_padding = pool_padding
         self.dropout = dropout
@@ -77,7 +84,6 @@ class ConvBlock:
 
         dim_layers = _get_dimensional_layers(self.conv_dim)
         convolution_nd = dim_layers["convolution"]
-        max_pooling_nd = dim_layers["max_pooling"]
         s_dropout_nd = dim_layers["s_dropout"]
 
         if self.kernel_l2_reg is not None:
@@ -105,9 +111,15 @@ class ConvBlock:
             block_layers.append(layers.BatchNormalization(axis=channel_axis))
         if self.activation is not None:
             block_layers.append(layers.Activation(self.activation))
-        if self.pool_size is not None:
-            block_layers.append(max_pooling_nd(
+
+        if self.pool_type == "global_average_pooling":
+            pooling_nd = dim_layers[self.pool_type]
+            block_layers.append(pooling_nd())
+        elif self.pool_size is not None:
+            pooling_nd = dim_layers[self.pool_type]
+            block_layers.append(pooling_nd(
                 pool_size=self.pool_size, padding=self.pool_padding))
+
         if self.dropout is not None:
             block_layers.append(layers.Dropout(self.dropout))
         elif self.sdropout is not None:
@@ -476,7 +488,7 @@ class OutputReg:
         self.kwargs = kwargs
 
     def __call__(self, layer):
-        if self.transition is not None:
+        if self.transition:
             x = getattr(layers, self.transition.split("keras:")[-1])()(layer)
         else:
             x = layer
@@ -528,7 +540,7 @@ class OutputCateg:
         self.kwargs = kwargs
 
     def __call__(self, layer):
-        if self.transition is not None:
+        if self.transition:
             x = getattr(layers, self.transition.split("keras:")[-1])()(layer)
         else:
             x = layer
@@ -610,6 +622,10 @@ def _get_dimensional_layers(dim):
             2: layers.Convolution2D, 3: layers.Convolution3D},
         "max_pooling": {
             2: layers.MaxPooling2D, 3: layers.MaxPooling3D},
+        "average_pooling": {
+            2: layers.AveragePooling2D, 3: layers.AveragePooling3D},
+        "global_average_pooling": {
+            2: layers.GlobalAveragePooling2D, 3: layers.GlobalAveragePooling3D},
         "s_dropout": {
             2: layers.SpatialDropout2D, 3: layers.SpatialDropout3D}
     }

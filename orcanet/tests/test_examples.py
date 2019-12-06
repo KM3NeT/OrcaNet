@@ -31,12 +31,18 @@ class TestSequentialBuilder(TestCase):
         mb = orcanet.model_builder.ModelBuilder(model_file)
         model = mb.build(self.get_orga(dims=2))
 
+        self.assertSequenceEqual(model.output_shape, (None, 3))
+        self.assertEqual(model.count_params(), 4691523)
+
     def test_resnet(self):
         toml_file = "resnet.toml"
 
         model_file = os.path.join(self.example_dir, toml_file)
         mb = orcanet.model_builder.ModelBuilder(model_file)
         model = mb.build(self.get_orga(dims=2))
+
+        self.assertSequenceEqual(model.output_shape, (None, 3))
+        self.assertEqual(model.count_params(), 11141699)
 
     def test_explanation(self):
         toml_file = "explanation.toml"
@@ -47,6 +53,9 @@ class TestSequentialBuilder(TestCase):
         orga.cfg.custom_objects = get_custom_objects()
         model = mb.build(orga)
 
+        self.assertSequenceEqual(model.output_shape, (None, 3))
+        self.assertEqual(model.count_params(), 2109635)
+
     def test_inception(self):
         toml_file = "inception.toml"
 
@@ -54,19 +63,25 @@ class TestSequentialBuilder(TestCase):
         mb = orcanet.model_builder.ModelBuilder(model_file)
         model = mb.build(self.get_orga(dims=2))
 
+        self.assertSequenceEqual(model.output_shape, (None, 3))
+        self.assertEqual(model.count_params(), 149827)
+
     def test_lstm(self):
         toml_file = "lstm.toml"
 
         model_file = os.path.join(self.example_dir, toml_file)
         mb = orcanet.model_builder.ModelBuilder(model_file)
-        # TODO model = mb.build(self.get_orga(dims=3))
+        model = mb.build(self.get_orga(dims=3))
+
+        self.assertSequenceEqual(model.output_shape, (None, 3))
+        self.assertEqual(model.count_params(), 11321)
 
 
 def get_input_shapes_3d():
-    dims = (10, 10, 10, 1)
+    dims = (10, 9, 8, 1)
     return {"input_A": dims}
 
 
 def get_input_shapes_2d():
-    dims = (10, 10, 1)
+    dims = (10, 9, 1)
     return {"input_A": dims}

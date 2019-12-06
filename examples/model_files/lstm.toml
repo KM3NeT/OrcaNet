@@ -1,23 +1,20 @@
-# A small lstm network.
-[body]
+# A small convoutinal lstm network.
+[model]
 conv_dim = 2
 kernel_size = 3
 
 blocks = [
     # here, input should be 3 dimensional, time on first axis!
     {type="conv_block", filters=32, time_distributed=true},
-    {type="keras:Flatten"},  # TODO has to be time distributed gpool!
+    {type="conv_block", filters=32, time_distributed=true, pool_type="global_average_pooling"},
+    # starting a layer block type with 'keras:' allows access to default keras layers
     {type="keras:LSTM", units=10},
+    {type="OutputReg", output_name='direction_xyz', transition=false, output_neurons=3}
 ]
-
-# ----------------------------------------------------------------------
-[head]
-architecture = "regression_error"
-architecture_args = {output_names=['a']}
 
 # ----------------------------------------------------------------------
 [compile]
 optimizer = "adam"
 
 [compile.losses]
-a = {function="mse"}
+direction_xyz = {function="mse"}
