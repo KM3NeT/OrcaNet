@@ -445,7 +445,7 @@ class OutputReg:
     def __init__(self, output_neurons,
                  output_name,
                  unit_list=None,
-                 transition=None,
+                 transition='keras:Flatten',
                  **kwargs):
         """
         Dense layer(s) for regression.
@@ -461,8 +461,8 @@ class OutputReg:
             with this many units in them. E.g., [64, 32] would add
             two Dense layers, the first with 64 neurons, the secound with
             32 neurons.
-        transition : str, optional
-            A layer that will be used as the first layer of this block.
+        transition : str or None
+            Name of a layer that will be used as the first layer of this block.
             Example: 'keras:GlobalAveragePooling2D', 'keras:Flatten'
         kwargs
             Keywords for the dense blocks that get added if unit_list is
@@ -497,7 +497,7 @@ class OutputCateg:
     def __init__(self, categories,
                  output_name,
                  unit_list=None,
-                 transition=None,
+                 transition='keras:Flatten',
                  **kwargs):
         """
         Dense layer(s) for categorization.
@@ -513,8 +513,8 @@ class OutputCateg:
             with this many units in them. E.g., [64, 32] would add
             two Dense layers, the first with 64 neurons, the secound with
             32 neurons.
-        transition : str, optional
-            A layer that will be used as the first layer of this block.
+        transition : str or None
+            Name of a layer that will be used as the first layer of this block.
             Example: 'keras:GlobalAveragePooling2D', 'keras:Flatten'
         kwargs
             Keywords for the dense blocks that get added if unit_list is
@@ -550,6 +550,10 @@ class OutputRegErr:
     def __init__(self, output_names, flatten=True, **kwargs):
         """
         Double network for regression + error estimation.
+
+        It has 3 dense layer blocks, followed by one dense layer
+        for each output_name, as well as dense layer blocks, followed by one dense layer
+        for the respective error of each output_name.
 
         Parameters
         ----------

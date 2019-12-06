@@ -42,6 +42,13 @@ Models can be build using toml input files. The path is handed over as
 the ``model_file`` argument of
 :py:class:`orcanet.model_builder.ModelBuilder`.
 
+.. code-block:: python
+
+    from orcanet.model_builder import ModelBuilder
+
+    mb = ModelBuilder(model_file="model.toml")
+    model = mb.build(organizer)
+
 Here is an example for the proper file format:
 
 .. literalinclude:: ../examples/model_files/explanation.toml

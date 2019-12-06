@@ -14,7 +14,7 @@ from orcanet.builder_util.builders import BlockBuilder
 
 class ModelBuilder:
     """
-    Builds a keras model from a toml file.
+    Build and compile a keras model from a toml file, using OrcaNet building blocks.
 
     The input of the model can match the dimensions of the input
     data given to the Organizer taking into account the sample
@@ -37,6 +37,15 @@ class ModelBuilder:
         and metrics is a list of functions/strings.
     optimizer_args : dict
         Kwargs for the optimizer.
+
+    Methods
+    -------
+    build
+        Build the network using an instance of Organizer.
+    build_with_input
+        Build the network without an Organizer, just using given input shapes.
+    compile
+        Compile a model with the optimizer settings given in the model_file.
 
     """
     def __init__(self, model_file):
@@ -61,10 +70,15 @@ class ModelBuilder:
                 # legacy
                 self._compat_init(file_content)
 
-            compile_sect = file_content["compile"]
-            self.optimizer = compile_sect.pop("optimizer")
-            self.compile_opt = compile_sect.pop("losses")
-            self.optimizer_args = compile_sect
+            if "compile" in file_content:
+                compile_sect = file_content["compile"]
+                self.optimizer = compile_sect.pop("optimizer")
+                self.compile_opt = compile_sect.pop("losses")
+                self.optimizer_args = compile_sect
+            else:
+                self.optimizer = None
+                self.compile_opt = None
+                self.optimizer_args = None
 
         except KeyError as e:
             if len(e.args) == 1:
@@ -234,6 +248,9 @@ class ModelBuilder:
             The compiled (or recompiled) keras model.
 
         """
+        if any((self.optimizer is None, self.compile_opt is None)):
+            raise ValueError("Can not compile, need optimizer name and losses")
+
         if self.optimizer == 'adam':
             optimizer = get_adam(**self.optimizer_args)
         elif self.optimizer == 'sgd':
@@ -345,55 +362,3 @@ def change_dropout_rate(model, before_concat, after_concat=None):
     print("Changed dropout rates of {} layers before and {} layers after "
           "Concatenate.".format(ch_bef, ch_aft))
     return clone
-
-
-# def parallelize_model(model, n_gpu, batchsize, mode="avolkov"):
-#     """
-#     Parallelizes the nn-model to multiple gpu's.
-#
-#     Currently, up to 4 GPU's at Tiny-GPU are supported.
-#
-#     Parameters
-#     ----------
-#     model : ks.model.Model
-#         Keras model of a neural network.
-#     n_gpu : int
-#         Number of gpu's that the model should be parallelized to.
-#     batchsize : int
-#         Batchsize that is used for the training / inferencing of the cnn.
-#     mode : str
-#         Avolkov or keras.
-#
-#     Returns
-#     -------
-#     model : ks.models.Model
-#         The parallelized Keras nn instance (multi_gpu_model).
-#     batchsize : int
-#         The new batchsize scaled by the number of used gpu's.
-#
-#     """
-#     assert n_gpu > 1 and isinstance(n_gpu, int), 'n_gpu must be an int with n_gpu >= 1!'
-#
-#     if mode == "avolkov":
-#         from orcanet.builder_util.multi_gpu.multi_gpu import (
-#             get_available_gpus, make_parallel, print_mgpu_modelsummary)
-#
-#         gpus_list = get_available_gpus(n_gpu)
-#         ngpus = len(gpus_list)
-#         print('Using GPUs: {}'.format(', '.join(gpus_list)))
-#
-#         # Data-Parallelize the model via function
-#         model = make_parallel(model, gpus_list, usenccl=False, initsync=True,
-#                               syncopt=False, enqueue=False)
-#         print_mgpu_modelsummary(model)
-#         batchsize = batchsize * ngpus
-#
-#     elif mode == "keras":
-#         # For keras, one has to save the original model, not the saved one...
-#         model = ks.utils.multi_gpu_model(model, n_gpu)
-#         batchsize *= n_gpu
-#
-#     else:
-#         raise NameError("Unknown mode", mode)
-#
-#     return model, batchsize
