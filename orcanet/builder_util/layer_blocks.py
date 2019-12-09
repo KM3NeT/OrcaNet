@@ -19,13 +19,13 @@ class ConvBlock:
                  kernel_initializer="he_normal",
                  time_distributed=False):
         """
-        2D/3D Convolutional block followed by BatchNorm, Activation,
+        1D/2D/3D Convolutional block followed by BatchNorm, Activation,
         MaxPooling and/or Dropout.
 
         Parameters
         ----------
         conv_dim : int
-            Specifies the dimension of the convolutional block, 2D/3D.
+            Specifies the dimension of the convolutional block, 1D/2D/3D.
         filters : int
             Number of filters used for the convolutional layer.
         strides : int or tuple
@@ -368,7 +368,7 @@ class InceptionBlockV2:
         Parameters
         ----------
         conv_dim : int
-            Specifies the dimension of the convolutional block, 2D/3D.
+            Specifies the dimension of the convolutional block, 1D/2D/3D.
         filters_1x1 : int or None
             No. of filters for the 1x1 convolutional branch.
             If None, dont make this branch.
@@ -615,18 +615,33 @@ class OutputRegErr:
 
 
 def _get_dimensional_layers(dim):
-    if dim not in (2, 3):
-        raise ValueError(f'Dimension must be 2 or 3, not {dim}')
+    if dim not in (1, 2, 3):
+        raise ValueError(f'Dimension must be 1, 2 or 3, not {dim}')
     dim_layers = {
         "convolution": {
-            2: layers.Convolution2D, 3: layers.Convolution3D},
+            1: layers.Convolution1D,
+            2: layers.Convolution2D,
+            3: layers.Convolution3D,
+        },
         "max_pooling": {
-            2: layers.MaxPooling2D, 3: layers.MaxPooling3D},
+            1: layers.MaxPooling1D,
+            2: layers.MaxPooling2D,
+            3: layers.MaxPooling3D,
+        },
         "average_pooling": {
-            2: layers.AveragePooling2D, 3: layers.AveragePooling3D},
+            1: layers.AveragePooling1D,
+            2: layers.AveragePooling2D,
+            3: layers.AveragePooling3D,
+        },
         "global_average_pooling": {
-            2: layers.GlobalAveragePooling2D, 3: layers.GlobalAveragePooling3D},
+            1: layers.GlobalAveragePooling1D,
+            2: layers.GlobalAveragePooling2D,
+            3: layers.GlobalAveragePooling3D,
+        },
         "s_dropout": {
-            2: layers.SpatialDropout2D, 3: layers.SpatialDropout3D}
+            1: layers.SpatialDropout1D,
+            2: layers.SpatialDropout2D,
+            3: layers.SpatialDropout3D,
+        }
     }
     return {layer_type: dim_layers[layer_type][dim] for layer_type in dim_layers.keys()}

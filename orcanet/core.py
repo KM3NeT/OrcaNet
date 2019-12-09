@@ -806,10 +806,11 @@ class Configuration(object):
         files = {}
         n_files = []
         for input_key, input_values in file_content.items():
-            if not all([key in allowed_which
-                        for key in input_values.keys()]):
-                raise NameError("Unknown argument in toml file: Must be"
-                                " either of {}".format(allowed_which))
+            for key in input_values.keys():
+                if key not in allowed_which:
+                    raise NameError(
+                        f"Unknown argument '{key}' in toml file: "
+                        f"Must be either of {allowed_which}")
 
             if which in input_values:
                 files_input = tuple(input_values[which])

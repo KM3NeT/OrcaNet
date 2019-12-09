@@ -108,7 +108,7 @@ class ModelBuilder:
             head_block_config["type"] = head_arch
             self.configs.append({**head_block_config, **head_args})
 
-    def build(self, orga, log_comp_opts=False):
+    def build(self, orga, log_comp_opts=False, verbose=False):
         """
         Build the network using an instance of Organizer.
 
@@ -122,6 +122,8 @@ class ModelBuilder:
         log_comp_opts : bool
             If the info used for the compilation of the model should be
             logged to the log.txt.
+        verbose : bool
+            Print info about the building process?
 
         Returns
         -------
@@ -133,13 +135,17 @@ class ModelBuilder:
             orga.io.get_input_shapes(),
             compile_model=True,
             custom_objects=orga.cfg.custom_objects,
+            verbose=verbose,
         )
         if log_comp_opts:
             self.log_model_properties(orga)
         model.summary()
         return model
 
-    def build_with_input(self, input_shapes, compile_model=True, custom_objects=None):
+    def build_with_input(self, input_shapes,
+                         compile_model=True,
+                         custom_objects=None,
+                         verbose=False):
         """
         Build the network with given input shapes.
 
@@ -152,6 +158,8 @@ class ModelBuilder:
             Compile the model?
         custom_objects : dict, optional
             Custom objects to use during compiling.
+        verbose : bool
+            Print info about the building process?
 
         Returns
         -------
@@ -163,7 +171,7 @@ class ModelBuilder:
             raise ValueError("Invalid input_shape"
                              "Has length {}, but must be 1\n input_shapes "
                              "= {}".format(len(input_shapes), input_shapes))
-        builder = BlockBuilder(self.defaults)
+        builder = BlockBuilder(self.defaults, verbose=verbose)
         model = builder.build(input_shapes, self.configs)
 
         if compile_model:

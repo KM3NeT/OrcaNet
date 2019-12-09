@@ -24,7 +24,7 @@
 # See orcanet/builder_util/layer_blocks.py for all available blocks, as well
 # as their possible arguments.
 type = "ConvBlock"
-# Specifies the dimension of convolutional blocks, either 2 or 3
+# Specifies the dimension of convolutional blocks, either 1, 2 or 3
 conv_dim = 3
 # Kernel size of the convolution.
 kernel_size = 3

@@ -14,10 +14,12 @@ class BlockBuilder:
     ----------
     defaults : dict or None
         Default values for all blocks in the model.
+    verbose : bool
+        Print info about the building process?
 
     """
-    def __init__(self, defaults=None):
-        """ Set dicts with default values for the layers of the model.
+    def __init__(self, defaults=None, verbose=False):
+        """ Set dict with default values for the layers of the model.
         """
         # dict with toml keyword vs block for all custom blocks
         self.all_blocks = dict(inspect.getmembers(layer_blocks, inspect.isclass))
@@ -38,6 +40,7 @@ class BlockBuilder:
 
         self._check_arguments(defaults)
         self.defaults = defaults
+        self.verbose = verbose
 
     def build(self, input_shape, configs):
         """
@@ -97,6 +100,8 @@ class BlockBuilder:
 
         """
         filled = self._with_defaults(layer_config, self.defaults)
+        if self.verbose:
+            print(f"Attaching layer {filled} to tensor {layer}")
         block = self._get_blocks(filled.pop("type"))
         return block(**filled)(layer)
 
