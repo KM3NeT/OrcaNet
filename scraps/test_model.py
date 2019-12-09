@@ -1,18 +1,18 @@
 from keras.models import Model, clone_model
-from keras.layers import Input, Dense, Concatenate, Dropout
+import keras.layers as layers
 import numpy as np
 from keras import backend as K
 
 
 def build_double_inp(compile=False):
-    inp_1 = Input((1,), name="inp_0")
-    inp_2 = Input((1,), name="inp_1")
+    inp_1 = layers.Input((1,), name="inp_0")
+    inp_2 = layers.Input((1,), name="inp_1")
 
-    x = Concatenate()([inp_1, inp_2])
-    x = Dense(3)(x)
+    x = layers.Concatenate()([inp_1, inp_2])
+    x = layers.Dense(3)(x)
 
-    output_1 = Dense(1, name="out_0")(x)
-    output_2 = Dense(2, name="out_1")(x)
+    output_1 = layers.Dense(1, name="out_0")(x)
+    output_2 = layers.Dense(2, name="out_1")(x)
 
     test_model = Model((inp_1, inp_2), (output_1, output_2))
 
@@ -30,12 +30,12 @@ def get_xys():
 
 
 def build_single_inp():
-    inp = Input((2,), name="inp")
+    inp = layers.Input((2,), name="inp")
 
-    x = Dense(3)(inp)
+    x = layers.Dense(3)(inp)
 
-    output_1 = Dense(1, name="out_0")(x)
-    output_2 = Dense(2, name="out_1")(x)
+    output_1 = layers.Dense(1, name="out_0")(x)
+    output_2 = layers.Dense(2, name="out_1")(x)
 
     test_model = Model(inp, (output_1, output_2))
     return test_model
@@ -53,8 +53,8 @@ def get_xs(model, batchsize=1):
 
 def dropout_test():
     def dropout_model(rate=0.):
-        inp = Input((10,))
-        out = Dropout(rate)(inp)
+        inp = layers.Input((10,))
+        out = layers.Dropout(rate)(inp)
         model = Model(inp, out)
         return model
 

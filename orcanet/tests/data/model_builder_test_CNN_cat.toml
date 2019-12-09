@@ -1,4 +1,4 @@
-[body]
+[model]
 architecture = "single"
 
 # global default values for all the layers of the network
@@ -10,14 +10,8 @@ batchnorm=true
 blocks = [
           {filters=10},
           {filters=10, pool_size=[2, 2, 2]},
+          {type="OutputCateg", transition="keras:Flatten", output_name="ts_output", categories=2, activation="relu", unit_list=[128, 32]}
           ]
-
-
-[head]
-architecture = "categorical"
-architecture_args = {output_name="ts_output", categories=2}
-
-activation = "relu"
 
 
 [compile]

@@ -1,27 +1,23 @@
 # A simple sequential network, featuring 2D convolutions, batchnorms, and
 # pooling layers, as well as a categorical output
-[body]
-type = "conv_block"
+[model]
+type = "ConvBlock"
 conv_dim = 2
 kernel_size = 3
 activation = 'relu'
 batchnorm=true
 
 blocks = [
-          {filters=64},
-          {filters=64, pool_size=[2, 2]},
-          {filters=128},
-          {filters=128, pool_size=[2, 2]},
-          {filters=256},
-          {filters=256, pool_size=[2, 2]},
-          {filters=512},
-          {filters=512},
-         ]
-
-# ----------------------------------------------------------------------
-[head]
-architecture = "gpool"
-architecture_args = {output_name="your_output_name_here", categories=3}
+    {filters=64},
+    {filters=64, pool_size=[2, 2]},
+    {filters=128},
+    {filters=128, pool_size=[2, 2]},
+    {filters=256},
+    {filters=256, pool_size=[2, 2]},
+    {filters=512},
+    {filters=512},
+    {type="OutputCateg", transition="keras:GlobalAveragePooling2D", output_name="your_output_name_here", categories=3}
+]
 
 # ----------------------------------------------------------------------
 [compile]

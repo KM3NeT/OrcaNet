@@ -57,7 +57,7 @@ class TestBatchGenerator(TestCase):
 
     def test_batch(self):
         filepaths = self.filepaths_file_1
-        gene = get_h5_generator(self.orga, filepaths)
+        gene = iter(get_h5_generator(self.orga, filepaths))
 
         target_xs_batch_1 = {
             "input_A": self.train_A_file_1_ctnt[0][:2],
@@ -81,15 +81,6 @@ class TestBatchGenerator(TestCase):
         assert_dict_arrays_equal(xs, target_xs_batch_2)
         assert_dict_arrays_equal(ys, target_ys_batch_2)
 
-        # appended batches
-        xs, ys = next(gene)
-        assert_dict_arrays_equal(xs, target_xs_batch_1)
-        assert_dict_arrays_equal(ys, target_ys_batch_1)
-
-        xs, ys = next(gene)
-        assert_dict_arrays_equal(xs, target_xs_batch_2)
-        assert_dict_arrays_equal(ys, target_ys_batch_2)
-
         with self.assertRaises(StopIteration):
             next(gene)
 
@@ -99,7 +90,7 @@ class TestBatchGenerator(TestCase):
         xs_mean = {name: np.ones(shape) * 0.5 for name, shape in self.n_bins.items()}
 
         self.orga.get_xs_mean = MagicMock(return_value=xs_mean)
-        gene = get_h5_generator(self.orga, filepaths, zero_center=True)
+        gene = iter(get_h5_generator(self.orga, filepaths, zero_center=True))
 
         target_xs_batch_1 = {
             "input_A": np.subtract(self.train_A_file_1_ctnt[0][:2], xs_mean["input_A"]),
@@ -132,7 +123,7 @@ class TestBatchGenerator(TestCase):
             return mod
 
         self.orga.cfg.sample_modifier = sample_modifier
-        gene = get_h5_generator(self.orga, filepaths)
+        gene = iter(get_h5_generator(self.orga, filepaths))
 
         target_xs_batch_1 = {
             "input_A": self.train_A_file_1_ctnt[0][:2]*2,
@@ -159,7 +150,7 @@ class TestBatchGenerator(TestCase):
     def test_batch_mc_infos(self):
         filepaths = self.filepaths_file_1
 
-        gene = get_h5_generator(self.orga, filepaths, keras_mode=False)
+        gene = iter(get_h5_generator(self.orga, filepaths, keras_mode=False))
 
         target_xs_batch_1 = {
             "input_A": self.train_A_file_1_ctnt[0][:2],

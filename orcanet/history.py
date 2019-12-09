@@ -185,11 +185,11 @@ class HistoryHandler:
         best_line = summary_data[best_index]
         return best_line
 
-    def get_best_epoch_fileno(self, metric="val_loss"):
+    def get_best_epoch_fileno(self, metric="val_loss", mini=True):
         """
         Get the epoch/fileno tuple where the given metric is smallest.
         """
-        best_line = self.get_best_epoch_info(metric=metric)
+        best_line = self.get_best_epoch_info(metric=metric, mini=mini)
         best_epoch_float = best_line["Epoch"]
         epoch, fileno = self._transform_epoch(best_epoch_float)
         return epoch, fileno

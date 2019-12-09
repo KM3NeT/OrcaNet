@@ -1,0 +1,19 @@
+# A small network to showcase the use of Inception blocks.
+[model]
+type="InceptionBlockV2"
+conv_dim = 2
+activation = 'relu'
+batchnorm = true
+
+blocks = [
+    {filters_1x1=64, filters_pool=64, filters_3x3=[48, 64], filters_3x3dbl=[64, 96], strides=2},
+    {filters_1x1=64, filters_pool=64, filters_3x3=[48, 64], filters_3x3dbl=[64, 96]},
+    {type="OutputReg", output_name="your_output_name_here", output_neurons=3}
+]
+
+# ----------------------------------------------------------------------
+[compile]
+optimizer = "adam"
+
+[compile.losses]
+your_output_name_here = {function="categorical_crossentropy", metrics=['acc']}

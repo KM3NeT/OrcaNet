@@ -1,0 +1,20 @@
+# A small convoutinal lstm network.
+[model]
+conv_dim = 2
+kernel_size = 3
+
+blocks = [
+    # here, input should be 3 dimensional, time on first axis!
+    {type="ConvBlock", filters=32, time_distributed=true},
+    {type="ConvBlock", filters=32, time_distributed=true, pool_type="global_average_pooling"},
+    # starting a layer block type with 'keras:' allows access to default keras layers
+    {type="keras:LSTM", units=10},
+    {type="OutputReg", output_name='direction_xyz', transition=false, output_neurons=3}
+]
+
+# ----------------------------------------------------------------------
+[compile]
+optimizer = "adam"
+
+[compile.losses]
+direction_xyz = {function="mse"}
