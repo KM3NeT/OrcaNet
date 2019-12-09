@@ -27,6 +27,7 @@
    input_list
    lr
    modifiers
+   example_models
    full_example
    CONTRIBUTING
 

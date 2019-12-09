@@ -49,7 +49,8 @@ the ``model_file`` argument of
     mb = ModelBuilder(model_file="model.toml")
     model = mb.build(organizer)
 
-Here is an example for the proper file format:
+Here is an example for the proper file format
+(See :ref:`example_models_page` for more examples):
 
 .. literalinclude:: ../examples/model_files/explanation.toml
    :language: toml
