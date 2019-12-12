@@ -64,8 +64,9 @@ blocks = [
 # ----------------------------------------------------------------------
 [compile]
 # Options for the compilation of the network
-# The optimizer to use for compiling, either 'adam' or 'sgd'
-optimizer = "adam"
+# The optimizer to use for compiling, either 'adam' or 'sgd' for predefined
+# orca optimizers, or keras:XXX for keras optimizers
+optimizer = "adam"  # or e.g. keras:Adam
 # Settings for the optimizer
 epsilon=0.1
 

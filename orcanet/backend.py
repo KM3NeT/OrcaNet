@@ -9,8 +9,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
+import orcanet
 from orcanet.utilities.layer_plotting import plot_activations, plot_weights
 from orcanet.logging import BatchLogger
+from orcanet.utilities.nn_utilities import RaiseOnNaN
 from orcanet.in_out import h5_get_number_of_rows
 from orcanet.h5_generator import get_h5_generator
 
@@ -49,7 +51,7 @@ def train_model(orga, model, epoch, batch_logger=False):
     else:
         f_size = orga.io.get_file_sizes("train")[epoch[1] - 1]
 
-    callbacks = []
+    callbacks = [RaiseOnNaN(), ]
     if batch_logger:
         callbacks.append(BatchLogger(orga, epoch))
     if orga.cfg.callback_train is not None:
@@ -68,7 +70,6 @@ def train_model(orga, model, epoch, batch_logger=False):
         steps_per_epoch=int(f_size / orga.cfg.batchsize),
         verbose=orga.cfg.verbose_train,
         max_queue_size=orga.cfg.max_queue_size,
-        class_weight=orga.cfg.class_weight,
         callbacks=callbacks,
         initial_epoch=epoch[0] - 1,
         epochs=epoch[0],
@@ -183,7 +184,7 @@ def save_actv_wghts_plot(orga, model, epoch, samples=1):
         orga, file, f_size=samples,
         zero_center=orga.cfg.zero_center_folder is not None,
         keras_mode=True))
-    xs, ys = next(generator)
+    xs, ys = next(generator)[:2]
 
     pdf_name_act = "{}/activations_epoch_{}_file_{}.pdf".format(
         orga.io.get_subfolder("activations", create=True), epoch[0], epoch[1])
@@ -235,9 +236,6 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
         label modifier instead of none.
 
     """
-    batchsize = orga.cfg.batchsize
-    compression = ("gzip", 1)
-
     file_size = h5_get_number_of_rows(
         list(files_dict.values())[0],
         datasets=[orga.cfg.key_x_values])
@@ -246,24 +244,26 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
         files_dict,
         zero_center=orga.cfg.zero_center_folder is not None,
         keras_mode=False,
-        use_def_label=use_def_label))
+        use_def_label=use_def_label
+    ))
 
     if samples is None:
-        steps = int(file_size / batchsize)
-        if file_size % batchsize != 0:
+        steps = int(file_size / orga.cfg.batchsize)
+        if file_size % orga.cfg.batchsize != 0:
             # add a smaller step in the end
             steps += 1
     else:
-        steps = int(samples / batchsize)
+        steps = int(samples / orga.cfg.batchsize)
 
-    with h5py.File(output_path, 'w') as h5_file:
+    with h5py.File(output_path, 'x') as h5_file:
+        h5_file.attrs.create("orcanet", orcanet.__version__, dtype="S6")
+
         for s in range(steps):
             if s % 1000 == 0:
                 print('Predicting in step {}/{} ({:0.2%})'.format(
                     s, steps, s/steps))
 
             info_blob = next(generator)
-
             y_pred = model.predict_on_batch(info_blob["xs"])
             if not isinstance(y_pred, list):
                 # if only one output, transform to a list
@@ -278,15 +278,16 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
             else:
                 datasets = orga.cfg.dataset_modifier(info_blob)
 
-            # TODO maybe add attr to data, like used files or orcanet version number?
             if s == 0:  # create datasets in the first step
                 for dataset_name, data in datasets.items():
-                    maxshape = (file_size,) + data.shape[1:]
-                    chunks = True  # (batchsize,) + data.shape[1:]
                     h5_file.create_dataset(
-                        dataset_name, data=data, maxshape=maxshape,
-                        chunks=chunks, compression=compression[0],
-                        compression_opts=compression[1])
+                        dataset_name,
+                        data=data,
+                        maxshape=(file_size,) + data.shape[1:],
+                        chunks=True,  # (batchsize,) + data.shape[1:]
+                        compression="gzip",
+                        compression_opts=1,
+                    )
 
             else:
                 for dataset_name, data in datasets.items():

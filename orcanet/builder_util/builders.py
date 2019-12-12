@@ -18,8 +18,11 @@ class BlockBuilder:
         Print info about the building process?
 
     """
-    def __init__(self, defaults=None, verbose=False):
-        """ Set dict with default values for the layers of the model.
+    def __init__(self, defaults=None, verbose=False, **kwargs):
+        """
+        Set dict with default values for the layers of the model.
+        Can also define custom block names as kwargs (key = toml name,
+        value = block).
         """
         # dict with toml keyword vs block for all custom blocks
         self.all_blocks = dict(inspect.getmembers(layer_blocks, inspect.isclass))
@@ -37,6 +40,9 @@ class BlockBuilder:
             "gpool_reg": layer_blocks.OutputReg,
             "regression_error": layer_blocks.OutputRegErr,
         }
+
+        if kwargs:
+            self.all_blocks = {**self.all_blocks, **kwargs}
 
         self._check_arguments(defaults)
         self.defaults = defaults

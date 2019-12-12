@@ -86,6 +86,19 @@ def get_layer_output(model, samples, layer_name, mode="test"):
     return layer_output
 
 
+class RaiseOnNaN(ks.callbacks.Callback):
+    """
+    Callback that terminates training when a NaN loss is encountered.
+    """
+    def on_batch_end(self, batch, logs=None):
+        logs = logs or {}
+        loss = logs.get('loss')
+        if loss is not None:
+            if np.isnan(loss) or np.isinf(loss):
+                raise ValueError(
+                    'Batch %d: Invalid loss, terminating training' % batch
+                )
+
 # ------------- Zero center functions -------------#
 
 
