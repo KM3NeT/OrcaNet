@@ -17,7 +17,8 @@ from orcanet_contrib.plotting.utils import correct_reco_energy, select_ic, get_e
 
 
 def make_2d_prop_to_prop_plot(pred_file, prop_1_name, prop_2_name, savefolder, savename, reco_energy_correction=None,
-                              cuts=None, title_prefix='OrcaNet: ', overlay=('KM3NeT', (0.05, 0.92), 'k'), title=True):
+                              cuts=None, title_prefix='OrcaNet: ', overlay=('KM3NeT', (0.05, 0.92), 'k'), title=True,
+                              vmax_dict=None):
     """
     Function that makes a 2d plot of property 1 vs property 2.
 
@@ -56,7 +57,6 @@ def make_2d_prop_to_prop_plot(pred_file, prop_1_name, prop_2_name, savefolder, s
         if 'lim' in properties[prop_2_name]:
             ax.set_ylim(properties[prop_2_name]['lim'][0], properties[prop_2_name]['lim'][1])
 
-        plot_line_through_the_origin(prop_1_name, prop_2_name)
         if title is True:
             title_text = plt.title(title_prefix + ic_list[ic]['title'] + ', ' + title_name_prop_1 + ' vs. ' + title_name_prop_2)
             title_text.set_position([.5, 1.04])
@@ -74,6 +74,7 @@ def make_2d_prop_to_prop_plot(pred_file, prop_1_name, prop_2_name, savefolder, s
                 y_label = 'Corrected reconstructed energy (GeV)'
 
         ax.set_xlabel(x_label), ax.set_ylabel(y_label)
+        plot_line_through_the_origin(prop_1_name, prop_2_name, ax=ax)
         # plt.tight_layout()
 
         pdf_plots.savefig(fig)
@@ -97,6 +98,7 @@ def make_2d_prop_to_prop_plot(pred_file, prop_1_name, prop_2_name, savefolder, s
     fig, ax = plt.subplots()
     pdf_plots = mpl.backends.backend_pdf.PdfPages(savefolder + '/' + savename + '.pdf')
 
+    if vmax_dict is None: vmax_dict = {}
     for ic in ic_list.keys():
         is_ic = select_ic(mc_info['particle_type'], mc_info['is_cc'], ic)
         if bool(np.any(is_ic, axis=0)) is False:
@@ -107,16 +109,23 @@ def make_2d_prop_to_prop_plot(pred_file, prop_1_name, prop_2_name, savefolder, s
         hist_2d_prop_1_prop_2 = np.histogram2d(prop_1[is_ic], prop_2[is_ic], [bins_prop_1, bins_prop_2])
         bin_edges_prop_1, bin_edges_prop_2 = hist_2d_prop_1_prop_2[1], hist_2d_prop_1_prop_2[2]
 
+        #print(hist_2d_prop_1_prop_2[0].T.max())
+        vmax = vmax_dict[ic] if ic in vmax_dict else hist_2d_prop_1_prop_2[0].T.max()
+        print(vmax)
+        print(vmax_dict)
         # Format in classical numpy convention: x along first dim (vertical), y along second dim (horizontal)
         # transpose to get typical cartesian convention: y along first dim (vertical), x along second dim (horizontal)
         pcm_prop_1_prop_2 = ax.pcolormesh(bin_edges_prop_1, bin_edges_prop_2, hist_2d_prop_1_prop_2[0].T,
-                                          norm=mpl.colors.LogNorm(vmin=1, vmax=hist_2d_prop_1_prop_2[0].T.max()))
+                                          #norm=mpl.colors.LogNorm(vmin=1, vmax=hist_2d_prop_1_prop_2[0].T.max()))
+                                          norm=mpl.colors.LogNorm(vmin=1, vmax=vmax))
 
         apply_plot_options_and_save_to_pdf()
+        if ic not in vmax_dict: vmax_dict[ic] = hist_2d_prop_1_prop_2[0].T.max()
 
     pdf_plots.close()
     plt.close()
 
+    return vmax_dict
 
 def get_make_2d_energy_resolution_plot_properties_dict():
     """
@@ -149,13 +158,13 @@ def get_make_2d_energy_resolution_plot_properties_dict():
                   'dir_z_true': {'dset_key': 'mc_info', 'col_name': 'dir_z', 'bins': np.linspace(-1, 1, 100),
                                  'title_name': 'true dir-z', 'ax_label': 'True dir-z', 'lim': (-1, 1)},
                   'azimuth_reco': {'dset_key': 'pred', 'bins': np.linspace(-math.pi, math.pi, 100),
-                                   'title_name': 'reco azimuth', 'ax_label': 'Reconstructed azimuth [rad]'},
+                                   'title_name': 'reco azimuth', 'ax_label': 'Reconstructed azimuth angle [rad]'},
                   'azimuth_true': {'dset_key': 'mc_info', 'bins': np.linspace(-math.pi, math.pi, 100),
-                                   'title_name': 'true azimuth', 'ax_label': 'True azimuth [rad]'},
+                                   'title_name': 'true azimuth', 'ax_label': 'True azimuth angle [rad]'},
                   'zenith_reco': {'dset_key': 'pred', 'bins': np.linspace(-math.pi/float(2), math.pi/float(2), 100),
-                                  'title_name': 'reco zenith', 'ax_label': 'Reconstructed zenith [rad]'},
+                                  'title_name': 'reco zenith', 'ax_label': 'Reconstructed zenith angle [rad]'},
                   'zenith_true': {'dset_key': 'mc_info', 'bins': np.linspace(-math.pi/float(2), math.pi/float(2), 100),
-                                  'title_name': 'true zenith', 'ax_label': 'True zenith [rad]'},
+                                  'title_name': 'true zenith', 'ax_label': 'True zenith angle [rad]'},
                   'bjorkeny_reco': {'dset_key': 'pred', 'col_name': 'pred_bjorkeny', 'bins': np.linspace(0, 1, 101),
                                     'title_name': 'reco bjorkeny', 'ax_label': 'Reconstructed bjorkeny'},
                   'bjorkeny_true': {'dset_key': 'mc_info', 'col_name': 'bjorkeny', 'bins': np.linspace(0, 1, 101),
@@ -172,14 +181,14 @@ def get_make_2d_energy_resolution_plot_properties_dict():
                                  'title_name': 'true vtx-y', 'ax_label': 'True vtx-y'},
                   'vtx_z_true': {'dset_key': 'mc_info', 'col_name': 'vertex_pos_z', 'bins': 50,
                                  'title_name': 'true vtx-z', 'ax_label': 'True vtx-z'},
-                  # 'vtx_long_reco_mc': {'dset_key': 'pred', 'col_name': None, 'bins': 150, 'lim': (-30, 30),
-                  #                      'title_name': 'vtx long', 'ax_label': 'Vertex longitudinal distance [m]'},
-                  # 'vtx_perp_reco_mc': {'dset_key': 'pred', 'col_name': None, 'bins': 150, 'lim': (0, 30),
-                  #                      'title_name': 'vtx perp', 'ax_label': 'Vertex perpendicular distance [m]'}
-                  'vtx_long_reco_mc': {'dset_key': 'pred', 'col_name': None, 'bins': 150, 'lim': (-90, 90),
-                                         'title_name': 'vtx long', 'ax_label': 'Vertex longitudinal distance [m]'},
-                  'vtx_perp_reco_mc': {'dset_key': 'pred', 'col_name': None, 'bins': 150, 'lim': (0, 90),
-                                         'title_name': 'vtx perp', 'ax_label': 'Vertex perpendicular distance [m]'}
+                  'vtx_long_reco_mc': {'dset_key': 'pred', 'col_name': None, 'bins': np.linspace(-30, 30, 61), 'lim': (-30, 30),
+                                       'title_name': 'vtx long', 'ax_label': 'Longitudinal distance [m]'},
+                  'vtx_perp_reco_mc': {'dset_key': 'pred', 'col_name': None, 'bins': np.linspace(0, 30, 31), 'lim': (0, 30),
+                                       'title_name': 'vtx perp', 'ax_label': 'Perpendicular distance [m]'}
+                  # 'vtx_long_reco_mc': {'dset_key': 'pred', 'col_name': None, 'bins': np.linspace(-90, 90, 73), 'lim': (-90, 90),
+                  #                        'title_name': 'vtx long', 'ax_label': 'Longitudinal distance [m]'},
+                  # 'vtx_perp_reco_mc': {'dset_key': 'pred', 'col_name': None, 'bins': np.linspace(0, 90, 37), 'lim': (0, 90),
+                  #                        'title_name': 'vtx perp', 'ax_label': 'Perpendicular distance [m]'}
                   }
 
     return properties
@@ -297,7 +306,7 @@ def get_property_info_to_plot(mc_info, prop_dset, properties, prop_name, reco_en
 
 
 def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, savefolder, savename,
-                                               reco_energy_correction=None, energy_bins=np.arange(1, 101, 3),
+                                               reco_energy_correction=None, energy_bins=np.arange(1, 101, 3),  # 3
                                                cuts=None, compare_2nd_reco=None, title=True,
                                                overlay=('KM3NeT Preliminary', (0.3, 0.95))):
     """
@@ -384,9 +393,9 @@ def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, s
 
             bins, perf = plot_data[0], plot_data[1]
             if sub_prop == 'azimuth_corr':
-                label = 'DL azimuth'
+                label = 'CNN azimuth'
             else:
-                label = 'DL ' + sub_prop.replace('_', ' ')
+                label = 'CNN ' + sub_prop.replace('_', ' ')
             ax.step(bins, perf, linestyle="-", where='post', label=label)
 
             if compare_2nd_reco is not None:
@@ -396,9 +405,15 @@ def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, s
                                                                        reco_energy_correction=None,
                                                                        energy_bins=energy_bins)
                 if sub_prop == 'azimuth_corr':
-                    label = 'Std azimuth'
+                    if ic == 'muon-CC':
+                        label = 'TOR azimuth'
+                    else:
+                        label = 'SOR azimuth'
                 else:
-                    label = 'Std ' + sub_prop.replace('_', ' ')
+                    if ic == 'muon-CC':
+                        label = 'TOR ' + sub_prop.replace('_', ' ')
+                    else:
+                        label = 'SOR ' + sub_prop.replace('_', ' ')
                 ax.step(bins, plot_data_2[1], linestyle="-", where='post', label=label)
 
         x_ticks_major = np.arange(0, 101, 10)
@@ -409,11 +424,11 @@ def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, s
             title_text.set_position([.5, 1.04])
 
         if mode[0] == 'rel_std_div':
-            y_label = r'$\sigma / E_{true}$ for ' + property_name + ' reco'
+            y_label = r'$\sigma / E_{true}$'
         elif mode[0] == 'std_div':
-            y_label = r'$\sigma$ for ' + property_name + ' reco'
+            y_label = r'$\sigma$'
         elif mode[0] == 'std_div_mean':
-            y_label = r'$\sigma (\mathrm{reco} / \mathrm{reco}_\mathrm{mean})$ for ' + property_name + ' reco'
+            y_label = r'$\sigma (\mathrm{reco} / \mathrm{reco}_\mathrm{mean})$'
         else:
             mode_str = mode[1].replace('_', ' ').capitalize()
             y_label = mode_str + properties[property_name]['ylabel']
@@ -424,6 +439,8 @@ def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, s
         plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold')
         ax.grid(True)
         ax.legend(loc='upper right')
+
+        #ax.set_xlim(0, 20)
 
         pdf_plots.savefig(fig)
         ax.cla()
@@ -526,8 +543,7 @@ def calc_plot_data_of_energy_dependent_label(mc_info, pred, prop_name, mode, sel
 
         space_angle_inner_value = np.sin(zenith_true) * np.sin(zenith_pred) * np.cos(azimuth_true - azimuth_pred)\
                                   + np.cos(zenith_true) * np.cos(zenith_pred)
-
-        space_angle_inner_value = np.clip(-1, 1, space_angle_inner_value)
+        space_angle_inner_value = np.clip(space_angle_inner_value, -1, 1)
         space_angle = np.arccos(space_angle_inner_value)
 
         prop_pred, prop_true = space_angle, np.zeros(space_angle.shape)
@@ -951,7 +967,7 @@ def get_prop_true_pred_and_prop_pred_sigma(pred, true, mc_info, properties, prop
             dz_pred_err = np.clip(np.copy(dz_pred_err), 0, None) * correction
             # dz_pred = np.clip(np.copy(dz_pred), -0.999, 0.999)
 
-            # normalize
+            # normalize #
             ax = np.newaxis
             dir_conc = np.concatenate([dx_pred[:, ax], dy_pred[:, ax], dz_pred[:, ax]], axis=1)
             norm = np.linalg.norm(dir_conc, axis=1)
@@ -1092,7 +1108,7 @@ def plot_1d_reco_err_to_reco_residual_for_prop(prop_true, prop_pred, prop_pred_e
     if title_flag is True:
         title = plt.title(title)
         title.set_position([.5, 1.04])
-    ax.set_xlabel(r'Estimated uncertainty $\sigma_{pred}$ ' + unit), ax.set_ylabel('Standard deviation of residuals ' + unit)
+    ax.set_xlabel(r'Estimated uncertainty $\sigma_{reco}$ ' + unit), ax.set_ylabel('Standard deviation of residuals ' + unit)
     ax.grid(True)
     plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold')
 
@@ -1156,12 +1172,17 @@ def make_2d_true_reco_plot_different_sigmas(pred_file, savefolder, savename, cut
 
     for prop_name in properties:
         if prop_name not in ['zenith', 'cos_zenith', 'azimuth', 'dir_z']:
-            continue
+        #if prop_name not in ['zenith', 'cos_zenith']:
+            continue  # TODO temp
 
         for ic in ic_list:
+            if ic != 'elec-CC':
+                continue # TODO TEMP
+
             is_ic = select_ic(mc_info['particle_type'], mc_info['is_cc'], ic)
             if bool(np.any(is_ic, axis=0)) is False:
                 continue
+
 
             mc_info_ic = mc_info[is_ic]
             pred_ic, true_ic = pred[is_ic], true[is_ic]
@@ -1459,7 +1480,7 @@ def plot_2d_dir_correlation_different_sigmas(prop_true, prop_pred, mc_info, prop
 # --------------------------- Utility code --------------------------- #
 
 
-def plot_line_through_the_origin(prop_1_name, prop_2_name):
+def plot_line_through_the_origin(prop_1_name, prop_2_name, ax=None):
     """
     Plots a line through the origin, if the two propertie names are recognized.
 
@@ -1483,7 +1504,8 @@ def plot_line_through_the_origin(prop_1_name, prop_2_name):
         plt.plot([0, 1], [0, 1], 'k-', lw=1, zorder=10)
 
     elif 'energy' in prop_1_name and 'energy' in prop_2_name:
-        plt.plot([-1, 1], [-1, 1], 'k-', lw=1, zorder=10)
+        if ax is not None:
+            plt.plot(ax.get_xlim(), ax.get_ylim(), 'k-', lw=1, zorder=10)
 
     else:
         warnings.warn('Couldnt decipher how to plot the line through the origin for your two properties'

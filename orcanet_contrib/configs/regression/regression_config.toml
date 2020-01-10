@@ -3,7 +3,7 @@
 # They overwrite the default values which are listed in the definition of the Configuration class.
 #
 [config]
-learning_rate = 0.0001 # "triple_decay"
+learning_rate = 0.00001
 zero_center_folder = "/home/saturn/capn/mppi033h/Data/zero_center_folder/"
 train_logger_display = 250
 train_logger_flush = -1

@@ -37,15 +37,15 @@ architecture_args = {output_names=['e', 'dx', 'dy', 'dz', 'by', 'vx', 'vy', 'vz'
 optimizer = "adam"
 
 [compile.losses]
-dx = {function="mean_absolute_error", weight=10}
-dy = {function="mean_absolute_error", weight=10}
-dz = {function='mean_absolute_error', weight=15}
-vx = {function='mean_absolute_error', weight=0.1}
-vy = {function='mean_absolute_error', weight=0.1}
-vz = {function='mean_absolute_error', weight=0.1}
+dx = {function="mean_absolute_error", weight=30}
+dy = {function="mean_absolute_error", weight=30}
+dz = {function='mean_absolute_error', weight=55}
+vx = {function='mean_absolute_error', weight=1}
+vy = {function='mean_absolute_error', weight=1}
+vz = {function='mean_absolute_error', weight=1}
 vt = {function='mean_absolute_error', weight=1e-30}
 e  = {function='mean_absolute_error', weight=1}
-by = {function='mean_absolute_error', weight=10}
+by = {function='mean_absolute_error', weight=30}
 dx_err = {function='loss_uncertainty_mse'}
 dy_err = {function='loss_uncertainty_mse'}
 dz_err = {function='loss_uncertainty_mse', weight=1.25}

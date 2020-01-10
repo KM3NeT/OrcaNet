@@ -116,20 +116,24 @@ def make_e_to_acc_plot_ts(pred_file, savefolder='', plot_range=(1, 100),
     fig, axes = plt.subplots()
 
     if merge_nu_anu is False:
-        make_step_plot_e_acc_class('muon-CC', mc_info, nn_pred_correct, axes, plot_range=plot_range, linestyle='-', color='b')
-        make_step_plot_e_acc_class('a_muon-CC', mc_info, nn_pred_correct, axes, plot_range=plot_range, linestyle='--', color='b')
-        make_step_plot_e_acc_class('elec-CC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='-', color='r')
-        make_step_plot_e_acc_class('a_elec-CC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='--', color='r')
-        make_step_plot_e_acc_class('elec-NC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='-', color='saddlebrown')
-        make_step_plot_e_acc_class('a_elec-NC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='--', color='saddlebrown')
+        be_and_1d_acc_per_e_bin = dict()  # contains bin edges and hists
+
+        be_and_1d_acc_per_e_bin['muon-CC'] = make_step_plot_e_acc_class('muon-CC', mc_info, nn_pred_correct, axes, plot_range=plot_range, linestyle='-', color='b')
+        be_and_1d_acc_per_e_bin['a_muon-CC'] = make_step_plot_e_acc_class('a_muon-CC', mc_info, nn_pred_correct, axes, plot_range=plot_range, linestyle='--', color='b')
+        be_and_1d_acc_per_e_bin['elec-CC'] = make_step_plot_e_acc_class('elec-CC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='-', color='r')
+        be_and_1d_acc_per_e_bin['a_elec-CC'] = make_step_plot_e_acc_class('a_elec-CC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='--', color='r')
+        be_and_1d_acc_per_e_bin['elec-NC'] = make_step_plot_e_acc_class('elec-NC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='-', color='saddlebrown')
+        be_and_1d_acc_per_e_bin['a_elec-NC'] = make_step_plot_e_acc_class('a_elec-NC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='--', color='saddlebrown')
 
         if no_taus is False:
-            make_step_plot_e_acc_class('tau-CC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='-', color='g')
-            make_step_plot_e_acc_class('a_tau-CC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='--', color='g')
+            be_and_1d_acc_per_e_bin['tau-CC'] = make_step_plot_e_acc_class('tau-CC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='-', color='g')
+            be_and_1d_acc_per_e_bin['a_tau-CC'] = make_step_plot_e_acc_class('a_tau-CC', mc_info, nn_pred_correct, axes, invert=True, plot_range=plot_range, linestyle='--', color='g')
 
         if save is True:
             configure_and_save_plot()
         plt.close()
+
+        return be_and_1d_acc_per_e_bin
 
     else:
         be_and_1d_acc_per_e_bin = dict()  # contains bin edges and hists
@@ -339,9 +343,18 @@ def make_e_to_acc_plot_with_diff(pred_file_1, pred_file_2, savefolder, cuts=None
 
     be_and_1d_acc_per_e_bin_1 = make_e_to_acc_plot_ts(pred_file_1, cuts=cuts[0],
                                                       prob_threshold_shower=prob_threshold_shower,
+                                                      plot_range=plot_range, merge_nu_anu=False, save=False,
+                                                      no_taus=no_taus)
+    # be_and_1d_acc_per_e_bin_2 = make_e_to_acc_plot_ts(pred_file_2, cuts=cuts[1],
+    #                                                   prob_threshold_shower=prob_threshold_shower,
+    #                                                   plot_range=plot_range, merge_nu_anu=False, save=False,
+    #                                                   no_taus=no_taus)
+
+    be_and_1d_acc_per_e_bin_1_merge = make_e_to_acc_plot_ts(pred_file_1, cuts=cuts[0],
+                                                      prob_threshold_shower=prob_threshold_shower,
                                                       plot_range=plot_range, merge_nu_anu=True, save=False,
                                                       no_taus=no_taus)
-    be_and_1d_acc_per_e_bin_2 = make_e_to_acc_plot_ts(pred_file_2, cuts=cuts[1],
+    be_and_1d_acc_per_e_bin_2_merge = make_e_to_acc_plot_ts(pred_file_2, cuts=cuts[1],
                                                       prob_threshold_shower=prob_threshold_shower,
                                                       plot_range=plot_range, merge_nu_anu=True, save=False,
                                                       no_taus=no_taus)
@@ -355,16 +368,16 @@ def make_e_to_acc_plot_with_diff(pred_file_1, pred_file_2, savefolder, cuts=None
         diff_gap_1_div_2 = ((gap_type_1_type_2_dict_1 / gap_type_1_type_2_dict_2) - 1) * 100
         return diff_gap_1_div_2
 
-    diff_gap_mu_cc_e_cc_f1_f2 = get_gaps_track_shower(be_and_1d_acc_per_e_bin_1, be_and_1d_acc_per_e_bin_2,
+    diff_gap_mu_cc_e_cc_f1_f2 = get_gaps_track_shower(be_and_1d_acc_per_e_bin_1_merge, be_and_1d_acc_per_e_bin_2_merge,
                                                       'muon-CC_nu_anu', 'elec-CC_nu_anu')
-    diff_gap_mu_cc_e_nc_f1_f2 = get_gaps_track_shower(be_and_1d_acc_per_e_bin_1, be_and_1d_acc_per_e_bin_2,
+    diff_gap_mu_cc_e_nc_f1_f2 = get_gaps_track_shower(be_and_1d_acc_per_e_bin_1_merge, be_and_1d_acc_per_e_bin_2_merge,
                                                       'muon-CC_nu_anu', 'elec-NC_nu_anu')
 
     fig, axes = plt.subplots()
 
-    axes.step(be_and_1d_acc_per_e_bin_1['muon-CC_nu_anu'][0], diff_gap_mu_cc_e_cc_f1_f2, where='pre', linestyle='-', color='darkorchid',
+    axes.step(be_and_1d_acc_per_e_bin_1_merge['muon-CC_nu_anu'][0], diff_gap_mu_cc_e_cc_f1_f2, where='pre', linestyle='-', color='darkorchid',
               label=r'$\nu^{\mathrm{CC}}_{\mu} \;\mathrm{to}\; \nu^{\mathrm{CC}}_{e}$', zorder=3)
-    axes.step(be_and_1d_acc_per_e_bin_1['muon-CC_nu_anu'][0], diff_gap_mu_cc_e_nc_f1_f2, where='pre', linestyle='-', color='darkorange',
+    axes.step(be_and_1d_acc_per_e_bin_1_merge['muon-CC_nu_anu'][0], diff_gap_mu_cc_e_nc_f1_f2, where='pre', linestyle='-', color='darkorange',
               label=r'$\nu^{\mathrm{CC}}_{\mu} \;\mathrm{to}\; \nu^{\mathrm{NC}}_{e}$', zorder=3)
 
     axes.legend(loc='lower right', ncol=2)
@@ -388,15 +401,19 @@ def make_e_to_acc_plot_with_diff(pred_file_1, pred_file_2, savefolder, cuts=None
     fig, axes = plt.subplots()
 
     # plot the hist data of all different interactions
-    colors = {'muon-CC_nu_anu': 'b', 'elec-CC_nu_anu': 'r', 'elec-NC_nu_anu': 'saddlebrown', 'tau-CC_nu_anu': 'g'}
+    #colors = {'muon-CC_nu_anu': 'b', 'elec-CC_nu_anu': 'r', 'elec-NC_nu_anu': 'saddlebrown', 'tau-CC_nu_anu': 'g'}
+    colors = {'muon-CC': 'b', 'a_muon-CC': 'b', 'elec-CC': 'r', 'a_elec-CC': 'r',
+              'elec-NC': 'saddlebrown', 'a_elec-NC': 'saddlebrown', 'tau-CC': 'g', 'a_tau-CC': 'g'}
     for key in be_and_1d_acc_per_e_bin_1:
         if be_and_1d_acc_per_e_bin_1[key][0] is None:
             continue
 
+        linestyle = '-' if key[0] != 'a' else '--'
+
         label = get_latex_code_for_ptype_str(key)
         bin_edges = be_and_1d_acc_per_e_bin_1[key][0]
         hist_1d = be_and_1d_acc_per_e_bin_1[key][1]
-        axes.step(bin_edges, hist_1d, where='pre', linestyle='-', color=colors[key],
+        axes.step(bin_edges, hist_1d, where='pre', linestyle=linestyle, color=colors[key],
                   label=label, zorder=3)
 
     configure_plot()
@@ -410,9 +427,9 @@ def make_e_to_acc_plot_with_diff(pred_file_1, pred_file_2, savefolder, cuts=None
 
     # plot the difference to small window
 
-    axes_2.step(be_and_1d_acc_per_e_bin_1['muon-CC_nu_anu'][0], diff_gap_mu_cc_e_cc_f1_f2, where='pre', linestyle='-', color='darkorchid',
+    axes_2.step(be_and_1d_acc_per_e_bin_1_merge['muon-CC_nu_anu'][0], diff_gap_mu_cc_e_cc_f1_f2, where='pre', linestyle='-', color='darkorchid',
                 label=r'$\nu^{\mathrm{CC}}_{\mu} \;\mathrm{to}\; \nu^{\mathrm{CC}}_{e}$', zorder=3)
-    axes_2.step(be_and_1d_acc_per_e_bin_1['muon-CC_nu_anu'][0], diff_gap_mu_cc_e_nc_f1_f2, where='pre', linestyle='-', color='darkorange',
+    axes_2.step(be_and_1d_acc_per_e_bin_1_merge['muon-CC_nu_anu'][0], diff_gap_mu_cc_e_nc_f1_f2, where='pre', linestyle='-', color='darkorange',
                 label=r'$\nu^{\mathrm{CC}}_{\mu} \;\mathrm{to}\; \nu^{\mathrm{NC}}_{e}$', zorder=3)
 
     axes_2.legend(loc='lower right', ncol=2)
@@ -477,7 +494,7 @@ def make_ts_prob_hists(pred_file, savefolder, cuts=None, title=True,
         plt.minorticks_on()
 
         plt.xlabel('CNN ' + ts_class + ' probability')
-        plt.ylabel('Normed quantity')
+        plt.ylabel('Normed counts')
         if title is True:
             title_text = plt.title(plot_title)
             title_text.set_position([.5, 1.04])
@@ -755,10 +772,11 @@ def plot_ts_separability(pred_file, savefolder, pred_file_2=None, cuts=None,
             prob_track = prob_track[evt_sel_mask]
 
     pdf_plots_dl = PdfPages(savefolder + '/separability_prob_hists_per_erange_dl.pdf')
-    separabilities = calculcate_separability(mc_info, prob_track, pdf_pages=pdf_plots_dl)
+    separabilities_e_cc = calculcate_separability(mc_info, prob_track, pdf_pages=pdf_plots_dl, type_compare='elec-CC')
+    separabilities_e_nc = calculcate_separability(mc_info, prob_track, pdf_pages=pdf_plots_dl, type_compare='elec-NC')
     pdf_plots_dl.close()
 
-    separabilities_2 = None
+    separabilities_2_e_cc = None
     if pred_file_2 is not None:
         mc_info_2 = pred_file_2['mc_info']
         prob_track_2 = pred_file_2['pred']['prob_track']
@@ -774,16 +792,25 @@ def plot_ts_separability(pred_file, savefolder, pred_file_2=None, cuts=None,
                 prob_track_2 = prob_track_2[evt_sel_mask_2]
 
         pdf_plots_rf = PdfPages(savefolder + '/separability_prob_hists_per_erange_rf.pdf')
-        separabilities_2 = calculcate_separability(mc_info_2, prob_track_2, pdf_pages=pdf_plots_rf)
+        separabilities_2_e_cc = calculcate_separability(mc_info_2, prob_track_2, pdf_pages=pdf_plots_rf, type_compare='elec-CC')
+        separabilities_2_e_nc = calculcate_separability(mc_info_2, prob_track_2, pdf_pages=pdf_plots_rf, type_compare='elec-NC')
         pdf_plots_rf.close()
 
     # plot the correlation coefficients
     fig, axes = plt.subplots()
-    plt.errorbar(separabilities[:, 1], separabilities[:, 0], yerr=separabilities[:, 2], color='b', marker='x', lw=0.5,
-                 markersize=3, label='CNN', capsize=1.5)
-    if separabilities_2 is not None:
-        plt.errorbar(separabilities_2[:, 1], separabilities_2[:, 0], yerr=separabilities_2[:, 2], color='r', marker='x', lw=0.5,
-                     markersize=3, label='RF', capsize=1.5)
+    plt.errorbar(separabilities_e_cc[:, 1], separabilities_e_cc[:, 0], yerr=separabilities_e_cc[:, 2], color='b', marker='x', lw=0.5,
+                 markersize=3, label=r'CNN $\nu^{\mathrm{CC}}_{\mu} \;\mathrm{to}\; \nu^{\mathrm{CC}}_{e}$',
+                 capsize=1.5)
+    plt.errorbar(separabilities_e_nc[:, 1], separabilities_e_nc[:, 0], yerr=separabilities_e_nc[:, 2], color='brown', marker='x', lw=0.5,
+                 markersize=3, label=r'CNN $\nu^{\mathrm{CC}}_{\mu} \;\mathrm{to}\; \nu^{\mathrm{NC}}_{e}$',
+                 capsize=1.5)
+    if separabilities_2_e_cc is not None:
+        plt.errorbar(separabilities_2_e_cc[:, 1], separabilities_2_e_cc[:, 0], yerr=separabilities_2_e_cc[:, 2], color='r', marker='x', lw=0.5,
+                     markersize=3, label=r'RF $\nu^{\mathrm{CC}}_{\mu} \;\mathrm{to}\; \nu^{\mathrm{CC}}_{e}$',
+                     capsize=1.5)
+        plt.errorbar(separabilities_2_e_nc[:, 1], separabilities_2_e_nc[:, 0], yerr=separabilities_2_e_nc[:, 2], color='green', marker='x', lw=0.5,
+                     markersize=3, label=r'RF $\nu^{\mathrm{CC}}_{\mu} \;\mathrm{to}\; \nu^{\mathrm{NC}}_{e}$',
+                     capsize=1.5)
 
     plt.xlabel('Energy [GeV]')
     plt.ylabel('Separability (1-c)')
@@ -809,7 +836,7 @@ def plot_ts_separability(pred_file, savefolder, pred_file_2=None, cuts=None,
 
 
 def calculcate_separability(mc_info, prob_track, pdf_pages=None, bin_edges=np.arange(-0.005, 1.005, (1 / 101) * 2.0),
-                            e_cut_range=np.logspace(0.3, 2, 18)):
+                            e_cut_range=np.logspace(0.3, 2, 18), type_compare='elec-CC'):
     """
     Calculates the separability per energy bin by calculating the correlation factors (s=1-c).
 
@@ -829,7 +856,7 @@ def calculcate_separability(mc_info, prob_track, pdf_pages=None, bin_edges=np.ar
     mc_energy = mc_info['energy']
     particle_type, is_cc = mc_info['particle_type'], mc_info['is_cc']
     is_muon_cc = select_ic(particle_type, is_cc, 'muon-CC')
-    is_elec_cc = select_ic(particle_type, is_cc, 'elec-CC')
+    is_elec_cc_nc = select_ic(particle_type, is_cc, type_compare)
 
     n = 0
     separabilities = []
@@ -841,27 +868,10 @@ def calculcate_separability(mc_info, prob_track, pdf_pages=None, bin_edges=np.ar
         e_cut_mask = np.logical_and(e_cut[0] <= mc_energy, mc_energy < e_cut[1])
 
         is_muon_cc_and_e_cut = np.logical_and(is_muon_cc, e_cut_mask)
-        is_elec_cc_and_e_cut = np.logical_and(is_elec_cc, e_cut_mask)
+        is_elec_cc_and_e_cut = np.logical_and(is_elec_cc_nc, e_cut_mask)
 
-        # --- just some plotting stuff --- #
-        hist_prob_track_e_cut_muon_cc = np.histogram(prob_track[is_muon_cc_and_e_cut], bins=bin_edges, density=True)
-        hist_prob_track_e_cut_elec_cc = np.histogram(prob_track[is_elec_cc_and_e_cut], bins=bin_edges, density=True)
-
-        if pdf_pages is not None:
-
-            fig, axes = plt.subplots()
-            plt.bar(hist_prob_track_e_cut_muon_cc[1][:-1], hist_prob_track_e_cut_muon_cc[0],
-                    width=np.diff(hist_prob_track_e_cut_muon_cc[1]), ec="k", align="edge", label='mu-cc', alpha=0.5)
-            plt.bar(hist_prob_track_e_cut_elec_cc[1][:-1], hist_prob_track_e_cut_elec_cc[0],
-                    width=np.diff(hist_prob_track_e_cut_elec_cc[1]), ec="k", align="edge", label='e-cc', alpha=0.5)
-            plt.title('Erange ' + str(e_cut[0]) + ' - ' + str(e_cut[1]))
-            plt.xlabel('Track probability')
-            plt.ylabel('Normed quantity')
-            axes.legend(loc='upper center')
-
-            pdf_pages.savefig(fig)
-            plt.close()
-        # --- just some plotting stuff --- #
+        hist_prob_track_e_cut_muon_cc_normed = np.histogram(prob_track[is_muon_cc_and_e_cut], bins=bin_edges, density=False)
+        hist_prob_track_e_cut_elec_cc_normed = np.histogram(prob_track[is_elec_cc_and_e_cut], bins=bin_edges, density=False)
 
         hist_prob_track_e_cut_muon_cc = np.histogram(prob_track[is_muon_cc_and_e_cut], bins=bin_edges)
         hist_prob_track_e_cut_elec_cc = np.histogram(prob_track[is_elec_cc_and_e_cut], bins=bin_edges)
@@ -883,24 +893,45 @@ def calculcate_separability(mc_info, prob_track, pdf_pages=None, bin_edges=np.ar
             plt.yscale('log')
             pdf_pages.savefig(fig)
             plt.close()
+
+            fig, axes = plt.subplots()
+            plt.bar(hist_prob_track_e_cut_muon_cc_normed[1][:-1], hist_prob_track_e_cut_muon_cc_normed[0],
+                    width=np.diff(hist_prob_track_e_cut_muon_cc_normed[1]), ec="k", align="edge", label='mu-cc', alpha=0.5)
+            plt.bar(hist_prob_track_e_cut_elec_cc_normed[1][:-1], hist_prob_track_e_cut_elec_cc_normed[0],
+                    width=np.diff(hist_prob_track_e_cut_elec_cc_normed[1]), ec="k", align="edge", label='e-cc', alpha=0.5)
+            plt.title('Erange ' + str(e_cut[0]) + ' - ' + str(e_cut[1]))
+            plt.xlabel('Track probability')
+            plt.ylabel('Normed quantity')
+            axes.legend(loc='upper center')
+
+            pdf_pages.savefig(fig)
+            plt.close()
         # --- just some plotting stuff --- #
 
         # --- Calculate the separability --- #
 
+        # calculate norm scaling factor
+        scaling_norm_muon_cc = hist_prob_track_e_cut_muon_cc_normed[0] / hist_prob_track_e_cut_muon_cc[0]
+        scaling_norm_elec_cc = hist_prob_track_e_cut_elec_cc_normed[0] / hist_prob_track_e_cut_elec_cc[0]
+        print(scaling_norm_muon_cc)
+        print(np.nanmean(scaling_norm_muon_cc))
+
         # Calculate denominator
-        sum_prob_muon_cc = np.sum(hist_prob_track_e_cut_muon_cc[0] ** 2)
-        sum_prob_elec_cc = np.sum(hist_prob_track_e_cut_elec_cc[0] ** 2)
+        sum_prob_muon_cc = np.sum(hist_prob_track_e_cut_muon_cc_normed[0] ** 2)
+        sum_prob_elec_cc = np.sum(hist_prob_track_e_cut_elec_cc_normed[0] ** 2)
         c_denominator = np.sqrt(sum_prob_muon_cc * sum_prob_elec_cc)
 
         # Calculate enumerator
         c_enumerator, separability_error = 0, 0
-        for j in range(hist_prob_track_e_cut_muon_cc[0].shape[0]):
+        for j in range(hist_prob_track_e_cut_muon_cc_normed[0].shape[0]):
+            n_mu_cc_bin_normed = hist_prob_track_e_cut_muon_cc_normed[0][j]
+            n_e_cc_bin_normed = hist_prob_track_e_cut_elec_cc_normed[0][j]
+
+            c_enumerator += n_mu_cc_bin_normed * n_e_cc_bin_normed
+
+            # calculate errors, scale down non-normed entrie values
             n_mu_cc_bin = hist_prob_track_e_cut_muon_cc[0][j]
             n_e_cc_bin = hist_prob_track_e_cut_elec_cc[0][j]
-
-            c_enumerator += n_mu_cc_bin * n_e_cc_bin
-
-            # calculate errors
             delta_n_mu_cc_bin = np.sqrt(n_mu_cc_bin)
             delta_n_e_cc_bin = np.sqrt(n_e_cc_bin)
 
@@ -910,13 +941,14 @@ def calculcate_separability(mc_info, prob_track, pdf_pages=None, bin_edges=np.ar
             if delta_n_e_cc_bin == 0:
                 print('Clipped zero e-cc bin at pos ' + str(j) + ' in the errors to'
                       ' 1 at e-range ' + str(e_cut[0]) + '-' + str(e_cut[1]))
-            delta_n_mu_cc_bin = np.clip(delta_n_mu_cc_bin, 1, None)
-            delta_n_e_cc_bin = np.clip(delta_n_e_cc_bin, 1, None)
+
+            delta_n_mu_cc_bin = np.clip(delta_n_mu_cc_bin, 1, None) * np.nanmean(scaling_norm_muon_cc)
+            delta_n_e_cc_bin = np.clip(delta_n_e_cc_bin, 1, None) * np.nanmean(scaling_norm_elec_cc)
 
             # first order errors of f = 1 - (x*y)/c (separability):
             # (y/c)**2 * delta_x**2 + (x/c)**2 * delta_y**2
-            first_order_error = ((n_mu_cc_bin / c_denominator) ** 2 * delta_n_e_cc_bin ** 2 +
-                                 (n_e_cc_bin / c_denominator) ** 2 * delta_n_mu_cc_bin ** 2)
+            first_order_error = ((n_mu_cc_bin_normed / c_denominator) ** 2 * delta_n_e_cc_bin ** 2 +
+                                 (n_e_cc_bin_normed / c_denominator) ** 2 * delta_n_mu_cc_bin ** 2)
 
             # second order errors of f = 1 - (x*y)/c (separability):
             # 1/2! * 2 * (1/c)**2 * delta_x**2 * delta_y**2
@@ -924,11 +956,12 @@ def calculcate_separability(mc_info, prob_track, pdf_pages=None, bin_edges=np.ar
 
             separability_error += np.sqrt(first_order_error + second_order_error)
 
+        print(c_enumerator)
+        print(c_denominator)
         separability = 1 - (c_enumerator / c_denominator)
         average_energy = np.mean(mc_energy[e_cut_mask])
 
         separabilities.append((separability, average_energy, separability_error))
-        
 
     separabilities = np.array(separabilities)
     return separabilities

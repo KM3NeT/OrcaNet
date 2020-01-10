@@ -55,7 +55,7 @@ def make_prob_hists_bg_classifier(pred_file, savefolder, bg_classes=('not_neutri
             plt.xlabel(xlabel_prefix + ' ' + bg_class + ' score')
         else:
             plt.xlabel(xlabel_prefix + ' ' + bg_class + ' probability')
-        plt.ylabel('Normed quantity')
+        plt.ylabel('Normed counts')
         if title is True:
             title_text = plt.title('Probability to be classified as ' + bg_class)
             title_text.set_position([.5, 1.04])
@@ -158,7 +158,7 @@ def make_prob_hists_for_class(prob_class, ptype, is_cc, axes, x_range=(0, 1)):
 
 
 def make_contamination_to_neutrino_efficiency_plot(pred_file_1, pred_file_2, dataset_modifier, savefolder,
-                                                   cuts=None, title=True, overlay=('KM3NeT', (0.8, 0.15))):
+                                                   cuts=None, title=True, overlay=('KM3NeT', (0.85, 0.15))):
     """
     Makes bg classifier plots like muon contamination vs neutrino efficiency, both weighted 1 year and non weighted.
 
@@ -285,6 +285,8 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
         # Just because we want a plot from 85 to 101
         ax.set_ylim(bottom=87, top=ax.get_ylim()[1])
         pdf_plots.savefig(fig)
+        ax.set_ylim(bottom=74, top=101)
+        pdf_plots.savefig(fig)
 
         plt.close()
 
@@ -322,7 +324,13 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
         pdf_plots.savefig(fig)
 
         # Just because we want a plot from 85 to 100.25
-        ax.set_ylim(bottom=95, top=100.25)
+        ax.set_ylim(bottom=96, top=100.25)
+        pdf_plots.savefig(fig)
+
+        ax.set_ylim(bottom=96.5, top=99.75)
+        pdf_plots.savefig(fig)
+
+        ax.set_ylim(bottom=98.6, top=99.7)
         pdf_plots.savefig(fig)
 
         plt.close()
