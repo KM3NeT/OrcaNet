@@ -128,6 +128,8 @@ class TestFullExample(TestCase):
         os.chdir(example_dir)
         sys.path.append(example_dir)
 
+        import full_example
+
         shutil.rmtree(example_dir+"/output")
         os.chdir(init_dir)
 
