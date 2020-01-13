@@ -72,24 +72,24 @@ class TetstZeroCenter(TestCase):
 
         self._check_dict_ndarray(xs_mean, target)
 
-        file_A = orga.cfg.zero_center_folder + "/" + orga.cfg._list_file + \
+        file_a = orga.cfg.zero_center_folder + "/" + orga.cfg._list_file + \
             '_input_testing_input_A.npz'
-        file_B = orga.cfg.zero_center_folder + "/" + orga.cfg._list_file + \
+        file_b = orga.cfg.zero_center_folder + "/" + orga.cfg._list_file + \
             '_input_testing_input_B.npz'
-        used_files_A = np.load(file_A)['zero_center_used_ip_files']
-        used_files_B = np.load(file_B)['zero_center_used_ip_files']
-        self.assertTrue(np.array_equal(used_files_A, self.train_inp_A))
-        self.assertTrue(np.array_equal(used_files_B, self.train_inp_B))
+        used_files_a = np.load(file_a)['zero_center_used_ip_files']
+        used_files_b = np.load(file_b)['zero_center_used_ip_files']
+        self.assertTrue(np.array_equal(used_files_a, self.train_inp_A))
+        self.assertTrue(np.array_equal(used_files_b, self.train_inp_B))
 
         # test loading of saved xs_mean
-        os.remove(file_B)
+        os.remove(file_b)
         xs_mean = load_zero_center_data(orga, logging=False)
 
         self._check_dict_ndarray(xs_mean, target)
-        used_files_A = np.load(file_A)['zero_center_used_ip_files']
-        used_files_B = np.load(file_B)['zero_center_used_ip_files']
-        self.assertTrue(np.array_equal(used_files_A, self.train_inp_A))
-        self.assertTrue(np.array_equal(used_files_B, self.train_inp_B))
+        used_files_a = np.load(file_a)['zero_center_used_ip_files']
+        used_files_b = np.load(file_b)['zero_center_used_ip_files']
+        self.assertTrue(np.array_equal(used_files_a, self.train_inp_A))
+        self.assertTrue(np.array_equal(used_files_b, self.train_inp_B))
 
     def _check_dict_ndarray(self, val, target):
         self.assertSetEqual(set(val.keys()), set(target.keys()))
@@ -107,9 +107,9 @@ class TestModel(TestCase):
         conc = layers.Concatenate()([inp1, inp2])
 
         intermed = layers.Dense(2,
-                         name=self.layer_names[2],
-                         bias_initializer="Ones",
-                         kernel_initializer="Ones")(conc)
+                                name=self.layer_names[2],
+                                bias_initializer="Ones",
+                                kernel_initializer="Ones")(conc)
         outp = layers.Dense(1, name=self.layer_names[3])(intermed)
 
         self.model = Model([inp1, inp2], outp)
@@ -161,6 +161,8 @@ def make_dummy_data(filepath1, filepath2, shape, mode=1):
         Path to file 2.
     shape : tuple
         Shape of the data, not including sample dimension.
+    mode : int
+        If mode 1 or mode 2 is used.
 
     """
     xs1 = np.ones((150,) + shape)

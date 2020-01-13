@@ -151,7 +151,7 @@ def make_dummy_data(filepath1, filepath2, shape):
     xs1 = np.concatenate([np.ones((75,) + shape), np.zeros((75,) + shape)])
     xs2 = np.concatenate([np.ones((25,) + shape), np.zeros((225,) + shape)])
 
-    dtypes = [('dir_x', '<f8'),]
+    dtypes = [('dir_x', '<f8'), ]
     ys1 = np.ones((150, len(dtypes))).ravel().view(dtype=dtypes)
     ys2 = np.ones((250, len(dtypes))).ravel().view(dtype=dtypes)
 
