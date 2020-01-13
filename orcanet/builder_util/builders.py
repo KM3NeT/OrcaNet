@@ -185,7 +185,7 @@ def get_input_block(input_shapes):
 
 class _attach_output_cat:
     def __init__(self, categories, output_name,
-                      flatten=True):
+                 flatten=True):
         self.categories = categories
         self.output_name = output_name
         self.flatten = flatten

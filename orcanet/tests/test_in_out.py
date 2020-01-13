@@ -348,7 +348,7 @@ class TestIOHandler(TestCase):
         self.assertSequenceEqual(value, target)
 
     def test_get_previous_epoch_1_2(self):
-        value = self.io.get_previous_epoch((1,2))
+        value = self.io.get_previous_epoch((1, 2))
         target = (1, 1)
         self.assertSequenceEqual(value, target)
 
