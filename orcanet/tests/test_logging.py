@@ -279,9 +279,9 @@ def build_test_model():
     input_shape = (1,)
     inp = layers.Input(input_shape, name="inp")
     x = layers.Dense(1, kernel_initializer="Ones",
-              bias_initializer="Zeros", trainable=False)(inp)
+                     bias_initializer="Zeros", trainable=False)(inp)
     outp = layers.Dense(1, name="out", kernel_initializer="Ones",
-                 bias_initializer="Zeros", trainable=False)(x)
+                        bias_initializer="Zeros", trainable=False)(x)
 
     test_model = Model(inp, outp)
     test_model.compile("sgd", loss={"out": "mse"}, metrics={"out": "mae"})
