@@ -1,7 +1,7 @@
 OrcaNet: A training organizer for Deep Learning in KM3NeT
 =========================================================
 
-.. image:: https://git.km3net.de/km3py/km3pipe/badges/master/pipeline.svg
+.. image:: https://git.km3net.de/ml/OrcaNet/badges/master/pipeline.svg
     :target: https://git.km3net.de/ml/OrcaNet/pipelines
 
 .. image:: https://examples.pages.km3net.de/km3badges/docs-latest-brightgreen.svg
