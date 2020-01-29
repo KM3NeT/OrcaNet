@@ -81,7 +81,7 @@ class TestInceptionBlockV2(TestCase):
             Model(self.inp_2d, x).count_params(), 436)
 
 
-class TestCaonvBlock(TestCase):
+class TestConvBlock(TestCase):
     def setUp(self):
         self.inp_2d = layers.Input(shape=(9, 10, 1))
         self.inp_3d = layers.Input(shape=(8, 9, 10, 1))
@@ -114,17 +114,13 @@ class TestCaonvBlock(TestCase):
             dropout=0.2,
             pool_size=2,
             time_distributed=True,
+            padding=[1, 0],
         )(self.inp_3d)
         model = Model(self.inp_3d, x)
 
         self.assertEqual(model.count_params(), 110)
-        self.assertSequenceEqual(model.output_shape, (None, 8, 4, 5, 11))
-        target_layers = (
-            layers.InputLayer,
-            layers.TimeDistributed,
-            layers.TimeDistributed,
-            layers.TimeDistributed,
-            layers.TimeDistributed,
-        )
+        self.assertSequenceEqual(model.output_shape, (None, 8, 4, 4, 11))
+        target_layers = [layers.InputLayer] + [layers.TimeDistributed] * 5
+
         for layer, target_layer in zip(model.layers, target_layers):
             self.assertIsInstance(layer, target_layer)

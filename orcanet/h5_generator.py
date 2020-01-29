@@ -13,7 +13,8 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
                  xs_mean=None,
                  f_size=None,
                  keras_mode=True,
-                 shuffle=False):
+                 shuffle=False,
+                 class_weights=None):
         """
         Yields batches of input data from h5 files.
 
@@ -68,6 +69,7 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         self.f_size = f_size
         self.keras_mode = keras_mode
         self.shuffle = shuffle
+        self.class_weights = class_weights
 
         # a dict with the names of list inputs as keys, and the opened
         # h5 files as values
@@ -110,7 +112,7 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
 
         """
         file_index = self._sample_pos[index]
-        info_blob = dict()
+        info_blob = {}
         info_blob["x_values"] = self.get_x_values(file_index)
         info_blob["y_values"] = self.get_y_values(file_index)
 
@@ -128,8 +130,14 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
             ys = None
         info_blob["ys"] = ys
 
+        if self.class_weights is not None:
+            info_blob["sample_weights"] = _get_sample_weights(ys, self.class_weights)
+
         if self.keras_mode:
-            return xs, ys
+            if info_blob.get("sample_weights"):
+                return xs, ys, info_blob["sample_weights"]
+            else:
+                return xs, ys
         else:
             return info_blob
 
@@ -245,6 +253,35 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         self._sample_pos = sample_pos
 
 
+def _get_sample_weights(ys, class_weights):
+    """
+    Produce a weight for each sample given the weight for each class.
+
+    Parameters
+    ----------
+    ys : dict
+        Maps output names to categorical one-hot labels as np.arrays.
+        Expected to be 2D (n_samples, n_classes).
+    class_weights : dict
+        Maps output neuron numbers to weights as floats.
+
+    Returns
+    -------
+    sample_weights : dict
+        Maps output names to weights for each sample in the batch as a
+        np.array.
+
+    """
+    sample_weights = {}
+    for output_name, labels in ys.items():
+        class_weights_arr = np.ones(labels.shape[1])
+        for k, v in class_weights.items():
+            class_weights_arr[int(k)] = v
+        labels_class = np.argmax(labels, axis=-1)
+        sample_weights[output_name] = class_weights_arr[labels_class]
+    return sample_weights
+
+
 def get_h5_generator(orga, files_dict, f_size=None, zero_center=False,
                      keras_mode=True, shuffle=False, use_def_label=True):
     """
@@ -252,7 +289,7 @@ def get_h5_generator(orga, files_dict, f_size=None, zero_center=False,
 
     Parameters
     ----------
-    orga : object Organizer
+    orga : orcanet.core.Organizer
         Contains all the configurable options in the OrcaNet scripts.
     files_dict : dict
         Pathes of the files to train on.
@@ -316,6 +353,7 @@ def get_h5_generator(orga, files_dict, f_size=None, zero_center=False,
         f_size=f_size,
         keras_mode=keras_mode,
         shuffle=shuffle,
+        class_weights=orga.cfg.class_weight,
     )
 
     return generator

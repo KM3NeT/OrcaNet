@@ -8,6 +8,7 @@ class ConvBlock:
                  filters,
                  kernel_size=3,
                  strides=1,
+                 padding="same",
                  pool_type="max_pooling",
                  pool_size=None,
                  pool_padding="valid",
@@ -30,6 +31,10 @@ class ConvBlock:
             Number of filters used for the convolutional layer.
         strides : int or tuple
             The stride length of the convolution.
+        padding : str or int or list
+            If str: Padding of the conv block.
+            If int or list: Padding argument of a ZeroPaddingND layer that
+            gets added before the convolution.
         kernel_size : int or tuple
             Kernel size which is used for all three dimensions.
         pool_size : None or int or tuple
@@ -66,6 +71,7 @@ class ConvBlock:
         self.filters = filters
         self.kernel_size = kernel_size
         self.strides = strides
+        self.padding = padding
         self.pool_type = pool_type
         self.pool_size = pool_size
         self.pool_padding = pool_padding
@@ -97,11 +103,18 @@ class ConvBlock:
             use_bias = True
 
         block_layers = list()
+
+        if isinstance(self.padding, str):
+            padding = self.padding
+        else:
+            block_layers.append(dim_layers["zero_padding"](self.padding))
+            padding = "valid"
+
         block_layers.append(convolution_nd(
             filters=self.filters,
             kernel_size=self.kernel_size,
             strides=self.strides,
-            padding='same',
+            padding=padding,
             kernel_initializer=self.kernel_initializer,
             use_bias=use_bias,
             kernel_regularizer=kernel_reg)
@@ -200,7 +213,8 @@ class ResnetBlock:
                  kernel_size=3,
                  activation='relu',
                  batchnorm=False,
-                 kernel_initializer="he_normal"):
+                 kernel_initializer="he_normal",
+                 time_distributed=False):
         """
         A residual building block for resnets. 2 c layers with a shortcut.
         https://arxiv.org/pdf/1605.07146.pdf
@@ -224,6 +238,8 @@ class ResnetBlock:
             Adds a batch normalization layer.
         kernel_initializer : string
             Initializer for the kernel weights.
+        time_distributed : bool
+            If True, apply the TimeDistributed Wrapper around all layers.
 
         """
         self.conv_dim = conv_dim
@@ -233,6 +249,7 @@ class ResnetBlock:
         self.activation = activation
         self.batchnorm = batchnorm
         self.kernel_initializer = kernel_initializer
+        self.time_distributed = time_distributed
 
     def __call__(self, inputs):
         x = ConvBlock(conv_dim=self.conv_dim,
@@ -241,13 +258,15 @@ class ResnetBlock:
                       strides=self.strides,
                       kernel_initializer=self.kernel_initializer,
                       batchnorm=self.batchnorm,
-                      activation=self.activation)(inputs)
+                      activation=self.activation,
+                      time_distributed=self.time_distributed)(inputs)
         x = ConvBlock(conv_dim=self.conv_dim,
                       filters=self.filters,
                       kernel_size=self.kernel_size,
                       kernel_initializer=self.kernel_initializer,
                       batchnorm=self.batchnorm,
-                      activation=None)(x)
+                      activation=None,
+                      time_distributed=self.time_distributed)(x)
 
         if self.strides != 1:
             shortcut = ConvBlock(conv_dim=self.conv_dim,
@@ -257,13 +276,17 @@ class ResnetBlock:
                                  kernel_initializer=self.kernel_initializer,
                                  activation=None,
                                  batchnorm=self.batchnorm,
+                                 time_distributed=self.time_distributed,
                                  )(inputs)
         else:
             shortcut = inputs
 
         x = layers.add([x, shortcut])
-        x = layers.Activation(self.activation)(x)
-        return x
+        acti_layer = layers.Activation(self.activation)
+        if self.time_distributed:
+            return layers.TimeDistributed(acti_layer)(x)
+        else:
+            return acti_layer(x)
 
 
 class ResnetBnetBlock:
@@ -642,6 +665,11 @@ def _get_dimensional_layers(dim):
             1: layers.SpatialDropout1D,
             2: layers.SpatialDropout2D,
             3: layers.SpatialDropout3D,
-        }
+        },
+        "zero_padding": {
+            1: layers.ZeroPadding1D,
+            2: layers.ZeroPadding2D,
+            3: layers.ZeroPadding3D,
+        },
     }
     return {layer_type: dim_layers[layer_type][dim] for layer_type in dim_layers.keys()}

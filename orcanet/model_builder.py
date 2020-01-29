@@ -4,6 +4,7 @@
 Scripts for making specific models.
 """
 
+import warnings
 import toml
 from datetime import datetime
 import keras as ks
@@ -48,7 +49,7 @@ class ModelBuilder:
         Compile a model with the optimizer settings given in the model_file.
 
     """
-    def __init__(self, model_file):
+    def __init__(self, model_file, **custom_blocks):
         """
         Read out parameters for creating models with OrcaNet from a toml file.
 
@@ -56,9 +57,13 @@ class ModelBuilder:
         ----------
         model_file : str
             Path to the model toml file.
+        custom_blocks
+            For building models with custom blocks in the toml:
+            Custom block names as kwargs ('toml name'='block').
 
         """
         file_content = toml.load(model_file)
+        self.custom_blocks = custom_blocks
 
         try:
             if "model" in file_content:
@@ -89,6 +94,10 @@ class ModelBuilder:
                            + str(option)) from None
 
     def _compat_init(self, file_content):
+        warnings.warn(
+            "The format of this model toml file is deprecated, consider "
+            "updating it to the new format (see online docu)."
+        )
         # legacy
         body = file_content["body"]
         if "architecture" in body:
@@ -171,7 +180,8 @@ class ModelBuilder:
             raise ValueError("Invalid input_shape"
                              "Has length {}, but must be 1\n input_shapes "
                              "= {}".format(len(input_shapes), input_shapes))
-        builder = BlockBuilder(self.defaults, verbose=verbose)
+        builder = BlockBuilder(
+            self.defaults, verbose=verbose, **self.custom_blocks)
         model = builder.build(input_shapes, self.configs)
 
         if compile_model:
@@ -259,13 +269,6 @@ class ModelBuilder:
         if any((self.optimizer is None, self.compile_opt is None)):
             raise ValueError("Can not compile, need optimizer name and losses")
 
-        if self.optimizer == 'adam':
-            optimizer = get_adam(**self.optimizer_args)
-        elif self.optimizer == 'sgd':
-            optimizer = get_sgd(**self.optimizer_args)
-        else:
-            raise NameError('Unknown optimizer name ({})'.format(self.optimizer))
-
         loss_functions, loss_weights, loss_metrics = {}, {}, {}
         for layer_name, layer_info in self.compile_opt.items():
             # Replace the str function name with actual function if it is custom
@@ -293,6 +296,7 @@ class ModelBuilder:
 
             loss_metrics[layer_name] = metrics
 
+        optimizer = self._get_optimizer()
         model.compile(loss=loss_functions, optimizer=optimizer,
                       metrics=loss_metrics, loss_weights=loss_weights)
         return model
@@ -311,6 +315,17 @@ class ModelBuilder:
             lines.append(key + ': ' + str(self.compile_opt[key]))
         lines.append('\n')
         orga.io.print_log(lines)
+
+    def _get_optimizer(self):
+        if self.optimizer == 'adam':
+            optimizer = get_adam(**self.optimizer_args)
+        elif self.optimizer == 'sgd':
+            optimizer = get_sgd(**self.optimizer_args)
+        elif self.optimizer.startswith("keras:"):
+            optimizer = getattr(ks.optimizers, self.optimizer.split("keras:")[-1])(**self.optimizer_args)
+        else:
+            raise NameError('Unknown optimizer name ({})'.format(self.optimizer))
+        return optimizer
 
 
 def get_adam(beta_1=0.9, beta_2=0.999, epsilon=0.1, decay=0.0, **kwargs):

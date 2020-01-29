@@ -275,7 +275,7 @@ class Organizer:
 
         return history
 
-    def predict(self, epoch=None, fileno=None, concatenate=False):
+    def predict(self, epoch=None, fileno=None, concatenate=False, samples=None):
         """
         Make a prediction if it does not exist yet, and return its filepath.
 
@@ -292,6 +292,9 @@ class Organizer:
             File number of a model to load.
         concatenate : bool
             Whether the prediction files should also be concatenated.
+        samples : int, optional
+            Don't use the full validation files, but just the given number
+            of samples.
 
         Returns
         -------
@@ -318,7 +321,8 @@ class Organizer:
             self._set_up(model)
 
             start_time = time.time()
-            backend.make_model_prediction(self, model, epoch, fileno)
+            backend.make_model_prediction(
+                self, model, epoch, fileno, samples=samples)
             elapsed_s = int(time.time() - start_time)
             print('Finished predicting on all validation files.')
             print("Elapsed time: {}\n".format(timedelta(seconds=elapsed_s)))
@@ -605,7 +609,6 @@ class Configuration(object):
     callback_train : keras callback or list or None
         Callback or list of callbacks to use during training.
     class_weight : dict or None
-        class_weigth argument of fit_generator:
         Optional dictionary mapping class indices (integers) to a weight
         (float) value, used for weighting the loss function (during
         training only). This can be useful to tell the model to
