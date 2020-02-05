@@ -4,6 +4,7 @@
 import os
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
+import keras as ks
 import keras.layers as layers
 
 from orcanet.core import Organizer
@@ -41,6 +42,12 @@ class TestModel(TestCase):
         self.assertEqual(model.output_shape[1:], (2, ))
         self.assertEqual(len(model.layers), 14)
         self.assertEqual(model.optimizer.epsilon, 0.2)
+
+    def test_model_setup_CNN_model_custom_callback(self):
+        builder = ModelBuilder(self.model_file)
+        builder.optimizer = ks.optimizers.sgd()
+        model = builder.build(self.orga)
+        self.assertIsInstance(model.optimizer, ks.optimizers.SGD)
 
     @patch('orcanet.model_builder.toml.load')
     def test_load_optimizer(self, mock_toml_load):

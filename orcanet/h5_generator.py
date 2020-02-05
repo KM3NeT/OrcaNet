@@ -1,4 +1,5 @@
 import h5py
+import time
 import numpy as np
 import keras as ks
 
@@ -10,6 +11,7 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
                  key_y_values="y",
                  sample_modifier=None,
                  label_modifier=None,
+                 phase="training",
                  xs_mean=None,
                  f_size=None,
                  keras_mode=True,
@@ -59,12 +61,15 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
             (once during init). Can reduce read out speed.
 
         """
+        if phase not in ("training", "validation", "inference"):
+            raise ValueError("Invalid phase")
         self.files_dict = files_dict
         self.batchsize = batchsize
         self.key_x_values = key_x_values
         self.key_y_values = key_y_values
         self.sample_modifier = sample_modifier
         self.label_modifier = label_modifier
+        self.phase = phase
         self.xs_mean = xs_mean
         self.f_size = f_size
         self.keras_mode = keras_mode
@@ -78,6 +83,10 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         self._sample_pos = None
         # total number of samples per file
         self._total_f_size = None
+
+        # for keeping track of the readout speed
+        self._total_time = 0.
+        self._total_batches = 0
 
         self.open()
 
@@ -105,14 +114,20 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
             Values : ndarray
                 A batch of labels for the corresponding output.
 
-        If keras_mode is False, it will return instead:
+        If class_weights is not None, will return aditionally:
+        sample_weights : dict
+            Maps output names to weights for each sample in the batch as a
+            np.array.
 
+        If keras_mode is False, will return instead:
         info_blob : dict
-            Blob containing, the x_values, y_values, xs and ys.
+            Blob containing the x_values, y_values, xs and ys, and optionally
+            the sample_weights.
 
         """
+        start_time = time.time()
         file_index = self._sample_pos[index]
-        info_blob = {}
+        info_blob = {"phase": self.phase}
         info_blob["x_values"] = self.get_x_values(file_index)
         info_blob["y_values"] = self.get_y_values(file_index)
 
@@ -133,6 +148,8 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         if self.class_weights is not None:
             info_blob["sample_weights"] = _get_sample_weights(ys, self.class_weights)
 
+        self._total_time += time.time() - start_time
+        self._total_batches += 1
         if self.keras_mode:
             if info_blob.get("sample_weights"):
                 return xs, ys, info_blob["sample_weights"]
@@ -203,6 +220,18 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
             # can not look up y_values, lets hope we dont need them
             y_values = None
         return y_values
+
+    def print_timestats(self, print_func=None):
+        """ Print stats about how long it took to read batches. """
+        if print_func is None:
+            print_func = print
+        print_func("Statistics of data readout:")
+        print_func(f"\tTotal time:\t{self._total_time/60:.2f} min")
+        if self._total_batches != 0:
+            print_func(
+                f"\tPer batch:\t"
+                f"{1000 * self._total_time/self._total_batches:.5} ms"
+            )
 
     @property
     def _size(self):
@@ -283,7 +312,8 @@ def _get_sample_weights(ys, class_weights):
 
 
 def get_h5_generator(orga, files_dict, f_size=None, zero_center=False,
-                     keras_mode=True, shuffle=False, use_def_label=True):
+                     keras_mode=True, shuffle=False, use_def_label=True,
+                     phase="training"):
     """
     Initialize the hdf5_batch_generator_base with the paramters in orga.cfg.
 
@@ -349,6 +379,7 @@ def get_h5_generator(orga, files_dict, f_size=None, zero_center=False,
         key_y_values=orga.cfg.key_y_values,
         sample_modifier=orga.cfg.sample_modifier,
         label_modifier=label_modifier,
+        phase=phase,
         xs_mean=xs_mean,
         f_size=f_size,
         keras_mode=keras_mode,

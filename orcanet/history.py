@@ -255,6 +255,9 @@ class HistoryHandler:
             file_data = self._load_txt(filepath)
             train_file_data.append([[epoch, file_no], file_data])
 
+        if len(train_file_data) == 0:
+            raise OSError(f"No train files found in {self.train_log_folder}!")
+
         # sort so that earlier epochs come first
         train_file_data.sort()
         full_train_data = train_file_data[0][1]

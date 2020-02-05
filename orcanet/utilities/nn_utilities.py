@@ -5,6 +5,7 @@
 import numpy as np
 import h5py
 import os
+import time
 import keras as ks
 from functools import reduce
 
@@ -98,6 +99,37 @@ class RaiseOnNaN(ks.callbacks.Callback):
                 raise ValueError(
                     'Batch %d: Invalid loss, terminating training' % batch
                 )
+
+
+class TimeModel(ks.callbacks.Callback):
+    """ Print how long the model took for processing batches. """
+    def __init__(self, print_func=None):
+        super().__init__()
+        self.print_func = print_func
+        self._total_time = 0.
+        self._total_batches = 0
+        self._t_start = 0.
+
+    def on_train_batch_begin(self, batch, logs=None):
+        self._t_start = time.time()
+
+    def on_train_batch_end(self, batch, logs=None):
+        self._total_time += time.time() - self._t_start
+        self._total_batches += 1
+
+    def on_epoch_end(self, epoch, logs=None):
+        if self.print_func is None:
+            print_func = print
+        else:
+            print_func = self.print_func
+        print_func("Statistics of model calculations:")
+        print_func(f"\tTotal time:\t{self._total_time/60:.2f} min")
+        if self._total_batches != 0:
+            print_func(
+                f"\tPer batch:\t"
+                f"{1000 * self._total_time/self._total_batches:.5} ms"
+            )
+
 
 # ------------- Zero center functions -------------#
 

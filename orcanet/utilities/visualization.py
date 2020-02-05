@@ -111,7 +111,7 @@ class TrainValPlotter:
                      logy=False):
         """
         Apply given layout.
-        Can caluclate good y_lims and x_ticks automatically.
+        Can calculate good y_lims and x_ticks automatically.
 
         Parameters
         ----------
@@ -139,8 +139,9 @@ class TrainValPlotter:
             plt.yscale("log")
         if x_ticks is not None:
             if x_ticks == "auto":
-                all_x_points = np.concatenate((self._xpoints_train,
-                                               self._xpoints_val))
+                all_x_points = np.concatenate(
+                    (self._xpoints_train, self._xpoints_val)
+                )
                 x_ticks = get_epoch_xticks(all_x_points)
             else:
                 x_ticks = x_ticks
@@ -151,9 +152,11 @@ class TrainValPlotter:
 
         if y_lims is not None:
             if y_lims == "auto":
-                y_lims = get_ylims(self._ypoints_train,
-                                   self._ypoints_val,
-                                   fraction=self.y_lim_padding)
+                y_lims = get_ylims(
+                    self._ypoints_train,
+                    self._ypoints_val,
+                    fraction=self.y_lim_padding,
+                )
             else:
                 y_lims = y_lims
             plt.ylim(y_lims)
@@ -309,7 +312,7 @@ def get_epoch_xticks(x_points):
     """
     Calculates the xticks for the train and validation summary plot.
 
-    One tick per poch. Less the larger #epochs is.
+    One tick per epoch. Less the larger #epochs is.
 
     Parameters
     ----------
@@ -326,12 +329,20 @@ def get_epoch_xticks(x_points):
         raise ValueError("x-coordinates are empty!")
 
     minimum, maximum = np.amin(x_points), np.amax(x_points)
-    start_epoch, end_epoch = np.floor(minimum), np.ceil(maximum)
-    # reduce number of x_ticks by factor of 2 if n_epochs > 20
-    n_epochs = end_epoch - start_epoch
-    x_ticks_stepsize = 1 + np.floor(n_epochs / 20.)
-    x_ticks_major = np.arange(
-        start_epoch, end_epoch + x_ticks_stepsize, x_ticks_stepsize)
+    if maximum - minimum > 0.5:
+        # for longer trainings
+        start_epoch, end_epoch = np.floor(minimum), np.ceil(maximum)
+        # less xticks if there are many epochs
+        n_epochs = end_epoch - start_epoch
+        x_ticks_stepsize = 1 + np.floor(n_epochs / 20.)
+        x_ticks_major = np.arange(
+            start_epoch, end_epoch + x_ticks_stepsize, x_ticks_stepsize)
+    else:
+        # for early peeks
+        start_epoch = np.floor(minimum)
+        end_epoch = maximum + minimum - start_epoch
+        x_ticks_major = np.linspace(
+            start_epoch, end_epoch, 6)
 
     return x_ticks_major
 

@@ -9,6 +9,7 @@ import shutil
 import h5py
 import numpy as np
 from inspect import signature
+from orcanet.h5_generator import Hdf5BatchGenerator
 
 
 def get_subfolder(main_folder, name=None, create=False):
@@ -583,6 +584,7 @@ class IOHandler(object):
 
         if self.cfg.sample_modifier is None:
             print("\nYou did not specify a sample modifier.")
+            info_blob["xs"] = info_blob["x_values"]
         else:
             modified_xs = self.cfg.sample_modifier(info_blob)
             modified_shapes = {modi_key: modified_xs[modi_key].shape[1:]
@@ -592,6 +594,7 @@ class IOHandler(object):
             for list_key in modified_shapes:
                 print("\t{}\t{}".format(list_key, modified_shapes[list_key]))
             list_inp_shapes = modified_shapes
+            info_blob["xs"] = modified_xs
 
         print("\nYour model requires the following input names and shapes:")
         for layer_key in layer_inp_shapes:
@@ -685,16 +688,16 @@ class IOHandler(object):
                 From the y_values datagroup of the input files.
 
         """
-        # TODO gets y_values only from first train file
-        files_dict = next(self.yield_files("train"))
-        x_values = {}
-        for i, inp_name in enumerate(files_dict):
-            with h5py.File(files_dict[inp_name], "r") as f:
-                x_values[inp_name] = f[self.cfg.key_x_values][:self.cfg.batchsize]
-                if i == 0:
-                    y_values = f[self.cfg.key_y_values][:self.cfg.batchsize]
-
-        info_blob = {"x_values": x_values, "y_values": y_values}
+        gen = Hdf5BatchGenerator(
+            next(self.yield_files("train")),
+            batchsize=self.cfg.batchsize,
+            key_x_values=self.cfg.key_x_values,
+            key_y_values=self.cfg.key_y_values,
+            keras_mode=False,
+        )
+        info_blob = gen[0]
+        info_blob.pop("xs")
+        info_blob.pop("ys")
         return info_blob
 
     def get_input_shapes(self):

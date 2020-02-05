@@ -27,8 +27,10 @@ class ModelBuilder:
         List with keywords for building each layer block in the model.
     defaults : dict
         Default values for the layer blocks in the model.
-    optimizer : str
-        Optimizer for training the model. Either "Adam" or "SGD".
+    optimizer : str or Optimizer
+        Optimizer for training the model. Can be a string like "adam" (or
+        "keras:adam" for the default keras variant), or an object derived
+        from ks.optimizers.Optimizer.
     compile_opt : dict
         Keys: Names of the output layers of the model.
         Values: Loss function, optionally weight and optionally metric of
@@ -36,8 +38,8 @@ class ModelBuilder:
         Format: { layer_name : { loss_function:, weight:, metrics: } }
         The loss_function is a string or a function, the weight is a float
         and metrics is a list of functions/strings.
-    optimizer_args : dict
-        Kwargs for the optimizer.
+    optimizer_args : dict, optional
+        Kwargs for the optimizer. Not used when an optimizer object is given.
 
     Methods
     -------
@@ -75,15 +77,14 @@ class ModelBuilder:
                 # legacy
                 self._compat_init(file_content)
 
+            self.optimizer = None
+            self.compile_opt = None
+            self.optimizer_args = {}
             if "compile" in file_content:
                 compile_sect = file_content["compile"]
-                self.optimizer = compile_sect.pop("optimizer")
-                self.compile_opt = compile_sect.pop("losses")
+                self.optimizer = compile_sect.pop("optimizer", None)
+                self.compile_opt = compile_sect.pop("losses", None)
                 self.optimizer_args = compile_sect
-            else:
-                self.optimizer = None
-                self.compile_opt = None
-                self.optimizer_args = None
 
         except KeyError as e:
             if len(e.args) == 1:
@@ -317,12 +318,21 @@ class ModelBuilder:
         orga.io.print_log(lines)
 
     def _get_optimizer(self):
+        if not isinstance(self.optimizer, str):
+            if self.optimizer_args:
+                warnings.warn(
+                    "Custom callback used, optimizer_args are ignored: " +
+                    str(self.optimizer_args)
+                )
+            return self.optimizer
         if self.optimizer == 'adam':
             optimizer = get_adam(**self.optimizer_args)
         elif self.optimizer == 'sgd':
             optimizer = get_sgd(**self.optimizer_args)
         elif self.optimizer.startswith("keras:"):
-            optimizer = getattr(ks.optimizers, self.optimizer.split("keras:")[-1])(**self.optimizer_args)
+            optimizer = getattr(
+                ks.optimizers, self.optimizer.split("keras:")[-1]
+            )(**self.optimizer_args)
         else:
             raise NameError('Unknown optimizer name ({})'.format(self.optimizer))
         return optimizer

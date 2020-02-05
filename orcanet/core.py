@@ -183,8 +183,10 @@ class Organizer:
 
         smry_logger = olog.SummaryLogger(self, model)
 
-        lr = self.io.get_learning_rate(next_epoch)
-        ks.backend.set_value(model.optimizer.lr, lr)
+        if self.cfg.learning_rate is not None:
+            ks.backend.set_value(
+                model.optimizer.lr, self.io.get_learning_rate(next_epoch)
+            )
 
         files_dict = self.io.get_file("train", next_epoch[1])
 
@@ -205,13 +207,17 @@ class Organizer:
         elapsed_s = int(time.time() - start_time)
 
         model.save(model_path)
-        smry_logger.write_line(next_epoch_float, lr, history_train=history)
+        smry_logger.write_line(
+            next_epoch_float,
+            ks.backend.get_value(model.optimizer.lr),
+            history_train=history,
+        )
 
         self.io.print_log('Training results:')
         for metric_name, loss in history.items():
-            self.io.print_log("   {}: \t{}".format(metric_name, loss))
-        self.io.print_log("Elapsed time: {}".format(timedelta(seconds=elapsed_s)))
-        self.io.print_log("Saved model to: {}\n".format(model_path_local))
+            self.io.print_log(f"   {metric_name}: \t{loss}")
+        self.io.print_log(f"Elapsed time: {timedelta(seconds=elapsed_s)}")
+        self.io.print_log(f"Saved model to: {model_path_local}\n")
 
         update_summary_plot(self)
         if self.cfg.cleanup_models:
@@ -616,7 +622,7 @@ class Configuration(object):
     cleanup_models : bool
         If true, will only keep the best (in terms of val loss) and the most
         recent from all saved models in order to save disk space.
-    custom_objects : dict or None
+    custom_objects : dict, optional
         Optional dictionary mapping names (strings) to custom classes or
         functions to be considered by keras during deserialization of models.
     dataset_modifier : function or None
@@ -635,8 +641,9 @@ class Configuration(object):
         files before they are fed into the model as labels. If None is given,
         all y_values with the same name as the output layers will be passed
         to the model as a dict, with the keys being the dtype names.
-    learning_rate : float, tuple, function or str
+    learning_rate : float, tuple, function, str (optional)
         The learning rate for the training.
+        If None is given, don't change the learning rate at all.
         If it is a float: The learning rate will be constantly this value.
         If it is a tuple of two floats: The first float gives the learning rate
         in epoch 1 file 1, and the second float gives the decrease of the
@@ -712,7 +719,7 @@ class Configuration(object):
 
         """
         self.batchsize = 64
-        self.learning_rate = 0.001
+        self.learning_rate = None
 
         self.zero_center_folder = None
         self.validate_interval = None
@@ -725,10 +732,10 @@ class Configuration(object):
 
         self.key_x_values = "x"
         self.key_y_values = "y"
-        self.custom_objects = None
+        self.custom_objects = {}
         self.shuffle_train = False
 
-        self.callback_train = None
+        self.callback_train = []
         self.use_scratch_ssd = False
         self.verbose_train = 1
         self.verbose_val = 0

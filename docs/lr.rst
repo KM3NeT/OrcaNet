@@ -1,8 +1,10 @@
 Learning rate
 =============
 
-The learning rate is stored in ``organizer.cfg.learning_rate``, and is set
-to 0.001 per default.
+OrcaNet provides multiple ways to easily determine a learning rate schedule
+for the training. For this, a
+learning rate varibale is stored in ``organizer.cfg.learning_rate``, which is set
+to None per default (no change to the current learning rate of the model).
 Depending on what type this attribute is, the learning rate schedule
 during the training will be one of the following:
 

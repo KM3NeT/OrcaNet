@@ -12,7 +12,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import orcanet
 from orcanet.utilities.layer_plotting import plot_activations, plot_weights
 from orcanet.logging import BatchLogger
-from orcanet.utilities.nn_utilities import RaiseOnNaN
+import orcanet.utilities.nn_utilities as nn_utilities
 from orcanet.in_out import h5_get_number_of_rows
 from orcanet.h5_generator import get_h5_generator
 
@@ -27,9 +27,9 @@ def train_model(orga, model, epoch, batch_logger=False):
 
     Parameters
     ----------
-    orga : object Organizer
+    orga : orcanet.core.Organizer
         Contains all the configurable options in the OrcaNet scripts.
-    model : keras model
+    model : keras.Model
         A compiled keras model.
     epoch : tuple
         Current epoch and the no of the file to train on.
@@ -51,7 +51,10 @@ def train_model(orga, model, epoch, batch_logger=False):
     else:
         f_size = orga.io.get_file_sizes("train")[epoch[1] - 1]
 
-    callbacks = [RaiseOnNaN(), ]
+    callbacks = [
+        nn_utilities.RaiseOnNaN(),
+        nn_utilities.TimeModel(print_func=orga.io.print_log),
+    ]
     if batch_logger:
         callbacks.append(BatchLogger(orga, epoch))
     if orga.cfg.callback_train is not None:
@@ -61,7 +64,7 @@ def train_model(orga, model, epoch, batch_logger=False):
             callbacks.append(orga.cfg.callback_train)
 
     training_generator = get_h5_generator(
-        orga, files_dict, f_size=f_size,
+        orga, files_dict, f_size=f_size, phase="training",
         zero_center=orga.cfg.zero_center_folder is not None,
         shuffle=orga.cfg.shuffle_train)
 
@@ -74,7 +77,7 @@ def train_model(orga, model, epoch, batch_logger=False):
         initial_epoch=epoch[0] - 1,
         epochs=epoch[0],
     )
-
+    training_generator.print_timestats(print_func=orga.io.print_log)
     # get a dict with losses and metrics
     # only trained for one epoch, so value is list of len 1
     history = {key: value[0] for key, value in history.history.items()}
@@ -87,9 +90,9 @@ def validate_model(orga, model):
 
     Parameters
     ----------
-    orga : object Organizer
+    orga : orcanet.core.Organizer
         Contains all the configurable options in the OrcaNet scripts.
-    model : keras model
+    model : keras.Model
         A compiled keras model.
 
     Returns
@@ -109,7 +112,7 @@ def validate_model(orga, model):
             f_size = orga.cfg.n_events  # for testing purposes
 
         val_generator = get_h5_generator(
-            orga, files_dict, f_size=f_size,
+            orga, files_dict, f_size=f_size, phase="validation",
             zero_center=orga.cfg.zero_center_folder is not None)
 
         history_file = model.evaluate_generator(
@@ -167,9 +170,9 @@ def save_actv_wghts_plot(orga, model, epoch, samples=1):
 
     Parameters
     ----------
-    orga : object Organizer
+    orga : orcanet.core.Organizer
         Contains all the configurable options in the OrcaNet scripts.
-    model : ks.models.Model
+    model : keras.Model
         The model to do the predictions with.
     epoch : tuple
         Current epoch and fileno.
@@ -221,9 +224,9 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
 
     Parameters
     ----------
-    orga : object Organizer
+    orga : orcanet.core.Organizer
         Contains all the configurable options in the OrcaNet scripts.
-    model : ks.model.Model
+    model : keras.Model
         Trained Keras model of a neural network.
     files_dict : dict
         Dict mapping model input names to h5 file paths.
@@ -244,7 +247,8 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
         files_dict,
         zero_center=orga.cfg.zero_center_folder is not None,
         keras_mode=False,
-        use_def_label=use_def_label
+        use_def_label=use_def_label,
+        phase="inference",
     ))
 
     if samples is None:
@@ -308,10 +312,10 @@ def make_model_prediction(orga, model, epoch, fileno, samples=None):
 
     Parameters
     ----------
-    orga : object Organizer
+    orga : orcanet.core.Organizer
         Contains all the configurable options in the OrcaNet scripts.
-    model : ks.model.Model
-        Trained Keras model of a neural network.
+    model : keras.Model
+        A compiled keras model.
     epoch : int
         Epoch of the last model training step in the epoch, file_no tuple.
     fileno : int

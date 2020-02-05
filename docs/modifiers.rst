@@ -28,6 +28,10 @@ the following keys:
         One batch of data from the ``cfg.key_y_values`` datagroup of the h5 file.
         If the content of the datagroup is a structured array, this will
         also be a structured array.
+    ``phase`` : str
+        Current phase the network is used in. Either 'training', 'validation'
+        or 'inference'. Can be used to have modifiers with different behaviours
+        depending on the phase.
     ``xs`` : dict
         One batch of data, resulting from applying the sample modifier on ``x_values``.
 
