@@ -36,22 +36,6 @@ def update_objects(orga, model_file):
     dataset_modifier = orca_modifiers.get("dataset_modifier")
 
     if sample_modifier is not None:
-        assert orga.cfg.sample_modifier is None, \
-            "Can not set sample modifier: Has already been set: " \
-            "{}".format(orga.cfg.sample_modifier)
-    if label_modifier is not None:
-        assert orga.cfg.label_modifier is None, \
-            "Can not set label modifier: Has already been set: " \
-            "{}".format(orga.cfg.label_modifier)
-    if dataset_modifier is not None:
-        assert orga.cfg.dataset_modifier is None, \
-            "Can not set dataset modifier: Has already been set: " \
-            "{}".format(orga.cfg.dataset_modifier)
-    assert orga.cfg.custom_objects is None, \
-        "Can not set custom objects: Have already been set: " \
-        "{}".format(orga.cfg.custom_objects)
-
-    if sample_modifier is not None:
         print("Using orga sample modifier: ", sample_modifier)
         orga.cfg.sample_modifier = orca_sample_modifiers(sample_modifier)
     if label_modifier is not None:

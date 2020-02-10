@@ -158,7 +158,7 @@ class SummaryLogger:
 
         Parameters
         ----------
-        orga : object Organizer
+        orga : orcanet.core.Organizer
             Contains all the configurable options in the OrcaNet scripts.
         model : ks.model.Model or None
             Keras model containing the metrics to plot.
@@ -375,7 +375,7 @@ class BatchLogger(ks.callbacks.Callback):
 
         Parameters
         ----------
-        orga : object Organizer
+        orga :  orcanet.core.Organizer
             Contains all the configurable options in the OrcaNet scripts.
         epoch : tuple
             Epoch and file number.
@@ -490,11 +490,11 @@ class BatchLogger(ks.callbacks.Callback):
 def log_start_training(orga):
     """
     When a training is started for the first time, this logs all the
-    input parameters in the log.txt file.
+    input parameters to the log.txt file.
 
     Parameters
     ----------
-    orga : object Organizer
+    orga : orcanet.core.Organizer
         Contains all the configurable options in the OrcaNet scripts.
 
     """
@@ -519,10 +519,9 @@ def log_start_training(orga):
         log(" " + input_name + ":")
         [log("\t" + input_file) for input_file in input_files]
 
-    log("\nNon-default settings used:")
+    log("\nSettings used:")
     for key, value in vars(orga.cfg).items():
-        if key == "output_folder" or key.startswith("_") \
-                or value == orga.cfg.default_values.get(key):
+        if key == "output_folder" or key.startswith("_"):
             continue
         log("   {}:\t{}".format(key, value))
 
