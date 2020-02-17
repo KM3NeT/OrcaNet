@@ -392,7 +392,7 @@ class Organizer:
             output_filename = "model_epoch_{}_file_{}_on_{}".format(
                 epoch, fileno, first_filename)
 
-            output_path = os.path.join(self.io.get_subfolder("predictions"),
+            output_path = os.path.join(self.io.get_subfolder("inference"),
                                        output_filename)
             filenames.append(output_path)
             if os.path.exists(output_path):
@@ -877,6 +877,7 @@ def _get_h5_files(folder):
     for f in os.listdir(folder):
         if f.endswith(".h5"):
             h5files.append(os.path.join(folder, f))
+    h5files.sort()
     if not h5files:
         warnings.warn(f"No .h5 files in dir {folder}!")
     return h5files

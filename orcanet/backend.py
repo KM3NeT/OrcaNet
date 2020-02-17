@@ -258,12 +258,13 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
             steps += 1
     else:
         steps = int(samples / orga.cfg.batchsize)
+    print_every = max(100, min(int(round(steps/10, -2)), 1000))
 
     with h5py.File(output_path, 'x') as h5_file:
         h5_file.attrs.create("orcanet", orcanet.__version__, dtype="S6")
 
         for s in range(steps):
-            if s % 1000 == 0:
+            if s % print_every == 0:
                 print('Predicting in step {}/{} ({:0.2%})'.format(
                     s, steps, s/steps))
 
