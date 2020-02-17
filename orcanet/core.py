@@ -405,7 +405,7 @@ class Organizer:
             backend.h5_inference(
                 self, model, files_dict, output_path, use_def_label=False)
             elapsed_s = int(time.time() - start_time)
-            print(f'Finished on file {first_filename} in {elapsed_s}')
+            print(f'Finished on file {first_filename} in {elapsed_s/60} min')
 
         return filenames
 
