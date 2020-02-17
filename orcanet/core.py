@@ -798,40 +798,10 @@ class Configuration(object):
         }
 
         for toml_name, files_dict_name in name_mapping.items():
-            files = self._extract_filepaths(file_content, toml_name)
+            files = _extract_filepaths(file_content, toml_name)
             self._files_dict[files_dict_name] = files or None
 
         self._list_file = list_file
-
-    @staticmethod
-    def _extract_filepaths(file_content, which):
-        """
-        Get train/val/inf filepaths for different inputs from a toml readout.
-        Makes sure that all input have the same number of files.
-
-        """
-        allowed_which = ["train_files", "validation_files", "inference_files"]
-        assert which in allowed_which
-
-        files = {}
-        n_files = []
-        for input_key, input_values in file_content.items():
-            for key in input_values.keys():
-                if key not in allowed_which:
-                    raise NameError(
-                        f"Unknown argument '{key}' in toml file: "
-                        f"Must be either of {allowed_which}")
-
-            if which in input_values:
-                files_input = tuple(input_values[which])
-                files[input_key] = files_input
-                n_files.append(len(files_input))
-
-        if n_files and n_files.count(n_files[0]) != len(n_files):
-            raise ValueError(
-                "Input with different number of {} in toml list".format(which))
-
-        return files
 
     def update_config(self, config_file):
         """
@@ -900,3 +870,61 @@ class Configuration(object):
     def key_labels(self):
         """ Backward compatibility """
         return self.key_y_values
+
+
+def _get_h5_files(folder):
+    h5files = []
+    for f in os.listdir(folder):
+        if f.endswith(".h5"):
+            h5files.append(os.path.join(folder, f))
+    if not h5files:
+        warnings.warn(f"No .h5 files in dir {folder}!")
+    return h5files
+
+
+def _extract_filepaths(file_content, which):
+    """
+    Get train, val or inf filepaths of all inputs from a toml readout.
+    Makes sure that all input have the same number of files.
+
+    """
+    # alternative names to write in the toml file
+    aliases = {
+        "train_files": ("training_files", "train", "training"),
+        "validation_files": ("val_files", "val", "validation"),
+        "inference_files": ("inf_files", "inf", "inference"),
+    }
+    assert which in aliases.keys(), f"{which} not in {list(aliases.keys())}"
+
+    def get_alias(ident):
+        for k, v in aliases.items():
+            if ident == k or ident in v:
+                return k
+        else:
+            raise NameError(
+                f"Unknown argument '{ident}' in toml file: "
+                f"Must be either of {list(aliases.keys())}"
+            )
+
+    files = {}
+    n_files = []
+    for input_name, input_files in file_content.items():
+        for filetype, filetyp_files in input_files.items():
+            if get_alias(filetype) != which:
+                continue
+            # if a dir is given as a filepath, use all h5 files in that dir instead
+            expanded_files = []
+            for path in filetyp_files:
+                if os.path.isdir(path):
+                    expanded_files.extend(_get_h5_files(path))
+                else:
+                    expanded_files.append(path)
+            files[input_name] = tuple(expanded_files)
+            # store number of files for this output
+            n_files.append(len(expanded_files))
+
+    if n_files and n_files.count(n_files[0]) != len(n_files):
+        raise ValueError(
+            "Input with different number of {} in toml list".format(which))
+
+    return files

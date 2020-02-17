@@ -17,10 +17,10 @@ validation_files = [
 "path/to/val_file_1_input_A.h5",
 ]
 
-# An optional list of files to apply trained models on. They do not need
-# to contain labels.
+# An optional list of files to apply trained models on. Instead of giving
+# explicit filepaths, one can also give a directory containing all the h5 files:
 inference_files = [
-"path/to/inference_file_1_input_A.h5",
+"path/to/inference_files_input_A/",
 ]
 
 # Another input set for a second input layer of the model.
@@ -37,7 +37,7 @@ validation_files = [
 ]
 
 inference_files = [
-"path/to/inference_file_1_input_B.h5",
+"path/to/inference_files_input_B/",
 ]
 
 

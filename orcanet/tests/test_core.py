@@ -1,3 +1,4 @@
+import tempfile
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 import os
@@ -5,7 +6,7 @@ import shutil
 from keras.models import Model
 import keras.layers as layers
 
-from orcanet.core import Organizer, Configuration
+from orcanet.core import Organizer, Configuration, _extract_filepaths
 
 
 class TestOrganizer(TestCase):
@@ -228,11 +229,11 @@ class TestConfiguration(TestCase):
             '[input_A]',
             'train_files = ["input_A_train_1.h5", "input_A_train_2.h5"]',
             'validation_files = ["input_A_val_1.h5"]',
-            'inference_files = ["input_A_inf_1.h5"]',
+            'inf = ["input_A_inf_1.h5"]',
 
             '[input_B]',
             'train_files = ["input_B_train_1.h5", "input_B_train_2.h5",]',
-            'validation_files = ["input_B_val_1.h5",]',
+            'validation = ["input_B_val_1.h5",]',
             'inference_files = ["input_B_inf_1.h5",]',
         ]
         file_name = self.temp_dir + "/test_config.toml"
@@ -350,11 +351,11 @@ class TestConfiguration(TestCase):
         content = [
             '[input_A]',
             'train_files = ["input_A_train_1.h5", "input_A_train_2.h5"]',
-            'validation_files = ["input_A_val_1.h5", "input_A_val_2.h5"]',
+            'validation = ["input_A_val_1.h5", "input_A_val_2.h5"]',
 
             '[input_B]',
             'train_files = ["input_B_train_1.h5", "input_B_train_2.h5",]',
-            'validation_files = ["input_B_val_1.h5",]',
+            'validation = ["input_B_val_1.h5",]',
         ]
         file_name = self.temp_dir + "/test_config.toml"
 
@@ -367,6 +368,21 @@ class TestConfiguration(TestCase):
                 cfg.import_list_file(file_name)
         finally:
             os.remove(file_name)
+
+    def test_extract_filepaths_dir_given_in_toml(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            h5files = tuple([
+                os.path.join(tempdir, fname)
+                for fname in ("file1.h5", "file2.h5")
+            ])
+            for fname in h5files:
+                open(os.path.join(tempdir, fname), "w").close()
+            content = {
+                'input_A':
+                    {'train_files': [tempdir]},
+            }
+            result = _extract_filepaths(content, "train_files")["input_A"]
+            self.assertTupleEqual(result, h5files)
 
 
 def build_test_model(compile=False):
