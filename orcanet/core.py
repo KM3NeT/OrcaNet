@@ -400,12 +400,12 @@ class Organizer:
                               "file".format(output_filename))
                 continue
 
+            print(f'Working on file {first_filename}')
             start_time = time.time()
             backend.h5_inference(
                 self, model, files_dict, output_path, use_def_label=False)
             elapsed_s = int(time.time() - start_time)
-            print('Finished on file {} in {}'.format(
-                first_filename, timedelta(seconds=elapsed_s)))
+            print(f'Finished on file {first_filename} in {elapsed_s}')
 
         return filenames
 
