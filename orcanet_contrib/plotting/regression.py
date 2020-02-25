@@ -354,7 +354,7 @@ def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, s
     """
     fig, ax = plt.subplots()
     pdf_plots = mpl.backends.backend_pdf.PdfPages(savefolder + '/' + savename + '.pdf')
-    title_prefix = 'CNN: '
+    title_prefix = ''
 
     properties = {'dirs_vector': {'sub_props': ['dir_x', 'dir_y', 'dir_z'], 'ylabel': ' direction error'},
                   'dirs_spherical': {'sub_props': ['azimuth', 'zenith'], 'ylabel': ' direction error [rad]'},
@@ -386,35 +386,67 @@ def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, s
         if bool(np.any(is_ic, axis=0)) is False:
             continue
 
+        is_nu = mc_info['particle_type'] > 0
+        is_ic_nu = np.logical_and(is_ic, is_nu)
+        is_ic_anu = np.logical_and(is_ic, np.invert(is_nu))
+
         for sub_prop in sub_props_list:
-            plot_data = calc_plot_data_of_energy_dependent_label(mc_info, pred, sub_prop, mode, selection=is_ic,
+
+            # plot_data = calc_plot_data_of_energy_dependent_label(mc_info, pred, sub_prop, mode, selection=is_ic,
+            #                                                      energy_bins=energy_bins,
+            #                                                      reco_energy_correction=reco_energy_correction)
+
+            plot_data_nu = calc_plot_data_of_energy_dependent_label(mc_info, pred, sub_prop, mode, selection=is_ic_nu,
+                                                                 energy_bins=energy_bins,
+                                                                 reco_energy_correction=reco_energy_correction)
+            plot_data_anu = calc_plot_data_of_energy_dependent_label(mc_info, pred, sub_prop, mode, selection=is_ic_anu,
                                                                  energy_bins=energy_bins,
                                                                  reco_energy_correction=reco_energy_correction)
 
-            bins, perf = plot_data[0], plot_data[1]
+            # bins, perf = plot_data[0], plot_data[1]
+            bins, perf_nu, perf_anu = plot_data_nu[0], plot_data_nu[1], plot_data_anu[1]
             if sub_prop == 'azimuth_corr':
-                label = 'CNN azimuth'
+                label = r'CNN azimuth'
             else:
-                label = 'CNN ' + sub_prop.replace('_', ' ')
-            ax.step(bins, perf, linestyle="-", where='post', label=label)
+                label = r'CNN ' + sub_prop.replace('_', ' ')
+
+            #a x.step(bins, perf, linestyle="-", where='post', label=label)
+
+            ax.step(bins, perf_nu, linestyle="-", where='post', label=label + r' $\nu$')
+            ax.step(bins, perf_anu, linestyle="--", where='post', color=plt.gca().lines[-1].get_color(), label=label + r' $\bar{\nu}$')
 
             if compare_2nd_reco is not None:
                 is_ic_2 = select_ic(mc_info_2['particle_type'], mc_info_2['is_cc'], ic)
+                is_nu_2 = mc_info_2['particle_type'] > 0
+                is_ic_2_nu = np.logical_and(is_ic_2, is_nu_2)
+                is_ic_2_anu = np.logical_and(is_ic_2, np.invert(is_nu_2))
+
                 # no energy correction for the 2nd file, typically some standard reco
-                plot_data_2 = calc_plot_data_of_energy_dependent_label(mc_info_2, pred_2, sub_prop, mode, selection=is_ic_2,
+                # plot_data_2 = calc_plot_data_of_energy_dependent_label(mc_info_2, pred_2, sub_prop, mode, selection=is_ic_2,
+                #                                                        reco_energy_correction=None,
+                #                                                        energy_bins=energy_bins)
+
+                plot_data_2_nu = calc_plot_data_of_energy_dependent_label(mc_info_2, pred_2, sub_prop, mode, selection=is_ic_2_nu,
                                                                        reco_energy_correction=None,
                                                                        energy_bins=energy_bins)
+                plot_data_2_anu = calc_plot_data_of_energy_dependent_label(mc_info_2, pred_2, sub_prop, mode, selection=is_ic_2_anu,
+                                                                       reco_energy_correction=None,
+                                                                       energy_bins=energy_bins)
+
                 if sub_prop == 'azimuth_corr':
                     if ic == 'muon-CC':
-                        label = 'TOR azimuth'
+                        label = r'TOR azimuth'
                     else:
-                        label = 'SOR azimuth'
+                        label = r'SOR azimuth'
                 else:
                     if ic == 'muon-CC':
-                        label = 'TOR ' + sub_prop.replace('_', ' ')
+                        label = r'TOR ' + sub_prop.replace('_', ' ')
                     else:
-                        label = 'SOR ' + sub_prop.replace('_', ' ')
-                ax.step(bins, plot_data_2[1], linestyle="-", where='post', label=label)
+                        label = r'SOR ' + sub_prop.replace('_', ' ')
+
+                # ax.step(bins, plot_data_2[1], linestyle="-", where='post', label=label)
+                ax.step(bins, plot_data_2_nu[1], linestyle="-", where='post', label=label + r' $\nu$')
+                ax.step(bins, plot_data_2_anu[1], linestyle="--", color=plt.gca().lines[-1].get_color(), where='post', label=label + r' $\bar{\nu}$')
 
         x_ticks_major = np.arange(0, 101, 10)
         ax.set_xticks(x_ticks_major)
@@ -443,6 +475,9 @@ def make_1d_property_errors_metric_over_energy(pred_file, property_name, mode, s
         #ax.set_xlim(0, 20)
 
         pdf_plots.savefig(fig)
+        plt.xlim((0, 30))
+        pdf_plots.savefig(fig)
+
         ax.cla()
 
     plt.close()
@@ -850,6 +885,10 @@ def make_1d_reco_err_to_reco_residual_plot(pred_file, savefolder, savename, cuts
 
     for prop_name in properties:
         for ic in ic_list:
+            # TODO temp
+            if ic != 'elec-CC':
+                continue
+
             is_ic = select_ic(mc_info['particle_type'], mc_info['is_cc'], ic)
             if bool(np.any(is_ic, axis=0)) is False:
                 continue
@@ -1097,6 +1136,8 @@ def plot_1d_reco_err_to_reco_residual_for_prop(prop_true, prop_pred, prop_pred_e
         y.append(residuals_std)
 
     plt.scatter(x, y, s=20, lw=0.75, c='blue', marker='+')
+    print(ax.get_xlim())
+    print(ax.get_ylim())
     xlim, ylim = ax.get_xlim(), ax.get_ylim()
     if xlim != ylim:
         max_val, idx = max((xlim, ylim)), (xlim, ylim).index(max((xlim, ylim)))
@@ -1105,12 +1146,23 @@ def plot_1d_reco_err_to_reco_residual_for_prop(prop_true, prop_pred, prop_pred_e
         else:
             ax.set_xlim(ylim)
 
+    xlim, ylim = ax.get_xlim(), ax.get_ylim()
+    ax.set_xlim([0, xlim[1]])
+    ax.set_ylim([0, ylim[1]])
+
     if title_flag is True:
         title = plt.title(title)
         title.set_position([.5, 1.04])
-    ax.set_xlabel(r'Estimated uncertainty $\sigma_{reco}$ ' + unit), ax.set_ylabel('Standard deviation of residuals ' + unit)
+    ax.set_xlabel(r'Estimated uncertainty $\sigma_{reco}$ ' + unit), ax.set_ylabel(r'Standard deviation of residuals $\sigma_{true}$ ' + unit)
     ax.grid(True)
     plt.text(overlay[1][0], overlay[1][1], overlay[0], transform=ax.transAxes, weight='bold')
+
+    print(ax.get_xlim())
+    print(ax.get_ylim())
+    print(ax.get_xbound())
+    print(ax.get_ybound())
+    plt.plot(ax.get_xbound(), ax.get_ybound(), 'k-', lw=1, zorder=10)
+    #plt.plot([-100, 100], [-100, 100], 'k-', lw=1, zorder=10)
 
     pdf_plots.savefig(fig)
     ax.cla()

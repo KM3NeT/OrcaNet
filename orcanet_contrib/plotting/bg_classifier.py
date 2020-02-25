@@ -223,7 +223,7 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
         ax.plot(np.array(muon_cont_weighted_std), np.array(neutrino_eff_weighted_std_mu_cut), label='RF')
 
         ax.set_xlim(left=0, right=20)
-        ax.set_xlabel('Muon contamination [%]'), ax.set_ylabel('Neutrino efficiency [%]')
+        ax.set_xlabel(r'Muon contamination $\mathrm{C}_{\mu}$ [%]'), ax.set_ylabel(r'Neutrino efficiency $\mathrm{\nu_{\mathrm{eff}}}$ [%]')
         ax.grid(True)
         ax.legend(loc='center right')
         if title is True:
@@ -273,7 +273,7 @@ def plot_contamination_to_neutr_eff_multi_e_cut(mc_info_dl, mc_info_std, pred_dl
         plt.errorbar(dpoints_muon_cont_std, dpoints_neutr_eff_std, xerr=dpoints_muon_cont_err_std, fmt='.', markersize=4, label='RF', linewidth=0.7)
 
         ax.set_xlim(left=0, right=20)
-        ax.set_xlabel('Muon contamination [%]'), ax.set_ylabel('Neutrino efficiency [%]')
+        ax.set_xlabel(r'Muon contamination $\mathrm{C}_{\mu}$ [%]'), ax.set_ylabel(r'Neutrino efficiency $\mathrm{\nu_{\mathrm{eff}}}$ [%]')
         ax.grid(True)
         ax.legend(loc='center right')
         if title is True:

@@ -329,7 +329,9 @@ def make_e_to_acc_plot_with_diff(pred_file_1, pred_file_2, savefolder, cuts=None
         plt.xticks(x_ticks_major)
         plt.minorticks_on()
 
-        plt.ylabel('Fraction of events classified as track')
+        #plt.ylabel('Fraction of events classified as track')
+        plt.ylabel(r'$\mathrm{f}_{\mathrm{track}}$')
+
         plt.ylim((0, 1.05))
         plt.yticks(y_ticks_major)
         if title is True:
@@ -376,9 +378,9 @@ def make_e_to_acc_plot_with_diff(pred_file_1, pred_file_2, savefolder, cuts=None
     fig, axes = plt.subplots()
 
     axes.step(be_and_1d_acc_per_e_bin_1_merge['muon-CC_nu_anu'][0], diff_gap_mu_cc_e_cc_f1_f2, where='pre', linestyle='-', color='darkorchid',
-              label=r'$\nu^{\mathrm{CC}}_{\mu} \;\mathrm{to}\; \nu^{\mathrm{CC}}_{e}$', zorder=3)
+              label=r'$\nu^{\mathrm{CC}}_{\mu} \;\mathrm{-}\; \nu^{\mathrm{CC}}_{e}$', zorder=3)
     axes.step(be_and_1d_acc_per_e_bin_1_merge['muon-CC_nu_anu'][0], diff_gap_mu_cc_e_nc_f1_f2, where='pre', linestyle='-', color='darkorange',
-              label=r'$\nu^{\mathrm{CC}}_{\mu} \;\mathrm{to}\; \nu^{\mathrm{NC}}_{e}$', zorder=3)
+              label=r'$\nu^{\mathrm{CC}}_{\mu} \;\mathrm{-}\; \nu^{\mathrm{NC}}_{e}$', zorder=3)
 
     axes.legend(loc='lower right', ncol=2)
     plt.xlabel('Energy [GeV]')
@@ -428,13 +430,14 @@ def make_e_to_acc_plot_with_diff(pred_file_1, pred_file_2, savefolder, cuts=None
     # plot the difference to small window
 
     axes_2.step(be_and_1d_acc_per_e_bin_1_merge['muon-CC_nu_anu'][0], diff_gap_mu_cc_e_cc_f1_f2, where='pre', linestyle='-', color='darkorchid',
-                label=r'$\nu^{\mathrm{CC}}_{\mu} \;\mathrm{to}\; \nu^{\mathrm{CC}}_{e}$', zorder=3)
+                label=r'$\nu^{\mathrm{CC}}_{\mu} \;\mathrm{-}\; \nu^{\mathrm{CC}}_{e}$', zorder=3)
     axes_2.step(be_and_1d_acc_per_e_bin_1_merge['muon-CC_nu_anu'][0], diff_gap_mu_cc_e_nc_f1_f2, where='pre', linestyle='-', color='darkorange',
-                label=r'$\nu^{\mathrm{CC}}_{\mu} \;\mathrm{to}\; \nu^{\mathrm{NC}}_{e}$', zorder=3)
+                label=r'$\nu^{\mathrm{CC}}_{\mu} \;\mathrm{-}\; \nu^{\mathrm{NC}}_{e}$', zorder=3)
 
     axes_2.legend(loc='lower right', ncol=2)
     plt.xlabel('Energy [GeV]')
-    plt.ylabel('Rel. improvement [%]')
+    #plt.ylabel('Rel. improvement [%]')
+    plt.ylabel(r'$\Delta \mathrm{f} $ [%]')
     plt.grid(True, zorder=0, linestyle='dotted')
     plt.ylim((-25, 25))
 
@@ -493,7 +496,8 @@ def make_ts_prob_hists(pred_file, savefolder, cuts=None, title=True,
         plt.xticks(x_ticks_major)
         plt.minorticks_on()
 
-        plt.xlabel('CNN ' + ts_class + ' probability')
+        #plt.xlabel('CNN ' + ts_class + ' probability')
+        plt.xlabel(r'$P_{i, \mathrm{track}}$')
         plt.ylabel('Normed counts')
         if title is True:
             title_text = plt.title(plot_title)

@@ -126,21 +126,20 @@ def make_ts_classifier_plots(dataset_modifier, main_perf_plots_path, pred_file):
         # ts_separability_mc_statistics_effect(pred_file_2, main_perf_plots_path + '/1d', 'rf_200b',
         #                                      cuts=cuts['mask_file_2'],
         #                                      bin_edges=np.arange(-0.005, 1.005, (1 / 101) * 0.5))
-        plot_ts_separability(pred_file, main_perf_plots_path + '/1d', pred_file_2=pred_file_2,
-                             cuts=(cuts['mask_file_1'], cuts['mask_file_2']), title=False)
-        raise SystemExit
+        # plot_ts_separability(pred_file, main_perf_plots_path + '/1d', pred_file_2=pred_file_2,
+        #                      cuts=(cuts['mask_file_1'], cuts['mask_file_2']), title=False)
 
         make_e_to_acc_plot_with_diff(pred_file, pred_file_2, main_perf_plots_path + '/1d',
                                      cuts=(cuts['mask_file_1'], cuts['mask_file_2']),
                                      prob_threshold_shower=0.5, plot_range=(1, 100), title=False,
-                                     no_taus=False)
+                                     no_taus=True)
 
-        make_e_to_acc_plot_ts(pred_file_2, main_perf_plots_path + '/1d', cuts=cuts['mask_file_2'],
-                              prob_threshold_shower=0.5, savename_prefix='rdf_', save=True, title=False, no_taus=False)
+        # make_e_to_acc_plot_ts(pred_file_2, main_perf_plots_path + '/1d', cuts=cuts['mask_file_2'],
+        #                       prob_threshold_shower=0.5, savename_prefix='rdf_', save=True, title=False, no_taus=False)
 
-    make_e_to_acc_plot_ts(pred_file, main_perf_plots_path + '/1d', cuts=cuts['from_npy_str'],
-                          prob_threshold_shower=0.5, savename_prefix='dl_', save=True, title=False, no_taus=False)
-    make_ts_prob_hists(pred_file, main_perf_plots_path + '/1d', cuts=cuts['from_npy_str'], title=False, no_taus=False)
+    # make_e_to_acc_plot_ts(pred_file, main_perf_plots_path + '/1d', cuts=cuts['from_npy_str'],
+    #                       prob_threshold_shower=0.5, savename_prefix='dl_', save=True, title=False, no_taus=False)
+    # make_ts_prob_hists(pred_file, main_perf_plots_path + '/1d', cuts=cuts['from_npy_str'], title=False, no_taus=True)
 
 
 def make_regression_plots(dataset_modifier, main_perf_plots_path, pred_file):
@@ -159,8 +158,8 @@ def make_regression_plots(dataset_modifier, main_perf_plots_path, pred_file):
         cuts['mask_file_1'] = mask_1_in_2
         cuts['mask_file_2'] = mask_2_in_1_cut
 
-    # if 'energy' in dataset_modifier:
-    #     print('Generating plots for energy performance investigations')
+    if 'energy' in dataset_modifier:
+        print('Generating plots for energy performance investigations')
 
         # make_2d_prop_to_prop_plot(pred_file, 'energy_true', 'energy_reco', main_perf_plots_path + '/2d/energy',
         #                           'e_true_to_e_reco', reco_energy_correction=reco_energy_correction,
@@ -171,20 +170,23 @@ def make_regression_plots(dataset_modifier, main_perf_plots_path, pred_file):
         #                               'standard_reco_e_true_to_e_reco', cuts=cuts['mask_file_2'],
         #                               title_prefix='Standard Reco: ', title=False)
 
-        # make_1d_property_errors_metric_over_energy(pred_file, 'energy', (None, 'median_relative'),
-        #                                            main_perf_plots_path + '/1d/energy',
-        #                                            'e_true_to_median_error_energy',
-        #                                            reco_energy_correction=reco_energy_correction,
-        #                                            cuts=(cuts['mask_file_1'], cuts['mask_file_2']),
-        #                                            compare_2nd_reco=pred_file_2,
-        #                                            overlay=('KM3NeT', (0.3, 0.95)), title=False)
-        # make_1d_property_errors_metric_over_energy(pred_file, 'energy', ('rel_std_div', None),
-        #                                            main_perf_plots_path + '/1d/energy',
-        #                                            'e_true_to_rel_std_div_energy',
-        #                                            reco_energy_correction=reco_energy_correction,
-        #                                            cuts=(cuts['mask_file_1'], cuts['mask_file_2']),
-        #                                            compare_2nd_reco=pred_file_2,
-        #                                            overlay=('KM3NeT', (0.3, 0.95)), title=False)
+        make_1d_property_errors_metric_over_energy(pred_file, 'energy', (None, 'median_relative'),
+                                                   main_perf_plots_path + '/1d/energy',
+                                                   'e_true_to_median_error_energy',
+                                                   reco_energy_correction=reco_energy_correction,
+                                                   cuts=(cuts['mask_file_1'], cuts['mask_file_2']),
+                                                   compare_2nd_reco=pred_file_2,
+                                                   overlay=('KM3NeT', (0.3, 0.95)), title=True)
+        make_1d_property_errors_metric_over_energy(pred_file, 'energy', ('rel_std_div', None),
+                                                   main_perf_plots_path + '/1d/energy',
+                                                   'e_true_to_rel_std_div_energy',
+                                                   reco_energy_correction=reco_energy_correction,
+                                                   cuts=(cuts['mask_file_1'], cuts['mask_file_2']),
+                                                   compare_2nd_reco=pred_file_2,
+                                                   overlay=('KM3NeT', (0.3, 0.95)), title=True)
+
+        raise SystemExit
+
     #     make_1d_property_errors_metric_over_energy(pred_file, 'energy', ('std_div_mean', None),
     #                                                main_perf_plots_path + '/1d/energy',
     #                                                'e_true_to_std_div_mean',
@@ -279,71 +281,71 @@ def make_regression_plots(dataset_modifier, main_perf_plots_path, pred_file):
     #                                                compare_2nd_reco=pred_file_2, title=True,
     #                                                overlay=('KM3NeT', (0.3, 0.85)))
     #
-    if 'vtx' in dataset_modifier:
-        print('Generating plots for vertex performance investigations')
+    # if 'vtx' in dataset_modifier:
+    #     print('Generating plots for vertex performance investigations')
+    #
+    #     vmax_dict = make_2d_prop_to_prop_plot(pred_file, 'vtx_long_reco_mc', 'vtx_perp_reco_mc', main_perf_plots_path + '/2d/vtx',
+    #                               'vtx_long_reco_mc_to_vtx_perp_reco_mc', cuts=cuts['mask_file_1'],
+    #                               title_prefix='OrcaNet: ',
+    #                               title=False, overlay=('KM3NeT', (0.3, 0.95), 'k'))
+    #
+    #     if pred_file_2 is not None:
+    #         make_2d_prop_to_prop_plot(pred_file_2, 'vtx_long_reco_mc', 'vtx_perp_reco_mc',
+    #                                   main_perf_plots_path + '/2d/vtx',
+    #                                   'vtx_long_reco_mc_to_vtx_perp_reco_mc_std', cuts=cuts['mask_file_2'],
+    #                                   title_prefix='Standard Reco: ', title=False, overlay=('KM3NeT', (0.3, 0.95), 'k'),
+    #                                   vmax_dict=vmax_dict)
+    #
+    #     raise SystemExit
+    #
+    #     vtx_tuples = [('vtx_x_true', 'vtx_x_reco'), ('vtx_y_true', 'vtx_y_reco'), ('vtx_z_true', 'vtx_z_reco')]
+    #
+    #     for vtx_tpl in vtx_tuples:
+    #         make_2d_prop_to_prop_plot(pred_file, vtx_tpl[0], vtx_tpl[1], main_perf_plots_path + '/2d/vtx',
+    #                                   vtx_tpl[0] + '_to_' + vtx_tpl[1], cuts=cuts['mask_file_1'],
+    #                                   title_prefix='OrcaNet: ',
+    #                                   title=True, overlay=('KM3NeT', (0.3, 0.95), 'k'))
+    #         if pred_file_2 is not None:
+    #             make_2d_prop_to_prop_plot(pred_file_2, vtx_tpl[0], vtx_tpl[1], main_perf_plots_path + '/2d/vtx',
+    #                                       'standard_reco_' + vtx_tpl[0] + '_to_' + vtx_tpl[1],
+    #                                       cuts=cuts['mask_file_2'], title_prefix='Standard Reco: ',
+    #                                       title=True, overlay=('KM3NeT', (0.3, 0.95), 'k'))
+    #
+    #     make_1d_property_errors_metric_over_energy(pred_file, 'vertex_vector', (None, 'median'),
+    #                                                main_perf_plots_path + '/1d/vtx',
+    #                                                'e_true_to_median_error_vertex',
+    #                                                cuts=(cuts['mask_file_1'], cuts['mask_file_2']),
+    #                                                compare_2nd_reco=pred_file_2, title=True,
+    #                                                overlay=('KM3NeT', (0.3, 0.95)))
+    #     make_1d_property_errors_metric_over_energy(pred_file, 'vertex_vector', (None, 'median_relative'),
+    #                                                main_perf_plots_path + '/1d/vtx',
+    #                                                'e_true_to_median_relative_error_vertex',
+    #                                                cuts=(cuts['mask_file_1'], cuts['mask_file_2']),
+    #                                                compare_2nd_reco=pred_file_2, title=True,
+    #                                                overlay=('KM3NeT', (0.3, 0.95)))
+    #     make_1d_property_errors_metric_over_energy(pred_file, 'vertex_vector', ('rel_std_div', None),
+    #                                                main_perf_plots_path + '/1d/vtx',
+    #                                                'e_true_to_rel_std_div_vertex',
+    #                                                cuts=(cuts['mask_file_1'], cuts['mask_file_2']),
+    #                                                compare_2nd_reco=pred_file_2, title=True,
+    #                                                overlay=('KM3NeT', (0.3, 0.95)))
+    #     make_1d_property_errors_metric_over_energy(pred_file, 'vertex_vector', ('std_div', None),
+    #                                                main_perf_plots_path + '/1d/vtx',
+    #                                                'e_true_to_std_div_vertex',
+    #                                                cuts=(cuts['mask_file_1'], cuts['mask_file_2']),
+    #                                                compare_2nd_reco=pred_file_2, title=True,
+    #                                                overlay=('KM3NeT', (0.3, 0.95)))
 
-        vmax_dict = make_2d_prop_to_prop_plot(pred_file, 'vtx_long_reco_mc', 'vtx_perp_reco_mc', main_perf_plots_path + '/2d/vtx',
-                                  'vtx_long_reco_mc_to_vtx_perp_reco_mc', cuts=cuts['mask_file_1'],
-                                  title_prefix='OrcaNet: ',
-                                  title=False, overlay=('KM3NeT', (0.3, 0.95), 'k'))
-
-        if pred_file_2 is not None:
-            make_2d_prop_to_prop_plot(pred_file_2, 'vtx_long_reco_mc', 'vtx_perp_reco_mc',
-                                      main_perf_plots_path + '/2d/vtx',
-                                      'vtx_long_reco_mc_to_vtx_perp_reco_mc_std', cuts=cuts['mask_file_2'],
-                                      title_prefix='Standard Reco: ', title=False, overlay=('KM3NeT', (0.3, 0.95), 'k'),
-                                      vmax_dict=vmax_dict)
-
-        raise SystemExit
-
-        vtx_tuples = [('vtx_x_true', 'vtx_x_reco'), ('vtx_y_true', 'vtx_y_reco'), ('vtx_z_true', 'vtx_z_reco')]
-
-        for vtx_tpl in vtx_tuples:
-            make_2d_prop_to_prop_plot(pred_file, vtx_tpl[0], vtx_tpl[1], main_perf_plots_path + '/2d/vtx',
-                                      vtx_tpl[0] + '_to_' + vtx_tpl[1], cuts=cuts['mask_file_1'],
-                                      title_prefix='OrcaNet: ',
-                                      title=True, overlay=('KM3NeT', (0.3, 0.95), 'k'))
-            if pred_file_2 is not None:
-                make_2d_prop_to_prop_plot(pred_file_2, vtx_tpl[0], vtx_tpl[1], main_perf_plots_path + '/2d/vtx',
-                                          'standard_reco_' + vtx_tpl[0] + '_to_' + vtx_tpl[1],
-                                          cuts=cuts['mask_file_2'], title_prefix='Standard Reco: ',
-                                          title=True, overlay=('KM3NeT', (0.3, 0.95), 'k'))
-
-        make_1d_property_errors_metric_over_energy(pred_file, 'vertex_vector', (None, 'median'),
-                                                   main_perf_plots_path + '/1d/vtx',
-                                                   'e_true_to_median_error_vertex',
-                                                   cuts=(cuts['mask_file_1'], cuts['mask_file_2']),
-                                                   compare_2nd_reco=pred_file_2, title=True,
-                                                   overlay=('KM3NeT', (0.3, 0.95)))
-        make_1d_property_errors_metric_over_energy(pred_file, 'vertex_vector', (None, 'median_relative'),
-                                                   main_perf_plots_path + '/1d/vtx',
-                                                   'e_true_to_median_relative_error_vertex',
-                                                   cuts=(cuts['mask_file_1'], cuts['mask_file_2']),
-                                                   compare_2nd_reco=pred_file_2, title=True,
-                                                   overlay=('KM3NeT', (0.3, 0.95)))
-        make_1d_property_errors_metric_over_energy(pred_file, 'vertex_vector', ('rel_std_div', None),
-                                                   main_perf_plots_path + '/1d/vtx',
-                                                   'e_true_to_rel_std_div_vertex',
-                                                   cuts=(cuts['mask_file_1'], cuts['mask_file_2']),
-                                                   compare_2nd_reco=pred_file_2, title=True,
-                                                   overlay=('KM3NeT', (0.3, 0.95)))
-        make_1d_property_errors_metric_over_energy(pred_file, 'vertex_vector', ('std_div', None),
-                                                   main_perf_plots_path + '/1d/vtx',
-                                                   'e_true_to_std_div_vertex',
-                                                   cuts=(cuts['mask_file_1'], cuts['mask_file_2']),
-                                                   compare_2nd_reco=pred_file_2, title=True,
-                                                   overlay=('KM3NeT', (0.3, 0.95)))
-
-    # if 'errors' in dataset_modifier:
-    #     print('Generating plots for error performance investigations')
-    #     # make_1d_reco_err_div_by_std_dev_plot(pred_file, main_perf_plots_path + '/1d/errors', 'reco_err_div_by_std_dev',
-    #     #                                      cuts=None)
-    #     make_1d_reco_err_to_reco_residual_plot(pred_file, main_perf_plots_path + '/1d/errors',
-    #                                            'reco_err_to_true_reco_residual',
-    #                                            cuts=None, title_flag=False, overlay=('KM3NeT', (0.3, 0.95)))
-    #     make_2d_true_reco_plot_different_sigmas(pred_file, main_perf_plots_path + '/2d/errors',
-    #                                             'true_reco_plot_different_sigmas',
-    #                                             cuts=None, title_flag=False, overlay=('KM3NeT', (0.3, 0.95)))
+    if 'errors' in dataset_modifier:
+        print('Generating plots for error performance investigations')
+        # make_1d_reco_err_div_by_std_dev_plot(pred_file, main_perf_plots_path + '/1d/errors', 'reco_err_div_by_std_dev',
+        #                                      cuts=None)
+        make_1d_reco_err_to_reco_residual_plot(pred_file, main_perf_plots_path + '/1d/errors',
+                                               'reco_err_to_true_reco_residual',
+                                               cuts=None, title_flag=True, overlay=('KM3NeT', (0.3, 0.95)))
+        # make_2d_true_reco_plot_different_sigmas(pred_file, main_perf_plots_path + '/2d/errors',
+        #                                         'true_reco_plot_different_sigmas',
+        #                                         cuts=None, title_flag=False, overlay=('KM3NeT', (0.3, 0.95)))
 
 
 def make_plots_subfolders(main_perf_plots_path, dataset_modifier):
