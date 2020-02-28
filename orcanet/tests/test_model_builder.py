@@ -45,7 +45,7 @@ class TestModel(TestCase):
 
     def test_model_setup_CNN_model_custom_callback(self):
         builder = ModelBuilder(self.model_file)
-        builder.optimizer = ks.optimizers.sgd()
+        builder.optimizer = ks.optimizers.SGD()
         model = builder.build(self.orga)
         self.assertIsInstance(model.optimizer, ks.optimizers.SGD)
 

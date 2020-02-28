@@ -354,9 +354,11 @@ def get_sgd(momentum=0.9, decay=0, nesterov=True, **kwargs):
                              **kwargs)
 
 
-def change_dropout_rate(model, before_concat, after_concat=None):
+def _change_dropout_rate(model, before_concat, after_concat=None):
     """
     Change the dropout rate in a model.
+
+    # TODO untested for tf 2.x!
 
     Only for models with a concatenate layer, aka multiple
     single input models that were merged together.
