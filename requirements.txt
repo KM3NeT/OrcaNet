@@ -1,5 +1,4 @@
-keras~=2.2.5
-tensorflow~=1.15.2
+tensorflow>=2.1
 numpy
 h5py
 matplotlib

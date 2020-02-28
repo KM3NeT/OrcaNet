@@ -9,7 +9,7 @@ import toml
 import warnings
 import time
 from datetime import timedelta
-import keras as ks
+import tensorflow.keras as ks
 
 import orcanet.backend as backend
 from orcanet.utilities.visualization import update_summary_plot

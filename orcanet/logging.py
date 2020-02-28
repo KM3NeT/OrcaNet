@@ -4,7 +4,7 @@ Scripts for writing the logfiles.
 
 import numpy as np
 import os
-import keras as ks
+import tensorflow.keras as ks
 from datetime import datetime
 from shutil import move
 

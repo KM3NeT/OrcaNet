@@ -1,7 +1,6 @@
 from unittest import TestCase
 from orcanet.core import Organizer
 import orcanet.model_builder
-from orcanet_contrib.custom_objects import get_custom_objects
 import os
 
 
@@ -50,7 +49,6 @@ class TestSequentialBuilder(TestCase):
         model_file = os.path.join(self.example_dir, toml_file)
         mb = orcanet.model_builder.ModelBuilder(model_file)
         orga = self.get_orga(dims=3)
-        orga.cfg.custom_objects = get_custom_objects()
         model = mb.build(orga)
 
         self.assertSequenceEqual(model.output_shape, (None, 3))

@@ -7,8 +7,8 @@ Scripts for making specific models.
 import warnings
 import toml
 from datetime import datetime
-import keras as ks
-import keras.layers as layers
+import tensorflow.keras as ks
+import tensorflow.keras.layers as layers
 
 from orcanet.builder_util.builders import BlockBuilder
 

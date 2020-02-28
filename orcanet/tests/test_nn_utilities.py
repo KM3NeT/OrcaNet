@@ -6,8 +6,8 @@ import os
 import shutil
 import h5py
 from unittest import TestCase
-from keras.models import Model
-import keras.layers as layers
+from tensorflow.keras.models import Model
+import tensorflow.keras.layers as layers
 
 from orcanet.core import Organizer
 from orcanet.utilities.nn_utilities import load_zero_center_data, get_layer_output
