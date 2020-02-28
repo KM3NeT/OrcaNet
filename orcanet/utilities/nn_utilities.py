@@ -110,14 +110,14 @@ class TimeModel(ks.callbacks.Callback):
         self._total_batches = 0
         self._t_start = 0.
 
-    def on_train_batch_begin(self, batch, logs=None):
+    def start_time(self):
         self._t_start = time.time()
 
-    def on_train_batch_end(self, batch, logs=None):
+    def stop_time(self):
         self._total_time += time.time() - self._t_start
         self._total_batches += 1
 
-    def on_epoch_end(self, epoch, logs=None):
+    def print_stats(self):
         if self.print_func is None:
             print_func = print
         else:
@@ -129,6 +129,27 @@ class TimeModel(ks.callbacks.Callback):
                 f"\tPer batch:\t"
                 f"{1000 * self._total_time/self._total_batches:.5} ms"
             )
+
+    def on_train_batch_begin(self, batch, logs=None):
+        self.start_time()
+
+    def on_test_batch_begin(self, batch, logs=None):
+        self.start_time()
+
+    def on_predict_batch_begin(self, batch, logs=None):
+        self.start_time()
+
+    def on_train_batch_end(self, batch, logs=None):
+        self.stop_time()
+
+    def on_test_batch_end(self, batch, logs=None):
+        self.stop_time()
+
+    def on_predict_batch_end(self, batch, logs=None):
+        self.stop_time()
+
+    def on_epoch_end(self, epoch, logs=None):
+        self.print_stats()
 
 
 # ------------- Zero center functions -------------#

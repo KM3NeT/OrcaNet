@@ -41,6 +41,7 @@ def get_subfolder(main_folder, name=None, create=False):
         "plots": main_folder + "plots",
         "activations": main_folder + "plots/activations",
         "predictions": main_folder + "predictions",
+        "inference": main_folder + "predictions/inference"
     }
 
     def get(fdr):

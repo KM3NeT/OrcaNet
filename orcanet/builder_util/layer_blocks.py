@@ -18,7 +18,8 @@ class ConvBlock:
                  kernel_l2_reg=None,
                  batchnorm=False,
                  kernel_initializer="he_normal",
-                 time_distributed=False):
+                 time_distributed=False,
+                 dilation_rate=1):
         """
         1D/2D/3D Convolutional block followed by BatchNorm, Activation,
         MaxPooling and/or Dropout.
@@ -65,6 +66,11 @@ class ConvBlock:
             Initializer for the kernel weights.
         time_distributed : bool
             If True, apply the TimeDistributed Wrapper around all layers.
+        dilation_rate : int
+            An integer or tuple/list of a single integer, specifying the
+            dilation rate to use for dilated convolution. Currently,
+            specifying any dilation_rate value != 1 is incompatible
+            with specifying any strides value != 1.
 
         """
         self.conv_dim = conv_dim
@@ -82,6 +88,7 @@ class ConvBlock:
         self.batchnorm = batchnorm
         self.kernel_initializer = kernel_initializer
         self.time_distributed = time_distributed
+        self.dilation_rate = dilation_rate
 
     def __call__(self, inputs):
         if self.dropout is not None and self.sdropout is not None:
@@ -117,7 +124,8 @@ class ConvBlock:
             padding=padding,
             kernel_initializer=self.kernel_initializer,
             use_bias=use_bias,
-            kernel_regularizer=kernel_reg)
+            kernel_regularizer=kernel_reg,
+            dilation_rate=self.dilation_rate)
         )
         if self.batchnorm:
             channel_axis = 1 if ks.backend.image_data_format() == "channels_first" else -1

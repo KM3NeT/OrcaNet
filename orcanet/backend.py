@@ -3,7 +3,7 @@
 """
 Code for training and validating NN's, as well as evaluating them.
 """
-
+import time
 import h5py
 import numpy as np
 import matplotlib.pyplot as plt
@@ -242,14 +242,15 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
     file_size = h5_get_number_of_rows(
         list(files_dict.values())[0],
         datasets=[orga.cfg.key_x_values])
-    generator = iter(get_h5_generator(
+    generator = get_h5_generator(
         orga,
         files_dict,
         zero_center=orga.cfg.zero_center_folder is not None,
         keras_mode=False,
         use_def_label=use_def_label,
         phase="inference",
-    ))
+    )
+    itergen = iter(generator)
 
     if samples is None:
         steps = int(file_size / orga.cfg.batchsize)
@@ -258,17 +259,23 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
             steps += 1
     else:
         steps = int(samples / orga.cfg.batchsize)
+    print_every = max(100, min(int(round(steps/10, -2)), 1000))
+    model_time_total = 0.
 
     with h5py.File(output_path, 'x') as h5_file:
         h5_file.attrs.create("orcanet", orcanet.__version__, dtype="S6")
 
         for s in range(steps):
-            if s % 1000 == 0:
+            if s % print_every == 0:
                 print('Predicting in step {}/{} ({:0.2%})'.format(
                     s, steps, s/steps))
 
-            info_blob = next(generator)
+            info_blob = next(itergen)
+
+            start_time = time.time()
             y_pred = model.predict_on_batch(info_blob["xs"])
+            model_time_total += time.time() - start_time
+
             if not isinstance(y_pred, list):
                 # if only one output, transform to a list
                 y_pred = [y_pred]
@@ -299,6 +306,11 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
                     h5_file[dataset_name].resize(
                         h5_file[dataset_name].shape[0] + data.shape[0], axis=0)
                     h5_file[dataset_name][-data.shape[0]:] = data
+
+    generator.print_timestats()
+    print("Statistics of model prediction:")
+    print(f"\tTotal time:\t{model_time_total / 60:.2f} min")
+    print(f"\tPer batch:\t{1000 * model_time_total / steps:.5} ms")
 
 
 def make_model_prediction(orga, model, epoch, fileno, samples=None):
