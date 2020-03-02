@@ -73,7 +73,7 @@ class ModelBuilder:
                 self.configs = model_args.pop('blocks')
                 self.defaults = model_args
 
-            else:
+            elif "body" in file_content:
                 # legacy
                 self._compat_init(file_content)
 
