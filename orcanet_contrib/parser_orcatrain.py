@@ -27,7 +27,7 @@ from matplotlib import use
 use('Agg')
 
 from docopt import docopt
-import keras as ks
+import tensorflow.keras as ks
 
 from orcanet.core import Organizer
 from orcanet.model_builder import ModelBuilder
