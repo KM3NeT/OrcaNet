@@ -43,7 +43,7 @@ class TestSummaryLogger(TestCase):
         history_train_0 = dict(zip(self.metrics, [0.0, 0.5]))
         history_train_1 = dict(zip(self.metrics, [1.0, 1.5]))
         history_val = dict(zip(self.metrics, [2.0, 2.5]))
-        """
+
         target = [
             "Epoch       | LR          | train_loss  | val_loss    | train_mae   | val_mae    \n",
             "------------+-------------+-------------+-------------+-------------+------------\n",
@@ -51,8 +51,8 @@ class TestSummaryLogger(TestCase):
             "1           | 0.002       | 1           | n/a         | 1.5         | n/a        \n",
         ]
         filled_line = "1           | 0.002       | 1           | 2           | 1.5         | 2.5        \n"
-        """
 
+        """
         target = [
             "Epoch       | LR          | train_loss  | val_loss    | train_mean_absolute_error | val_mean_absolute_error\n",
             "------------+-------------+-------------+-------------+---------------------------+------------------------\n",
@@ -60,6 +60,7 @@ class TestSummaryLogger(TestCase):
             "1           | 0.002       | 1           | n/a         | 1.5                       | n/a                    \n",
         ]
         filled_line = "1           | 0.002       | 1           | 2           | 1.5                       | 2.5                    \n"
+        """
 
         epoch = (1, 1)
         lr = 0.001
@@ -84,7 +85,6 @@ class TestSummaryLogger(TestCase):
         history_train_1 = dict(zip(self.metrics, [1.0, 1.5]))
         history_val = dict(zip(self.metrics, [2.0, 2.5]))
 
-        """
         target = [
             "Epoch       | LR          | train_loss  | val_loss    | train_mae   | val_mae    \n",
             "------------+-------------+-------------+-------------+-------------+------------\n",
@@ -92,6 +92,7 @@ class TestSummaryLogger(TestCase):
             "2           | 0.002       | 1           | n/a         | 1.5         | n/a        \n",
         ]
         filled_line = "1.60241     | 0.001       | 0           | 2           | 0.5         | 2.5        \n"
+
         """
         target = [
             "Epoch       | LR          | train_loss  | val_loss    | train_mean_absolute_error | val_mean_absolute_error\n",
@@ -100,6 +101,7 @@ class TestSummaryLogger(TestCase):
             "2           | 0.002       | 1           | n/a         | 1.5                       | n/a                    \n",
         ]
         filled_line = "1.60241     | 0.001       | 0           | 2           | 0.5                       | 2.5                    \n"
+        """
 
         epoch = (2, 1)
         lr = 0.001
@@ -196,18 +198,20 @@ class TestBatchLogger(TestCase):
     def test_batch_logger_epoch_1_logfile_1(self):
         epoch = (1, 1)
         lines = self._make_and_get_lines(epoch)
-        """
+
         target_file1 = [
             'Batch       | Batch_float | loss        | mae        \n',
             '------------+-------------+-------------+------------\n',
             '4           | 0.2         | 0.25        | 0.5        \n',
         ]
+
         """
         target_file1 = [
             'Batch       | Batch_float | loss        | mean_absolute_error\n',
             '------------+-------------+-------------+--------------------\n',
             '4           | 0.2         | 0.25        | 0.5                \n',
         ]
+        """
 
         for line_no in range(len(lines)):
             self.assertEqual(target_file1[line_no], lines[line_no])
@@ -215,13 +219,14 @@ class TestBatchLogger(TestCase):
     def test_batch_logger_epoch_1_logfile_2(self):
         epoch = (1, 2)
         lines = self._make_and_get_lines(epoch)
-        """
+
         target_file1 = [
             'Batch       | Batch_float | loss        | mae        \n',
             '------------+-------------+-------------+------------\n',
             '4           | 0.6         | 0.25        | 0.5        \n',
             '6           | 0.8         | 0.125       | 0.25       \n',
         ]
+
         """
         target_file1 = [
             'Batch       | Batch_float | loss        | mean_absolute_error\n',
@@ -229,6 +234,7 @@ class TestBatchLogger(TestCase):
             '4           | 0.6         | 0.25        | 0.5                \n',
             '6           | 0.8         | 0.125       | 0.25               \n',
         ]
+        """
 
         for line_no in range(len(lines)):
             self.assertEqual(target_file1[line_no], lines[line_no])
@@ -236,7 +242,7 @@ class TestBatchLogger(TestCase):
     def test_batch_logger_epoch_2_logfile_1(self):
         epoch = (2, 1)
         lines = self._make_and_get_lines(epoch)
-        """
+
         target_file1 = [
             'Batch       | Batch_float | loss        | mae        \n',
             '------------+-------------+-------------+------------\n',
@@ -248,6 +254,7 @@ class TestBatchLogger(TestCase):
             '------------+-------------+-------------+--------------------\n',
             '4           | 1.2         | 0.25        | 0.5                \n',
         ]
+        """
 
         for line_no in range(len(lines)):
             self.assertEqual(target_file1[line_no], lines[line_no])
@@ -300,7 +307,6 @@ def get_test_data(samples):
     MAE: 1/2
 
     """
-    dtypes = [('inp', '<f8'), ]
     xs = np.ones(samples,) * 0.5
-    ys = np.ones((samples, 1)).ravel().view(dtype=dtypes)
+    ys = np.ones((samples, 1))
     return xs, ys

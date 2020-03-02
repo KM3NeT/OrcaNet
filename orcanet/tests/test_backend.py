@@ -1,8 +1,8 @@
+import tempfile
 from unittest import TestCase
 from unittest.mock import MagicMock
 import os
 import warnings
-import shutil
 import h5py
 import numpy as np
 import tensorflow.keras as ks
@@ -116,11 +116,10 @@ class TestFunctions(TestCase):
 class TestTrainValidatePredict(TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.temp_dir = os.path.join(os.path.dirname(__file__),
-                                    ".temp", "test_backend")
+        cls.tdir = tempfile.TemporaryDirectory()
+        cls.temp_dir = cls.tdir.name
         cls.pred_dir = os.path.join(cls.temp_dir, "predictions")
 
-        os.mkdir(cls.temp_dir)
         os.mkdir(cls.pred_dir)
 
         cls.pred_filepath = os.path.join(
@@ -173,7 +172,7 @@ class TestTrainValidatePredict(TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        shutil.rmtree(cls.temp_dir)
+        cls.tdir.cleanup()
 
     def test_train(self):
         epoch = (1, 1)

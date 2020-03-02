@@ -63,7 +63,8 @@ class TestModel(TestCase):
         opti = builder._get_optimizer()
 
         target = {
-            'lr': 1.0,
+            'name': 'Adam',
+            'learning_rate': 1.0,
             'beta_1': 0.8999999761581421,
             'beta_2': 0.9990000128746033,
             'decay': 0.0,

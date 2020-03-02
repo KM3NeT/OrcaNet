@@ -1,7 +1,7 @@
+import tempfile
 from unittest import TestCase
 from unittest.mock import MagicMock
 import os
-import shutil
 import numpy as np
 
 from orcanet.core import Organizer
@@ -12,9 +12,8 @@ from orcanet.tests.test_backend import save_dummy_h5py, assert_dict_arrays_equal
 class TestBatchGenerator(TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.temp_dir = os.path.join(os.path.dirname(__file__), ".temp",
-                                    "test_backend")
-        os.mkdir(cls.temp_dir)
+        cls.tdir = tempfile.TemporaryDirectory()
+        cls.temp_dir = cls.tdir.name
 
         # make some dummy data
         cls.n_bins = {'input_A': (2, 3), 'input_B': (2, 3)}
@@ -53,7 +52,7 @@ class TestBatchGenerator(TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        shutil.rmtree(cls.temp_dir)
+        cls.tdir.cleanup()
 
     def test_batch(self):
         filepaths = self.filepaths_file_1
