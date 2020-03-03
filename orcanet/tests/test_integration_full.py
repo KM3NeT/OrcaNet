@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """ Run a test of the entire code on dummy data. """
+import tempfile
 import numpy as np
 import h5py
 import os
@@ -23,8 +24,8 @@ class TestIntegration(TestCase):
         """
         # Pathes
         # Temporary output folder
-        self.temp_dir = os.path.join(os.path.dirname(__file__),
-                                     ".temp", "full_test")
+        self.tdir = tempfile.TemporaryDirectory()
+        self.temp_dir = self.tdir.name
         self.output_folder = os.path.join(self.temp_dir, "model")
 
         # Pathes to temp dummy data that will get generated
@@ -37,12 +38,6 @@ class TestIntegration(TestCase):
         # The config file to load
         self.data_folder = os.path.join(os.path.dirname(__file__), "data")
         config_file = os.path.join(self.data_folder, "config_test.toml")
-
-        # Make sure temp dir does either not exist or is empty
-        if os.path.exists(self.temp_dir):
-            assert len(os.listdir(self.temp_dir)) == 0
-        else:
-            os.makedirs(self.temp_dir)
 
         # Make dummy data of given shape
         self.shape = (3, 3, 3, 3)
@@ -63,7 +58,7 @@ class TestIntegration(TestCase):
 
     def tearDown(self):
         """ Remove the .temp directory. """
-        shutil.rmtree(self.temp_dir)
+        self.tdir.cleanup()
 
     def test_integration_zero_center(self):
         """ Calculate the zero center image and check if it works properly. """

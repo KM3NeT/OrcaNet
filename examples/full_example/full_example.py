@@ -1,7 +1,7 @@
 import numpy as np
 import h5py
-from keras.layers import Input, Dense
-from keras.models import Model
+from tensorflow.keras.layers import Input, Dense
+from tensorflow.keras.models import Model
 import os
 
 from orcanet.core import Organizer

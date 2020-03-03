@@ -6,8 +6,10 @@ import numpy as np
 import h5py
 import os
 import time
-import keras as ks
+import tensorflow.keras as ks
 from functools import reduce
+# TODO hacky, see https://github.com/tensorflow/tensorflow/issues/34201:
+from tensorflow import python as tfp
 
 
 def get_auto_label_modifier(model):
@@ -59,9 +61,9 @@ def get_layer_output(model, samples, layer_name, mode="test"):
 
     """
     if mode == "test":
-        phase = 0
+        phase = False
     elif mode == "train":
-        phase = 1
+        phase = True
     else:
         raise NameError("Unknown mode: ", mode)
 
@@ -81,7 +83,7 @@ def get_layer_output(model, samples, layer_name, mode="test"):
         xs = samples
 
     get_output = ks.backend.function(
-        inp_tensors + [ks.backend.learning_phase(), ],
+        inp_tensors + [tfp.keras.backend.symbolic_learning_phase(), ],
         [model.get_layer(layer_name).output])
     layer_output = get_output(xs + [phase, ])[0]
     return layer_output

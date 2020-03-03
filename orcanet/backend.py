@@ -68,7 +68,7 @@ def train_model(orga, model, epoch, batch_logger=False):
         zero_center=orga.cfg.zero_center_folder is not None,
         shuffle=orga.cfg.shuffle_train)
 
-    history = model.fit_generator(
+    history = model.fit(
         training_generator,
         steps_per_epoch=int(f_size / orga.cfg.batchsize),
         verbose=orga.cfg.verbose_train,
@@ -115,7 +115,7 @@ def validate_model(orga, model):
             orga, files_dict, f_size=f_size, phase="validation",
             zero_center=orga.cfg.zero_center_folder is not None)
 
-        history_file = model.evaluate_generator(
+        history_file = model.evaluate(
             val_generator,
             steps=int(f_size / orga.cfg.batchsize),
             max_queue_size=orga.cfg.max_queue_size,

@@ -574,7 +574,7 @@ class IOHandler(object):
         y_values = info_blob["y_values"]
         layer_inputs = get_inputs(model)
         # keys: name of layers, values: shape of input
-        layer_inp_shapes = {key: layer_inputs[key].input_shape[1:]
+        layer_inp_shapes = {key: layer_inputs[key].input_shape[0][1:]
                             for key in layer_inputs}
         list_inp_shapes = self.get_n_bins()
 

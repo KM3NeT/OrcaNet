@@ -4,8 +4,8 @@
 import os
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
-import keras as ks
-import keras.layers as layers
+import tensorflow.keras as ks
+import tensorflow.keras.layers as layers
 
 from orcanet.core import Organizer
 from orcanet.model_builder import ModelBuilder
@@ -45,7 +45,7 @@ class TestModel(TestCase):
 
     def test_model_setup_CNN_model_custom_callback(self):
         builder = ModelBuilder(self.model_file)
-        builder.optimizer = ks.optimizers.sgd()
+        builder.optimizer = ks.optimizers.SGD()
         model = builder.build(self.orga)
         self.assertIsInstance(model.optimizer, ks.optimizers.SGD)
 
@@ -63,7 +63,8 @@ class TestModel(TestCase):
         opti = builder._get_optimizer()
 
         target = {
-            'lr': 1.0,
+            'name': 'Adam',
+            'learning_rate': 1.0,
             'beta_1': 0.8999999761581421,
             'beta_2': 0.9990000128746033,
             'decay': 0.0,

@@ -7,8 +7,8 @@ Scripts for making specific models.
 import warnings
 import toml
 from datetime import datetime
-import keras as ks
-import keras.layers as layers
+import tensorflow.keras as ks
+import tensorflow.keras.layers as layers
 
 from orcanet.builder_util.builders import BlockBuilder
 
@@ -73,7 +73,7 @@ class ModelBuilder:
                 self.configs = model_args.pop('blocks')
                 self.defaults = model_args
 
-            else:
+            elif "body" in file_content:
                 # legacy
                 self._compat_init(file_content)
 
@@ -354,9 +354,11 @@ def get_sgd(momentum=0.9, decay=0, nesterov=True, **kwargs):
                              **kwargs)
 
 
-def change_dropout_rate(model, before_concat, after_concat=None):
+def _change_dropout_rate(model, before_concat, after_concat=None):
     """
     Change the dropout rate in a model.
+
+    # TODO untested for tf 2.x!
 
     Only for models with a concatenate layer, aka multiple
     single input models that were merged together.

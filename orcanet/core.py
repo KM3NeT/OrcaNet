@@ -9,7 +9,7 @@ import toml
 import warnings
 import time
 from datetime import timedelta
-import keras as ks
+import tensorflow.keras as ks
 
 import orcanet.backend as backend
 from orcanet.utilities.visualization import update_summary_plot
@@ -25,7 +25,7 @@ class Organizer:
 
     Attributes
     ----------
-    cfg : Configuration
+    cfg : orcanet.core.Configuration
         Contains all configurable options.
     io : orcanet.in_out.IOHandler
         Utility functions for accessing the info in cfg.
@@ -225,7 +225,7 @@ class Organizer:
 
         return history
 
-    def validate(self, make_weight_plots=True):
+    def validate(self):
         """
         Validate the most recent saved model on all validation files.
 
@@ -237,9 +237,6 @@ class Organizer:
         history : dict
             The history of the validation on all files. A record of validation
             loss values and metrics values.
-        make_weight_plots : bool
-            If true, generate and save plots of the activations and weights of
-            the network to the 'plots/' subfolder.
 
         """
         latest_epoch = self.io.get_latest_epoch()
@@ -272,7 +269,7 @@ class Organizer:
         smry_logger.write_line(epoch_float, "n/a", history_val=history)
 
         update_summary_plot(self)
-        if make_weight_plots:
+        if self.cfg.make_weight_plots:
             backend.save_actv_wghts_plot(
                 self, model, latest_epoch, samples=self.cfg.batchsize)
 
@@ -548,7 +545,7 @@ class Organizer:
                 try:
                     plots_folder = self.io.get_subfolder("plots", create=True)
                     ks.utils.plot_model(model, plots_folder + "/model_plot.png")
-                except OSError as e:
+                except ImportError as e:
                     warnings.warn("Can not plot model: " + str(e))
 
         else:
@@ -653,6 +650,9 @@ class Configuration(object):
         If it is a str: Path to a csv file inside the main folder, containing
         3 columns with the epoch, fileno, and the value the lr will be set
         to when reaching this epoch/fileno.
+    make_weight_plots : bool
+        If true, generate and save plots of the activations and weights of
+        the network to the 'plots/' subfolder.
     max_queue_size : int
         max_queue_size option of the keras training and evaluation generator
         methods. How many batches get preloaded
@@ -739,7 +739,7 @@ class Configuration(object):
         self.use_scratch_ssd = False
         self.verbose_train = 1
         self.verbose_val = 0
-
+        self.make_weight_plots = True
         self.n_events = None
         self.max_queue_size = 10
         self.train_logger_display = 100
