@@ -25,7 +25,7 @@ class BlockBuilder:
         value = block).
         """
         # dict with toml keyword vs block for all custom blocks
-        self.all_blocks = dict(inspect.getmembers(layer_blocks, inspect.isclass))
+        self.all_blocks = layer_blocks.blocks
 
         # legacy
         self.all_blocks = {
@@ -190,6 +190,7 @@ def get_input_block(input_shapes):
 
 
 class _attach_output_cat:
+    # legacy
     def __init__(self, categories, output_name,
                  flatten=True):
         self.categories = categories
@@ -211,6 +212,7 @@ class _attach_output_cat:
 
 
 class _attach_output_gpool_categ:
+    # legacy
     def __init__(self, categories, output_name, dropout=None):
         self.categories = categories
         self.output_name = output_name

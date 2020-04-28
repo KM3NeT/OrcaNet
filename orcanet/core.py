@@ -320,7 +320,10 @@ class Organizer:
             pred_filepaths = self.io.get_pred_files_list(epoch, fileno)
 
         else:
-            model = self.load_saved_model(epoch, fileno, logging=False)
+            if self._stored_model is None:
+                model = self.load_saved_model(epoch, fileno, logging=False)
+            else:
+                model = self._stored_model
             self._set_up(model)
 
             start_time = time.time()
@@ -379,7 +382,10 @@ class Organizer:
             raise ValueError(
                 "Either both or none of epoch and fileno must be None")
 
-        model = self.load_saved_model(epoch, fileno, logging=False)
+        if self._stored_model is None:
+            model = self.load_saved_model(epoch, fileno, logging=False)
+        else:
+            model = self._stored_model
         self._set_up(model)
 
         filenames = []
@@ -544,7 +550,8 @@ class Organizer:
 
                 try:
                     plots_folder = self.io.get_subfolder("plots", create=True)
-                    ks.utils.plot_model(model, plots_folder + "/model_plot.png")
+                    ks.utils.plot_model(
+                        model, plots_folder + "/model_plot.png", show_shapes=True)
                 except ImportError as e:
                     warnings.warn("Can not plot model: " + str(e))
 
@@ -627,6 +634,10 @@ class Configuration(object):
         in the resulting h5 file. If none, every output layer will get one
         dataset each for both the label and the prediction, and one dataset
         containing the y_values from the validation files.
+    fixed_batchsize : bool
+        The last batch in the file might be smaller then the batchsize.
+        Usually, this is no problem, but set to True to skip this batch
+        [default: False].
     key_x_values : str
         The name of the datagroup in the h5 input files which contains
         the samples for the network.
@@ -735,6 +746,7 @@ class Configuration(object):
         self.custom_objects = {}
         self.shuffle_train = False
 
+        self.fixed_batchsize = False
         self.callback_train = []
         self.use_scratch_ssd = False
         self.verbose_train = 1

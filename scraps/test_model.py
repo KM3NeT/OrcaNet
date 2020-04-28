@@ -1,7 +1,7 @@
-from keras.models import Model, clone_model
-import keras.layers as layers
+from tensorflow.keras.models import Model, clone_model
+import tensorflow.keras.layers as layers
 import numpy as np
-from keras import backend as K
+from tensorflow.keras import backend as K
 
 
 def build_double_inp(compile=False):

@@ -11,6 +11,7 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
                  key_y_values="y",
                  sample_modifier=None,
                  label_modifier=None,
+                 fixed_batchsize=False,
                  phase="training",
                  xs_mean=None,
                  f_size=None,
@@ -46,6 +47,9 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         label_modifier : function or None
             Operation to be performed on batches of labels read from the input files
             before they are fed into the model.
+        fixed_batchsize : bool
+            The last batch in the file might be smaller then the batchsize.
+            Usually, this is no problem, but set to True to skip this batch.
         xs_mean : ndarray or None
             Zero center image to be subtracted from data as preprocessing.
         f_size : int or None
@@ -69,6 +73,7 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         self.key_y_values = key_y_values
         self.sample_modifier = sample_modifier
         self.label_modifier = label_modifier
+        self.fixed_batchsize = fixed_batchsize
         self.phase = phase
         self.xs_mean = xs_mean
         self.f_size = f_size
@@ -272,10 +277,12 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         """
         Define the start indices of each batch in the h5 file and store this.
         """
-        total_no_of_batches = int(
-            np.ceil(self._size / self._batchsize))  # w/o queue
-        sample_pos = np.arange(total_no_of_batches) * self._batchsize
+        if self.fixed_batchsize:
+            total_no_of_batches = np.floor(self._size / self._batchsize)
+        else:
+            total_no_of_batches = np.ceil(self._size / self._batchsize)
 
+        sample_pos = np.arange(int(total_no_of_batches)) * self._batchsize
         if self.shuffle:
             np.random.shuffle(sample_pos)
 
@@ -385,6 +392,7 @@ def get_h5_generator(orga, files_dict, f_size=None, zero_center=False,
         keras_mode=keras_mode,
         shuffle=shuffle,
         class_weights=orga.cfg.class_weight,
+        fixed_batchsize=orga.cfg.fixed_batchsize,
     )
 
     return generator

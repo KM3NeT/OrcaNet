@@ -370,18 +370,20 @@ class BatchLogger(ks.callbacks.Callback):
     This class is intended to be used only for one epoch = one file.
 
     """
-    def __init__(self, orga, epoch):
+    def __init__(self, orga, epoch, reset_metrics=True):
         """
-
         Parameters
         ----------
         orga :  orcanet.core.Organizer
             Contains all the configurable options in the OrcaNet scripts.
         epoch : tuple
             Epoch and file number.
+        reset_metrics : bool
+            Reset internal state of metric after eveery batch?
 
         """
-        ks.callbacks.Callback.__init__(self)
+        super().__init__()
+        self.reset_metrics = reset_metrics
 
         self.epoch_number = epoch[0]
         self.f_number = epoch[1]
@@ -447,6 +449,8 @@ class BatchLogger(ks.callbacks.Callback):
 
         if self.flush != -1 and self.display % self.flush == 0:
             self._flush_file()
+        if self.reset_metrics:
+            self.model.reset_metrics()
 
     def on_epoch_end(self, batch, logs=None):
         # on epoch end here means that this is called after one fit_generator

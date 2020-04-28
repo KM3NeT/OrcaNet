@@ -3,6 +3,15 @@ import tensorflow.keras as ks
 import tensorflow.keras.layers as layers
 
 
+blocks = {}
+
+
+def register(block):
+    blocks[block.__name__] = block
+    return block
+
+
+@register
 class ConvBlock:
     def __init__(self, conv_dim,
                  filters,
@@ -155,6 +164,7 @@ class ConvBlock:
         return x
 
 
+@register
 class DenseBlock:
     def __init__(self, units,
                  dropout=None,
@@ -214,6 +224,7 @@ class DenseBlock:
         return x
 
 
+@register
 class ResnetBlock:
     def __init__(self, conv_dim,
                  filters,
@@ -297,6 +308,7 @@ class ResnetBlock:
             return acti_layer(x)
 
 
+@register
 class ResnetBnetBlock:
     def __init__(self, conv_dim,
                  filters,
@@ -379,6 +391,7 @@ class ResnetBnetBlock:
         return x
 
 
+@register
 class InceptionBlockV2:
     def __init__(self,
                  conv_dim,
@@ -484,6 +497,7 @@ class InceptionBlockV2:
         return x
 
 
+@register
 class OutputReg:
     def __init__(self, output_neurons,
                  output_name,
@@ -497,7 +511,7 @@ class OutputReg:
         ----------
         output_neurons : int
             Number of neurons in the last layer.
-        output_name : str
+        output_name : str or None
             Name that will be given to the output layer of the network.
         unit_list : List, optional
             A list of ints. Add additional Dense layers after the gpool
@@ -536,6 +550,7 @@ class OutputReg:
         return out
 
 
+@register
 class OutputCateg:
     def __init__(self, categories,
                  output_name,
@@ -589,6 +604,7 @@ class OutputCateg:
         return out
 
 
+@register
 class OutputRegErr:
     def __init__(self, output_names, flatten=True, **kwargs):
         """

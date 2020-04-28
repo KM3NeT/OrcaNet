@@ -6,6 +6,7 @@ Code for training and validating NN's, as well as evaluating them.
 import time
 import h5py
 import numpy as np
+import os
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
@@ -253,16 +254,18 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
     itergen = iter(generator)
 
     if samples is None:
-        steps = int(file_size / orga.cfg.batchsize)
-        if file_size % orga.cfg.batchsize != 0:
-            # add a smaller step in the end
-            steps += 1
+        steps = len(generator)
     else:
         steps = int(samples / orga.cfg.batchsize)
     print_every = max(100, min(int(round(steps/10, -2)), 1000))
     model_time_total = 0.
 
-    with h5py.File(output_path, 'x') as h5_file:
+    temp_output_path = os.path.join(
+        os.path.dirname(output_path),
+        "temp_" + os.path.basename(output_path) + "_" +
+        time.strftime("%d-%m-%Y-%H-%M-%S", time.gmtime()))
+    print(f"Creating temporary file {temp_output_path}")
+    with h5py.File(temp_output_path, 'x') as h5_file:
         h5_file.attrs.create("orcanet", orcanet.__version__, dtype="S6")
 
         for s in range(steps):
@@ -307,6 +310,11 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
                         h5_file[dataset_name].shape[0] + data.shape[0], axis=0)
                     h5_file[dataset_name][-data.shape[0]:] = data
 
+    if os.path.exists(output_path):
+        raise FileExistsError(
+            f"{output_path} exists already! But file {temp_output_path} "
+            f"is finished and can be safely used.")
+    os.rename(temp_output_path, output_path)
     generator.print_timestats()
     print("Statistics of model prediction:")
     print(f"\tTotal time:\t{model_time_total / 60:.2f} min")
