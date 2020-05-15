@@ -36,7 +36,13 @@ OrcaNet can be installed via pip by running::
 
     pip install orcanet
 
-By default, orcanet will install tensorflow (the cpu version).
+
+Tensorflow 1.X
+--------------
+
+Orcanet per default runs on tensorflow 2, but there is also no longer supperted
+tf 1 branch, which makes use of the deprecated stand-alone keras package.
+For the tf 1 version, orcanet will install tensorflow (the cpu version).
 For training with graphics cards, tensorflow-gpu is required, which needs
 to be installed manually via::
 

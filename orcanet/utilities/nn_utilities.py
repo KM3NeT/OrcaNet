@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """Utility functions used for training a NN."""
 
+import warnings
 import numpy as np
 import h5py
 import os
@@ -98,8 +99,9 @@ class RaiseOnNaN(ks.callbacks.Callback):
         loss = logs.get('loss')
         if loss is not None:
             if np.isnan(loss) or np.isinf(loss):
+                warnings.warn(f"Input values:\n{batch}\n\nLogs:\n{logs}")
                 raise ValueError(
-                    'Batch %d: Invalid loss, terminating training' % batch
+                    f'Batch {batch}: Invalid loss {loss}, terminating training'
                 )
 
 
