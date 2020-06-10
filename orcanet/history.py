@@ -331,7 +331,6 @@ class HistoryHandler:
         # TODO suboptimal that n/a gets replaced by np.nan, because this
         #  means that legitamte, not availble cells can not be distinguished
         #  from failed 'nan' metric values produced by training.
-
         file_data = np.genfromtxt(
             filepath,
             names=True,
@@ -341,4 +340,8 @@ class HistoryHandler:
             missing_values="n/a",
             filling_values=np.nan
         )
+        # replace inf with nan so it can be plotted
+        for column_name in file_data.dtype.names:
+            x = file_data[column_name]
+            x[np.isinf(x)] = np.nan
         return file_data
