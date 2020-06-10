@@ -300,24 +300,8 @@ class HistoryHandler:
 
             n_nans_val = np.count_nonzero(np.isnan(list(val_losses.values())))
             n_nans_train = np.count_nonzero(np.isnan(list(train_losses.values())))
-
-            if n_nans_val == 0:
-                is_val = True
-            elif n_nans_val == len(val_losses):
-                is_val = False
-            else:
-                raise ValueError(
-                    "Invalid summary file: Expected val losses to be either only "
-                    "nans, or no nans (got {})".format(val_losses))
-
-            if n_nans_train == 0:
-                is_trained = True
-            elif n_nans_train == len(train_losses):
-                is_trained = False
-            else:
-                raise ValueError(
-                    "Invalid summary file: Expected train losses to be either only "
-                    "nans, or no nans (got {})".format(train_losses))
+            is_val = n_nans_val != 0
+            is_trained = n_nans_train != 0
 
             line_state = {"epoch": line["Epoch"],
                           "is_trained": is_trained,
