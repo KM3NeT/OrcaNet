@@ -99,7 +99,9 @@ class Organizer:
             loaded automatically to continue the training.
         epochs : int, optional
             How many epochs should be trained by running this function.
-            None for infinite.
+            None for infinite. This includes the current epoch in case it
+            is not finished yet, i.e. 1 means complete the epoch if there
+            are files left, otherwise do the next epoch.
 
         Returns
         -------
