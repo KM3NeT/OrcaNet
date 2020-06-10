@@ -12,13 +12,15 @@ class Summarizer:
     - Plot the training and validation curves in a single plot and show them
     - Print info about the best and worst epochs
 
-    Attributes
+    Parameters
     ----------
     folders : str or List, optional
         Path to a orcanet folder, or to multiple folder as a list.
-        Default: CWD.
-    metric : str
-        The metric to plot. Default: loss.
+        [default: CWD].
+    metric : str or List, optional
+        The metric to plot [default: 'loss'].
+        If its a list: Same length as folders. Plot a different metric for
+        each folder.
     smooth : int, optional
         Apply gaussian blur to the train curve with given sigma.
     labels : List, optional
@@ -35,8 +37,17 @@ class Summarizer:
                  labels=None,
                  noplot=False,
                  width=1.):
+        if isinstance(metric, str):
+            metric = [metric]
+        if len(metric) == 1:
+            self.metrics = metric * len(folders)
+            self._unique_metrics = False
+        else:
+            if len(metric) != len(folders):
+                raise ValueError("Need to give exactly one metric per folder!")
+            self.metrics = metric
+            self._unique_metrics = True
         self.folders = folders
-        self.metric = metric
         self.smooth = smooth
         self.labels = labels
         self.noplot = noplot
@@ -61,49 +72,59 @@ class Summarizer:
                     f"Warning: Can not summarize {self._folders[folder_no]}"
                     f", skipping... ({e})"
                 )
+
+        if self._unique_metrics:
+            column_title, y_label = ("combined metrics",) * 2
+        else:
+            column_title, y_label = self._full_metrics[0], self._metric_names[0]
+
         if len(min_stats) > 0:
             min_stats.sort()
             print("\nMinimum\n-------")
-            print("{}   \t{}\t{}\t{}".format(" ", "Epoch", self._full_metric, "name"))
+            print("{}   \t{}\t{}\t{}".format(" ", "Epoch", column_title, "name"))
             for i, stat in enumerate(min_stats, 1):
                 print("{} | \t{}\t{}\t{}".format(i, stat[2], stat[0], stat[1]))
 
         if len(max_stats) > 0:
             max_stats.sort(reverse=True)
             print("\nMaximum\n-------")
-            print("{}   \t{}\t{}\t{}".format(" ", "Epoch", self._full_metric, "name"))
+            print("{}   \t{}\t{}\t{}".format(" ", "Epoch", column_title, "name"))
             for i, stat in enumerate(max_stats, 1):
                 print("{} | \t{}\t{}\t{}".format(i, stat[2], stat[0], stat[1]))
 
         if not self.noplot:
             self._tvp.apply_layout(
                 x_label="Epoch",
-                y_label=self._metric_name,
+                y_label=y_label,
                 grid=True,
                 legend=True,
             )
             plt.show()
 
     @property
-    def _metric_name(self):
-        """ E.g. loss """
-        if self.metric.startswith("train_"):
-            metric = self.metric[6:]
-        elif self.metric.startswith("val_"):
-            metric = self.metric[4:]
-        else:
-            metric = self.metric
-        return metric
+    def _metric_names(self):
+        """ E.g. [loss, ...] """
+        metric_names = []
+        for metric in self.metrics:
+            if metric.startswith("train_"):
+                m = metric[6:]
+            elif metric.startswith("val_"):
+                m = metric[4:]
+            else:
+                m = metric
+            metric_names.append(m)
+        return metric_names
 
     @property
-    def _full_metric(self):
-        """ E.g. val_loss """
-        if not (self.metric.startswith("train_") or
-                self.metric.startswith("val_")):
-            full_metric = "val_" + self.metric
-        else:
-            full_metric = self.metric
-        return full_metric
+    def _full_metrics(self):
+        """ E.g. [val_loss, ...] """
+        full_metrics = []
+        for metric in self.metrics:
+            if metric.startswith("train_") or metric.startswith("val_"):
+                full_metrics.append(metric)
+            else:
+                full_metrics.append("val_" + metric)
+        return full_metrics
 
     @property
     def _folders(self):
@@ -133,7 +154,7 @@ class Summarizer:
         val_data, min_stat, max_stat = None, None, None
         # read data from summary file
         try:
-            smry_met_name = self._full_metric
+            smry_met_name = self._full_metrics[folder_no]
             max_line = hist.get_best_epoch_info(
                 metric=smry_met_name, mini=False)
             min_line = hist.get_best_epoch_info(
@@ -143,7 +164,7 @@ class Summarizer:
 
             summary_data = hist.get_summary_data()
             val_data = [summary_data["Epoch"],
-                        summary_data[self._full_metric]]
+                        summary_data[self._full_metrics[folder_no]]]
 
         except OSError:
             print(f"Warning: No summary file found for {folder}")
@@ -154,7 +175,7 @@ class Summarizer:
         # read data from training files
         full_train_data = hist.get_train_data()
         train_data = [full_train_data["Batch_float"],
-                      full_train_data[self._metric_name]]
+                      full_train_data[self._metric_names[folder_no]]]
 
         if not self.noplot:
             if len(self._labels) == 1:
@@ -188,9 +209,9 @@ class Summarizer:
 
         """
         minima, maxima = {}, {}
-        for folder in self._folders:
+        for folder_no, folder in enumerate(self._folders):
             hist = HistoryHandler(folder)
-            smry_met_name = self._full_metric
+            smry_met_name = self._full_metrics[folder_no]
             try:
                 max_line = hist.get_best_epoch_info(metric=smry_met_name,
                                                     mini=False)
@@ -210,11 +231,11 @@ def main():
         description=str(Summarizer.__doc__),
         formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('folders', type=str, nargs='*')
-    parser.add_argument('-metric', type=str, nargs="?")
-    parser.add_argument('-smooth', nargs="?", type=int)
-    parser.add_argument('-width', nargs="?", type=float)
-    parser.add_argument('-labels', nargs="*", type=str)
-    parser.add_argument('-noplot', action="store_true")
+    parser.add_argument('--metric', type=str, nargs="*")
+    parser.add_argument('--smooth', nargs="?", type=int)
+    parser.add_argument('--width', nargs="?", type=float)
+    parser.add_argument('--labels', nargs="*", type=str)
+    parser.add_argument('--noplot', action="store_true")
     args = vars(parser.parse_args())
     for key in list(args.keys()):
         if args[key] is None:
