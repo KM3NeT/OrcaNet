@@ -297,16 +297,14 @@ class HistoryHandler:
                     raise NameError(
                         "Invalid summary file: Invalid column name {}: must be "
                         "either Epoch, LR, or start with val_ or train_".format(name))
+            # if theres any not-nan entry, consider it completed
+            is_trained = any(~np.isnan(tuple(train_losses.values())))
+            is_validated = any(~np.isnan(tuple(val_losses.values())))
 
-            n_nans_val = np.count_nonzero(np.isnan(list(val_losses.values())))
-            n_nans_train = np.count_nonzero(np.isnan(list(train_losses.values())))
-            is_val = n_nans_val != 0
-            is_trained = n_nans_train != 0
-
-            line_state = {"epoch": line["Epoch"],
-                          "is_trained": is_trained,
-                          "is_validated": is_val, }
-            state_dicts.append(line_state)
+            state_dicts.append({
+                "epoch": line["Epoch"],
+                "is_trained": is_trained,
+                "is_validated": is_validated, })
 
         return state_dicts
 
