@@ -37,19 +37,29 @@ class Summarizer:
                  labels=None,
                  noplot=False,
                  width=1.):
+        if not folders:
+            folders = ["./"]
+        elif isinstance(folders, str):
+            folders = [folders]
+        self.folders = folders
+
         if isinstance(metric, str):
             metric = [metric]
         if len(metric) == 1:
-            self.metrics = metric * len(folders)
+            self.metrics = metric * len(self.folders)
             self._unique_metrics = False
         else:
             if len(metric) != len(folders):
                 raise ValueError("Need to give exactly one metric per folder!")
             self.metrics = metric
             self._unique_metrics = True
-        self.folders = folders
+
+        if labels is None:
+            self.labels = self.folders
+        else:
+            self.labels = labels
+
         self.smooth = smooth
-        self.labels = labels
         self.noplot = noplot
         self.width = width
         self._tvp = None
@@ -59,8 +69,8 @@ class Summarizer:
             self._tvp = TrainValPlotter()
 
         min_stats, max_stats = [], []
-        print("Reading stats of {} trainings...".format(len(self._folders)))
-        for folder_no in range(len(self._folders)):
+        print("Reading stats of {} trainings...".format(len(self.folders)))
+        for folder_no in range(len(self.folders)):
             try:
                 min_stat, max_stat = self._summarize_folder(folder_no)
                 if min_stat is not None:
@@ -69,7 +79,7 @@ class Summarizer:
                     max_stats.append(max_stat)
             except Exception as e:
                 print(
-                    f"Warning: Can not summarize {self._folders[folder_no]}"
+                    f"Warning: Can not summarize {self.folders[folder_no]}"
                     f", skipping... ({e})"
                 )
 
@@ -126,29 +136,9 @@ class Summarizer:
                 full_metrics.append("val_" + metric)
         return full_metrics
 
-    @property
-    def _folders(self):
-        """ Get a list of folders. """
-        if not self.folders:
-            folders = "./"
-        else:
-            folders = self.folders
-
-        if isinstance(folders, str):
-            folders = [folders]
-        return folders
-
-    @property
-    def _labels(self):
-        """ Get a list of labels. """
-        if self.labels is None:
-            return self._folders
-        else:
-            return self.labels
-
     def _summarize_folder(self, folder_no):
-        label = self._labels[folder_no]
-        folder = self._folders[folder_no]
+        label = self.labels[folder_no]
+        folder = self.folders[folder_no]
 
         hist = HistoryHandler(folder)
         val_data, min_stat, max_stat = None, None, None
@@ -178,7 +168,7 @@ class Summarizer:
                       full_train_data[self._metric_names[folder_no]]]
 
         if not self.noplot:
-            if len(self._labels) == 1:
+            if len(self.labels) == 1:
                 train_label, val_label = "training", "validation"
             elif val_data is None:
                 train_label, val_label = label, None
@@ -209,7 +199,7 @@ class Summarizer:
 
         """
         minima, maxima = {}, {}
-        for folder_no, folder in enumerate(self._folders):
+        for folder_no, folder in enumerate(self.folders):
             hist = HistoryHandler(folder)
             smry_met_name = self._full_metrics[folder_no]
             try:
