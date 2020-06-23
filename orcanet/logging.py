@@ -151,19 +151,18 @@ def gen_line_cells(data, widths=None, float_precision=4, minimum_cell_width=9):
 class SummaryLogger:
     """
     For writing the summary logfile made during training.
+
+    Parameters
+    ----------
+    orga : orcanet.core.Organizer
+        Contains all the configurable options in the OrcaNet scripts.
+    model : ks.model.Model or None
+        Keras model containing the metrics to plot.
+
     """
     def __init__(self, orga, model):
-        """
-        Init with the training files in orga, and metrics in the model.
-
-        Parameters
-        ----------
-        orga : orcanet.core.Organizer
-            Contains all the configurable options in the OrcaNet scripts.
-        model : ks.model.Model or None
-            Keras model containing the metrics to plot.
-
-        """
+        self.orga = orga
+        self.model = model
         # Minimum width of the cells in characters.
         self.minimum_cell_width = 11
         # Precision to which floats are rounded if they appear in data.
@@ -171,16 +170,18 @@ class SummaryLogger:
 
         self.logfile_name = orga.cfg.output_folder + 'summary.txt'
         self.temp_filepath = orga.cfg.output_folder + "/.temp_summary.txt"
-        self.orga = orga
-
-        self.metric_names = model.metrics_names
-        self.column_names = self._get_column_names()
 
     def write_line(self, epoch_float, lr, history_train=None, history_val=None):
         """
         Write a line to the summary.txt file in the trained model folder.
 
         Will update an existing line if possible.
+
+        Notes
+        -----
+        In tf 2.2, model.metrics_names is only filled after the model
+        has been used on data, i.e. only after that point this line can
+        be run. Otherwise, _get_column_names will throw a NameError.
 
         Parameters
         ----------
@@ -207,7 +208,7 @@ class SummaryLogger:
 
         # Format the content: (Epoch, LR, train_1, val_1, ...)
         data = [epoch_float, lr]
-        for i, metric_name in enumerate(self.metric_names):
+        for i, metric_name in enumerate(self.model.metrics_names):
             if history_train is None:
                 data.append("n/a")
             else:
@@ -237,7 +238,7 @@ class SummaryLogger:
 
     def _get_column_names(self):
         column_names = ["Epoch", "LR", ]
-        for metric_name in self.metric_names:
+        for metric_name in self.model.metrics_names:
             column_names.append("train_" + str(metric_name))
             column_names.append("val_" + str(metric_name))
         column_names = tuple(column_names)
@@ -290,7 +291,8 @@ class SummaryLogger:
             The width of every cell in characters.
 
         """
-        headline, widths = self._gen_line_str(self.column_names)
+        column_names = self._get_column_names()
+        headline, widths = self._gen_line_str(column_names)
         if not os.path.isfile(self.logfile_name) or \
                 os.stat(self.logfile_name).st_size == 0:
 
@@ -369,19 +371,17 @@ class BatchLogger(ks.callbacks.Callback):
     of the batch in the epoch (i.e. taking all files into account).
     This class is intended to be used only for one epoch = one file.
 
+    Parameters
+    ----------
+    orga :  orcanet.core.Organizer
+        Contains all the configurable options in the OrcaNet scripts.
+    epoch : tuple
+        Epoch and file number.
+    reset_metrics : bool
+        Reset internal state of metric after eveery batch?
+
     """
     def __init__(self, orga, epoch, reset_metrics=True):
-        """
-        Parameters
-        ----------
-        orga :  orcanet.core.Organizer
-            Contains all the configurable options in the OrcaNet scripts.
-        epoch : tuple
-            Epoch and file number.
-        reset_metrics : bool
-            Reset internal state of metric after eveery batch?
-
-        """
         super().__init__()
         self.reset_metrics = reset_metrics
 
@@ -413,10 +413,15 @@ class BatchLogger(ks.callbacks.Callback):
         self.lines = None
         self.cum_metrics = None
         self.file = None
+        self.epoch_initialized = False
         self._stored_metrics = False
         self._logger = None
 
     def on_epoch_begin(self, epoch, logs=None):
+        self.epoch_initialized = False
+
+    def initialize_epoch(self):
+        """ Start a new logfile and prepare the logger. """
         # no of seen batches in this epoch
         self.seen = 0
         # list of stored lines, so that multiple can be written at once
@@ -437,6 +442,9 @@ class BatchLogger(ks.callbacks.Callback):
         #   {'batch': 7, 'size': 5, 'loss': 2.06344,
         #    'dx_loss': 0.19809794, 'dx_err_loss': 0.08246058}
         logs = logs or {}
+        if not self.epoch_initialized:
+            self.initialize_epoch()
+            self.epoch_initialized = True
 
         self.seen += 1
         for metric in self.model.metrics_names:

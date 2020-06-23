@@ -126,7 +126,7 @@ class BlockBuilder:
             raise KeyError("No layer block type specified")
 
         block = self._get_blocks(block_name)
-        args = list(inspect.signature(block).parameters.keys())
+        args = list(inspect.signature(block.__init__).parameters.keys())
 
         if defaults is not None:
             for key, val in defaults.items():
@@ -155,7 +155,7 @@ class BlockBuilder:
         # possible arguments for all blocks
         psb_args = ["type", ]
         for block in self._get_blocks().values():
-            args = list(inspect.signature(block).parameters.keys())
+            args = list(inspect.signature(block.__init__).parameters.keys())
             for arg in args:
                 if arg not in psb_args and arg != "kwargs":
                     psb_args.append(arg)

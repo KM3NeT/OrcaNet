@@ -13,6 +13,59 @@ def register(block):
 
 @register
 class ConvBlock:
+    """
+    1D/2D/3D Convolutional block followed by BatchNorm, Activation,
+    MaxPooling and/or Dropout.
+
+    Parameters
+    ----------
+    conv_dim : int
+        Specifies the dimension of the convolutional block, 1D/2D/3D.
+    filters : int
+        Number of filters used for the convolutional layer.
+    strides : int or tuple
+        The stride length of the convolution.
+    padding : str or int or list
+        If str: Padding of the conv block.
+        If int or list: Padding argument of a ZeroPaddingND layer that
+        gets added before the convolution.
+    kernel_size : int or tuple
+        Kernel size which is used for all three dimensions.
+    pool_size : None or int or tuple
+        Specifies pool size for the pooling layer, e.g. (1,1,2)
+        -> sizes for a 3D conv block. If its None, no pooling will be added,
+        except for when global average pooling is used.
+    pool_type : str, optional
+        The type of pooling layer to add. Ignored if pool_size is None.
+        Can be max_pooling (default), average_pooling, or
+        global_average_pooling.
+    pool_padding : str
+        Padding option of the pooling layer.
+    dropout : float or None
+        Adds a dropout layer if the value is not None.
+        Can not be used together with sdropout.
+        Hint: 0 will add a dropout layer, but with a rate of 0 (=no dropout).
+    sdropout : float or None
+        Adds a spatial dropout layer if the value is not None.
+        Can not be used together with dropout.
+    activation : str or None
+        Type of activation function that should be used. E.g. 'linear',
+        'relu', 'elu', 'selu'.
+    kernel_l2_reg : float, optional
+        Regularization factor of l2 regularizer for the weights.
+    batchnorm : bool
+        Adds a batch normalization layer.
+    kernel_initializer : string
+        Initializer for the kernel weights.
+    time_distributed : bool
+        If True, apply the TimeDistributed Wrapper around all layers.
+    dilation_rate : int
+        An integer or tuple/list of a single integer, specifying the
+        dilation rate to use for dilated convolution. Currently,
+        specifying any dilation_rate value != 1 is incompatible
+        with specifying any strides value != 1.
+
+    """
     def __init__(self, conv_dim,
                  filters,
                  kernel_size=3,
@@ -29,59 +82,6 @@ class ConvBlock:
                  kernel_initializer="he_normal",
                  time_distributed=False,
                  dilation_rate=1):
-        """
-        1D/2D/3D Convolutional block followed by BatchNorm, Activation,
-        MaxPooling and/or Dropout.
-
-        Parameters
-        ----------
-        conv_dim : int
-            Specifies the dimension of the convolutional block, 1D/2D/3D.
-        filters : int
-            Number of filters used for the convolutional layer.
-        strides : int or tuple
-            The stride length of the convolution.
-        padding : str or int or list
-            If str: Padding of the conv block.
-            If int or list: Padding argument of a ZeroPaddingND layer that
-            gets added before the convolution.
-        kernel_size : int or tuple
-            Kernel size which is used for all three dimensions.
-        pool_size : None or int or tuple
-            Specifies pool size for the pooling layer, e.g. (1,1,2)
-            -> sizes for a 3D conv block. If its None, no pooling will be added,
-            except for when global average pooling is used.
-        pool_type : str, optional
-            The type of pooling layer to add. Ignored if pool_size is None.
-            Can be max_pooling (default), average_pooling, or
-            global_average_pooling.
-        pool_padding : str
-            Padding option of the pooling layer.
-        dropout : float or None
-            Adds a dropout layer if the value is not None.
-            Can not be used together with sdropout.
-            Hint: 0 will add a dropout layer, but with a rate of 0 (=no dropout).
-        sdropout : float or None
-            Adds a spatial dropout layer if the value is not None.
-            Can not be used together with dropout.
-        activation : str or None
-            Type of activation function that should be used. E.g. 'linear',
-            'relu', 'elu', 'selu'.
-        kernel_l2_reg : float, optional
-            Regularization factor of l2 regularizer for the weights.
-        batchnorm : bool
-            Adds a batch normalization layer.
-        kernel_initializer : string
-            Initializer for the kernel weights.
-        time_distributed : bool
-            If True, apply the TimeDistributed Wrapper around all layers.
-        dilation_rate : int
-            An integer or tuple/list of a single integer, specifying the
-            dilation rate to use for dilated convolution. Currently,
-            specifying any dilation_rate value != 1 is incompatible
-            with specifying any strides value != 1.
-
-        """
         self.conv_dim = conv_dim
         self.filters = filters
         self.kernel_size = kernel_size
@@ -166,30 +166,30 @@ class ConvBlock:
 
 @register
 class DenseBlock:
+    """
+    Dense layer followed by BatchNorm, Activation and/or Dropout.
+
+    Parameters
+    ----------
+    units : int
+        Number of neurons of the dense layer.
+    dropout : float or None
+        Adds a dropout layer if the value is not None.
+    activation : str or None
+        Type of activation function that should be used. E.g. 'linear',
+        'relu', 'elu', 'selu'.
+    kernel_l2_reg : float, optional
+        Regularization factor of l2 regularizer for the weights.
+    batchnorm : bool
+        Adds a batch normalization layer.
+
+    """
     def __init__(self, units,
                  dropout=None,
                  activation='relu',
                  kernel_l2_reg=None,
                  batchnorm=False,
                  kernel_initializer="he_normal"):
-        """
-        Dense layer followed by BatchNorm, Activation and/or Dropout.
-
-        Parameters
-        ----------
-        units : int
-            Number of neurons of the dense layer.
-        dropout : float or None
-            Adds a dropout layer if the value is not None.
-        activation : str or None
-            Type of activation function that should be used. E.g. 'linear',
-            'relu', 'elu', 'selu'.
-        kernel_l2_reg : float, optional
-            Regularization factor of l2 regularizer for the weights.
-        batchnorm : bool
-            Adds a batch normalization layer.
-
-        """
         self.units = units
         self.dropout = dropout
         self.activation = activation
@@ -226,6 +226,33 @@ class DenseBlock:
 
 @register
 class ResnetBlock:
+    """
+    A residual building block for resnets. 2 c layers with a shortcut.
+    https://arxiv.org/pdf/1605.07146.pdf
+
+    Parameters
+    ----------
+    conv_dim : int
+        Specifies the dimension of the convolutional block, 2D/3D.
+    filters : int
+        Number of filters used for the convolutional layers.
+    strides : int or tuple
+        The stride length of the convolution. If strides is 1, this is
+        the identity block. If not, it has a conv block
+        at the shortcut.
+    kernel_size : int or tuple
+        Kernel size which is used for all three dimensions.
+    activation : str or None
+        Type of activation function that should be used. E.g. 'linear',
+        'relu', 'elu', 'selu'.
+    batchnorm : bool
+        Adds a batch normalization layer.
+    kernel_initializer : string
+        Initializer for the kernel weights.
+    time_distributed : bool
+        If True, apply the TimeDistributed Wrapper around all layers.
+
+    """
     def __init__(self, conv_dim,
                  filters,
                  strides=1,
@@ -234,33 +261,6 @@ class ResnetBlock:
                  batchnorm=False,
                  kernel_initializer="he_normal",
                  time_distributed=False):
-        """
-        A residual building block for resnets. 2 c layers with a shortcut.
-        https://arxiv.org/pdf/1605.07146.pdf
-
-        Parameters
-        ----------
-        conv_dim : int
-            Specifies the dimension of the convolutional block, 2D/3D.
-        filters : int
-            Number of filters used for the convolutional layers.
-        strides : int or tuple
-            The stride length of the convolution. If strides is 1, this is
-            the identity block. If not, it has a conv block
-            at the shortcut.
-        kernel_size : int or tuple
-            Kernel size which is used for all three dimensions.
-        activation : str or None
-            Type of activation function that should be used. E.g. 'linear',
-            'relu', 'elu', 'selu'.
-        batchnorm : bool
-            Adds a batch normalization layer.
-        kernel_initializer : string
-            Initializer for the kernel weights.
-        time_distributed : bool
-            If True, apply the TimeDistributed Wrapper around all layers.
-
-        """
         self.conv_dim = conv_dim
         self.filters = filters
         self.kernel_size = kernel_size
@@ -310,6 +310,32 @@ class ResnetBlock:
 
 @register
 class ResnetBnetBlock:
+    """
+    A residual bottleneck building block for resnets.
+    https://arxiv.org/pdf/1605.07146.pdf
+
+    Parameters
+    ----------
+    conv_dim : int
+        Specifies the dimension of the convolutional block, 2D/3D.
+    filters : List
+        Number of filters used for the convolutional layers.
+        Has to be length 3. First and third is for the 1x1 convolutions.
+    strides : int or tuple
+        The stride length of the convolution. If strides is 1, this is
+        the identity block. If not, it has a conv block
+        at the shortcut.
+    kernel_size : int or tuple
+        Kernel size which is used for all three dimensions.
+    activation : str or None
+        Type of activation function that should be used. E.g. 'linear',
+        'relu', 'elu', 'selu'.
+    batchnorm : bool
+        Adds a batch normalization layer.
+    kernel_initializer : string
+        Initializer for the kernel weights.
+
+    """
     def __init__(self, conv_dim,
                  filters,
                  strides=1,
@@ -317,32 +343,6 @@ class ResnetBnetBlock:
                  activation='relu',
                  batchnorm=False,
                  kernel_initializer="he_normal"):
-        """
-        A residual bottleneck building block for resnets.
-        https://arxiv.org/pdf/1605.07146.pdf
-
-        Parameters
-        ----------
-        conv_dim : int
-            Specifies the dimension of the convolutional block, 2D/3D.
-        filters : List
-            Number of filters used for the convolutional layers.
-            Has to be length 3. First and third is for the 1x1 convolutions.
-        strides : int or tuple
-            The stride length of the convolution. If strides is 1, this is
-            the identity block. If not, it has a conv block
-            at the shortcut.
-        kernel_size : int or tuple
-            Kernel size which is used for all three dimensions.
-        activation : str or None
-            Type of activation function that should be used. E.g. 'linear',
-            'relu', 'elu', 'selu'.
-        batchnorm : bool
-            Adds a batch normalization layer.
-        kernel_initializer : string
-            Initializer for the kernel weights.
-
-        """
         self.conv_dim = conv_dim
         self.filters = filters
         self.kernel_size = kernel_size
@@ -393,6 +393,38 @@ class ResnetBnetBlock:
 
 @register
 class InceptionBlockV2:
+    """
+    A GoogleNet Inception block (v2).
+    https://arxiv.org/pdf/1512.00567v3.pdf, see fig. 5.
+    Keras implementation, e.g.:
+    https://github.com/keras-team/keras-applications/blob/master/keras_applications/inception_resnet_v2.py
+
+    Parameters
+    ----------
+    conv_dim : int
+        Specifies the dimension of the convolutional block, 1D/2D/3D.
+    filters_1x1 : int or None
+        No. of filters for the 1x1 convolutional branch.
+        If None, dont make this branch.
+    filters_pool : int or None
+        No. of filters for the pooling branch.
+        If None, dont make this branch.
+    filters_3x3 : tuple or None
+        No. of filters for the 3x3 convolutional branch. First int
+        is the filters in the 1x1 conv, second int for the 3x3 conv.
+        First should be chosen smaller for computational efficiency.
+        If None, dont make this branch.
+    filters_3x3dbl : tuple or None
+        No. of filters for the 3x3 convolutional branch. First int
+        is the filters in the 1x1 conv, second int for the two 3x3 convs.
+        First should be chosen smaller for computational efficiency.
+        If None, dont make this branch.
+    strides : int or tuple
+        Stride length of this block.
+        Like in the keras implementation, no 1x1 convs with stride > 1
+        will be used, instead they will be skipped.
+
+    """
     def __init__(self,
                  conv_dim,
                  filters_1x1,
@@ -403,38 +435,6 @@ class InceptionBlockV2:
                  activation="relu",
                  batchnorm=False,
                  dropout=None):
-        """
-        A GoogleNet Inception block (v2).
-        https://arxiv.org/pdf/1512.00567v3.pdf, see fig. 5.
-        Keras implementation, e.g.:
-        https://github.com/keras-team/keras-applications/blob/master/keras_applications/inception_resnet_v2.py
-
-        Parameters
-        ----------
-        conv_dim : int
-            Specifies the dimension of the convolutional block, 1D/2D/3D.
-        filters_1x1 : int or None
-            No. of filters for the 1x1 convolutional branch.
-            If None, dont make this branch.
-        filters_pool : int or None
-            No. of filters for the pooling branch.
-            If None, dont make this branch.
-        filters_3x3 : tuple or None
-            No. of filters for the 3x3 convolutional branch. First int
-            is the filters in the 1x1 conv, second int for the 3x3 conv.
-            First should be chosen smaller for computational efficiency.
-            If None, dont make this branch.
-        filters_3x3dbl : tuple or None
-            No. of filters for the 3x3 convolutional branch. First int
-            is the filters in the 1x1 conv, second int for the two 3x3 convs.
-            First should be chosen smaller for computational efficiency.
-            If None, dont make this branch.
-        strides : int or tuple
-            Stride length of this block.
-            Like in the keras implementation, no 1x1 convs with stride > 1
-            will be used, instead they will be skipped.
-
-        """
         self.filters_1x1 = filters_1x1  # 64
         self.filters_pool = filters_pool  # 64
         self.filters_3x3 = filters_3x3  # 48, 64
@@ -499,33 +499,33 @@ class InceptionBlockV2:
 
 @register
 class OutputReg:
+    """
+    Dense layer(s) for regression.
+
+    Parameters
+    ----------
+    output_neurons : int
+        Number of neurons in the last layer.
+    output_name : str or None
+        Name that will be given to the output layer of the network.
+    unit_list : List, optional
+        A list of ints. Add additional Dense layers after the gpool
+        with this many units in them. E.g., [64, 32] would add
+        two Dense layers, the first with 64 neurons, the secound with
+        32 neurons.
+    transition : str or None
+        Name of a layer that will be used as the first layer of this block.
+        Example: 'keras:GlobalAveragePooling2D', 'keras:Flatten'
+    kwargs
+        Keywords for the dense blocks that get added if unit_list is
+        not None.
+
+    """
     def __init__(self, output_neurons,
                  output_name,
                  unit_list=None,
                  transition='keras:Flatten',
                  **kwargs):
-        """
-        Dense layer(s) for regression.
-
-        Parameters
-        ----------
-        output_neurons : int
-            Number of neurons in the last layer.
-        output_name : str or None
-            Name that will be given to the output layer of the network.
-        unit_list : List, optional
-            A list of ints. Add additional Dense layers after the gpool
-            with this many units in them. E.g., [64, 32] would add
-            two Dense layers, the first with 64 neurons, the secound with
-            32 neurons.
-        transition : str or None
-            Name of a layer that will be used as the first layer of this block.
-            Example: 'keras:GlobalAveragePooling2D', 'keras:Flatten'
-        kwargs
-            Keywords for the dense blocks that get added if unit_list is
-            not None.
-
-        """
         self.output_neurons = output_neurons
         self.output_name = output_name
         self.unit_list = unit_list
@@ -552,33 +552,33 @@ class OutputReg:
 
 @register
 class OutputCateg:
+    """
+    Dense layer(s) for categorization.
+
+    Parameters
+    ----------
+    categories : int
+        Number of categories (= neurons in the last layer).
+    output_name : str
+        Name that will be given to the output layer of the network.
+    unit_list : List, optional
+        A list of ints. Add additional Dense layers after the gpool
+        with this many units in them. E.g., [64, 32] would add
+        two Dense layers, the first with 64 neurons, the secound with
+        32 neurons.
+    transition : str or None
+        Name of a layer that will be used as the first layer of this block.
+        Example: 'keras:GlobalAveragePooling2D', 'keras:Flatten'
+    kwargs
+        Keywords for the dense blocks that get added if unit_list is
+        not None.
+
+    """
     def __init__(self, categories,
                  output_name,
                  unit_list=None,
                  transition='keras:Flatten',
                  **kwargs):
-        """
-        Dense layer(s) for categorization.
-
-        Parameters
-        ----------
-        categories : int
-            Number of categories (= neurons in the last layer).
-        output_name : str
-            Name that will be given to the output layer of the network.
-        unit_list : List, optional
-            A list of ints. Add additional Dense layers after the gpool
-            with this many units in them. E.g., [64, 32] would add
-            two Dense layers, the first with 64 neurons, the secound with
-            32 neurons.
-        transition : str or None
-            Name of a layer that will be used as the first layer of this block.
-            Example: 'keras:GlobalAveragePooling2D', 'keras:Flatten'
-        kwargs
-            Keywords for the dense blocks that get added if unit_list is
-            not None.
-
-        """
         self.categories = categories
         self.output_name = output_name
         self.unit_list = unit_list
@@ -606,24 +606,24 @@ class OutputCateg:
 
 @register
 class OutputRegErr:
+    """
+    Double network for regression + error estimation.
+
+    It has 3 dense layer blocks, followed by one dense layer
+    for each output_name, as well as dense layer blocks, followed by one dense layer
+    for the respective error of each output_name.
+
+    Parameters
+    ----------
+    output_names : List
+        List of strs, the output names, each with one neuron + one err neuron.
+    flatten : bool
+        If True, start with a flatten layer.
+    kwargs
+        Keywords for the dense blocks.
+
+    """
     def __init__(self, output_names, flatten=True, **kwargs):
-        """
-        Double network for regression + error estimation.
-
-        It has 3 dense layer blocks, followed by one dense layer
-        for each output_name, as well as dense layer blocks, followed by one dense layer
-        for the respective error of each output_name.
-
-        Parameters
-        ----------
-        output_names : List
-            List of strs, the output names, each with one neuron + one err neuron.
-        flatten : bool
-            If True, start with a flatten layer.
-        kwargs
-            Keywords for the dense blocks.
-
-        """
         self.flatten = flatten
         self.output_names = output_names
         self.kwargs = kwargs
