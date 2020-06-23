@@ -3,6 +3,7 @@
 Visualization tools used without Keras.
 Makes performance graphs for training and validating.
 """
+import os
 import numpy as np
 
 import matplotlib.pyplot as plt
@@ -358,7 +359,7 @@ def update_summary_plot(orga):
 
     Parameters
     ----------
-    orga : object Organizer
+    orga : orcanet.core.Organizer
         Contains all the configurable options in the OrcaNet scripts.
 
     """
@@ -381,6 +382,8 @@ def update_summary_plot(orga):
                 color_counter -= 1
             orga.history.plot_metric(
                 metric, color=colors[color_counter % len(colors)])
+            plt.suptitle(
+                os.path.basename(os.path.abspath(orga.cfg.output_folder)))
             color_counter += 1
             pdf.savefig()
             plt.clf()

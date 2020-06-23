@@ -297,32 +297,14 @@ class HistoryHandler:
                     raise NameError(
                         "Invalid summary file: Invalid column name {}: must be "
                         "either Epoch, LR, or start with val_ or train_".format(name))
+            # if theres any not-nan entry, consider it completed
+            is_trained = any(~np.isnan(tuple(train_losses.values())))
+            is_validated = any(~np.isnan(tuple(val_losses.values())))
 
-            n_nans_val = np.count_nonzero(np.isnan(list(val_losses.values())))
-            n_nans_train = np.count_nonzero(np.isnan(list(train_losses.values())))
-
-            if n_nans_val == 0:
-                is_val = True
-            elif n_nans_val == len(val_losses):
-                is_val = False
-            else:
-                raise ValueError(
-                    "Invalid summary file: Expected val losses to be either only "
-                    "nans, or no nans (got {})".format(val_losses))
-
-            if n_nans_train == 0:
-                is_trained = True
-            elif n_nans_train == len(train_losses):
-                is_trained = False
-            else:
-                raise ValueError(
-                    "Invalid summary file: Expected train losses to be either only "
-                    "nans, or no nans (got {})".format(train_losses))
-
-            line_state = {"epoch": line["Epoch"],
-                          "is_trained": is_trained,
-                          "is_validated": is_val, }
-            state_dicts.append(line_state)
+            state_dicts.append({
+                "epoch": line["Epoch"],
+                "is_trained": is_trained,
+                "is_validated": is_validated, })
 
         return state_dicts
 
@@ -331,7 +313,6 @@ class HistoryHandler:
         # TODO suboptimal that n/a gets replaced by np.nan, because this
         #  means that legitamte, not availble cells can not be distinguished
         #  from failed 'nan' metric values produced by training.
-
         file_data = np.genfromtxt(
             filepath,
             names=True,
@@ -341,4 +322,8 @@ class HistoryHandler:
             missing_values="n/a",
             filling_values=np.nan
         )
+        # replace inf with nan so it can be plotted
+        for column_name in file_data.dtype.names:
+            x = file_data[column_name]
+            x[np.isinf(x)] = np.nan
         return file_data

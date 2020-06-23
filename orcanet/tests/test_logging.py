@@ -27,17 +27,19 @@ class TestSummaryLogger(TestCase):
         self.orga.io.get_file_sizes = MagicMock(return_value=file_sizes)
         model = build_test_model()
         self.smry = SummaryLogger(self.orga, model)
+        # tf 2.2: train the model to set metric_names
+        model.train_on_batch(np.ones((2, 1)), np.ones((2, 1)))
 
         self.metrics = model.metrics_names
 
-        def check_file(target_lines, verbose=False):
-            with open(self.summary_file) as file:
-                for i, line in enumerate(file):
-                    if verbose:
-                        print([line])
-                        print([target_lines[i]])
-                    self.assertEqual(line, target_lines[i])
-        self.check_file = check_file
+    def _check_file(self, target_lines):
+        verbose = False  # for debugging
+        with open(self.summary_file) as file:
+            for i, line in enumerate(file):
+                if verbose:
+                    print("\n", [line])
+                    print([target_lines[i]])
+                self.assertEqual(line, target_lines[i])
 
     def test_writing_summary_file_update_epoch_1(self):
         history_train_0 = dict(zip(self.metrics, [0.0, 0.5]))
@@ -66,19 +68,19 @@ class TestSummaryLogger(TestCase):
         lr = 0.001
         self.smry.write_line(self.orga.io.get_epoch_float(*epoch), lr,
                              history_train=history_train_0)
-        self.check_file(target)
+        self._check_file(target)
 
         epoch = (1, 2)
         lr = 0.002
         self.smry.write_line(self.orga.io.get_epoch_float(*epoch), lr,
                              history_train=history_train_1)
-        self.check_file(target)
+        self._check_file(target)
 
         target[-1] = filled_line
         lr = np.nan
         self.smry.write_line(self.orga.io.get_epoch_float(*epoch), lr,
                              history_val=history_val)
-        self.check_file(target)
+        self._check_file(target)
 
     def test_writing_summary_file_update_epoch_2(self):
         history_train_0 = dict(zip(self.metrics, [0.0, 0.5]))
@@ -107,19 +109,19 @@ class TestSummaryLogger(TestCase):
         lr = 0.001
         self.smry.write_line(self.orga.io.get_epoch_float(*epoch), lr,
                              history_train=history_train_0)
-        self.check_file(target)
+        self._check_file(target)
 
         target[2] = filled_line
         lr = "n/a"
         self.smry.write_line(self.orga.io.get_epoch_float(*epoch), lr,
                              history_val=history_val)
-        self.check_file(target)
+        self._check_file(target)
 
         epoch = (2, 2)
         lr = 0.002
         self.smry.write_line(self.orga.io.get_epoch_float(*epoch), lr,
                              history_train=history_train_1)
-        self.check_file(target)
+        self._check_file(target)
 
     def tearDown(self):
         os.remove(self.summary_file)
@@ -174,8 +176,8 @@ class TestGenLineStr(TestCase):
 
 class TestBatchLogger(TestCase):
     def setUp(self):
-        self.temp_dir = os.path.join(os.path.dirname(__file__), ".temp",
-                                     "batch_logger")
+        self.temp_dir = os.path.join(
+            os.path.dirname(__file__), ".temp", "batch_logger")
 
         self.model = build_test_model()
         samples_file1 = 40
@@ -184,8 +186,8 @@ class TestBatchLogger(TestCase):
         self.data_file2 = get_test_data(samples_file2)
 
         self.orga = Organizer(self.temp_dir)
-        self.orga.io.get_file_sizes = MagicMock(return_value=[samples_file1,
-                                                              samples_file2])
+        self.orga.io.get_file_sizes = MagicMock(
+            return_value=[samples_file1, samples_file2])
         self.orga.io.get_subfolder("train_log", create=True)
 
         self.orga.cfg.batchsize = 10

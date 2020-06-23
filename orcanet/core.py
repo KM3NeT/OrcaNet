@@ -99,7 +99,9 @@ class Organizer:
             loaded automatically to continue the training.
         epochs : int, optional
             How many epochs should be trained by running this function.
-            None for infinite.
+            None for infinite. This includes the current epoch in case it
+            is not finished yet, i.e. 1 means complete the epoch if there
+            are files left, otherwise do the next epoch.
 
         Returns
         -------
@@ -552,7 +554,8 @@ class Organizer:
                     plots_folder = self.io.get_subfolder("plots", create=True)
                     ks.utils.plot_model(
                         model, plots_folder + "/model_plot.png", show_shapes=True)
-                except ImportError as e:
+                except (ImportError, AttributeError) as e:
+                    # TODO remove AttributeError once https://github.com/tensorflow/tensorflow/issues/38988 is fixed
                     warnings.warn("Can not plot model: " + str(e))
 
         else:

@@ -99,7 +99,7 @@ class IOHandler(object):
 
     def get_all_epochs(self):
         """
-        Get a sorted list of all existing epoch/fileno pairs.
+        Get a sorted list of the epoch/fileno pairs of all saved models.
 
         Returns
         -------
