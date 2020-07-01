@@ -9,7 +9,7 @@ sphinx
 sphinx-rtd-theme
 sphinx-autoapi
 twine
-numpydoc
+numpydoc==0.9.2
 natsort
 pydocstyle
 pydot
