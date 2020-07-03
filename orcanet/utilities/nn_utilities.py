@@ -105,6 +105,17 @@ class RaiseOnNaN(ks.callbacks.Callback):
                 )
 
 
+
+class Dev(ks.callbacks.Callback):
+    def __init__(self):
+        super().__init__()
+        self.status = None
+
+    def on_predict_batch_end(self, batch, logs=None):
+        self.status = batch, logs
+
+
+
 class TimeModel(ks.callbacks.Callback):
     """ Print how long the model took for processing batches. """
     def __init__(self, print_func=None):

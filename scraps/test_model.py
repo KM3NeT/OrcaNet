@@ -15,7 +15,7 @@ def build_double_inp(compile=False):
     output_2 = layers.Dense(2, name="out_1")(x)
 
     test_model = Model((inp_1, inp_2), (output_1, output_2))
-
+    test_model.get_losses_for
     if compile:
         test_model.compile("adam", loss={"out_0": "mse", "out_1": "mse"},
                            metrics={"out_0": "mae", "out_1": "mae"})
