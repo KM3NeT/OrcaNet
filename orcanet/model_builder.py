@@ -127,7 +127,7 @@ class ModelBuilder:
 
         Parameters
         ----------
-        orga : object Organizer
+        orga : orcanet.core.Organizer
             Contains all the configurable options in the OrcaNet scripts.
         log_comp_opts : bool
             If the info used for the compilation of the model should be
@@ -141,10 +141,15 @@ class ModelBuilder:
             The network.
 
         """
+        if orga.cfg.fixed_batchsize:
+            batch_size = orga.cfg.batchsize
+        else:
+            batch_size = None
         model = self.build_with_input(
             orga.io.get_input_shapes(),
             compile_model=True,
             custom_objects=orga.cfg.get_custom_objects(),
+            batch_size=batch_size,
             verbose=verbose,
         )
         if log_comp_opts:
@@ -155,6 +160,7 @@ class ModelBuilder:
     def build_with_input(self, input_shapes,
                          compile_model=True,
                          custom_objects=None,
+                         batch_size=None,
                          verbose=False):
         """
         Build the network with given input shapes.
@@ -168,6 +174,8 @@ class ModelBuilder:
             Compile the model?
         custom_objects : dict, optional
             Custom objects to use during compiling.
+        batch_size : int, optional
+            Use a fixed batchsize for the inputs.
         verbose : bool
             Print info about the building process?
 
@@ -177,12 +185,8 @@ class ModelBuilder:
             The network.
 
         """
-        if len(input_shapes) is not 1:
-            raise ValueError("Invalid input_shape"
-                             "Has length {}, but must be 1\n input_shapes "
-                             "= {}".format(len(input_shapes), input_shapes))
         builder = BlockBuilder(
-            self.defaults, verbose=verbose, **self.custom_blocks)
+            self.defaults, verbose=verbose, batch_size=batch_size, **self.custom_blocks)
         model = builder.build(input_shapes, self.configs)
 
         if compile_model:

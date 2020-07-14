@@ -226,7 +226,8 @@ class DenseBlock:
 
 
 @register
-class EdgeConvBlock:
+class MEdgeConvBlock:
+    """ EdgeConv as defined in ParticleNet, see github.com/StefReck/MEdgeConv """
     def __init__(self, units,
                  next_neighbors=16,
                  shortcut=True,
@@ -259,7 +260,7 @@ class EdgeConvBlock:
         if self.pooling:
             return medgeconv.GlobalAvgValidPooling()((nodes, is_valid))
         else:
-            return nodes, is_valid, coordinates
+            return nodes, is_valid, nodes
 
 
 @register

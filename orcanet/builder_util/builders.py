@@ -10,15 +10,17 @@ class BlockBuilder:
     """
     Builds single-input block-wise sequential neural network.
 
-    Attributes
+    Parameters
     ----------
     defaults : dict or None
         Default values for all blocks in the model.
     verbose : bool
         Print info about the building process?
+    batch_size : int, optional
+        Define a fixed batchsize for the input.
 
     """
-    def __init__(self, defaults=None, verbose=False, **kwargs):
+    def __init__(self, defaults=None, verbose=False, batch_size=None, **kwargs):
         """
         Set dict with default values for the layers of the model.
         Can also define custom block names as kwargs (key = toml name,
@@ -47,6 +49,7 @@ class BlockBuilder:
         self._check_arguments(defaults)
         self.defaults = defaults
         self.verbose = verbose
+        self.batch_size = batch_size
 
     def build(self, input_shape, configs):
         """
@@ -69,14 +72,7 @@ class BlockBuilder:
         model : keras model
 
         """
-        if not isinstance(input_shape, dict):
-            raise TypeError(
-                "input_shapes must be a dict, not ", type(input_shape))
-        if not len(input_shape) == 1:
-            raise TypeError(
-                "input_shapes must have length 1, not ", len(input_shape))
-
-        input_layer = get_input_block(input_shape)[0]
+        input_layer = get_input_block(input_shape, batch_size=self.batch_size)
 
         x = input_layer
         for layer_config in configs:
@@ -166,7 +162,7 @@ class BlockBuilder:
                     f"Unknown default argument: {t_def} (has to appear in a block)")
 
 
-def get_input_block(input_shapes):
+def get_input_block(input_shapes, batch_size=None):
     """
     Build input layers according to a dict mapping the layer names to shapes.
 
@@ -175,18 +171,24 @@ def get_input_block(input_shapes):
     input_shapes : dict
         Keys: Input layer names.
         Values: Their shapes.
+    batch_size : int, optional
+        Specify fixed batchsize.
 
     Returns
     -------
-    inputs : List
-        A list of named keras input layers.
+    inputs : tf.Tensor or tuple
+        A list of named keras input layers, or the input Tensor if there
+        is only one input.
 
     """
     inputs = []
     for input_name, input_shape in input_shapes.items():
         inputs.append(layers.Input(
-            shape=input_shape, name=input_name, dtype=ks.backend.floatx()))
-    return inputs
+            shape=input_shape, name=input_name,
+            dtype=ks.backend.floatx(), batch_size=batch_size))
+    if len(inputs) == 1:
+        inputs = inputs[0]
+    return tuple(inputs)
 
 
 class _attach_output_cat:

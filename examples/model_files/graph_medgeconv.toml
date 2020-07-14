@@ -1,0 +1,21 @@
+# ParticleNet, using my custom MEdgeConv block
+# its mandatory to use the fixed_batchsize option in the config.
+
+[model]
+type = "MEdgeConvBlock"
+next_neighbors = 16
+shortcut = true
+
+blocks = [
+    {units=[64, 64, 64], batchnorm_for_nodes=true},
+    {units=[128, 128, 128]},
+    {units=[256, 256, 256], pooling=true},
+    {type="OutputCateg", transition=false, output_name="your_output_name_here", categories=3}
+]
+
+# ----------------------------------------------------------------------
+[compile]
+optimizer = "adam"
+
+[compile.losses]
+your_output_name_here = {function="categorical_crossentropy", metrics=['acc']}
