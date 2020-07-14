@@ -144,7 +144,7 @@ class ModelBuilder:
         model = self.build_with_input(
             orga.io.get_input_shapes(),
             compile_model=True,
-            custom_objects=orga.cfg.custom_objects,
+            custom_objects=orga.cfg.get_custom_objects(),
             verbose=verbose,
         )
         if log_comp_opts:

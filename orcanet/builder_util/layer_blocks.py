@@ -1,6 +1,7 @@
 import tensorflow.keras.backend as K
 import tensorflow.keras as ks
 import tensorflow.keras.layers as layers
+import medgeconv
 
 
 blocks = {}
@@ -222,6 +223,43 @@ class DenseBlock:
         if self.dropout is not None:
             x = layers.Dropout(self.dropout)(x)
         return x
+
+
+@register
+class EdgeConvBlock:
+    def __init__(self, units,
+                 next_neighbors=16,
+                 shortcut=True,
+                 batchnorm_for_nodes=False,
+                 pooling=False,
+                 kernel_initializer="glorot_uniform",
+                 activation="relu"):
+        self.units = units
+        self.next_neighbors = next_neighbors
+        self.batchnorm_for_nodes = batchnorm_for_nodes
+        self.shortcut = shortcut
+        self.pooling = pooling
+        self.kernel_initializer = kernel_initializer
+        self.activation = activation
+
+    def __call__(self, x):
+        nodes, is_valid, coordinates = x
+
+        if self.batchnorm_for_nodes:
+            nodes = layers.BatchNormalization()(nodes)
+
+        nodes = medgeconv.EdgeConv(
+            units=self.units,
+            next_neighbors=self.next_neighbors,
+            kernel_initializer=self.kernel_initializer,
+            activation=self.activation,
+            shortcut=self.shortcut,
+        )((nodes, is_valid, coordinates))
+
+        if self.pooling:
+            return medgeconv.GlobalAvgValidPooling()((nodes, is_valid))
+        else:
+            return nodes, is_valid, coordinates
 
 
 @register

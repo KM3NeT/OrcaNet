@@ -17,6 +17,7 @@ from orcanet.in_out import IOHandler
 from orcanet.history import HistoryHandler
 from orcanet.utilities.nn_utilities import load_zero_center_data, get_auto_label_modifier
 import orcanet.logging as olog
+import medgeconv
 
 
 class Organizer:
@@ -528,7 +529,7 @@ class Organizer:
         path_loc = self.io.get_model_path(epoch, fileno, local=True)
         self.io.print_log("Loading saved model: " + path_loc, logging=logging)
         model = ks.models.load_model(
-            path_of_model, custom_objects=self.cfg.custom_objects)
+            path_of_model, custom_objects=self.cfg.get_custom_objects())
         return model
 
     def _get_model(self, model, logging=False):
@@ -871,20 +872,10 @@ class Configuration(object):
             raise AttributeError("No {} files have been specified!".format(which))
         return self._files_dict[which]
 
-    @property
-    def default_values(self):
-        """ The default values for all settings. """
-        return self._default_values
-
-    @property
-    def key_samples(self):
-        """ Backward compatibility """
-        return self.key_x_values
-
-    @property
-    def key_labels(self):
-        """ Backward compatibility """
-        return self.key_y_values
+    def get_custom_objects(self):
+        """ Get user custom objects + orcanet internal ones. """
+        orcanet_co = medgeconv.custom_objects
+        return {**orcanet_co, **self.custom_objects}
 
 
 def _get_h5_files(folder):

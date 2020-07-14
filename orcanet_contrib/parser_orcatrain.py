@@ -79,9 +79,9 @@ def orca_train(output_folder, list_file, config_file, model_file,
 
         path_of_model = orga.io.get_model_path(-1, -1)
         model = ks.models.load_model(path_of_model,
-                                     custom_objects=orga.cfg.custom_objects)
+                                     custom_objects=orga.cfg.get_custom_objects())
         print("Recompiling the saved model")
-        model = builder.compile_model(model, custom_objects=orga.cfg.custom_objects)
+        model = builder.compile_model(model, custom_objects=orga.cfg.get_custom_objects())
         builder.log_model_properties(orga)
 
     else:
