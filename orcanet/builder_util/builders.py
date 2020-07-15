@@ -203,8 +203,9 @@ def get_input_block(input_shapes, batchsize=None, names=None):
             batch_size=batchsize))
 
     if len(inputs) == 1:
-        inputs = inputs[0]
-    return tuple(inputs)
+        return inputs[0]
+    else:
+        return tuple(inputs)
 
 
 class _attach_output_cat:
