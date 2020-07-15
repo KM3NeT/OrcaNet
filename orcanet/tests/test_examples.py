@@ -79,11 +79,11 @@ class TestSequentialBuilder(TestCase):
         model_file = os.path.join(self.example_dir, toml_file)
         mb = orcanet.model_builder.ModelBuilder(model_file)
         orga = self.get_orga(dims="graph")
-        orga.cfg.batchsize = 10
+        orga.cfg.batchsize = 64
         orga.cfg.fixed_batchsize = True
         model = mb.build(orga)
 
-        self.assertSequenceEqual(model.output_shape, (10, 3))
+        self.assertSequenceEqual(model.output_shape, (64, 3))
         self.assertEqual(model.count_params(), 304223)
         self.assertEqual(len(model.layers), 87)
 
