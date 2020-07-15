@@ -40,6 +40,8 @@ class ModelBuilder:
         and metrics is a list of functions/strings.
     optimizer_args : dict, optional
         Kwargs for the optimizer. Not used when an optimizer object is given.
+    input_opts : dict
+        Specify options for the input of the model.
 
     Methods
     -------
@@ -71,6 +73,7 @@ class ModelBuilder:
             if "model" in file_content:
                 model_args = file_content["model"]
                 self.configs = model_args.pop('blocks')
+                self.input_opts = model_args.pop("input_opts", {})
                 self.defaults = model_args
 
             elif "body" in file_content:
@@ -141,15 +144,10 @@ class ModelBuilder:
             The network.
 
         """
-        if orga.cfg.fixed_batchsize:
-            batch_size = orga.cfg.batchsize
-        else:
-            batch_size = None
         model = self.build_with_input(
             orga.io.get_input_shapes(),
             compile_model=True,
             custom_objects=orga.cfg.get_custom_objects(),
-            batch_size=batch_size,
             verbose=verbose,
         )
         if log_comp_opts:
@@ -160,7 +158,6 @@ class ModelBuilder:
     def build_with_input(self, input_shapes,
                          compile_model=True,
                          custom_objects=None,
-                         batch_size=None,
                          verbose=False):
         """
         Build the network with given input shapes.
@@ -174,19 +171,18 @@ class ModelBuilder:
             Compile the model?
         custom_objects : dict, optional
             Custom objects to use during compiling.
-        batch_size : int, optional
-            Use a fixed batchsize for the inputs.
         verbose : bool
             Print info about the building process?
 
         Returns
         -------
-        model : keras model
+        model : ks.Model
             The network.
 
         """
         builder = BlockBuilder(
-            self.defaults, verbose=verbose, batch_size=batch_size, **self.custom_blocks)
+            self.defaults, verbose=verbose, input_opts=self.input_opts,
+            **self.custom_blocks)
         model = builder.build(input_shapes, self.configs)
 
         if compile_model:

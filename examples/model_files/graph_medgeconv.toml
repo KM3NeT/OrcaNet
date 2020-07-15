@@ -1,7 +1,12 @@
 # ParticleNet, using my custom MEdgeConv block
-# its mandatory to use the fixed_batchsize option in the config.
+# in the config, its mandatory to use the fixed_batchsize option and the
+# same batchsize as given below.
+# use a sample_modifier to produce the 3 given inputs
 
 [model]
+# specify options for the input of the model
+input_opts = {batchsize = 64, names = ["nodes", "is_valid", "coordinates"]}
+
 type = "MEdgeConvBlock"
 next_neighbors = 16
 shortcut = true

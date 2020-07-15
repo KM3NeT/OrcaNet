@@ -20,7 +20,7 @@ class BlockBuilder:
         Define a fixed batchsize for the input.
 
     """
-    def __init__(self, defaults=None, verbose=False, batch_size=None, **kwargs):
+    def __init__(self, defaults=None, verbose=False, input_opts=None, **kwargs):
         """
         Set dict with default values for the layers of the model.
         Can also define custom block names as kwargs (key = toml name,
@@ -49,7 +49,10 @@ class BlockBuilder:
         self._check_arguments(defaults)
         self.defaults = defaults
         self.verbose = verbose
-        self.batch_size = batch_size
+        if input_opts is None:
+            self.input_opts = {}
+        else:
+            self.input_opts = input_opts
 
     def build(self, input_shape, configs):
         """
@@ -72,7 +75,7 @@ class BlockBuilder:
         model : keras model
 
         """
-        input_layer = get_input_block(input_shape, batch_size=self.batch_size)
+        input_layer = get_input_block(input_shape, **self.input_opts)
 
         x = input_layer
         for layer_config in configs:
@@ -162,7 +165,7 @@ class BlockBuilder:
                     f"Unknown default argument: {t_def} (has to appear in a block)")
 
 
-def get_input_block(input_shapes, batch_size=None):
+def get_input_block(input_shapes, batchsize=None, names=None):
     """
     Build input layers according to a dict mapping the layer names to shapes.
 
@@ -171,8 +174,10 @@ def get_input_block(input_shapes, batch_size=None):
     input_shapes : dict
         Keys: Input layer names.
         Values: Their shapes.
-    batch_size : int, optional
+    batchsize : int, optional
         Specify fixed batchsize.
+    names : tuple, optional
+        Make sure the inputs are these names and return them in this order.
 
     Returns
     -------
@@ -181,11 +186,22 @@ def get_input_block(input_shapes, batch_size=None):
         is only one input.
 
     """
+    if names is None:
+        input_names = list(input_shapes.keys())
+    else:
+        if not set(names) == set(input_shapes.keys()):
+            raise ValueError(f"Invalid input names: Expected {names} "
+                             f"got {list(input_shapes.keys())}")
+        input_names = names
+
     inputs = []
-    for input_name, input_shape in input_shapes.items():
+    for input_name in input_names:
         inputs.append(layers.Input(
-            shape=input_shape, name=input_name,
-            dtype=ks.backend.floatx(), batch_size=batch_size))
+            shape=input_shapes[input_name],
+            name=input_name,
+            dtype=ks.backend.floatx(),
+            batch_size=batchsize))
+
     if len(inputs) == 1:
         inputs = inputs[0]
     return tuple(inputs)
