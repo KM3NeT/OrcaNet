@@ -144,6 +144,14 @@ class ModelBuilder:
             The network.
 
         """
+        if orga.cfg.fixed_batchsize:
+            if "batchsize" in self.input_opts and \
+                    self.input_opts["batchsize"] != orga.cfg.batchsize:
+                raise ValueError(
+                    f"Batchsize in input_opts is {self.input_opts['batchsize']}, "
+                    f"but in cfg its {orga.cfg.batchsize}")
+            self.input_opts["batchsize"] = orga.cfg.batchsize
+
         model = self.build_with_input(
             orga.io.get_input_shapes(),
             compile_model=True,
