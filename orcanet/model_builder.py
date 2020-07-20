@@ -7,6 +7,7 @@ Scripts for making specific models.
 import warnings
 import toml
 from datetime import datetime
+import tensorflow as tf
 import tensorflow.keras as ks
 import tensorflow.keras.layers as layers
 
@@ -152,12 +153,23 @@ class ModelBuilder:
                     f"but in cfg its {orga.cfg.batchsize}")
             self.input_opts["batchsize"] = orga.cfg.batchsize
 
-        model = self.build_with_input(
-            orga.io.get_input_shapes(),
-            compile_model=True,
-            custom_objects=orga.cfg.get_custom_objects(),
-            verbose=verbose,
-        )
+        def get_model():
+            return self.build_with_input(
+                orga.io.get_input_shapes(),
+                compile_model=True,
+                custom_objects=orga.cfg.get_custom_objects(),
+                verbose=verbose,
+            )
+
+        if orga.cfg.multi_gpu and len(
+                tf.config.list_physical_devices('GPU')) > 1:
+            strategy = tf.distribute.MirroredStrategy()
+            print(f'Number of GPUs: {strategy.num_replicas_in_sync}')
+            with strategy.scope():
+                model = get_model()
+        else:
+            model = get_model()
+
         if log_comp_opts:
             self.log_model_properties(orga)
         model.summary()
