@@ -170,7 +170,7 @@ def load_zero_center_data(orga, logging=False):
 
     Parameters
     ----------
-    orga : object Organizer
+    orga : orcanet.core.Organizer
         Contains all the configurable options in the OrcaNet scripts.
     logging : bool
         If true, will log the execution of this function into the
@@ -190,7 +190,7 @@ def load_zero_center_data(orga, logging=False):
     if not zero_center_folder.endswith("/"):
         zero_center_folder += "/"
     train_files_list_name = os.path.basename(orga.cfg.get_list_file())
-    key_samples = orga.cfg.key_samples
+    key_samples = orga.cfg.key_x_values
 
     orga.io.print_log("Zero centering", logging)
     orga.io.print_log("--------------", logging)

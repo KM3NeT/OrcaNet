@@ -3,6 +3,7 @@ numpy
 h5py
 matplotlib
 toml
+MEdgeConv @ git+https://github.com/StefReck/MEdgeConv.git#egg=MEdgeConv
 docopt
 setuptools_scm
 sphinx

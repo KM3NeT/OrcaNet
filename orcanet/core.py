@@ -9,6 +9,7 @@ import toml
 import warnings
 import time
 from datetime import timedelta
+import tensorflow as tf
 import tensorflow.keras as ks
 
 import orcanet.backend as backend
@@ -17,6 +18,7 @@ from orcanet.in_out import IOHandler
 from orcanet.history import HistoryHandler
 from orcanet.utilities.nn_utilities import load_zero_center_data, get_auto_label_modifier
 import orcanet.logging as olog
+import medgeconv
 
 
 class Organizer:
@@ -76,7 +78,7 @@ class Organizer:
         self._auto_label_modifier = None
         self._stored_model = None
 
-    def train_and_validate(self, model=None, epochs=None):
+    def train_and_validate(self, model=None, epochs=None, to_epoch=None):
         """
         Train a model and validate according to schedule.
 
@@ -102,6 +104,9 @@ class Organizer:
             None for infinite. This includes the current epoch in case it
             is not finished yet, i.e. 1 means complete the epoch if there
             are files left, otherwise do the next epoch.
+        to_epoch : int, optional
+            Train up to and including this epoch. Can not be used together with
+            epochs.
 
         Returns
         -------
@@ -123,8 +128,19 @@ class Organizer:
         next_epoch = self.io.get_next_epoch(latest_epoch)
         n_train_files = self.io.get_no_of_files("train")
 
+        if to_epoch is None:
+            epochs_left = epochs
+        else:
+            if epochs is not None:
+                raise ValueError("Can not give both 'epochs' and 'to_epoch'")
+            if latest_epoch is None:
+                epochs_left = to_epoch
+            else:
+                epochs_left = max(
+                    0, to_epoch - self.io.get_next_epoch(latest_epoch)[0] + 1)
+
         trained_epochs = 0
-        while epochs is None or trained_epochs < epochs:
+        while epochs_left is None or trained_epochs < epochs_left:
             # Train on remaining files
             for file_no in range(next_epoch[1], n_train_files + 1):
                 curr_epoch = (next_epoch[0], file_no)
@@ -367,9 +383,9 @@ class Organizer:
         Parameters
         ----------
         epoch : int, optional
-            Epoch of a model to load.
+            Epoch of a model to load [default: lowest val loss].
         fileno : int, optional
-            File number of a model to load.
+            File number of a model to load [default: lowest val loss].
 
         Returns
         -------
@@ -513,7 +529,8 @@ class Organizer:
         Parameters
         ----------
         epoch : int
-            Epoch of the saved model.
+            Epoch of the saved model. If both this and fileno are -1,
+            load the most recent model.
         fileno : int
             Fileno of the saved model.
         logging : bool
@@ -527,9 +544,7 @@ class Organizer:
         path_of_model = self.io.get_model_path(epoch, fileno)
         path_loc = self.io.get_model_path(epoch, fileno, local=True)
         self.io.print_log("Loading saved model: " + path_loc, logging=logging)
-        model = ks.models.load_model(
-            path_of_model, custom_objects=self.cfg.custom_objects)
-        return model
+        return self._load_model(path_of_model)
 
     def _get_model(self, model, logging=False):
         """ Load most recent saved model or use user model. """
@@ -544,7 +559,7 @@ class Organizer:
             elif isinstance(model, str):
                 # path to a saved model
                 self.io.print_log("Loading model from " + model, logging=logging)
-                model = ks.models.load_model(model)
+                model = self._load_model(model)
 
             if logging:
                 self._save_as_json(model)
@@ -566,8 +581,24 @@ class Organizer:
             elif isinstance(model, str):
                 # path to a saved model
                 self.io.print_log("Loading model from " + model, logging=logging)
-                model = ks.models.load_model(model)
+                model = self._load_model(model)
 
+        return model
+
+    def _load_model(self, filepath):
+        """ Load from path, with custom objects and parallized. """
+        def ks_load():
+            return ks.models.load_model(
+                filepath, custom_objects=self.cfg.get_custom_objects())
+
+        if self.cfg.multi_gpu and len(
+                tf.config.list_physical_devices('GPU')) > 1:
+            strategy = tf.distribute.MirroredStrategy()
+            print(f'Number of GPUs: {strategy.num_replicas_in_sync}')
+            with strategy.scope():
+                model = ks_load()
+        else:
+            model = ks_load()
         return model
 
     def _save_as_json(self, model):
@@ -671,6 +702,8 @@ class Configuration(object):
         max_queue_size option of the keras training and evaluation generator
         methods. How many batches get preloaded
         from the generator.
+    multi_gpu : bool
+        Use all availble GPUs (distributed training if theres more then one).
     n_events : None or int
         For testing purposes. If not the whole .h5 file should be used for
         training, define the number of samples.
@@ -759,6 +792,7 @@ class Configuration(object):
         self.max_queue_size = 10
         self.train_logger_display = 100
         self.train_logger_flush = -1
+        self.multi_gpu = True
 
         self._default_values = dict(self.__dict__)
 
@@ -871,20 +905,10 @@ class Configuration(object):
             raise AttributeError("No {} files have been specified!".format(which))
         return self._files_dict[which]
 
-    @property
-    def default_values(self):
-        """ The default values for all settings. """
-        return self._default_values
-
-    @property
-    def key_samples(self):
-        """ Backward compatibility """
-        return self.key_x_values
-
-    @property
-    def key_labels(self):
-        """ Backward compatibility """
-        return self.key_y_values
+    def get_custom_objects(self):
+        """ Get user custom objects + orcanet internal ones. """
+        orcanet_co = medgeconv.custom_objects
+        return {**orcanet_co, **self.custom_objects}
 
 
 def _get_h5_files(folder):

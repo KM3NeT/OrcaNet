@@ -287,6 +287,9 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
                 out: y_pred[i] for i, out in enumerate(model.output_names)}
             info_blob["y_pred"] = y_pred
 
+            if info_blob.get("org_batchsize") is not None:
+                _slice_to_size(info_blob)
+
             if orga.cfg.dataset_modifier is None:
                 datasets = get_datasets(info_blob)
             else:
@@ -319,6 +322,17 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
     print("Statistics of model prediction:")
     print(f"\tTotal time:\t{model_time_total / 60:.2f} min")
     print(f"\tPer batch:\t{1000 * model_time_total / steps:.5} ms")
+
+
+def _slice_to_size(info_blob):
+    org_batchsize = info_blob["org_batchsize"]
+    for input_key, x in info_blob["xs"].items():
+        info_blob["xs"][input_key] = x[:org_batchsize]
+    for output_key, y_pred in info_blob["y_pred"].items():
+        info_blob["y_pred"][output_key] = y_pred[:org_batchsize]
+    if info_blob.get("ys") is not None:
+        for output_key, y in info_blob["ys"].items():
+            info_blob["ys"][output_key] = y[:org_batchsize]
 
 
 def make_model_prediction(orga, model, epoch, fileno, samples=None):
