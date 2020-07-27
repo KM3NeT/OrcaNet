@@ -13,13 +13,12 @@ class TestSequentialBuilder(TestCase):
         self.example_dir = os.path.join(orca_dir, "examples", "model_files")
 
         def get_orga(dims):
+            dimdict = {
+                2: get_input_shapes_2d,
+                3: get_input_shapes_3d,
+                "graph": get_input_shapes_graph}
             orga = Organizer(".")
-            if dims == 2:
-                orga.io.get_input_shapes = get_input_shapes_2d
-            elif dims == 3:
-                orga.io.get_input_shapes = get_input_shapes_3d
-            else:
-                raise AssertionError
+            orga.io.get_input_shapes = dimdict[dims]
             return orga
         self.get_orga = get_orga
 
@@ -74,12 +73,28 @@ class TestSequentialBuilder(TestCase):
         self.assertSequenceEqual(model.output_shape, (None, 3))
         self.assertEqual(model.count_params(), 11321)
 
+    def test_medgeconv(self):
+        toml_file = "graph_medgeconv.toml"
+
+        model_file = os.path.join(self.example_dir, toml_file)
+        mb = orcanet.model_builder.ModelBuilder(model_file)
+        orga = self.get_orga(dims="graph")
+        orga.cfg.batchsize = 64
+        orga.cfg.fixed_batchsize = True
+        model = mb.build(orga)
+
+        self.assertSequenceEqual(model.output_shape, (64, 3))
+        self.assertEqual(model.count_params(), 304223)
+        self.assertEqual(len(model.layers), 87)
+
 
 def get_input_shapes_3d():
-    dims = (10, 9, 8, 1)
-    return {"input_A": dims}
+    return {"input_A": (10, 9, 8, 1)}
 
 
 def get_input_shapes_2d():
-    dims = (10, 9, 1)
-    return {"input_A": dims}
+    return {"input_A": (10, 9, 1)}
+
+
+def get_input_shapes_graph():
+    return {"nodes": (20, 7), "is_valid": (20,), "coords": (20, 4)}

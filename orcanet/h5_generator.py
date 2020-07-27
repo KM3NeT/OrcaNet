@@ -150,6 +150,9 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
             ys = None
         info_blob["ys"] = ys
 
+        if self.fixed_batchsize:
+            self.pad_to_size(info_blob)
+
         if self.class_weights is not None:
             info_blob["sample_weights"] = _get_sample_weights(ys, self.class_weights)
 
@@ -162,6 +165,18 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
                 return xs, ys
         else:
             return info_blob
+
+    def pad_to_size(self, info_blob):
+        """ Pad the batch to have a fixed batchsize. """
+        org_batchsize = len(next(iter(info_blob["xs"].values())))
+        if org_batchsize == self.batchsize:
+            return
+        info_blob["org_batchsize"] = org_batchsize
+        for input_key, x in info_blob["xs"].items():
+            info_blob["xs"][input_key] = _pad_to_size(x, self.batchsize)
+        if info_blob.get("ys") is not None:
+            for output_key, y in info_blob["ys"].items():
+                info_blob["ys"][output_key] = _pad_to_size(y, self.batchsize)
 
     def open(self):
         """ Open all files and prepare for read out. """
@@ -194,10 +209,11 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         x_values = {}
         for input_key, file in self._files.items():
             x_values[input_key] = file[self.key_x_values][
-                                  start_index: start_index + self._batchsize]
+                      start_index: start_index + self._batchsize]
             if self.xs_mean is not None:
-                x_values[input_key] = np.subtract(x_values[input_key],
-                                                  self.xs_mean[input_key])
+                x_values[input_key] = np.subtract(
+                    x_values[input_key], self.xs_mean[input_key])
+
         return x_values
 
     def get_y_values(self, start_index):
@@ -277,7 +293,7 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         """
         Define the start indices of each batch in the h5 file and store this.
         """
-        if self.fixed_batchsize:
+        if self.fixed_batchsize and self.phase != "inference":
             total_no_of_batches = np.floor(self._size / self._batchsize)
         else:
             total_no_of_batches = np.ceil(self._size / self._batchsize)
@@ -396,3 +412,14 @@ def get_h5_generator(orga, files_dict, f_size=None, zero_center=False,
     )
 
     return generator
+
+
+def _pad_to_size(x, size):
+    """ Pad x to given size along axis 0 by repeating last element. """
+    if len(x) > size:
+        raise ValueError(f"Can't pad x with shape {x.shape} to length {size}")
+    elif len(x) == size:
+        return x
+    else:
+        return np.concatenate((x, np.broadcast_to(
+                x[-1], (size - len(x),) + x.shape[1:])), axis=0)

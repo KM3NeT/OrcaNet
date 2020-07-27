@@ -7,6 +7,7 @@ Scripts for making specific models.
 import warnings
 import toml
 from datetime import datetime
+import tensorflow as tf
 import tensorflow.keras as ks
 import tensorflow.keras.layers as layers
 
@@ -40,6 +41,8 @@ class ModelBuilder:
         and metrics is a list of functions/strings.
     optimizer_args : dict, optional
         Kwargs for the optimizer. Not used when an optimizer object is given.
+    input_opts : dict
+        Specify options for the input of the model.
 
     Methods
     -------
@@ -71,6 +74,7 @@ class ModelBuilder:
             if "model" in file_content:
                 model_args = file_content["model"]
                 self.configs = model_args.pop('blocks')
+                self.input_opts = model_args.pop("input_opts", {})
                 self.defaults = model_args
 
             elif "body" in file_content:
@@ -127,7 +131,7 @@ class ModelBuilder:
 
         Parameters
         ----------
-        orga : object Organizer
+        orga : orcanet.core.Organizer
             Contains all the configurable options in the OrcaNet scripts.
         log_comp_opts : bool
             If the info used for the compilation of the model should be
@@ -141,12 +145,31 @@ class ModelBuilder:
             The network.
 
         """
-        model = self.build_with_input(
-            orga.io.get_input_shapes(),
-            compile_model=True,
-            custom_objects=orga.cfg.custom_objects,
-            verbose=verbose,
-        )
+        if orga.cfg.fixed_batchsize:
+            if "batchsize" in self.input_opts and \
+                    self.input_opts["batchsize"] != orga.cfg.batchsize:
+                raise ValueError(
+                    f"Batchsize in input_opts is {self.input_opts['batchsize']}, "
+                    f"but in cfg its {orga.cfg.batchsize}")
+            self.input_opts["batchsize"] = orga.cfg.batchsize
+
+        def get_model():
+            return self.build_with_input(
+                orga.io.get_input_shapes(),
+                compile_model=True,
+                custom_objects=orga.cfg.get_custom_objects(),
+                verbose=verbose,
+            )
+
+        if orga.cfg.multi_gpu and len(
+                tf.config.list_physical_devices('GPU')) > 1:
+            strategy = tf.distribute.MirroredStrategy()
+            print(f'Number of GPUs: {strategy.num_replicas_in_sync}')
+            with strategy.scope():
+                model = get_model()
+        else:
+            model = get_model()
+
         if log_comp_opts:
             self.log_model_properties(orga)
         model.summary()
@@ -173,16 +196,13 @@ class ModelBuilder:
 
         Returns
         -------
-        model : keras model
+        model : ks.Model
             The network.
 
         """
-        if len(input_shapes) is not 1:
-            raise ValueError("Invalid input_shape"
-                             "Has length {}, but must be 1\n input_shapes "
-                             "= {}".format(len(input_shapes), input_shapes))
         builder = BlockBuilder(
-            self.defaults, verbose=verbose, **self.custom_blocks)
+            self.defaults, verbose=verbose, input_opts=self.input_opts,
+            **self.custom_blocks)
         model = builder.build(input_shapes, self.configs)
 
         if compile_model:
