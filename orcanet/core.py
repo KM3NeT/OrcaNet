@@ -287,9 +287,6 @@ class Organizer:
         smry_logger.write_line(epoch_float, "n/a", history_val=history)
 
         update_summary_plot(self)
-        if self.cfg.make_weight_plots:
-            backend.save_actv_wghts_plot(
-                self, model, latest_epoch, samples=self.cfg.batchsize)
 
         if self.cfg.cleanup_models:
             self.cleanup_models()
@@ -695,9 +692,6 @@ class Configuration(object):
         If it is a str: Path to a csv file inside the main folder, containing
         3 columns with the epoch, fileno, and the value the lr will be set
         to when reaching this epoch/fileno.
-    make_weight_plots : bool
-        If true, generate and save plots of the activations and weights of
-        the network to the 'plots/' subfolder.
     max_queue_size : int
         max_queue_size option of the keras training and evaluation generator
         methods. How many batches get preloaded
@@ -787,7 +781,7 @@ class Configuration(object):
         self.use_scratch_ssd = False
         self.verbose_train = 1
         self.verbose_val = 0
-        self.make_weight_plots = True
+        self.make_weight_plots = False  # Removed in v0.11.1
         self.n_events = None
         self.max_queue_size = 10
         self.train_logger_display = 100
@@ -823,6 +817,10 @@ class Configuration(object):
             else:
                 raise AttributeError(
                     "Unknown attribute {}".format(key))
+
+        # deprecation warning TODO remove in the future
+        if self.make_weight_plots:
+            warnings.warn("make_weight_plots was removed in version v0.11.1")
 
     def import_list_file(self, list_file):
         """

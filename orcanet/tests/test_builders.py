@@ -46,7 +46,7 @@ class TestSequentialBuilder(TestCase):
 
         self.assertIsInstance(model.layers[1], layers.Convolution2D)
         kreg = model.layers[1].get_config()["kernel_regularizer"]["config"]
-        self.assertAlmostEqual(kreg["l1"], 0.0)
+        self.assertTrue("l1" not in kreg)
         self.assertAlmostEqual(kreg["l2"], layer_config["kernel_l2_reg"])
 
         self.assertIsInstance(model.layers[2], layers.BatchNormalization)

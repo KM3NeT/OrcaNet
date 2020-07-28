@@ -7,19 +7,12 @@ import time
 import h5py
 import numpy as np
 import os
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
 
 import orcanet
-from orcanet.utilities.layer_plotting import plot_activations, plot_weights
 from orcanet.logging import BatchLogger
 import orcanet.utilities.nn_utilities as nn_utilities
 from orcanet.in_out import h5_get_number_of_rows
 from orcanet.h5_generator import get_h5_generator
-
-# for debugging
-# from tensorflow.python import debug as tf_debug
-# K.set_session(tf_debug.LocalCLIDebugWrapperSession(tf.Session()))
 
 
 def train_model(orga, model, epoch, batch_logger=False):
@@ -162,56 +155,6 @@ def weighted_average(histories, f_sizes):
     wgtd_average = np.dot(np.transpose(histories), rltv_fsizes)
 
     return wgtd_average.tolist()
-
-
-def save_actv_wghts_plot(orga, model, epoch, samples=1):
-    """
-    Plots the weights of a model and the activations for samples from
-    the validation set to one .pdf file each.
-
-    Parameters
-    ----------
-    orga : orcanet.core.Organizer
-        Contains all the configurable options in the OrcaNet scripts.
-    model : keras.Model
-        The model to do the predictions with.
-    epoch : tuple
-        Current epoch and fileno.
-    samples : int
-        Number of samples to make the plot for.
-
-    """
-    plt.ioff()
-
-    file = next(orga.io.yield_files("val"))
-    generator = iter(get_h5_generator(
-        orga, file, f_size=samples,
-        zero_center=orga.cfg.zero_center_folder is not None,
-        keras_mode=True))
-    xs, ys = next(generator)[:2]
-
-    pdf_name_act = "{}/activations_epoch_{}_file_{}.pdf".format(
-        orga.io.get_subfolder("activations", create=True), epoch[0], epoch[1])
-
-    with PdfPages(pdf_name_act) as pdf:
-        for layer in model.layers:
-            plot_activations(model, xs, layer.name, mode='test')
-            pdf.savefig()
-            plt.clf()
-        plt.close()
-
-    pdf_name_wght = "{}/weights_epoch_{}_file_{}.pdf".format(
-        orga.io.get_subfolder("activations", create=True), epoch[0], epoch[1])
-
-    with PdfPages(pdf_name_wght) as pdf:
-        for layer in model.layers:
-            try:
-                plot_weights(model, layer.name)
-            except ValueError:
-                continue
-            pdf.savefig()
-            plt.clf()
-        plt.close()
 
 
 def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_label=True):
