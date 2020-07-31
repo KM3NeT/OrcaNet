@@ -5,6 +5,7 @@ import os
 import warnings
 import h5py
 import numpy as np
+import tensorflow as tf
 import tensorflow.keras as ks
 import tensorflow.keras.layers as layers
 
@@ -113,7 +114,7 @@ class TestFunctions(TestCase):
         self.assertSequenceEqual(averaged_histories, target)
 
 
-class TestTrainValidatePredict(TestCase):
+class TestTrainValidatePredict(tf.test.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tdir = tempfile.TemporaryDirectory()

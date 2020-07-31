@@ -1,11 +1,11 @@
-from unittest import TestCase
+import tensorflow as tf
 from tensorflow.keras.models import Model
 import tensorflow.keras.layers as layers
 
 from orcanet.builder_util.builders import BlockBuilder
 
 
-class TestSequentialBuilder(TestCase):
+class TestSequentialBuilder(tf.test.TestCase):
 
     def test_input_names_and_shapes_full_model(self):
         defaults = {"type": "conv_block", "conv_dim": 3}
