@@ -6,9 +6,8 @@ ALLNAMES += examples
 install:
 	pip install .
 
-install-dev:
+install-dev: dependencies
 	pip install -e .
-	pip install -Ur requirements_dev.txt
 
 clean:
 	python setup.py clean --all
@@ -33,8 +32,6 @@ lint:
 
 dependencies:
 	pip install -Ur requirements.txt
-
-dependencies-dev:
 	pip install -Ur requirements_dev.txt
 
 .PHONY: yapf
