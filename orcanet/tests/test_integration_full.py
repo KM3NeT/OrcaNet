@@ -7,15 +7,15 @@ import h5py
 import os
 import sys
 import shutil
-from unittest import TestCase
 
+import tensorflow as tf
 import orcanet
 from orcanet.core import Organizer
 from orcanet.model_builder import ModelBuilder
 from orcanet_contrib.custom_objects import get_custom_objects
 
 
-class TestIntegration(TestCase):
+class TestIntegration(tf.test.TestCase):
     """ Run the actual training to see if it throws any errors. """
     def setUp(self):
         """
@@ -112,7 +112,7 @@ class TestIntegration(TestCase):
         orga.predict()
 
 
-class TestFullExample(TestCase):
+class TestFullExample(tf.test.TestCase):
     """
     Test the full example in the examples folder, as it is used on the docs.
     Must go thorugh without any errors.
