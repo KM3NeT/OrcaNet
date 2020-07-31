@@ -3,18 +3,12 @@ ALLNAMES = $(PKGNAME)
 ALLNAMES += orcanet_contrib
 ALLNAMES += examples
 
-default: build
-
-all: install
-
-build:
-	@echo "No need to build anymore :)"
-
 install:
 	pip install .
 
 install-dev:
 	pip install -e .
+	pip install -Ur requirements_dev.txt
 
 clean:
 	python setup.py clean --all
@@ -25,10 +19,6 @@ test:
 
 test-cov:
 	py.test --cov ./ --ignore orcanet/tests/test_integration_full.py --cov-report term-missing --cov-report xml:reports/coverage.xml --cov-report html:reports/coverage $(ALLNAMES)
-
-test-loop:
-	py.test $(PKGNAME)
-	ptw --ext=.py,.pyx --ignore=doc $(PKGNAME)
 
 flake8:
 	py.test --flake8
@@ -43,6 +33,9 @@ lint:
 
 dependencies:
 	pip install -Ur requirements.txt
+
+dependencies-dev:
+	pip install -Ur requirements_dev.txt
 
 .PHONY: yapf
 yapf:

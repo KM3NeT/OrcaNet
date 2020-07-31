@@ -22,6 +22,7 @@ cache:
   virtualenv venv
   source venv/bin/activate
   make install
+  make dependencies-dev
 
 
 test:
