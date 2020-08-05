@@ -1,11 +1,11 @@
-from unittest import TestCase
+import tensorflow as tf
 from tensorflow.keras.models import Model
 import tensorflow.keras.layers as layers
 
 from orcanet.builder_util.builders import BlockBuilder
 
 
-class TestSequentialBuilder(TestCase):
+class TestSequentialBuilder(tf.test.TestCase):
 
     def test_input_names_and_shapes_full_model(self):
         defaults = {"type": "conv_block", "conv_dim": 3}
@@ -46,7 +46,7 @@ class TestSequentialBuilder(TestCase):
 
         self.assertIsInstance(model.layers[1], layers.Convolution2D)
         kreg = model.layers[1].get_config()["kernel_regularizer"]["config"]
-        self.assertAlmostEqual(kreg["l1"], 0.0)
+        self.assertTrue("l1" not in kreg)
         self.assertAlmostEqual(kreg["l2"], layer_config["kernel_l2_reg"])
 
         self.assertIsInstance(model.layers[2], layers.BatchNormalization)

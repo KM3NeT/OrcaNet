@@ -7,19 +7,12 @@ import time
 import h5py
 import numpy as np
 import os
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
 
 import orcanet
-from orcanet.utilities.layer_plotting import plot_activations, plot_weights
 from orcanet.logging import BatchLogger
 import orcanet.utilities.nn_utilities as nn_utilities
 from orcanet.in_out import h5_get_number_of_rows
 from orcanet.h5_generator import get_h5_generator
-
-# for debugging
-# from tensorflow.python import debug as tf_debug
-# K.set_session(tf_debug.LocalCLIDebugWrapperSession(tf.Session()))
 
 
 def train_model(orga, model, epoch, batch_logger=False):
@@ -164,6 +157,7 @@ def weighted_average(histories, f_sizes):
     return wgtd_average.tolist()
 
 
+
 def save_actv_wghts_plot(orga, model, epoch, samples=1):
     """
     Plots the weights of a model and the activations for samples from
@@ -214,6 +208,7 @@ def save_actv_wghts_plot(orga, model, epoch, samples=1):
             pdf.savefig()
             plt.clf()
         plt.close()
+
 
 
 def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_label=True):

@@ -3,13 +3,14 @@ from unittest import TestCase
 from unittest.mock import MagicMock, patch
 import os
 import shutil
+import tensorflow as tf
 from tensorflow.keras.models import Model
 import tensorflow.keras.layers as layers
 
 from orcanet.core import Organizer, Configuration, _extract_filepaths
 
 
-class TestOrganizer(TestCase):
+class TestOrganizer(tf.test.TestCase):
     """
     Test the organizer by creating a dummy directory .temp/core.
     """

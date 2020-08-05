@@ -10,7 +10,7 @@ from tensorflow.keras.models import Model
 import tensorflow.keras.layers as layers
 
 from orcanet.core import Organizer
-from orcanet.utilities.nn_utilities import load_zero_center_data, get_layer_output
+from orcanet.utilities.nn_utilities import load_zero_center_data
 
 
 class TetstZeroCenter(TestCase):
@@ -113,33 +113,6 @@ class TestModel(TestCase):
         outp = layers.Dense(1, name=self.layer_names[3])(intermed)
 
         self.model = Model([inp1, inp2], outp)
-
-    def test_get_layer_output_list_input(self):
-        samples = [np.ones((2, 2)), np.ones((2, 3))]
-
-        args = {
-            "model": self.model,
-            "samples": samples,
-            "layer_name": self.layer_names[2],
-            "mode": "test",
-        }
-        value = get_layer_output(**args)
-        target = [[6., 6.], [6., 6.]]
-        np.testing.assert_array_equal(value, target)
-
-    def test_get_layer_output_dict_input(self):
-        samples = {self.layer_names[0]: np.ones((2, 2)),
-                   self.layer_names[1]: np.ones((2, 3))}
-
-        args = {
-            "model": self.model,
-            "samples": samples,
-            "layer_name": self.layer_names[2],
-            "mode": "test",
-        }
-        value = get_layer_output(**args)
-        target = [[6., 6.], [6., 6.]]
-        np.testing.assert_array_equal(value, target)
 
 
 def make_dummy_data(filepath1, filepath2, shape, mode=1):

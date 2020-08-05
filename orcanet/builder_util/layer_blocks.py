@@ -12,6 +12,9 @@ def register(block):
     return block
 
 
+register(medgeconv.DisjointEdgeConvBlock)
+
+
 @register
 class ConvBlock:
     """

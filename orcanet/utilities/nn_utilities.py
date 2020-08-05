@@ -39,57 +39,6 @@ def get_auto_label_modifier(model):
     return label_modifier
 
 
-def get_layer_output(model, samples, layer_name, mode="test"):
-    """
-    Get the output of an intermediate layer from a model.
-
-    Parameters
-    ----------
-    model : keras model
-        The model.
-    samples : List or ndarray
-        The data to apply the model to.
-    layer_name : str
-        Name of the layer.
-    mode : str
-        Mode of the layers during the forward pass. Either train or test.
-        Important for batchnorm, dropout, ...
-
-    Returns
-    -------
-    layer_output : ndarray
-        The output from the layer.
-
-    """
-    if mode == "test":
-        phase = False
-    elif mode == "train":
-        phase = True
-    else:
-        raise NameError("Unknown mode: ", mode)
-
-    # either a tensor or a list of tensors
-    inp_tensors = model.input
-    # Make input to always be a list
-    if not isinstance(inp_tensors, list):
-        inp_tensors = [inp_tensors, ]
-
-    if isinstance(samples, dict):
-        # doesnt work with dicts so transform into lists instead
-        xs = [samples[key] for key in model.input_names]
-    elif not isinstance(samples, list):
-        # Make input to always be a list
-        xs = [samples, ]
-    else:
-        xs = samples
-
-    get_output = ks.backend.function(
-        inp_tensors + [tfp.keras.backend.symbolic_learning_phase(), ],
-        [model.get_layer(layer_name).output])
-    layer_output = get_output(xs + [phase, ])[0]
-    return layer_output
-
-
 class RaiseOnNaN(ks.callbacks.Callback):
     """
     Callback that terminates training when a NaN loss is encountered.

@@ -7,14 +7,15 @@ import h5py
 import os
 import sys
 import shutil
-from unittest import TestCase
 
+import tensorflow as tf
+import orcanet
 from orcanet.core import Organizer
 from orcanet.model_builder import ModelBuilder
 from orcanet_contrib.custom_objects import get_custom_objects
 
 
-class TestIntegration(TestCase):
+class TestIntegration(tf.test.TestCase):
     """ Run the actual training to see if it throws any errors. """
     def setUp(self):
         """
@@ -111,7 +112,7 @@ class TestIntegration(TestCase):
         orga.predict()
 
 
-class TestFullExample(TestCase):
+class TestFullExample(tf.test.TestCase):
     """
     Test the full example in the examples folder, as it is used on the docs.
     Must go thorugh without any errors.
@@ -119,14 +120,19 @@ class TestFullExample(TestCase):
     def test_full_example(self):
         init_dir = os.getcwd()
 
-        example_dir = os.path.join(os.path.dirname(__file__), "../../examples/full_example")
+        example_dir = os.path.join(
+            os.path.dirname(orcanet.__path__[0]), "examples/full_example")
         os.chdir(example_dir)
         sys.path.append(example_dir)
-
-        import full_example
-
-        shutil.rmtree(example_dir+"/output")
-        os.chdir(init_dir)
+        output_dir = os.path.join(example_dir, "output")
+        if os.path.exists(output_dir):
+            raise FileExistsError(output_dir)
+        try:
+            import full_example
+        finally:
+            if os.path.exists(output_dir):
+                shutil.rmtree(output_dir, ignore_errors=True)
+            os.chdir(init_dir)
 
 
 def make_dummy_data(filepath1, filepath2, shape):
