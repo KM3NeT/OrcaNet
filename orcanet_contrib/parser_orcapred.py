@@ -27,8 +27,10 @@ from matplotlib import use
 use('Agg')
 
 from docopt import docopt
+import toml
 
 from orcanet.core import Organizer
+from orcanet_contrib.eval_nn import make_performance_plots
 from orcanet_contrib.orca_handler_util import update_objects
 
 
@@ -68,7 +70,20 @@ def orca_pred(output_folder, list_file, config_file, model_file,
 
     # Per default, a prediction will be done for the model with the
     # highest epoch and filenumber.
-    orga.predict(epoch=epoch, fileno=fileno, concatenate=True)
+    pred_filepath_conc = orga.predict(epoch=epoch, fileno=fileno,
+                                      concatenate=True)[0]
+
+    # make performance plots, only available for bg/ts/regression
+    dset_mod_available_plots = ['regression', 'bg_classifier', 'ts_classifier']
+    try:
+        dataset_modifier = toml.load(model_file)["orca_modifiers"][
+            "dataset_modifier"]
+        if any(x in dataset_modifier for x in dset_mod_available_plots):
+            plots_folder = orga.io.get_subfolder(name='plots')
+            make_performance_plots(pred_filepath_conc, dataset_modifier, plots_folder)
+
+    except KeyError:
+        pass
 
 
 def main():

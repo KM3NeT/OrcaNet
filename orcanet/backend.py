@@ -193,13 +193,15 @@ def save_actv_wghts_plot(orga, model, epoch, samples=1):
     pdf_name_act = "{}/activations_epoch_{}_file_{}.pdf".format(
         orga.io.get_subfolder("activations", create=True), epoch[0], epoch[1])
 
+    '''
     with PdfPages(pdf_name_act) as pdf:
         for layer in model.layers:
             plot_activations(model, xs, layer.name, mode='test')
             pdf.savefig()
             plt.clf()
         plt.close()
-
+	'''
+	
     pdf_name_wght = "{}/weights_epoch_{}_file_{}.pdf".format(
         orga.io.get_subfolder("activations", create=True), epoch[0], epoch[1])
 
