@@ -29,6 +29,8 @@ class Summarizer:
         Dont plot the train/val curves [default: False].
     width : float
         Scaling of the width of the curves and the marker size [default: 1].
+    verbose : bool
+        Print various infos.
 
     """
     def __init__(self, folders,
@@ -36,7 +38,8 @@ class Summarizer:
                  smooth=None,
                  labels=None,
                  noplot=False,
-                 width=1.):
+                 width=1.,
+                 verbose=True):
         if not folders:
             folders = ["./"]
         elif isinstance(folders, str):
@@ -59,17 +62,19 @@ class Summarizer:
         else:
             self.labels = labels
 
+        self.verbose = verbose
         self.smooth = smooth
         self.noplot = noplot
         self.width = width
         self._tvp = None
 
-    def summarize(self):
+    def summarize(self, show=True):
         if not self.noplot:
             self._tvp = TrainValPlotter()
 
         min_stats, max_stats = [], []
-        print("Reading stats of {} trainings...".format(len(self.folders)))
+        if self.verbose:
+            print("Reading stats of {} trainings...".format(len(self.folders)))
         for folder_no in range(len(self.folders)):
             try:
                 min_stat, max_stat = self._summarize_folder(folder_no)
@@ -78,29 +83,31 @@ class Summarizer:
                 if max_stat is not None:
                     max_stats.append(max_stat)
             except Exception as e:
-                print(
-                    f"Warning: Can not summarize {self.folders[folder_no]}"
-                    f", skipping... ({e})"
-                )
+                if self.verbose:
+                    print(
+                        f"Warning: Can not summarize {self.folders[folder_no]}"
+                        f", skipping... ({e})"
+                    )
 
         if self._unique_metrics:
             column_title, y_label = ("combined metrics",) * 2
         else:
             column_title, y_label = self._full_metrics[0], self._metric_names[0]
 
-        if len(min_stats) > 0:
-            min_stats.sort()
-            print("\nMinimum\n-------")
-            print("{}   \t{}\t{}\t{}".format(" ", "Epoch", column_title, "name"))
-            for i, stat in enumerate(min_stats, 1):
-                print("{} | \t{}\t{}\t{}".format(i, stat[2], stat[0], stat[1]))
+        if self.verbose:
+            if len(min_stats) > 0:
+                min_stats.sort()
+                print("\nMinimum\n-------")
+                print("{}   \t{}\t{}\t{}".format(" ", "Epoch", column_title, "name"))
+                for i, stat in enumerate(min_stats, 1):
+                    print("{} | \t{}\t{}\t{}".format(i, stat[2], stat[0], stat[1]))
 
-        if len(max_stats) > 0:
-            max_stats.sort(reverse=True)
-            print("\nMaximum\n-------")
-            print("{}   \t{}\t{}\t{}".format(" ", "Epoch", column_title, "name"))
-            for i, stat in enumerate(max_stats, 1):
-                print("{} | \t{}\t{}\t{}".format(i, stat[2], stat[0], stat[1]))
+            if len(max_stats) > 0:
+                max_stats.sort(reverse=True)
+                print("\nMaximum\n-------")
+                print("{}   \t{}\t{}\t{}".format(" ", "Epoch", column_title, "name"))
+                for i, stat in enumerate(max_stats, 1):
+                    print("{} | \t{}\t{}\t{}".format(i, stat[2], stat[0], stat[1]))
 
         if not self.noplot:
             self._tvp.apply_layout(
@@ -109,7 +116,8 @@ class Summarizer:
                 grid=True,
                 legend=True,
             )
-            plt.show()
+            if show:
+                plt.show()
 
     @property
     def _metric_names(self):
@@ -155,12 +163,13 @@ class Summarizer:
             summary_data = hist.get_summary_data()
             val_data = [summary_data["Epoch"],
                         summary_data[self._full_metrics[folder_no]]]
-
         except OSError:
-            print(f"Warning: No summary file found for {folder}")
+            if self.verbose:
+                print(f"Warning: No summary file found for {folder}")
 
         except ValueError as e:
-            print(f"Error reading summary file {hist.summary_file} ({e})")
+            if self.verbose:
+                print(f"Error reading summary file {hist.summary_file} ({e})")
 
         # read data from training files
         full_train_data = hist.get_train_data()

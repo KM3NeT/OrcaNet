@@ -77,6 +77,7 @@ class Organizer:
         self.xs_mean = None
         self._auto_label_modifier = None
         self._stored_model = None
+        self._strategy = None
 
     def train_and_validate(self, model=None, epochs=None, to_epoch=None):
         """
@@ -584,18 +585,9 @@ class Organizer:
 
     def _load_model(self, filepath):
         """ Load from path, with custom objects and parallized. """
-        def ks_load():
-            return ks.models.load_model(
+        with self.get_strategy().scope():
+            model = ks.models.load_model(
                 filepath, custom_objects=self.cfg.get_custom_objects())
-
-        if self.cfg.multi_gpu and len(
-                tf.config.list_physical_devices('GPU')) > 1:
-            strategy = tf.distribute.MirroredStrategy()
-            print(f'Number of GPUs: {strategy.num_replicas_in_sync}')
-            with strategy.scope():
-                model = ks_load()
-        else:
-            model = ks_load()
         return model
 
     def _save_as_json(self, model):
@@ -632,6 +624,17 @@ class Organizer:
                     (self.cfg.validate_interval is not None and
                      epoch[1] % self.cfg.validate_interval == 0)
         return val_sched
+
+    def get_strategy(self):
+        """ Get the strategy for distributed training. """
+        if self._strategy is None:
+            if self.cfg.multi_gpu and len(
+                    tf.config.list_physical_devices('GPU')) > 1:
+                self._strategy = tf.distribute.MirroredStrategy()
+            else:
+                self._strategy = tf.distribute.get_strategy()
+            print(f'Number of GPUs: {self._strategy.num_replicas_in_sync}')
+        return self._strategy
 
 
 class Configuration(object):
@@ -689,6 +692,8 @@ class Configuration(object):
         learning rate per file (e.g. 0.1 for 10% decrease per file).
         If it is a function: Takes as an input the epoch and the
         file number (in this order), and returns the learning rate.
+        Both epoch and fileno start at 1, i.e. 1, 1 is the start of the
+        training.
         If it is a str: Path to a csv file inside the main folder, containing
         3 columns with the epoch, fileno, and the value the lr will be set
         to when reaching this epoch/fileno.
