@@ -116,7 +116,7 @@ class Organizer:
         """
         latest_epoch = self.io.get_latest_epoch()
 
-        model = self._get_model(model, logging=False)
+        model = self._get_model(model, logging=True)
         self._stored_model = model
 
         # check if the validation is missing for the latest fileno
@@ -565,7 +565,7 @@ class Organizer:
                 try:
                     plots_folder = self.io.get_subfolder("plots", create=True)
                     ks.utils.plot_model(
-                        model, plots_folder + "/model_plot.png", show_shapes=True)
+                        model, plots_folder + "/model_plot.pdf", show_shapes=True)
                 except (ImportError, AttributeError) as e:
                     # TODO remove AttributeError once https://github.com/tensorflow/tensorflow/issues/38988 is fixed
                     warnings.warn("Can not plot model: " + str(e))

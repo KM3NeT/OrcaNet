@@ -591,6 +591,69 @@ class OutputReg:
 
         return out
 
+@register
+class OutputReg_incl_error:
+    """
+    Dense layer(s) for regression of absolute value + uncertainty to be used
+    with log prob loss.
+
+    Parameters
+    ----------
+    output_neurons : int
+        Number of neurons in the last layer.
+    output_name : str or None
+        Name that will be given to the output layer of the network.
+    unit_list : List, optional
+        A list of ints. Add additional Dense layers after the gpool
+        with this many units in them. E.g., [64, 32] would add
+        two Dense layers, the first with 64 neurons, the secound with
+        32 neurons.
+    transition : str or None
+        Name of a layer that will be used as the first layer of this block.
+        Example: 'keras:GlobalAveragePooling2D', 'keras:Flatten'
+    kwargs
+        Keywords for the dense blocks that get added if unit_list is
+        not None.
+
+    """
+    def __init__(self, output_neurons,
+                 output_name,
+                 unit_list=None,
+                 transition='keras:Flatten',
+                 **kwargs):
+        self.output_neurons = output_neurons
+        self.output_name = output_name
+        self.unit_list = unit_list
+        self.transition = transition
+        self.kwargs = kwargs
+
+    def __call__(self, layer):
+        if self.transition:
+            x = getattr(layers, self.transition.split("keras:")[-1])()(layer)
+        else:
+            x = layer
+
+        if self.unit_list is not None:
+            for units in self.unit_list:
+                x = DenseBlock(units=units, **self.kwargs)(x)
+
+        #layer part with the mu to be fitted
+        mu_neurons = layers.Dense(
+            units=self.output_neurons,
+            activation=None,
+            name="mu_temp")(x)
+
+        #layer with the uncertainty estimation
+        sigma_neurons = layers.Dense(
+            units=self.output_neurons,
+            activation="softplus",
+            name="sigma_temp")(x)
+
+        merged_layer = layers.Concatenate(name=self.output_name)([mu_neurons,sigma_neurons])
+                
+        return merged_layer
+
+
 
 @register
 class OutputCateg:
@@ -701,6 +764,61 @@ class OutputRegErr:
                 [outputs[i], output_label_error])
             outputs.append(output_label_merged)
         return outputs
+
+@register
+class OutputRegErr_no_gradstop:
+    """
+    Double network for regression + error estimation - but not with gradstop.
+
+    It has 3 dense layer blocks, followed by one dense layer
+    for each output_name, as well as dense layer blocks, followed by one dense layer
+    for the respective error of each output_name.
+
+    Parameters
+    ----------
+    output_names : List
+        List of strs, the output names, each with one neuron + one err neuron.
+    flatten : bool
+        If True, start with a flatten layer.
+    kwargs
+        Keywords for the dense blocks.
+
+    """
+    def __init__(self, output_names, flatten=True, **kwargs):
+        self.flatten = flatten
+        self.output_names = output_names
+        self.kwargs = kwargs
+
+    def __call__(self, layer):
+        if self.flatten:
+            flatten = layers.Flatten()(layer)
+        else:
+            flatten = layer
+        outputs = []
+
+        x = DenseBlock(units=128, **self.kwargs)(flatten)
+        x = DenseBlock(units=32, **self.kwargs)(x)
+
+        for name in self.output_names:
+            output_label = layers.Dense(units=1, name=name)(x)
+            outputs.append(output_label)
+
+        # Network for the errors of the labels
+        x_err = DenseBlock(units=128, **self.kwargs)(flatten)
+        x_err = DenseBlock(units=32, **self.kwargs)(x)
+
+
+        for i, name in enumerate(self.output_names):
+            output_label_error = layers.Dense(
+                units=1,
+                activation='softplus',
+                name=name + '_err_temp')(x_err)
+            # Predicted label gets concatenated with its error (needed for loss function)
+            output_label_merged = layers.Concatenate(name=name + '_err')(
+                [outputs[i], output_label_error])
+            outputs.append(output_label_merged)
+        return outputs
+
 
 
 def _get_dimensional_layers(dim):

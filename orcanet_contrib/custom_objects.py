@@ -1,7 +1,7 @@
 import tensorflow.keras.backend as K
 import tensorflow as tf
 import math
-
+import tensorflow_probability as tfp
 
 def get_custom_objects():
     """
@@ -13,9 +13,39 @@ def get_custom_objects():
         'loss_uncertainty_mae': loss_uncertainty_mae,
         'loss_uncertainty_gaussian_likelihood': loss_uncertainty_gaussian_likelihood,
         'loss_uncertainty_gaussian_likelihood_dir': loss_uncertainty_gaussian_likelihood_dir,
-        'loss_mean_relative_error_energy': loss_mean_relative_error_energy
+        'loss_mean_relative_error_energy': loss_mean_relative_error_energy,
+        'loss_uncertainty_log_prob': loss_uncertainty_log_prob,
     }
     return custom_objects
+
+
+def loss_uncertainty_log_prob(y_true, y_pred):
+    """
+	tba
+
+    Returns
+    -------
+    mre : Mean relative (energy) error loss
+
+    """
+    truth = y_true[:, 0]
+    mu = y_pred[:, 0]
+    sigma = y_pred[:, 1]
+    
+    loss = -1 * tfp.distributions.Normal(loc=mu,scale=sigma).log_prob(truth)
+    
+    return loss
+    
+def loss_uncertainty_log_prob_first_try_with_splitted_final_layers(y_true, y_pred):
+
+    truth = y_true[:, 0]
+    mu = y_pred[:, 0]
+    sigma = y_pred[:, 1]
+    
+    loss = -1 * tfp.distributions.Normal(loc=mu,scale=sigma).log_prob(truth)
+    
+    return loss
+
 
 
 def loss_mean_relative_error_energy(y_true, y_pred):

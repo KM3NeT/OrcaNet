@@ -31,10 +31,11 @@ import warnings
 import numpy as np
 from docopt import docopt
 import tensorflow.keras as ks
+import toml
 
 from orcanet.core import Organizer
 from orcanet.model_builder import ModelBuilder
-from orcanet_contrib.orca_handler_util import orca_learning_rates, update_objects, GraphSampleMod
+from orcanet_contrib.orca_handler_util import orca_learning_rates, update_objects, GraphSampleMod, GraphSampleMod_with_trig
 
 
 def orca_train(output_folder, list_file, config_file, model_file,no_epochs,
@@ -66,8 +67,20 @@ def orca_train(output_folder, list_file, config_file, model_file,no_epochs,
     
     #special sample modifier for the graph neural networks; dont use the "sample_modifier" 
     #option in the model.toml file
-    orga.cfg.sample_modifier = GraphSampleMod()
+    file_content = toml.load(model_file)
+    knn_for_sample_mod = file_content["model"]["next_neighbors"]
     
+    #load a specific sample mod, even for gnn
+    sample_modifier = file_content["orca_modifiers"]["sample_modifier_own"]
+    
+    if sample_modifier == "normal":
+        orga.cfg.sample_modifier = GraphSampleMod(knn=knn_for_sample_mod)
+    elif sample_modifier == "with_trig":
+        orga.cfg.sample_modifier = GraphSampleMod_with_trig(knn=knn_for_sample_mod)
+    else:
+        "No valid sample_modifier_own given!"
+        exit()
+        
     # Load in the orga sample-, label-, and dataset-modifiers, as well as
     # the custom objects
     update_objects(orga, model_file)

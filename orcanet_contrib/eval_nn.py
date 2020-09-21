@@ -81,7 +81,7 @@ def make_performance_plots(pred_filepath, dataset_modifier, plots_folder):
         #make_e_to_acc_plot_ts(pred_file, 'Classified as track', main_perf_plots_path + '/1d', cuts=cuts['from_npy_str'],
          #                     prob_threshold_shower=0.5, savename_prefix='dl_', save=True)
         make_e_to_acc_plot_ts(pred_file, 'Classified as track', main_perf_plots_path + '/1d',
-                              prob_threshold_shower=0.5, savename_prefix='dl_', save=True)
+                              prob_threshold_shower=0.5, savename_prefix='dl_', save=True,merge_nu_anu=True)
         make_ts_prob_hists(pred_file, main_perf_plots_path + '/1d')
 
 

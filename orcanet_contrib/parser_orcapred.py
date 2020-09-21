@@ -31,7 +31,7 @@ import toml
 
 from orcanet.core import Organizer
 from orcanet_contrib.eval_nn import make_performance_plots
-from orcanet_contrib.orca_handler_util import update_objects
+from orcanet_contrib.orca_handler_util import update_objects, GraphSampleMod
 
 
 def orca_pred(output_folder, list_file, config_file, model_file,
@@ -63,7 +63,10 @@ def orca_pred(output_folder, list_file, config_file, model_file,
     """
     # Set up the Organizer with the input data
     orga = Organizer(output_folder, list_file, config_file, tf_log_level=1)
-
+    
+    #get the sample modifier from the orca handler directly (also needed here in pred)
+    orga.cfg.sample_modifier = GraphSampleMod()
+    
     # When predicting with a orga model, the right modifiers and custom
     # objects need to be given
     update_objects(orga, model_file)
