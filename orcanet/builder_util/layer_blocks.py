@@ -2,20 +2,15 @@ import tensorflow.keras.backend as K
 import tensorflow.keras as ks
 import tensorflow.keras.layers as layers
 import medgeconv
+from orcanet.utilities.misc import get_register
+
+# for orcanet custom objects
+blocks, _register = get_register()
+# edge conv blocks
+_register(medgeconv.DisjointEdgeConvBlock)
 
 
-blocks = {}
-
-
-def register(block):
-    blocks[block.__name__] = block
-    return block
-
-
-register(medgeconv.DisjointEdgeConvBlock)
-
-
-@register
+@_register
 class ConvBlock:
     """
     1D/2D/3D Convolutional block followed by BatchNorm, Activation,
@@ -168,7 +163,7 @@ class ConvBlock:
         return x
 
 
-@register
+@_register
 class DenseBlock:
     """
     Dense layer followed by BatchNorm, Activation and/or Dropout.
@@ -228,7 +223,7 @@ class DenseBlock:
         return x
 
 
-@register
+@_register
 class MEdgeConvBlock:
     """ EdgeConv as defined in ParticleNet, see github.com/StefReck/MEdgeConv """
     def __init__(self, units,
@@ -266,7 +261,7 @@ class MEdgeConvBlock:
             return nodes, is_valid, nodes
 
 
-@register
+@_register
 class ResnetBlock:
     """
     A residual building block for resnets. 2 c layers with a shortcut.
@@ -350,7 +345,7 @@ class ResnetBlock:
             return acti_layer(x)
 
 
-@register
+@_register
 class ResnetBnetBlock:
     """
     A residual bottleneck building block for resnets.
@@ -433,7 +428,7 @@ class ResnetBnetBlock:
         return x
 
 
-@register
+@_register
 class InceptionBlockV2:
     """
     A GoogleNet Inception block (v2).
@@ -539,7 +534,7 @@ class InceptionBlockV2:
         return x
 
 
-@register
+@_register
 class OutputReg:
     """
     Dense layer(s) for regression.
@@ -592,7 +587,7 @@ class OutputReg:
         return out
 
 
-@register
+@_register
 class OutputCateg:
     """
     Dense layer(s) for categorization.
@@ -646,7 +641,7 @@ class OutputCateg:
         return out
 
 
-@register
+@_register
 class OutputRegErr:
     """
     Double network for regression + error estimation.

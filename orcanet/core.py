@@ -17,6 +17,7 @@ from orcanet.utilities.visualization import update_summary_plot
 from orcanet.in_out import IOHandler
 from orcanet.history import HistoryHandler
 from orcanet.utilities.nn_utilities import load_zero_center_data, get_auto_label_modifier
+import orcanet.utilities.losses
 import orcanet.logging as olog
 import medgeconv
 
@@ -631,9 +632,9 @@ class Organizer:
             if self.cfg.multi_gpu and len(
                     tf.config.list_physical_devices('GPU')) > 1:
                 self._strategy = tf.distribute.MirroredStrategy()
+                print(f'Number of GPUs: {self._strategy.num_replicas_in_sync}')
             else:
                 self._strategy = tf.distribute.get_strategy()
-            print(f'Number of GPUs: {self._strategy.num_replicas_in_sync}')
         return self._strategy
 
 
@@ -911,7 +912,8 @@ class Configuration(object):
     def get_custom_objects(self):
         """ Get user custom objects + orcanet internal ones. """
         orcanet_co = medgeconv.custom_objects
-        return {**orcanet_co, **self.custom_objects}
+        orcanet_loss_functions = orcanet.utilities.losses.loss_functions
+        return {**orcanet_co, **orcanet_loss_functions, **self.custom_objects}
 
 
 def _get_h5_files(folder):
