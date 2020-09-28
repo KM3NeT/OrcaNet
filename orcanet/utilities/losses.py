@@ -27,7 +27,7 @@ def lkl_normal_tfp(y_true, y_pred):
 @_register
 def lkl_normal(y_true, y_pred):
     """
-    Negative gaussian log-likelihood function for n regression output neurons
+    Negative normal log-likelihood function for n regression output neurons
     with clipping for increased stability.
 
     For stability in the case of outliers, the loss l_i is capped
@@ -38,14 +38,12 @@ def lkl_normal(y_true, y_pred):
     y_true : tf.Tensor
         Shape (bs, 2, n) or (bs, 2).
         y_true[:, 0] is the label of shape (bs, n) (true), and y_true[:, 1]
-        is not used.
-        (necessary as tf 2.1 requires y_true and y_pred to have same shape)
+        is not used (necessary as tf 2.1 requires y_true and y_pred to
+        have same shape).
     y_pred : tf.Tensor
         Shape (bs, 2, n) or (bs, 2).
-        The reconstruction of the network for the
-        label and its error, each of which has shape (bs, n) or shape (bs,).
-        y_pred[:, 0] is the label reco (pred), and y_pred[:, 1]
-        is the err reco (sigma).
+        The output of the network.
+        y_pred[:, 0] is mu, and y_pred[:, 1] is sigma.
 
     """
     mu_true = y_true[:, 0]

@@ -1,3 +1,4 @@
+import tensorflow as tf
 import tensorflow.keras.backend as K
 import tensorflow.keras as ks
 import tensorflow.keras.layers as layers
@@ -585,6 +586,62 @@ class OutputReg:
             name=self.output_name)(x)
 
         return out
+
+
+@_register
+class OutputRegNormal:
+    """
+    Output block for regression using a normal distribution as output.
+
+    The output tensor will have shape (?, 2, output_neurons),
+    with [:, 0] being the mu and [:, 1] being the sigma.
+
+    Parameters
+    ----------
+    mu_activation : str, optional
+        Activation function for the mu neurons.
+    sigma_activation : str, optional
+        Activation function for the sigma neurons.
+
+    See OutputReg for other paramters.
+
+    """
+    def __init__(self, output_neurons,
+                 output_name,
+                 unit_list=None,
+                 mu_activation=None,
+                 sigma_activation="softplus",
+                 transition=None,
+                 **kwargs):
+        self.output_neurons = output_neurons
+        self.output_name = output_name
+        self.unit_list = unit_list
+        self.mu_activation = mu_activation
+        self.sigma_activation = sigma_activation
+        self.transition = transition
+        self.kwargs = kwargs
+
+    def __call__(self, layer):
+        if self.transition:
+            x = getattr(layers, self.transition.split("keras:")[-1])()(layer)
+        else:
+            x = layer
+
+        if self.unit_list is not None:
+            for units in self.unit_list:
+                x = DenseBlock(units=units, **self.kwargs)(x)
+
+        mu = layers.Dense(
+            units=self.output_neurons,
+            activation=self.mu_activation,
+            name=f"{self.output_name}_mu")(x)
+        sigma = layers.Dense(
+            units=self.output_neurons,
+            activation=self.sigma_activation,
+            name=f"{self.output_name}_sigma")(x)
+
+        return layers.Concatenate(name=self.output_name, axis=-2)(
+            [tf.expand_dims(tsr, -2) for tsr in [mu, sigma]])
 
 
 @_register
