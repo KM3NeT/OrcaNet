@@ -27,11 +27,9 @@ class BlockBuilder:
         value = block).
         """
         # dict with toml keyword vs block for all custom blocks
-        self.all_blocks = layer_blocks.blocks
-
-        # legacy
         self.all_blocks = {
-            **self.all_blocks,
+            **layer_blocks.blocks,
+            # legacy names:
             "conv_block": layer_blocks.ConvBlock,
             "dense_block": layer_blocks.DenseBlock,
             "resnet_block": layer_blocks.ResnetBlock,

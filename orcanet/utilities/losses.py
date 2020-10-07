@@ -8,7 +8,7 @@ from orcanet.utilities.misc import get_register
 
 # fuzz factor for numerical stability
 EPS = tf.constant(1e-7, dtype="float32")
-# for orcanet custom objects
+# for loading via toml and orcanet custom objects
 loss_functions, _register = get_register()
 
 
