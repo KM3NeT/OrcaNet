@@ -5,11 +5,36 @@ Use them by setting .cfg.sample_modifier of the orcanet.core.Organizer.
 """
 from abc import abstractmethod
 import numpy as np
+from orcanet.utilities.misc import get_register
+
+smods, _register = get_register()
+
+
+def get_sample_modifier(toml_entry):
+    """
+    Load up one of the orcanet sample modifiers via toml config.
+
+    Parameters
+    ----------
+    toml_entry : str or dict or list
+        The 'sample_modifier' given in the config toml.
+
+    """
+    args, kwargs = [], {}
+    if isinstance(toml_entry, str):
+        smod_name = toml_entry
+    elif isinstance(toml_entry, dict):
+        smod_name = toml_entry["name"]
+        kwargs = {k: v for k, v in toml_entry.items() if k != "name"}
+    else:
+        smod_name = toml_entry[0]
+        args = toml_entry[1:]
+    return smods[smod_name](*args, **kwargs)
 
 
 class BaseModifier:
     """
-    Parent class for modifiers that do the same operation on each input.
+    Base class for modifiers that do the same operation on each input.
     Apply modify on x_value of each input, and output as dict.
 
     """
@@ -26,6 +51,29 @@ class BaseModifier:
         raise NotImplementedError
 
 
+class JoinedModifier(BaseModifier):
+    """
+    For applying multiple sample modifiers after each other.
+
+    Example
+    -------
+    organizer.cfg.sample_modifier = JoinedModifier([
+        Reshape((11, 13, 18)), Permute((2, 1, 3))
+    ])
+    --> Reshape each sample, then permute axes.
+
+    """
+    def __init__(self, sample_modifiers):
+        self.sample_modifiers = sample_modifiers
+
+    def modify(self, x_value):
+        result = x_value
+        for smod in self.sample_modifiers:
+            result = smod.modify(result)
+        return result
+
+
+@_register
 class Permute(BaseModifier):
     """
     Permute the axes of the samples to given order.
@@ -49,6 +97,7 @@ class Permute(BaseModifier):
         return np.transpose(x_value, [0] + self.axes)
 
 
+@_register
 class Reshape(BaseModifier):
     """
     Reshape samples to given shape.
@@ -70,25 +119,3 @@ class Reshape(BaseModifier):
 
     def modify(self, x_value):
         return np.reshape(x_value, [x_value.shape[0]] + self.newshape)
-
-
-class JoinedModifier(BaseModifier):
-    """
-    For applying multiple sample modifiers after each other.
-
-    Example
-    -------
-    organizer.cfg.sample_modifier = JoinedModifier([
-        Reshape((11, 13, 18)), Permute((2, 1, 3))
-    ])
-    --> Reshape each sample, then permute axes.
-
-    """
-    def __init__(self, sample_modifiers):
-        self.sample_modifiers = sample_modifiers
-
-    def modify(self, x_value):
-        result = x_value
-        for smod in self.sample_modifiers:
-            result = smod.modify(result)
-        return result

@@ -18,6 +18,7 @@ from orcanet.in_out import IOHandler
 from orcanet.history import HistoryHandler
 from orcanet.utilities.nn_utilities import load_zero_center_data, get_auto_label_modifier
 import orcanet.utilities.losses
+from orcanet.utilities.sample_modifiers import get_sample_modifier
 import orcanet.logging as olog
 import medgeconv
 
@@ -867,12 +868,13 @@ class Configuration(object):
 
         """
         user_values = toml.load(config_file)["config"]
-        for key in user_values:
+        for key, value in user_values.items():
             if hasattr(self, key):
-                setattr(self, key, user_values[key])
+                if key == "sample_modifier":
+                    value = get_sample_modifier(value)
+                setattr(self, key, value)
             else:
-                raise AttributeError(
-                    "Unknown attribute {} in config file ".format(key))
+                raise AttributeError(f"Unknown attribute {key} in config file")
 
     def get_list_file(self):
         """
