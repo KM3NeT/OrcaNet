@@ -17,8 +17,9 @@ from orcanet.utilities.visualization import update_summary_plot
 from orcanet.in_out import IOHandler
 from orcanet.history import HistoryHandler
 from orcanet.utilities.nn_utilities import load_zero_center_data, get_auto_label_modifier
+from orcanet.utilities.misc import from_register
 import orcanet.utilities.losses
-from orcanet.utilities.sample_modifiers import get_sample_modifier
+import orcanet.utilities.sample_modifiers as sample_modifiers
 import orcanet.logging as olog
 import medgeconv
 
@@ -871,7 +872,8 @@ class Configuration(object):
         for key, value in user_values.items():
             if hasattr(self, key):
                 if key == "sample_modifier":
-                    value = get_sample_modifier(value)
+                    value = from_register(
+                        toml_entry=value, register=sample_modifiers.smods)
                 setattr(self, key, value)
             else:
                 raise AttributeError(f"Unknown attribute {key} in config file")
