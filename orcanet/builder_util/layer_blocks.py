@@ -538,6 +538,59 @@ class InceptionBlockV2:
         x = layers.concatenate(branches, axis=channel_axis)
         return x
 
+@register
+class OutputCateg:
+    """
+    Dense layer(s) for categorization.
+
+    Parameters
+    ----------
+    categories : int
+        Number of categories (= neurons in the last layer).
+    output_name : str
+        Name that will be given to the output layer of the network.
+    unit_list : List, optional
+        A list of ints. Add additional Dense layers after the gpool
+        with this many units in them. E.g., [64, 32] would add
+        two Dense layers, the first with 64 neurons, the secound with
+        32 neurons.
+    transition : str or None
+        Name of a layer that will be used as the first layer of this block.
+        Example: 'keras:GlobalAveragePooling2D', 'keras:Flatten'
+    kwargs
+        Keywords for the dense blocks that get added if unit_list is
+        not None.
+
+    """
+    def __init__(self, categories,
+                 output_name,
+                 unit_list=None,
+                 transition='keras:Flatten',
+                 **kwargs):
+        self.categories = categories
+        self.output_name = output_name
+        self.unit_list = unit_list
+        self.transition = transition
+        self.kwargs = kwargs
+
+    def __call__(self, layer):
+        if self.transition:
+            x = getattr(layers, self.transition.split("keras:")[-1])()(layer)
+        else:
+            x = layer
+
+        if self.unit_list is not None:
+            for units in self.unit_list:
+                x = DenseBlock(units=units, **self.kwargs)(x)
+
+        out = layers.Dense(
+            units=self.categories,
+            activation='softmax',
+            kernel_initializer='he_normal',
+            name=self.output_name)(x)
+
+        return out
+
 
 @register
 class OutputReg:
@@ -599,9 +652,7 @@ class OutputReg_incl_error:
 
     Parameters
     ----------
-    output_neurons : int
-        Number of neurons in the last layer.
-    output_name : str or None
+    output_names : str or None
         Name that will be given to the output layer of the network.
     unit_list : List, optional
         A list of ints. Add additional Dense layers after the gpool
@@ -616,13 +667,12 @@ class OutputReg_incl_error:
         not None.
 
     """
-    def __init__(self, output_neurons,
-                 output_name,
+    def __init__(self,
+                 output_names,
                  unit_list=None,
                  transition='keras:Flatten',
                  **kwargs):
-        self.output_neurons = output_neurons
-        self.output_name = output_name
+        self.output_names = output_names
         self.unit_list = unit_list
         self.transition = transition
         self.kwargs = kwargs
@@ -636,77 +686,28 @@ class OutputReg_incl_error:
         if self.unit_list is not None:
             for units in self.unit_list:
                 x = DenseBlock(units=units, **self.kwargs)(x)
+        
+        full_layer = []
+        
+        for name in self.output_names:
+            
+            #layer part with the mu to be fitted
+            mu_neurons = layers.Dense(
+                units=1,
+                name=name + "_mu_temp")(x)
 
-        #layer part with the mu to be fitted
-        mu_neurons = layers.Dense(
-            units=self.output_neurons,
-            activation=None,
-            name="mu_temp")(x)
+            #layer with the uncertainty estimation
+            sigma_neurons = layers.Dense(
+                units=1,
+                activation="softplus",
+                name=name + "_sigma_temp")(x)
 
-        #layer with the uncertainty estimation
-        sigma_neurons = layers.Dense(
-            units=self.output_neurons,
-            activation="softplus",
-            name="sigma_temp")(x)
+            merged_layer = layers.Concatenate(name=name)([mu_neurons,sigma_neurons])
+            
+            full_layer.append(merged_layer)
+            
+        return full_layer
 
-        merged_layer = layers.Concatenate(name=self.output_name)([mu_neurons,sigma_neurons])
-                
-        return merged_layer
-
-
-
-@register
-class OutputCateg:
-    """
-    Dense layer(s) for categorization.
-
-    Parameters
-    ----------
-    categories : int
-        Number of categories (= neurons in the last layer).
-    output_name : str
-        Name that will be given to the output layer of the network.
-    unit_list : List, optional
-        A list of ints. Add additional Dense layers after the gpool
-        with this many units in them. E.g., [64, 32] would add
-        two Dense layers, the first with 64 neurons, the secound with
-        32 neurons.
-    transition : str or None
-        Name of a layer that will be used as the first layer of this block.
-        Example: 'keras:GlobalAveragePooling2D', 'keras:Flatten'
-    kwargs
-        Keywords for the dense blocks that get added if unit_list is
-        not None.
-
-    """
-    def __init__(self, categories,
-                 output_name,
-                 unit_list=None,
-                 transition='keras:Flatten',
-                 **kwargs):
-        self.categories = categories
-        self.output_name = output_name
-        self.unit_list = unit_list
-        self.transition = transition
-        self.kwargs = kwargs
-
-    def __call__(self, layer):
-        if self.transition:
-            x = getattr(layers, self.transition.split("keras:")[-1])()(layer)
-        else:
-            x = layer
-
-        if self.unit_list is not None:
-            for units in self.unit_list:
-                x = DenseBlock(units=units, **self.kwargs)(x)
-
-        out = layers.Dense(
-            units=self.categories,
-            activation='softmax',
-            kernel_initializer='he_normal',
-            name=self.output_name)(x)
-
-        return out
 
 
 @register

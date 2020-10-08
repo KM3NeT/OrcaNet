@@ -27,6 +27,7 @@ from matplotlib import use
 use('Agg')
 
 from docopt import docopt
+import numpy as np
 import toml
 
 from orcanet.core import Organizer
@@ -64,8 +65,12 @@ def orca_pred(output_folder, list_file, config_file, model_file,
     # Set up the Organizer with the input data
     orga = Organizer(output_folder, list_file, config_file, tf_log_level=1)
     
+    #special sample modifier for the graph neural networks; dont use the "sample_modifier" 
+    #option in the model.toml file
+    file_content = toml.load(model_file)
+    knn_for_sample_mod = file_content["model"]["next_neighbors"]
     #get the sample modifier from the orca handler directly (also needed here in pred)
-    orga.cfg.sample_modifier = GraphSampleMod()
+    orga.cfg.sample_modifier = GraphSampleMod(knn=knn_for_sample_mod)
     
     # When predicting with a orga model, the right modifiers and custom
     # objects need to be given

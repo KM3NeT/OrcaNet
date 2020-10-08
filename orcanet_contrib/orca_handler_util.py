@@ -419,7 +419,47 @@ def orca_label_modifiers(name):
                 ys[key_label] = ys[key_label].astype(np.float32)
                 
             return ys 
-    
+
+    elif name == 'dir':
+        def label_modifier(data):
+            
+            y_values = data["y_values"]
+
+            ys = dict()
+            
+            # make a copy of the y_values array, since we modify it now
+            y_values_copy = np.copy(y_values)
+            
+            #ys['dz'],ys['dz_err'] = y_values_copy['dir_z'],y_values_copy['dir_z']
+            ys['dx'] = y_values_copy['dir_x']
+            ys['dy'] = y_values_copy['dir_y']
+            ys['dz'] = y_values_copy['dir_z']
+            
+            for key_label in ys:
+                ys[key_label] = ys[key_label].astype(np.float32)
+                
+            return ys 
+
+    elif name == 'pos':
+        def label_modifier(data):
+            
+            y_values = data["y_values"]
+
+            ys = dict()
+            
+            # make a copy of the y_values array, since we modify it now
+            y_values_copy = np.copy(y_values)
+            
+            #ys['dz'],ys['dz_err'] = y_values_copy['dir_z'],y_values_copy['dir_z']
+            ys['vx'] = y_values_copy['vertex_pos_x']
+            ys['vy'] = y_values_copy['vertex_pos_y']
+            ys['vz'] = y_values_copy['vertex_pos_z']
+            
+            for key_label in ys:
+                ys[key_label] = ys[key_label].astype(np.float32)
+                
+            return ys 
+                            
     elif name == 'e_error':
         def label_modifier(data):
             
@@ -440,14 +480,15 @@ def orca_label_modifiers(name):
             # set bjorkeny label of nc events to 1
             np.place(y_values_copy['bjorkeny'], elec_nc_bool_idx, 1)            
             
-            ys['e'], ys['e_err'] = np.log(y_values_copy['energy']), np.log(y_values_copy['energy'])
+            #ys['e'], ys['e_err'] = np.log(y_values_copy['energy']), np.log(y_values_copy['energy'])
+            ys['e'] = np.log(y_values_copy['energy'])
                         
             for key_label in ys:
                 ys[key_label] = ys[key_label].astype(np.float32)
                 
             return ys 
                  
-    elif name == 'dz_e_error':
+    elif name == 'dz_e':
         def label_modifier(data):
             
             y_values = data["y_values"]
@@ -467,9 +508,9 @@ def orca_label_modifiers(name):
             # set bjorkeny label of nc events to 1
             np.place(y_values_copy['bjorkeny'], elec_nc_bool_idx, 1)            
             
-            ys['e'], ys['e_err'] = np.log(y_values_copy['energy']), np.log(y_values_copy['energy'])
-            ys['dz'],ys['dz_err'] = y_values_copy['dir_z'],y_values_copy['dir_z']
-                        
+            ys['dz'] = y_values_copy['dir_z']            
+            ys['e'] = np.log(y_values_copy['energy'])
+            
             for key_label in ys:
                 ys[key_label] = ys[key_label].astype(np.float32)
                 
@@ -532,7 +573,7 @@ def orca_label_modifiers(name):
             ys['ts_output'] = categorical_ts.astype(np.float32)
             return ys
 
-    elif name == 'bg_classifier':
+    elif name == 'bg_classifier_3_class':
         def label_modifier(data):
             
             y_values = data["y_values"]
@@ -556,6 +597,37 @@ def orca_label_modifiers(name):
             ys['bg_output'] = categorical_bg.astype(np.float32)
             return ys
 
+    elif name == 'bg_classifier_4_class':
+        def label_modifier(data):
+            
+            y_values = data["y_values"]
+            # for every sample, [1,0,0] for neutrinos, [0,1,0] for mupage
+            # and [0,0,1] for random_noise - only with 4 classes
+            # particle types: mupage: np.abs(13), random_noise = 0, neutrinos =
+            ys = dict()
+            particle_type = y_values['particle_type']
+            is_mupage = np.abs(particle_type) == 13
+            is_random_noise = np.abs(particle_type == 0)
+            
+            is_muon_neutrino = np.abs(particle_type) == 14
+            is_electron_neutrino = np.abs(particle_type) == 12
+            is_cc = y_values['is_cc']
+            
+            is_neutrino_track = np.logical_and(is_muon_neutrino,is_cc)
+            is_nc_muon_neutrino = np.logical_and(is_muon_neutrino,np.invert(is_cc))
+            is_neutrino_shower = np.logical_or(is_electron_neutrino,is_nc_muon_neutrino)
+                                    
+            batchsize = y_values.shape[0]
+            categorical_bg = np.zeros((batchsize, 4), dtype='bool')
+
+            categorical_bg[:, 0] = is_neutrino_track            
+            categorical_bg[:, 1] = is_neutrino_shower
+            categorical_bg[:, 2] = is_mupage
+            categorical_bg[:, 3] = is_random_noise
+
+            ys['bg_output'] = categorical_bg.astype(np.float32)
+            return ys
+            
     elif name == 'bg_classifier_2_class':
         def label_modifier(data):
             
@@ -639,11 +711,15 @@ def orca_dataset_modifiers(name):
             return datasets
 
             
-    elif name == 'bg_classifier':
-        def dataset_modifier(mc_info, y_true, y_pred):
+    elif name == 'bg_classifier_3_class':
+        def dataset_modifier(info_blob):
 
-            # y_pred and y_true are dicts with keys for each output
-            # we only have 1 output in case of the bg classifier
+            #blob contains: y_values (mc info), xs ("images/graphs"), ys (true labels), y_pred (predicted labels)
+        
+            mc_info = info_blob['y_values']
+            y_pred = info_blob['y_pred']
+            y_true = info_blob['ys']
+            
             y_pred = y_pred['bg_output']
             y_true = y_true['bg_output']
 
@@ -677,10 +753,56 @@ def orca_dataset_modifiers(name):
 
             return datasets
 
+    elif name == 'bg_classifier_4_class':
+        def dataset_modifier(info_blob):
+
+            #blob contains: y_values (mc info), xs ("images/graphs"), ys (true labels), y_pred (predicted labels)
+        
+            mc_info = info_blob['y_values']
+            y_pred = info_blob['y_pred']
+            y_true = info_blob['ys']
+            
+            y_pred = y_pred['bg_output']
+            y_true = y_true['bg_output']
+
+            datasets = dict()
+            datasets['mc_info'] = mc_info  # is already a structured array
+            
+            #add also the hit info
+            datasets['hits'] = info_blob["x_values"]["points"]
+            
+            # make pred dataset
+            dtypes = np.dtype([('prob_neutrino_track', y_pred.dtype),
+                               ('prob_neutrino_shower', y_pred.dtype),
+                               ('prob_muon', y_pred.dtype),
+                               ('prob_random_noise', y_pred.dtype)])
+            pred = np.empty(y_pred.shape[0], dtype=dtypes)
+            pred['prob_neutrino_track'] = y_pred[:, 0]
+            pred['prob_neutrino_shower'] = y_pred[:, 1]
+            pred['prob_muon'] = y_pred[:, 2]
+            pred['prob_random_noise'] = y_pred[:, 3]
+
+            datasets['pred'] = pred
+
+            # make true dataset
+            dtypes = np.dtype([('cat_neutrino_track', y_true.dtype),
+                               ('cat_neutrino_shower', y_true.dtype),
+                               ('cat_muon', y_true.dtype),
+                               ('cat_random_noise', y_true.dtype)])
+            true = np.empty(y_true.shape[0], dtype=dtypes)
+            true['cat_neutrino_track'] = y_true[:, 0]
+            true['cat_neutrino_shower'] = y_true[:, 1]
+            true['cat_muon'] = y_true[:, 2]
+            true['cat_random_noise'] = y_true[:, 3]
+
+            datasets['true'] = true
+
+            return datasets
+
     elif name == 'bg_classifier_2_class':
         def dataset_modifier(info_blob):
             
-            #blob contains: y_values (mc info), xs ("images/images"), ys (true labels), y_pred (predicted labels)
+            #blob contains: y_values (mc info), xs ("images/graphs"), ys (true labels), y_pred (predicted labels)
         
             mc_info = info_blob['y_values']
             y_pred = info_blob['y_pred']
@@ -878,27 +1000,29 @@ def orca_dataset_modifiers(name):
             """y_pred and y_true are dicts with keys for each output,
                here, we have 1 key for each regression variable"""
 
+            #first entry of the tupel is the name for the output
+            #second entry is how it was called in orcanet; take for both,
+            #value and uncertainty the same variable name 
             pred_labels_and_nn_output_names = [('pred_dir_z', 'dz'),
-                                              # ('pred_dir_z_err','dz_err')
+                                               ('pred_dir_z_err','dz')
                                                 ]
-
+            
             dtypes_pred = [(tpl[0], y_pred[tpl[1]].dtype) for tpl in pred_labels_and_nn_output_names]
             n_evts = y_pred['dz'].shape[0]
             pred = np.empty(n_evts, dtype=dtypes_pred)
 
             for tpl in pred_labels_and_nn_output_names:
-                if 'err' in tpl[1]:
-                    # the err outputs have shape (bs, 2) with 2 (pred_label, pred_label_err)
-                    # we only want to select the pred_label_err output
-                    pred[tpl[0]] = y_pred[tpl[1]][:, 1] 
+                #the uncertainty estimation is the 2nd column
+                if 'err' in tpl[0]:
+                    pred[tpl[0]] = y_pred[tpl[1]][:, 1]
+                #the fitted value is the first
                 else:
-                    pred[tpl[0]] = np.squeeze(y_pred[tpl[1]], axis=1)  # reshape (bs, 1) to (bs)
+                    pred[tpl[0]] = y_pred[tpl[1]][:, 0]
 
             datasets['pred'] = pred
 
             # make true dataset
             true_labels_and_nn_output_names = [('true_dir_z', 'dz'),
-                                               #('true_dir_z_err', 'dz_err')
                                                ]
 
             dtypes_true = [(tpl[0], y_true[tpl[1]].dtype) for tpl in true_labels_and_nn_output_names]
@@ -910,6 +1034,124 @@ def orca_dataset_modifiers(name):
             datasets['true'] = true
             
             return datasets
+
+    elif name == 'regression_dir':
+        def dataset_modifier(info_blob):
+
+            mc_info = info_blob['y_values']
+            y_pred = info_blob['y_pred']
+            y_true = info_blob['ys']
+            
+            datasets = dict()
+            datasets['mc_info'] = mc_info  # is already a structured array
+
+            #add also the hit info
+            datasets['hits'] = info_blob["x_values"]["points"]
+            
+            # make pred dataset
+            """y_pred and y_true are dicts with keys for each output,
+               here, we have 1 key for each regression variable"""
+
+            #first entry of the tupel is the name for the output
+            #second entry is how it was called in orcanet; take for both,
+            #value and uncertainty the same variable name 
+            pred_labels_and_nn_output_names = [('pred_dir_x', 'dx'),
+                                               ('pred_dir_x_err','dx'),
+                                               ('pred_dir_y', 'dy'),
+                                               ('pred_dir_y_err','dy'),
+                                               ('pred_dir_z', 'dz'),
+                                               ('pred_dir_z_err','dz')
+                                                ]
+            
+            dtypes_pred = [(tpl[0], y_pred[tpl[1]].dtype) for tpl in pred_labels_and_nn_output_names]
+            n_evts = y_pred['dz'].shape[0]
+            pred = np.empty(n_evts, dtype=dtypes_pred)
+
+            for tpl in pred_labels_and_nn_output_names:
+                #the uncertainty estimation is the 2nd column
+                if 'err' in tpl[0]:
+                    pred[tpl[0]] = y_pred[tpl[1]][:, 1]
+                #the fitted value is the first
+                else:
+                    pred[tpl[0]] = y_pred[tpl[1]][:, 0]
+
+            datasets['pred'] = pred
+
+            # make true dataset
+            true_labels_and_nn_output_names = [('true_dir_x', 'dx'),
+                                               ('true_dir_y', 'dy'),
+                                               ('true_dir_z', 'dz'),
+                                               ]
+
+            dtypes_true = [(tpl[0], y_true[tpl[1]].dtype) for tpl in true_labels_and_nn_output_names]
+            true = np.empty(n_evts, dtype=dtypes_true)
+
+            for tpl in true_labels_and_nn_output_names:
+                true[tpl[0]] = y_true[tpl[1]]
+
+            datasets['true'] = true
+            
+            return datasets
+
+
+    elif name == 'regression_pos':
+        def dataset_modifier(info_blob):
+
+            mc_info = info_blob['y_values']
+            y_pred = info_blob['y_pred']
+            y_true = info_blob['ys']
+            
+            datasets = dict()
+            datasets['mc_info'] = mc_info  # is already a structured array
+
+            #add also the hit info
+            datasets['hits'] = info_blob["x_values"]["points"]
+            
+            # make pred dataset
+            """y_pred and y_true are dicts with keys for each output,
+               here, we have 1 key for each regression variable"""
+
+            #first entry of the tupel is the name for the output
+            #second entry is how it was called in orcanet; take for both,
+            #value and uncertainty the same variable name 
+            pred_labels_and_nn_output_names = [('pred_pos_x', 'vx'),
+                                               ('pred_pos_x_err','vx'),
+                                               ('pred_pos_y', 'vy'),
+                                               ('pred_pos_y_err','vy'),
+                                               ('pred_pos_z', 'vz'),
+                                               ('pred_pos_z_err','vz')
+                                                ]
+            
+            dtypes_pred = [(tpl[0], y_pred[tpl[1]].dtype) for tpl in pred_labels_and_nn_output_names]
+            n_evts = y_pred['vz'].shape[0]
+            pred = np.empty(n_evts, dtype=dtypes_pred)
+
+            for tpl in pred_labels_and_nn_output_names:
+                #the uncertainty estimation is the 2nd column
+                if 'err' in tpl[0]:
+                    pred[tpl[0]] = y_pred[tpl[1]][:, 1]
+                #the fitted value is the first
+                else:
+                    pred[tpl[0]] = y_pred[tpl[1]][:, 0]
+
+            datasets['pred'] = pred
+
+            # make true dataset
+            true_labels_and_nn_output_names = [('true_pos_x', 'vx'),
+                                               ('true_pos_y', 'vy'),
+                                               ('true_pos_z', 'vz'),
+                                               ]
+
+            dtypes_true = [(tpl[0], y_true[tpl[1]].dtype) for tpl in true_labels_and_nn_output_names]
+            true = np.empty(n_evts, dtype=dtypes_true)
+
+            for tpl in true_labels_and_nn_output_names:
+                true[tpl[0]] = y_true[tpl[1]]
+
+            datasets['true'] = true
+            
+            return datasets
+
 
     
     elif name == 'regression_e_error':
@@ -927,9 +1169,12 @@ def orca_dataset_modifiers(name):
             # make pred dataset
             """y_pred and y_true are dicts with keys for each output,
                here, we have 1 key for each regression variable"""
-
+            
+            #first entry of the tupel is the name for the output
+            #second entry is how it was called in orcanet; take for both,
+            #value and uncertainty the same variable name 
             pred_labels_and_nn_output_names = [('pred_e', 'e'),
-                                               ('pred_e_err','e_err')
+                                               ('pred_e_err','e')
                                                 ]
 
             dtypes_pred = [(tpl[0], y_pred[tpl[1]].dtype) for tpl in pred_labels_and_nn_output_names]
@@ -937,18 +1182,18 @@ def orca_dataset_modifiers(name):
             pred = np.empty(n_evts, dtype=dtypes_pred)
 
             for tpl in pred_labels_and_nn_output_names:
-                if 'err' in tpl[1]:
-                    # the err outputs have shape (bs, 2) with 2 (pred_label, pred_label_err)
-                    # we only want to select the pred_label_err output
-                    pred[tpl[0]] = y_pred[tpl[1]][:, 1] 
+                #the uncertainty estimation is the 2nd column
+                if 'err' in tpl[0]:
+                    pred[tpl[0]] = y_pred[tpl[1]][:, 1]
+                #the fitted value is the first
                 else:
-                    pred[tpl[0]] = np.squeeze(y_pred[tpl[1]], axis=1)  # reshape (bs, 1) to (bs)
+                    pred[tpl[0]] = y_pred[tpl[1]][:, 0]
 
             datasets['pred'] = pred
 
             # make true dataset
             true_labels_and_nn_output_names = [('true_e', 'e'),
-                                               ('true_e_err', 'e_err')
+                                               #('true_e_err', 'e_err')
                                                ]
 
             dtypes_true = [(tpl[0], y_true[tpl[1]].dtype) for tpl in true_labels_and_nn_output_names]
@@ -963,7 +1208,7 @@ def orca_dataset_modifiers(name):
 
 
     
-    elif name == 'regression_dz_e_error':
+    elif name == 'regression_dz_e':
         def dataset_modifier(info_blob):
 
             mc_info = info_blob['y_values']
@@ -979,31 +1224,32 @@ def orca_dataset_modifiers(name):
             """y_pred and y_true are dicts with keys for each output,
                here, we have 1 key for each regression variable"""
 
-            pred_labels_and_nn_output_names = [('pred_e', 'e'),
-                                               ('pred_e_err','e_err'),
-                                               ('pred_dir_z', 'dz'),
-                                               ('pred_dir_z_err','dz_err'),
+            #first entry of the tupel is the name for the output
+            #second entry is how it was called in orcanet; take for both,
+            #value and uncertainty the same variable name 
+            pred_labels_and_nn_output_names = [('pred_dir_z', 'dz'),
+                                               ('pred_dir_z_err', 'dz'),
+                                               ('pred_e', 'e'),
+                                               ('pred_e_err', 'e'),
                                                 ]
 
             dtypes_pred = [(tpl[0], y_pred[tpl[1]].dtype) for tpl in pred_labels_and_nn_output_names]
-            n_evts = y_pred['e'].shape[0]
+            n_evts = y_pred['dz'].shape[0]
             pred = np.empty(n_evts, dtype=dtypes_pred)
 
             for tpl in pred_labels_and_nn_output_names:
-                if 'err' in tpl[1]:
-                    # the err outputs have shape (bs, 2) with 2 (pred_label, pred_label_err)
-                    # we only want to select the pred_label_err output
-                    pred[tpl[0]] = y_pred[tpl[1]][:, 1] 
+                #the uncertainty estimation is the 2nd column
+                if 'err' in tpl[0]:
+                    pred[tpl[0]] = y_pred[tpl[1]][:, 1]
+                #the fitted value is the first
                 else:
-                    pred[tpl[0]] = np.squeeze(y_pred[tpl[1]], axis=1)  # reshape (bs, 1) to (bs)
+                    pred[tpl[0]] = y_pred[tpl[1]][:, 0]
 
             datasets['pred'] = pred
 
             # make true dataset
-            true_labels_and_nn_output_names = [('true_e', 'e'),
-                                               ('true_e_err', 'e_err'),
-                                               ('true_dir_z', 'dz'),
-                                               ('true_dir_z_err', 'dz_err'),
+            true_labels_and_nn_output_names = [('true_dir_z', 'dz'),
+                                                ('true_e', 'e'),
                                                ]
 
             dtypes_true = [(tpl[0], y_true[tpl[1]].dtype) for tpl in true_labels_and_nn_output_names]
@@ -1032,9 +1278,12 @@ def orca_dataset_modifiers(name):
             # make pred dataset
             """y_pred and y_true are dicts with keys for each output,
                here, we have 1 key for each regression variable"""
-
+            
+            #first entry of the tupel is the name for the output
+            #second entry is how it was called in orcanet; take for both,
+            #value and uncertainty the same variable name 
             pred_labels_and_nn_output_names = [('pred_dir_z', 'dz'),
-                                               ('pred_dir_z_err','dz_err')
+                                               ('pred_dir_z_err','dz')
                                                 ]
                                                 
             dtypes_pred = [(tpl[0], y_pred[tpl[1]].dtype) for tpl in pred_labels_and_nn_output_names]
@@ -1048,6 +1297,45 @@ def orca_dataset_modifiers(name):
                     pred[tpl[0]] = y_pred[tpl[1]][:, 1] 
                 else:
                     pred[tpl[0]] = np.squeeze(y_pred[tpl[1]], axis=1)  # reshape (bs, 1) to (bs)
+
+            datasets['pred'] = pred
+ 
+            return datasets
+   
+    elif name == 'regression_dz_error_log_prob_real_data':
+        def dataset_modifier(info_blob):
+
+            info = info_blob['y_values']
+            y_pred = info_blob['y_pred']
+                        
+            datasets = dict()
+            datasets['info'] = info  # is already a structured array
+            
+            #add also the hit info
+            datasets['hits'] = info_blob["x_values"]["points"]
+            
+            # make pred dataset
+            """y_pred and y_true are dicts with keys for each output,
+               here, we have 1 key for each regression variable"""
+            
+            #first entry of the tupel is the name for the output
+            #second entry is how it was called in orcanet; take for both,
+            #value and uncertainty the same variable name 
+            pred_labels_and_nn_output_names = [('pred_dir_z', 'dz'),
+                                               ('pred_dir_z_err','dz')
+                                                ]
+                                                
+            dtypes_pred = [(tpl[0], y_pred[tpl[1]].dtype) for tpl in pred_labels_and_nn_output_names]
+            n_evts = y_pred['dz'].shape[0]
+            pred = np.empty(n_evts, dtype=dtypes_pred)
+
+            for tpl in pred_labels_and_nn_output_names:
+                #the uncertainty estimation is the 2nd column
+                if 'err' in tpl[0]:
+                    pred[tpl[0]] = y_pred[tpl[1]][:, 1]
+                #the fitted value is the first
+                else:
+                    pred[tpl[0]] = y_pred[tpl[1]][:, 0]
 
             datasets['pred'] = pred
  
@@ -1158,8 +1446,48 @@ def orca_learning_rates(name, total_file_no):
             Function that calculates the current learning rate based on
             the number of already trained epochs.
 
-            Learning rate schedule: lr_decay = 2% for lr > 0.0003
-                                    lr_decay = 1% for 0.0003 >= lr > 0.0001
+            Learning rate schedule: lr_decay = 2.5% for lr > 0.0003
+                                    lr_decay = 1.5% for 0.0003 >= lr > 0.0001
+                                    lr_decay = 1% for 0.0001 >= lr
+
+            Parameters
+            ----------
+            n_epoch : int
+                The number of the current epoch which is used to calculate
+                the new learning rate.
+            n_file : int
+                The number of the current filenumber which is used to
+                calculate the new learning rate.
+
+            Returns
+            -------
+            lr_temp : float
+                Calculated learning rate for this epoch.
+
+            """
+            n_lr_decays = (n_epoch - 1) * total_file_no + (n_file - 1)
+            lr_temp = 0.06  # * n_gpu TODO think about multi gpu lr
+
+            for i in range(n_lr_decays):
+                if lr_temp > 0.04:
+                    lr_decay = 0.025  # standard for regression: 0.07, standard for PID: 0.02
+                elif 0.04 >= lr_temp > 0.01:
+                    lr_decay = 0.015  # standard for regression: 0.04, standard for PID: 0.01
+                else:
+                    lr_decay = 0.01  # standard for regression: 0.02, standard for PID: 0.005
+                
+                lr_temp = lr_temp * (1 - float(lr_decay))
+
+            return lr_temp
+
+    elif name == "triple_decay_reg":
+        def learning_rate(n_epoch, n_file):
+            """
+            Function that calculates the current learning rate based on
+            the number of already trained epochs.
+
+            Learning rate schedule: lr_decay = 1.5% for lr > 0.0003
+                                    lr_decay = 1.0% for 0.0003 >= lr > 0.0001
                                     lr_decay = 0.5% for 0.0001 >= lr
 
             Parameters
@@ -1178,18 +1506,60 @@ def orca_learning_rates(name, total_file_no):
 
             """
             n_lr_decays = (n_epoch - 1) * total_file_no + (n_file - 1)
-            lr_temp = 0.003  # * n_gpu TODO think about multi gpu lr
+            lr_temp = 0.005  # * n_gpu TODO think about multi gpu lr
 
             for i in range(n_lr_decays):
-                if lr_temp > 0.0003:
-                    lr_decay = 0.02  # standard for regression: 0.07, standard for PID: 0.02
-                elif 0.0003 >= lr_temp > 0.0001:
+                if lr_temp > 0.003:
+                    lr_decay = 0.015  # standard for regression: 0.07, standard for PID: 0.02
+                elif 0.003 >= lr_temp > 0.001:
                     lr_decay = 0.01  # standard for regression: 0.04, standard for PID: 0.01
                 else:
                     lr_decay = 0.005  # standard for regression: 0.02, standard for PID: 0.005
+                
                 lr_temp = lr_temp * (1 - float(lr_decay))
 
             return lr_temp
+
+    elif name == "triple_decay_cf":
+        def learning_rate(n_epoch, n_file):
+            """
+            Function that calculates the current learning rate based on
+            the number of already trained epochs.
+
+            Learning rate schedule: lr_decay = 3% for lr > 0.015
+                                    lr_decay = 2% for 0.015 >= lr > 0.01
+                                    lr_decay = 1% for 0.0001 >= lr
+
+            Parameters
+            ----------
+            n_epoch : int
+                The number of the current epoch which is used to calculate
+                the new learning rate.
+            n_file : int
+                The number of the current filenumber which is used to
+                calculate the new learning rate.
+
+            Returns
+            -------
+            lr_temp : float
+                Calculated learning rate for this epoch.
+
+            """
+            n_lr_decays = (n_epoch - 1) * total_file_no + (n_file - 1)
+            lr_temp = 0.025  # * n_gpu TODO think about multi gpu lr
+
+            for i in range(n_lr_decays):
+                if lr_temp > 0.015:
+                    lr_decay = 0.03  # standard for regression: 0.07, standard for PID: 0.02
+                elif 0.015 >= lr_temp > 0.01:
+                    lr_decay = 0.02  # standard for regression: 0.04, standard for PID: 0.01
+                else:
+                    lr_decay = 0.01  # standard for regression: 0.02, standard for PID: 0.005
+                
+                lr_temp = lr_temp * (1 - float(lr_decay))
+
+            return lr_temp
+
 
     else:
         raise NameError("Unknown orca learning rate name", name)
