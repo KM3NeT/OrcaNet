@@ -142,10 +142,10 @@ class GraphEdgeConv:
 
     def _cache_column_names(self, x_dataset):
         try:
-            self.column_names = tuple(x_dataset.attrs["TITLE"].decode().split(", "))
-        except (AttributeError, KeyError):
-            raise ValueError("Can not auto-read column names")
-        print(f"Using column names {self.column_names}")
+            self.column_names = [x_dataset.attrs[f"hit_info_{i}"]
+                                 for i in range(x_dataset.shape[-1])]
+        except Exception:
+            raise ValueError("Can not read column names from dataset attributes")
 
     def __call__(self, info_blob):
         # graph has only one file, take it no matter the name
