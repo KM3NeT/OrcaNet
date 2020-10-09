@@ -142,7 +142,7 @@ class GraphEdgeConv:
 
     def _cache_column_names(self, x_dataset):
         try:
-            self.column_names = x_dataset.attrs["TITLE"].decode().split(", ")
+            self.column_names = tuple(x_dataset.attrs["TITLE"].decode().split(", "))
         except (AttributeError, KeyError):
             raise ValueError("Can not auto-read column names")
         print(f"Using column names {self.column_names}")

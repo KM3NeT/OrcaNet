@@ -648,6 +648,20 @@ class Configuration(object):
     leading underscore) can be changed either directly or with a
     .toml config file via the method update_config().
 
+    Parameters
+    ----------
+    output_folder : str
+        Name of the folder of this model in which everything will be saved,
+        e.g., the summary.txt log file is located in here.
+    list_file : str or None
+        Path to a toml list file with pathes to all the h5 files that should
+        be used for training and validation.
+    config_file : str or None
+        Path to a toml config file with attributes that are used instead of
+        the default ones.
+    kwargs
+        Overwrites the values given in the config file.
+
     Attributes
     ----------
     batchsize : int
@@ -702,8 +716,7 @@ class Configuration(object):
         to when reaching this epoch/fileno.
     max_queue_size : int
         max_queue_size option of the keras training and evaluation generator
-        methods. How many batches get preloaded
-        from the generator.
+        methods. How many batches get preloaded from the generator.
     multi_gpu : bool
         Use all availble GPUs (distributed training if theres more then one).
     n_events : None or int
@@ -720,12 +733,9 @@ class Configuration(object):
     train_logger_flush : int
         After how many lines the training log file should be flushed (updated on
         the disk). -1 for flush at the end of the file only.
-    output_folder : str
-        Name of the folder of this model in which everything will be saved,
-        e.g., the summary.txt log file is located in here.
     use_scratch_ssd : bool
-        Only working at HPC Erlangen: Declares if the input files should be
-        copied to the node-local SSD scratch space.
+        Declares if the input files should be copied to a local temp dir,
+        i.e. the path defined in the 'TMPDIR' environment variable.
     validate_interval : int or None
         Validate the model after this many training files have been trained on
         in an epoch. There will always be a validation at the end of an epoch.
@@ -737,6 +747,10 @@ class Configuration(object):
     verbose_val : int
         verbose option of evaluate_generator.
         0 = silent, 1 = progress bar.
+    y_field_names : tuple, optional
+        During train and val, read out only these fields from the y dataset.
+        --> Speed up, especially if there are many fields.
+        Note: If given, should have at least length 2.
     zero_center_folder : None or str
         Path to a folder in which zero centering images are stored.
         If this path is set, zero centering images for the given dataset will
@@ -746,27 +760,6 @@ class Configuration(object):
     """
     # TODO add a clober script that properly deletes models + logfiles
     def __init__(self, output_folder, list_file=None, config_file=None, **kwargs):
-        """
-        Set the attributes of the Configuration object.
-
-        Values are loaded from the given files, if provided. Otherwise, default
-        values are used.
-
-        Parameters
-        ----------
-        output_folder : str
-            Name of the folder of this model in which everything will be saved,
-            e.g., the summary.txt log file is located in here.
-        list_file : str or None
-            Path to a toml list file with pathes to all the h5 files that should
-            be used for training and validation.
-        config_file : str or None
-            Path to a toml config file with attributes that are used instead of
-            the default ones.
-        kwargs
-            Overwrites the values given in the config file.
-
-        """
         self.batchsize = 64
         self.learning_rate = None
 
@@ -795,6 +788,7 @@ class Configuration(object):
         self.train_logger_display = 100
         self.train_logger_flush = -1
         self.multi_gpu = True
+        self.y_field_names = None
 
         self._default_values = dict(self.__dict__)
 

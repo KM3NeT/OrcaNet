@@ -12,6 +12,7 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
                  sample_modifier=None,
                  label_modifier=None,
                  fixed_batchsize=False,
+                 y_field_names=None,
                  phase="training",
                  xs_mean=None,
                  f_size=None,
@@ -44,6 +45,14 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         sample_modifier : function or None
             Operation to be performed on batches of samples read from the input
             files before they are fed into the model.
+        y_field_names : tuple, optional
+            During train and val, read out only these fields from the y dataset.
+            --> Speed up, especially if there are many fields.
+            Note: If given, should have at least length 2.
+        phase : str
+            Which phase are we in? training, validation, or inference.
+            Inference means both orga.predict and orga.inference, i.e.
+            whenever we write a h5 file.
         label_modifier : function or None
             Operation to be performed on batches of labels read from the input files
             before they are fed into the model.
@@ -80,6 +89,7 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         self.keras_mode = keras_mode
         self.shuffle = shuffle
         self.class_weights = class_weights
+        self.y_field_names = y_field_names
 
         # a dict with the names of list inputs as keys, and the opened
         # h5 files as values
@@ -236,8 +246,10 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         """
         first_file = list(self._files.values())[0]
         try:
-            y_values = first_file[self.key_y_values][
-                       start_index:start_index + self._batchsize]
+            slc = slice(start_index, start_index + self._batchsize)
+            if self.y_field_names is not None and self.phase != "inference":
+                slc = (slc,) + tuple(self.y_field_names,)
+            y_values = first_file[self.key_y_values][slc]
         except KeyError:
             # can not look up y_values, lets hope we dont need them
             y_values = None
@@ -424,6 +436,7 @@ def get_h5_generator(orga, files_dict, f_size=None, zero_center=False,
         shuffle=shuffle,
         class_weights=orga.cfg.class_weight,
         fixed_batchsize=orga.cfg.fixed_batchsize,
+        y_field_names=orga.cfg.y_field_names,
     )
 
     return generator
