@@ -96,37 +96,41 @@ class GraphEdgeConv:
     Read out points, coordinates and is_valid from the ndarray h5 set.
     Intended for the MEdgeConv layers.
 
+    The array in the h5 file is expected to have shape
+    (?, n_points_max, n_features), i.e. the hit features
+    (like pos_x, time, is_valid, ...) are in the last dimension.
+
     Parameters
     ----------
     knn : int or None
         Number of nearest neighbors used in the edge conv.
         Pad events with too few hits by duping first hit, and give a warning.
+    node_features : tuple
+        Defines the node features.
+    coord_features : tuple
+        Defines the coordinates.
+    is_valid_features : str
+        Defines the is_valid.
     with_lightspeed : bool
         Multiply time for coordinates input with lightspeed.
-    nodes : tuple
-        Defines the node features.
-    coords : tuple
-        Defines the coordinates.
-    is_valid : str
-        Defines the is_valid.
+    column_names : tuple, optional
+        Name and order of the features in the last dimension of the array.
+        If None is given, will attempt to auto-read the column names from
+        the attributes of the dataset.
 
     """
     def __init__(self, knn=16,
+                 node_features=("pos_x", "pos_y", "pos_z", "time", "dir_x", "dir_y", "dir_z"),
+                 coord_features=("pos_x", "pos_y", "pos_z", "time"),
+                 is_valid_features="is_valid",
                  with_lightspeed=True,
-                 nodes=("pos_x", "pos_y", "pos_z", "time", "dir_x", "dir_y", "dir_z"),
-                 coords=("pos_x", "pos_y", "pos_z", "time"),
-                 is_valid="is_valid"):
+                 column_names=None):
         self.knn = knn
         self.with_lightspeed = with_lightspeed
-        self.for_nodes = nodes
-        self.for_coords = coords
-        self.for_isvalid = is_valid
-
-        # which index in the array from the file contains which data
-        # TODO hardcoded
-        self.column_names = (
-            "pos_x", "pos_y", "pos_z", "time", 'tot',
-            'channel_id', "dir_x", "dir_y", "dir_z", "is_valid")
+        self.node_features = node_features
+        self.coord_features = coord_features
+        self.is_valid_features = is_valid_features
+        self.column_names = column_names
         self.lightspeed = 0.225  # in water; m/ns
 
     def _str_to_idx(self, which):
@@ -136,11 +140,24 @@ class GraphEdgeConv:
         else:
             return [self.column_names.index(w) for w in which]
 
+    def _cache_column_names(self, x_dataset):
+        try:
+            self.column_names = x_dataset.attrs["TITLE"].decode().split(", ")
+        except (AttributeError, KeyError):
+            raise ValueError("Can not auto-read column names")
+        print(f"Using column names {self.column_names}")
+
     def __call__(self, info_blob):
-        x_value = list(info_blob["x_values"].values())[0]
-        nodes = x_value[:, :, self._str_to_idx(self.for_nodes)]
-        coords = x_value[:, :, self._str_to_idx(self.for_coords)]
-        is_valid = x_value[:, :, self._str_to_idx(self.for_valid)]
+        # graph has only one file, take it no matter the name
+        input_name = list(info_blob["x_values"].keys())[0]
+
+        x_values = info_blob["x_values"][input_name]
+        if self.column_names is None:
+            self._cache_column_names(info_blob["meta"]["datasets"][input_name]["samples"])
+
+        nodes = x_values[:, :, self._str_to_idx(self.node_features)]
+        coords = x_values[:, :, self._str_to_idx(self.coord_features)]
+        is_valid = x_values[:, :, self._str_to_idx(self.is_valid_features)]
 
         if self.with_lightspeed:
             coords[:, :, -1] *= self.lightspeed

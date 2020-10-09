@@ -92,6 +92,7 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         # for keeping track of the readout speed
         self._total_time = 0.
         self._total_batches = 0
+        self._file_meta = None
 
         self.open()
 
@@ -132,7 +133,7 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         """
         start_time = time.time()
         file_index = self._sample_pos[index]
-        info_blob = {"phase": self.phase}
+        info_blob = {"phase": self.phase, "meta": self.get_file_meta()}
         info_blob["x_values"] = self.get_x_values(file_index)
         info_blob["y_values"] = self.get_y_values(file_index)
 
@@ -253,6 +254,20 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
                 f"\tPer batch:\t"
                 f"{1000 * self._total_time/self._total_batches:.5} ms"
             )
+
+    def get_file_meta(self):
+        """ Meta information about the files. Only read out once. """
+        if self._file_meta is None:
+            self._file_meta = {}
+            # sample and label dataset for each input
+            datasets = {}
+            for input_key, file in self._files.items():
+                datasets[input_key] = {
+                    "samples": file[self.key_x_values],
+                    "labels": file[self.key_y_values],
+                }
+            self._file_meta["datasets"] = datasets
+        return self._file_meta
 
     @property
     def _size(self):
