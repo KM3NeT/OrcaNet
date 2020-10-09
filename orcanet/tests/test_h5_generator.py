@@ -177,6 +177,14 @@ class TestBatchGenerator(TestCase):
         assert_dict_arrays_equal(info_blob["ys"], target_ys_batch_2)
         assert_equal_struc_array(info_blob["y_values"], target_mc_info_batch_2)
 
+    def test_y_field_names(self):
+        # TODO test is a bit dumb, because y in this file only has 2 fields anyways
+        y_field_names = ("mc_A", "mc_B")
+        filepaths = self.filepaths_file_1
+        self.orga.cfg.y_field_names = y_field_names
+        gene = get_h5_generator(self.orga, filepaths, keras_mode=False)
+        self.assertTupleEqual(gene[0]["y_values"].dtype.names, y_field_names)
+
 
 def label_modifier(info_blob):
     y_values = info_blob["y_values"]
