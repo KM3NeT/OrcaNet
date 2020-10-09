@@ -45,10 +45,9 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         sample_modifier : function or None
             Operation to be performed on batches of samples read from the input
             files before they are fed into the model.
-        y_field_names : tuple, optional
+        y_field_names : tuple or list or str, optional
             During train and val, read out only these fields from the y dataset.
             --> Speed up, especially if there are many fields.
-            Note: If given, should have at least length 2.
         phase : str
             Which phase are we in? training, validation, or inference.
             Inference means both orga.predict and orga.inference, i.e.
@@ -89,6 +88,12 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         self.keras_mode = keras_mode
         self.shuffle = shuffle
         self.class_weights = class_weights
+
+        if y_field_names is not None:
+            if isinstance(y_field_names, str):
+                y_field_names = (y_field_names, )
+            else:
+                y_field_names = tuple(y_field_names)
         self.y_field_names = y_field_names
 
         # a dict with the names of list inputs as keys, and the opened
@@ -248,8 +253,13 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         try:
             slc = slice(start_index, start_index + self._batchsize)
             if self.y_field_names is not None and self.phase != "inference":
-                slc = (slc,) + tuple(self.y_field_names,)
-            y_values = first_file[self.key_y_values][slc]
+                y_values = first_file[self.key_y_values][(slc,) + tuple(self.y_field_names,)]
+                if len(self.y_field_names) == 1:
+                    # result of slice is a ndarray; convert to structured
+                    y_values = y_values.astype(
+                        np.dtype([(self.y_field_names[0], y_values.dtype)]))
+            else:
+                y_values = first_file[self.key_y_values][slc]
         except KeyError:
             # can not look up y_values, lets hope we dont need them
             y_values = None

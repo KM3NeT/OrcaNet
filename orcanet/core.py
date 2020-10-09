@@ -747,10 +747,9 @@ class Configuration(object):
     verbose_val : int
         verbose option of evaluate_generator.
         0 = silent, 1 = progress bar.
-    y_field_names : tuple, optional
+    y_field_names : tuple or list or str, optional
         During train and val, read out only these fields from the y dataset.
         --> Speed up, especially if there are many fields.
-        Note: If given, should have at least length 2.
     zero_center_folder : None or str
         Path to a folder in which zero centering images are stored.
         If this path is set, zero centering images for the given dataset will
