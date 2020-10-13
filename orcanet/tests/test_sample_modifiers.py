@@ -28,13 +28,6 @@ class TestAppli(TestCase):
             (self.batchsize, ) + (11, 7, 5)
         )
 
-    def test_permute_fromstr(self):
-        result = smods.Permute.from_str("3,2,1")(self.info_blob)
-        self.assertEqual(
-            result[self.inp_a_name].shape,
-            (self.batchsize, ) + (11, 7, 5)
-        )
-
     def test_joined_modifier(self):
         new_shape = (5*7, 11)
         modifiers = [

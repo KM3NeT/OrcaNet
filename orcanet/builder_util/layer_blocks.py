@@ -5,13 +5,13 @@ import tensorflow.keras.layers as layers
 import medgeconv
 from orcanet.utilities.misc import get_register
 
-# for orcanet custom objects
-blocks, _register = get_register()
+# for loading via toml and orcanet custom objects
+blocks, register = get_register()
 # edge conv blocks
-_register(medgeconv.DisjointEdgeConvBlock)
+register(medgeconv.DisjointEdgeConvBlock)
 
 
-@_register
+@register
 class ConvBlock:
     """
     1D/2D/3D Convolutional block followed by BatchNorm, Activation,
@@ -164,7 +164,7 @@ class ConvBlock:
         return x
 
 
-@_register
+@register
 class DenseBlock:
     """
     Dense layer followed by BatchNorm, Activation and/or Dropout.
@@ -224,7 +224,7 @@ class DenseBlock:
         return x
 
 
-@_register
+@register
 class MEdgeConvBlock:
     """ EdgeConv as defined in ParticleNet, see github.com/StefReck/MEdgeConv """
     def __init__(self, units,
@@ -262,7 +262,7 @@ class MEdgeConvBlock:
             return nodes, is_valid, nodes
 
 
-@_register
+@register
 class ResnetBlock:
     """
     A residual building block for resnets. 2 c layers with a shortcut.
@@ -346,7 +346,7 @@ class ResnetBlock:
             return acti_layer(x)
 
 
-@_register
+@register
 class ResnetBnetBlock:
     """
     A residual bottleneck building block for resnets.
@@ -429,7 +429,7 @@ class ResnetBnetBlock:
         return x
 
 
-@_register
+@register
 class InceptionBlockV2:
     """
     A GoogleNet Inception block (v2).
@@ -535,7 +535,7 @@ class InceptionBlockV2:
         return x
 
 
-@_register
+@register
 class OutputReg:
     """
     Dense layer(s) for regression.
@@ -588,7 +588,7 @@ class OutputReg:
         return out
 
 
-@_register
+@register
 class OutputRegNormal:
     """
     Output block for regression using a normal distribution as output.
@@ -644,7 +644,7 @@ class OutputRegNormal:
             [tf.expand_dims(tsr, -2) for tsr in [mu, sigma]])
 
 
-@_register
+@register
 class OutputCateg:
     """
     Dense layer(s) for categorization.
@@ -698,7 +698,7 @@ class OutputCateg:
         return out
 
 
-@_register
+@register
 class OutputRegErr:
     """
     Double network for regression + error estimation.
