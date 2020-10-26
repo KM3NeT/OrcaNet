@@ -20,6 +20,7 @@ from orcanet.utilities.nn_utilities import load_zero_center_data, get_auto_label
 from orcanet.utilities.misc import from_register
 import orcanet.utilities.losses
 import orcanet.utilities.sample_modifiers as sample_modifiers
+import orcanet.utilities.dataset_modifiers as dataset_modifiers
 import orcanet.logging as olog
 import medgeconv
 
@@ -682,9 +683,9 @@ class Configuration(object):
         functions to be considered by keras during deserialization of models.
     dataset_modifier : function or None
         For orga.predict: Function that determines which datasets get created
-        in the resulting h5 file. If none, every output layer will get one
-        dataset each for both the label and the prediction, and one dataset
-        containing the y_values from the validation files.
+        in the resulting h5 file. Default: save as array, i.e. every output layer
+        will get one dataset each for both the label and the prediction,
+        and one dataset containing the y_values from the validation files.
     fixed_batchsize : bool
         The last batch in the file might be smaller then the batchsize.
         Usually, this is no problem, but set to True to skip this batch
@@ -867,6 +868,9 @@ class Configuration(object):
                 if key == "sample_modifier":
                     value = from_register(
                         toml_entry=value, register=sample_modifiers.smods)
+                elif key == "dataset_modifier":
+                    value = from_register(
+                        toml_entry=value, register=dataset_modifiers.dmods)
                 setattr(self, key, value)
             else:
                 raise AttributeError(f"Unknown attribute {key} in config file")
