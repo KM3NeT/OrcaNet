@@ -61,13 +61,14 @@ def as_recarray(info_blob):
     return datasets
 
 
+@register
 def as_recarray_distr(info_blob):
     """
     Save network output as recarray to h5. Intended for when network
     outputs are distributions and thus 3D.
     I.e. (batchsize, 2, X), with [:, 0] being mu and [:, 1] being std.
 
-    Output from network:
+    Example output from network:
     shape {"A": (bs, 2), "B": (bs, 2, 3)}
         [:, 0] is reco, [:, 1] is err
 
@@ -75,34 +76,22 @@ def as_recarray_distr(info_blob):
     A_1, A_err_1, B_1, B_1_err, B_2, B_err_2, ...
 
     """
-    def output_to_rec(network_output, with_err=True):
-        rec_dict = {}
-        for output_name, output_array in network_output.items():
-            if len(output_array.shape) == 2:
-                output_array = np.expand_dims(output_array, -1)
-            elif len(output_array.shape) != 3:
-                raise ValueError(
-                    f"Invalid shape {output_array.shape}: {output_array}")
-
-            for i in range(output_array.shape[-1]):
-                rec_dict[f"{output_name}_{i+1}"] = output_array[:, 0, i]
-                if with_err:
-                    rec_dict[f"{output_name}_err_{i+1}"] = output_array[:, 1, i]
-        return utmisc.to_recarray(dictionary=rec_dict)
-
-    datasets = dict()
-    datasets["pred"] = output_to_rec(info_blob["y_pred"])
+    y_pred = info_blob["y_pred"]
+    datas = {}
+    for output_name, array in y_pred.items():
+        datas[output_name] = array[:, 0]
+        datas[f"{output_name}_err"] = array[:, 1]
+    info_blob["y_pred"] = datas
 
     ys = info_blob.get("ys")
     if ys is not None:
         # errs for the trues are just padded, so skip
-        datasets["true"] = output_to_rec(ys, with_err=False)
+        datas = {}
+        for output_name, array in y_pred.items():
+            datas[output_name] = array[:, 0]
+        info_blob["ys"] = datas
 
-    y_values = info_blob.get("y_values")
-    if y_values is not None:
-        datasets['y_values'] = y_values  # is already a structured array
-
-    return datasets
+    return as_recarray(info_blob)
 
 
 def dict_to_recarray(array_dict):
@@ -125,7 +114,9 @@ def dict_to_recarray(array_dict):
     """
     column_names, arrays = [], []
     for key, array in array_dict.items():
-        if len(array.shape) > 2:
+        if len(array.shape) == 1:
+            array = np.expand_dims(array, -1)
+        elif len(array.shape) > 2:
             array = np.reshape(array, (len(array), -1))
         arrays.append(array)
         for i in range(array.shape[-1]):

@@ -10,6 +10,12 @@ class TestFunctions(TestCase):
         self.assertTrue(output.shape == (5, ))
         self.assertTupleEqual(output.dtype.names, ('aa_1', 'aa_2', 'aa_3', 'bb_1'))
 
+    def test_dict_to_recarray_len_1(self):
+        inp = {"aa": np.ones((5, 3)), "bb": np.ones((5, ))}
+        output = dmods.dict_to_recarray(inp)
+        self.assertTrue(output.shape == (5, ))
+        self.assertTupleEqual(output.dtype.names, ('aa_1', 'aa_2', 'aa_3', 'bb_1'))
+
     def test_dict_to_recarray_wrong_dim(self):
         inp = {"aa": np.ones((4, 3)), "bb": np.ones((5, 1))}
         with self.assertRaises(ValueError):
@@ -49,3 +55,19 @@ class TestFunctions(TestCase):
 
         datasets = dmods.as_array(info_blob)
         self.assertDictEqual(datasets, target)
+
+    def test_as_recarray_distr(self):
+        inp = {
+            "y_pred": {"aa": np.ones((5, 2)), "bb": np.ones((5, 2, 3))},
+            "ys": {"aa": np.ones((5, 2)), "bb": np.ones((5, 2, 3))},
+        }
+        output = dmods.as_recarray_distr(inp)
+        self.assertTrue(output["pred"].shape == (5, ))
+        self.assertTupleEqual(
+            output["pred"].dtype.names,
+            ('aa_1', 'aa_err_1', 'bb_1', 'bb_2', 'bb_3', 'bb_err_1', 'bb_err_2', 'bb_err_3'))
+
+        self.assertTrue(output["true"].shape == (5, ))
+        self.assertTupleEqual(
+            output["true"].dtype.names,
+            ('aa_1', 'bb_1', 'bb_2', 'bb_3'))
