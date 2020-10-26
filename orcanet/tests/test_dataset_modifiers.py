@@ -4,31 +4,6 @@ import orcanet.lib.dataset_modifiers as dmods
 
 
 class TestFunctions(TestCase):
-    def test_dict_to_recarray(self):
-        inp = {"aa": np.ones((5, 3)), "bb": np.ones((5, 1))}
-        output = dmods.dict_to_recarray(inp)
-        self.assertTrue(output.shape == (5, ))
-        self.assertTupleEqual(output.dtype.names, ('aa_1', 'aa_2', 'aa_3', 'bb_1'))
-
-    def test_dict_to_recarray_len_1(self):
-        inp = {"aa": np.ones((5, 3)), "bb": np.ones((5, ))}
-        output = dmods.dict_to_recarray(inp)
-        self.assertTrue(output.shape == (5, ))
-        self.assertTupleEqual(output.dtype.names, ('aa_1', 'aa_2', 'aa_3', 'bb_1'))
-
-    def test_dict_to_recarray_wrong_dim(self):
-        inp = {"aa": np.ones((4, 3)), "bb": np.ones((5, 1))}
-        with self.assertRaises(ValueError):
-            dmods.dict_to_recarray(inp)
-
-    def test_dict_to_recarray_weird_shape(self):
-        inp = {"aa": np.ones((5, 3, 2)), "bb": np.ones((5, 1))}
-        output = dmods.dict_to_recarray(inp)
-        self.assertTrue(output.shape == (5, ))
-        self.assertTupleEqual(
-            output.dtype.names,
-            ('aa_1', 'aa_2', 'aa_3', 'aa_4', 'aa_5', 'aa_6', 'bb_1'))
-
     def test_as_array(self):
         y_values = "y_values gets simply passed forward"
         y_true = {
@@ -56,7 +31,7 @@ class TestFunctions(TestCase):
         datasets = dmods.as_array(info_blob)
         self.assertDictEqual(datasets, target)
 
-    def test_as_recarray_distr(self):
+    def test_as_recarray_dist(self):
         inp = {
             "y_pred": {"aa": np.ones((5, 2)), "bb": np.ones((5, 2, 3))},
             "ys": {"aa": np.ones((5, 2)), "bb": np.ones((5, 2, 3))},

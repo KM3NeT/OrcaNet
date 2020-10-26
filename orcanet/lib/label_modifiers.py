@@ -1,3 +1,7 @@
+import orcanet.misc as misc
+
+# for loading via toml TODO nothing in here yet...
+lmods, register = misc.get_register()
 
 
 class ColumnLabels:

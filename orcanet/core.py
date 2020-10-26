@@ -868,6 +868,9 @@ class Configuration(object):
                 elif key == "dataset_modifier":
                     value = from_register(
                         toml_entry=value, register=lib.dataset_modifiers.dmods)
+                elif key == "label_modifier":
+                    value = from_register(
+                        toml_entry=value, register=lib.label_modifiers.lmods)
                 setattr(self, key, value)
             else:
                 raise AttributeError(f"Unknown attribute {key} in config file")
