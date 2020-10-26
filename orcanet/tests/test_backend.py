@@ -11,7 +11,7 @@ import tensorflow.keras.layers as layers
 
 from orcanet.core import Organizer
 from orcanet.backend import train_model, validate_model, make_model_prediction, weighted_average
-from orcanet.utilities.nn_utilities import get_auto_label_modifier
+import orcanet.lib as lib
 
 
 class TestFunctions(TestCase):
@@ -143,7 +143,7 @@ class TestTrainValidatePredict(tf.test.TestCase):
 
         self.model = build_dummy_model(self.input_shapes, self.output_shapes)
         self.model.compile(loss="mse", optimizer="sgd")
-        self.orga._auto_label_modifier = get_auto_label_modifier(self.model)
+        self.orga._auto_label_modifier = lib.label_modifiers.ColumnLabels(self.model)
 
     @classmethod
     def tearDownClass(cls):

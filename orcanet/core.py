@@ -15,7 +15,7 @@ import orcanet.backend as backend
 from orcanet.utilities.visualization import update_summary_plot
 from orcanet.in_out import IOHandler
 from orcanet.history import HistoryHandler
-from orcanet.utilities.nn_utilities import load_zero_center_data, get_auto_label_modifier
+from orcanet.utilities.nn_utilities import load_zero_center_data
 import orcanet.lib as lib
 import orcanet.logging as logging
 from orcanet.misc import from_register
@@ -607,7 +607,7 @@ class Organizer:
                              "list file with pathes to h5 files first.")
 
         if self.cfg.label_modifier is None:
-            self._auto_label_modifier = get_auto_label_modifier(model)
+            self._auto_label_modifier = lib.label_modifiers.ColumnLabels(model)
 
         if self.cfg.zero_center_folder is not None:
             self.get_xs_mean(logging)

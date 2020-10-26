@@ -420,8 +420,7 @@ def get_h5_generator(orga, files_dict, f_size=None, zero_center=False,
         label_modifier = orga.cfg.label_modifier
     elif use_def_label:
         assert orga._auto_label_modifier is not None, \
-            "Auto label modifier has not been set up (can be done with " \
-            "nn_utilities.get_auto_label_modifier)"
+            "Auto label modifier has not been set up"
         label_modifier = orga._auto_label_modifier
     else:
         label_modifier = None
