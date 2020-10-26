@@ -13,7 +13,7 @@ from orcanet.logging import BatchLogger
 import orcanet.utilities.nn_utilities as nn_utilities
 from orcanet.in_out import h5_get_number_of_rows
 from orcanet.h5_generator import get_h5_generator
-import orcanet.utilities.dataset_modifiers as dataset_modifiers
+import orcanet.lib.dataset_modifiers as dataset_modifiers
 
 
 def train_model(orga, model, epoch, batch_logger=False):

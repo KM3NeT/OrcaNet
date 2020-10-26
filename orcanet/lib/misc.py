@@ -1,4 +1,5 @@
 """ Odds and ends. """
+import numpy as np
 
 
 def get_register():
@@ -49,3 +50,36 @@ def from_register(toml_entry, register):
         return cls(*args, **kwargs)
     except TypeError:
         raise TypeError(f"Error initializing {cls}")
+
+
+def dict_to_recarray(array_dict):
+    """
+    Convert a dict with np arrays to a 2d recarray.
+    Column names are derived from the dict keys.
+
+    Parameters
+    ----------
+    array_dict : dict
+        Keys: string
+        Values: ND arrays, same length and number of dimensions.
+            All dimensions expect first will get flattened.
+
+    Returns
+    -------
+    ndarray
+        The recarray.
+
+    """
+    column_names, arrays = [], []
+    for key, array in array_dict.items():
+        if len(array.shape) == 1:
+            array = np.expand_dims(array, -1)
+        elif len(array.shape) > 2:
+            array = np.reshape(array, (len(array), -1))
+        arrays.append(array)
+        for i in range(array.shape[-1]):
+            column_names.append(f"{key}_{i+1}")
+
+    names = ",".join([name for name in column_names])
+    data = np.concatenate(arrays, axis=1)
+    return np.core.records.fromrecords(data, names=names)

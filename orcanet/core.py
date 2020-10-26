@@ -10,18 +10,14 @@ import warnings
 import time
 from datetime import timedelta
 import tensorflow as tf
-import tensorflow.keras as ks
 
 import orcanet.backend as backend
 from orcanet.utilities.visualization import update_summary_plot
 from orcanet.in_out import IOHandler
 from orcanet.history import HistoryHandler
 from orcanet.utilities.nn_utilities import load_zero_center_data, get_auto_label_modifier
-from orcanet.utilities.misc import from_register
-import orcanet.utilities.losses
-import orcanet.utilities.sample_modifiers as sample_modifiers
-import orcanet.utilities.dataset_modifiers as dataset_modifiers
-import orcanet.logging as olog
+import orcanet.lib as lib
+import orcanet.logging as logging
 import medgeconv
 
 
@@ -195,7 +191,7 @@ class Organizer:
 
         if latest_epoch is None:
             self.io.check_connections(model)
-            olog.log_start_training(self)
+            logging.log_start_training(self)
 
         model_path = self.io.get_model_path(*next_epoch)
         model_path_local = self.io.get_model_path(*next_epoch, local=True)
@@ -204,10 +200,10 @@ class Organizer:
                 "Can not train model in epoch {} file {}, this model has "
                 "already been saved!".format(*next_epoch))
 
-        smry_logger = olog.SummaryLogger(self, model)
+        smry_logger = logging.SummaryLogger(self, model)
 
         if self.cfg.learning_rate is not None:
-            ks.backend.set_value(
+            tf.keras.backend.set_value(
                 model.optimizer.lr, self.io.get_learning_rate(next_epoch)
             )
 
@@ -218,7 +214,7 @@ class Organizer:
         self.io.print_log(line)
         self.io.print_log("-" * len(line))
         self.io.print_log("Learning rate is at {}".format(
-            ks.backend.get_value(model.optimizer.lr)))
+            tf.keras.backend.get_value(model.optimizer.lr)))
         self.io.print_log('Inputs and files:')
         for input_name, input_file in files_dict.items():
             self.io.print_log("   {}: \t{}".format(input_name,
@@ -232,7 +228,7 @@ class Organizer:
         model.save(model_path)
         smry_logger.write_line(
             next_epoch_float,
-            ks.backend.get_value(model.optimizer.lr),
+            tf.keras.backend.get_value(model.optimizer.lr),
             history_train=history,
         )
 
@@ -277,9 +273,9 @@ class Organizer:
         self._set_up(model, logging=True)
 
         epoch_float = self.io.get_epoch_float(*latest_epoch)
-        smry_logger = olog.SummaryLogger(self, model)
+        smry_logger = logging.SummaryLogger(self, model)
 
-        olog.log_start_validation(self)
+        logging.log_start_validation(self)
 
         start_time = time.time()
         history = backend.validate_model(self, model)
@@ -569,7 +565,7 @@ class Organizer:
 
                 try:
                     plots_folder = self.io.get_subfolder("plots", create=True)
-                    ks.utils.plot_model(
+                    tf.keras.utils.plot_model(
                         model, plots_folder + "/model_plot.png", show_shapes=True)
                 except (ImportError, AttributeError) as e:
                     # TODO remove AttributeError once https://github.com/tensorflow/tensorflow/issues/38988 is fixed
@@ -590,7 +586,7 @@ class Organizer:
     def _load_model(self, filepath):
         """ Load from path, with custom objects and parallized. """
         with self.get_strategy().scope():
-            model = ks.models.load_model(
+            model = tf.keras.models.load_model(
                 filepath, custom_objects=self.cfg.get_custom_objects())
         return model
 
@@ -866,11 +862,11 @@ class Configuration(object):
         for key, value in user_values.items():
             if hasattr(self, key):
                 if key == "sample_modifier":
-                    value = from_register(
-                        toml_entry=value, register=sample_modifiers.smods)
+                    value = lib.misc.from_register(
+                        toml_entry=value, register=lib.sample_modifiers.smods)
                 elif key == "dataset_modifier":
-                    value = from_register(
-                        toml_entry=value, register=dataset_modifiers.dmods)
+                    value = lib.misc.from_register(
+                        toml_entry=value, register=lib.dataset_modifiers.dmods)
                 setattr(self, key, value)
             else:
                 raise AttributeError(f"Unknown attribute {key} in config file")
@@ -913,7 +909,7 @@ class Configuration(object):
     def get_custom_objects(self):
         """ Get user custom objects + orcanet internal ones. """
         orcanet_co = medgeconv.custom_objects
-        orcanet_loss_functions = orcanet.utilities.losses.loss_functions
+        orcanet_loss_functions = lib.losses.loss_functions
         return {**orcanet_co, **orcanet_loss_functions, **self.custom_objects}
 
 

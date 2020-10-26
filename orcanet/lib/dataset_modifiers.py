@@ -1,8 +1,7 @@
-import numpy as np
-from orcanet.utilities.misc import get_register
+import orcanet.lib.misc as misc
 
 # for loading via toml
-dmods, register = get_register()
+dmods, register = misc.get_register()
 
 
 @register
@@ -48,11 +47,11 @@ def as_recarray(info_blob):
 
     """
     datasets = dict()
-    datasets["pred"] = dict_to_recarray(info_blob.get("y_pred"))
+    datasets["pred"] = misc.dict_to_recarray(info_blob.get("y_pred"))
 
     ys = info_blob.get("ys")
     if ys is not None:
-        datasets["true"] = dict_to_recarray(ys)
+        datasets["true"] = misc.dict_to_recarray(ys)
 
     y_values = info_blob.get("y_values")
     if y_values is not None:
@@ -93,36 +92,3 @@ def as_recarray_distr(info_blob):
         info_blob["ys"] = datas
 
     return as_recarray(info_blob)
-
-
-def dict_to_recarray(array_dict):
-    """
-    Convert a dict with np arrays to a 2d recarray.
-    Column names are derived from the dict keys.
-
-    Parameters
-    ----------
-    array_dict : dict
-        Keys: string
-        Values: ND arrays, same length and number of dimensions.
-            All dimensions expect first will get flattened.
-
-    Returns
-    -------
-    ndarray
-        The recarray.
-
-    """
-    column_names, arrays = [], []
-    for key, array in array_dict.items():
-        if len(array.shape) == 1:
-            array = np.expand_dims(array, -1)
-        elif len(array.shape) > 2:
-            array = np.reshape(array, (len(array), -1))
-        arrays.append(array)
-        for i in range(array.shape[-1]):
-            column_names.append(f"{key}_{i+1}")
-
-    names = ",".join([name for name in column_names])
-    data = np.concatenate(arrays, axis=1)
-    return np.core.records.fromrecords(data, names=names)

@@ -1,6 +1,6 @@
 from unittest import TestCase
 import numpy as np
-import orcanet.utilities.dataset_modifiers as dmods
+import orcanet.lib.dataset_modifiers as dmods
 
 
 class TestFunctions(TestCase):
