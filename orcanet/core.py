@@ -18,6 +18,7 @@ from orcanet.history import HistoryHandler
 from orcanet.utilities.nn_utilities import load_zero_center_data, get_auto_label_modifier
 import orcanet.lib as lib
 import orcanet.logging as logging
+from orcanet.misc import from_register
 import medgeconv
 
 
@@ -862,10 +863,10 @@ class Configuration(object):
         for key, value in user_values.items():
             if hasattr(self, key):
                 if key == "sample_modifier":
-                    value = lib.misc.from_register(
+                    value = from_register(
                         toml_entry=value, register=lib.sample_modifiers.smods)
                 elif key == "dataset_modifier":
-                    value = lib.misc.from_register(
+                    value = from_register(
                         toml_entry=value, register=lib.dataset_modifiers.dmods)
                 setattr(self, key, value)
             else:

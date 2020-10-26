@@ -3,7 +3,7 @@ import tensorflow.keras.backend as K
 import tensorflow.keras as ks
 import tensorflow.keras.layers as layers
 import medgeconv
-from orcanet.lib.misc import get_register
+from misc import get_register
 
 # for loading via toml and orcanet custom objects
 blocks, register = get_register()

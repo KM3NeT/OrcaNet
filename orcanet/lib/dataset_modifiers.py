@@ -1,4 +1,4 @@
-import orcanet.lib.misc as misc
+import orcanet.misc as misc
 
 # for loading via toml
 dmods, register = misc.get_register()
