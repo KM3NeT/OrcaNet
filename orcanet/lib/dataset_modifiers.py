@@ -61,7 +61,7 @@ def as_recarray(info_blob):
 
 
 @register
-def as_recarray_distr(info_blob):
+def as_recarray_dist(info_blob):
     """
     Save network output as recarray to h5. Intended for when network
     outputs are distributions and thus 3D.

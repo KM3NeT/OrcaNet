@@ -61,7 +61,7 @@ class TestFunctions(TestCase):
             "y_pred": {"aa": np.ones((5, 2)), "bb": np.ones((5, 2, 3))},
             "ys": {"aa": np.ones((5, 2)), "bb": np.ones((5, 2, 3))},
         }
-        output = dmods.as_recarray_distr(inp)
+        output = dmods.as_recarray_dist(inp)
         self.assertTrue(output["pred"].shape == (5, ))
         self.assertTupleEqual(
             output["pred"].dtype.names,
