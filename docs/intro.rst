@@ -91,9 +91,9 @@ To let the model predict on validation data, use:
 
 .. code-block:: python
 
-    organizer.predict(epoch, fileno)
+    organizer.predict()
 
-This will load the trained and saved model of the given epoch and file number,
+This will load the trained and saved model with the lowest validation loss,
 and create a h5 file containing for every sample:
 
 - the label for the model

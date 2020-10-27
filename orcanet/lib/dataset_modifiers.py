@@ -72,7 +72,7 @@ def as_recarray_dist(info_blob):
         [:, 0] is reco, [:, 1] is err
 
     dtypes that will get saved to h5:
-    A_1, A_err_1, B_1, B_2, B_1_err, B_err_2, ...
+    A_1, A_err_1, B_1, B_2, B_3, B_err_1, B_err_2, B_err_3
 
     """
     y_pred = info_blob["y_pred"]
