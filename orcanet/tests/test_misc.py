@@ -28,3 +28,58 @@ class TestFunctions(TestCase):
         self.assertTupleEqual(
             output.dtype.names,
             ('aa_1', 'aa_2', 'aa_3', 'aa_4', 'aa_5', 'aa_6', 'bb_1'))
+
+
+class TestRegister(TestCase):
+    def setUp(self):
+        self.register = {
+            "_func": _func,
+            "_Cls": _Cls,
+        }
+
+    def _parse_entry(self, toml_entry):
+        return misc.from_register(toml_entry, self.register)
+
+    def test_func_str(self):
+        self.assertEqual(self._parse_entry("_func")(12), 12)
+
+    def test_func_list(self):
+        with self.assertRaises(TypeError):
+            self._parse_entry(["_func", 5])
+
+    def test_class_str(self):
+        with self.assertRaises(TypeError):
+            self._parse_entry("_Cls")
+
+    def test_class_list(self):
+        self.assertTupleEqual(self._parse_entry(["_Cls", 0])(12), (0, 12))
+
+    def test_class_dict(self):
+        self.assertTupleEqual(
+            self._parse_entry({"name": "_Cls", "a": 0})(12), (0, 12))
+
+    def test_class_dict_name_missing(self):
+        with self.assertRaises(KeyError):
+            self._parse_entry({"names": "_Cls", "a": 0})(12), (0, 12)
+
+    def test_class_list_dict(self):
+        self.assertTupleEqual(
+            self._parse_entry(["_Cls", {"a": 0}])(12), (0, 12))
+
+    def test_register(self):
+        saved, register = misc.get_register()
+        register(_func)
+        register(_Cls)
+        self.assertDictEqual(self.register, saved)
+
+
+def _func(a):
+    return a
+
+
+class _Cls:
+    def __init__(self, a):
+        self.a = a
+
+    def __call__(self, x):
+        return self.a, x

@@ -1,4 +1,5 @@
 """ Odds and ends. """
+import inspect
 import numpy as np
 
 
@@ -45,11 +46,16 @@ def from_register(toml_entry, register):
         else:
             args = toml_entry[1:]
 
-    cls = register[name]
+    obj = register[name]
     try:
-        return cls(*args, **kwargs)
+        if inspect.isfunction(obj):
+            if args or kwargs:
+                raise TypeError(f"Can not pass arguments to function ({args}, {kwargs})")
+            return obj
+        else:
+            return obj(*args, **kwargs)
     except TypeError:
-        raise TypeError(f"Error initializing {cls}")
+        raise TypeError(f"Error initializing {obj}")
 
 
 def dict_to_recarray(array_dict):
