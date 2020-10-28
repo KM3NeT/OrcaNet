@@ -6,7 +6,7 @@ Use them by setting .cfg.sample_modifier of the orcanet.core.Organizer.
 from abc import abstractmethod
 import warnings
 import numpy as np
-from orcanet.utilities.misc import get_register
+from orcanet.misc import get_register
 
 # for loading via toml
 smods, register = get_register()

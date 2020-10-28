@@ -23,7 +23,7 @@ class TestOrganizer(tf.test.TestCase):
     def tearDown(self):
         shutil.rmtree(self.temp_dir)
 
-    @patch('orcanet.core.ks.utils.plot_model')
+    @patch('orcanet.core.tf.keras.utils.plot_model')
     def test_load_model_new_training(self, mock_plot_model):
         def plot_history(model, folder):
             pass

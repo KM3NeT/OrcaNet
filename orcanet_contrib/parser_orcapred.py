@@ -68,7 +68,7 @@ def orca_pred(output_folder, list_file, config_file, model_file,
 
     # Per default, a prediction will be done for the model with the
     # highest epoch and filenumber.
-    orga.predict(epoch=epoch, fileno=fileno, concatenate=True)
+    orga.predict(epoch=epoch, fileno=fileno)
 
 
 def main():

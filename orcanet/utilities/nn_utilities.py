@@ -11,32 +11,6 @@ import tensorflow.keras as ks
 from functools import reduce
 
 
-def get_auto_label_modifier(model):
-    """
-    Get a label_modifier for when none is specified by the user.
-
-    Will simply assume that for every output of the model,
-    there is a column in the y_values with the same name.
-
-    Parameters
-    ----------
-    model : ks.Model
-        A keras model.
-
-    Returns
-    -------
-    label_modifier : function
-
-    """
-    names = model.output_names
-
-    def label_modifier(info_blob):
-        y_values = info_blob["y_values"]
-        ys = {name: y_values[name] for name in names}
-        return ys
-    return label_modifier
-
-
 class RaiseOnNaN(ks.callbacks.Callback):
     """
     Callback that terminates training when a NaN loss is encountered.

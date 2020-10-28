@@ -10,37 +10,11 @@ import tensorflow.keras as ks
 import tensorflow.keras.layers as layers
 
 from orcanet.core import Organizer
-from orcanet.backend import get_datasets, train_model, validate_model, make_model_prediction, weighted_average
-from orcanet.utilities.nn_utilities import get_auto_label_modifier
+from orcanet.backend import train_model, validate_model, make_model_prediction, weighted_average
+import orcanet.lib as lib
 
 
 class TestFunctions(TestCase):
-    def test_get_datasets(self):
-        y_values = "y_values gets simply passed forward"
-        y_true = {
-            "out_A": 1,
-            "out_B": 2,
-        }
-        y_pred = {
-            "out_pred_A": 3,
-            "out_pred_B": 4,
-        }
-        target = {
-            "y_values": y_values,
-            "label_out_A": 1,
-            "label_out_B": 2,
-            "pred_out_pred_A": 3,
-            "pred_out_pred_B": 4,
-        }
-        info_blob = {
-            "y_values": y_values,
-            "ys": y_true,
-            "y_pred": y_pred,
-        }
-
-        datasets = get_datasets(info_blob)
-        self.assertDictEqual(datasets, target)
-
     def test_weighted_average(self):
         # metrics [A, B, C]
         histories = [
@@ -169,7 +143,7 @@ class TestTrainValidatePredict(tf.test.TestCase):
 
         self.model = build_dummy_model(self.input_shapes, self.output_shapes)
         self.model.compile(loss="mse", optimizer="sgd")
-        self.orga._auto_label_modifier = get_auto_label_modifier(self.model)
+        self.orga._auto_label_modifier = lib.label_modifiers.ColumnLabels(self.model)
 
     @classmethod
     def tearDownClass(cls):

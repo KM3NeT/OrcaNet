@@ -1,6 +1,6 @@
 import numpy as np
 import tensorflow as tf
-import orcanet.utilities.losses as on_losses
+import orcanet.lib.losses as on_losses
 
 
 class TestLklNormal(tf.test.TestCase):

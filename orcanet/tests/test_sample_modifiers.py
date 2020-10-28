@@ -1,6 +1,6 @@
 from unittest import TestCase
 import numpy as np
-import orcanet.utilities.sample_modifiers as smods
+import orcanet.lib.sample_modifiers as smods
 
 
 class TestAppli(TestCase):
