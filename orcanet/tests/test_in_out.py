@@ -409,12 +409,6 @@ class TestIOHandler(TestCase):
         target = self.io.get_subfolder("predictions") + '/pred_model_epoch_1_file_2_on_in_out_test_list_val_file_3.h5'
         self.assertEqual(value, target)
 
-    def test_get_cumulative_number_of_rows(self):
-        h5_file_list = [self.train_A_file_1["path"], self.train_A_file_2["path"]]
-        value = self.io.get_cumulative_number_of_rows(h5_file_list)
-        target = [0, self.train_sizes[0], self.train_sizes[0] + self.train_sizes[1]]
-        self.assertEqual(value, target)
-
     def test_get_local_files_train(self):
         value = self.io.get_local_files("train")
         target = {

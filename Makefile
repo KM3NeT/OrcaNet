@@ -17,7 +17,7 @@ test:
 	py.test --junitxml=./reports/junit.xml -o junit_suite_name=$(PKGNAME) $(PKGNAME)
 
 test-cov:
-	py.test --cov ./ --ignore orcanet/tests/test_integration_full.py --cov-report term-missing --cov-report xml:reports/coverage.xml --cov-report html:reports/coverage $(ALLNAMES)
+	py.test --cov ./ --cov-report term-missing --cov-report xml:reports/coverage.xml --cov-report html:reports/coverage $(ALLNAMES)
 
 flake8:
 	py.test --flake8

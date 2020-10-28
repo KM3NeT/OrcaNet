@@ -295,23 +295,21 @@ class Organizer:
 
         return history
 
-    def predict(self, epoch=None, fileno=None, concatenate=False, samples=None):
+    def predict(self, epoch=None, fileno=None, samples=None):
         """
         Make a prediction if it does not exist yet, and return its filepath.
 
         Load the model with the lowest validation loss, let it predict on
         all samples of the validation set
         in the toml list, and save this prediction together with all the
-        y_values as a h5 file in the predictions subfolder.
+        y_values as h5 file(s) in the predictions subfolder.
 
         Parameters
         ----------
         epoch : int, optional
-            Epoch of a model to load.
+            Epoch of a model to load. Default: lowest val loss.
         fileno : int, optional
-            File number of a model to load.
-        concatenate : bool
-            Whether the prediction files should also be concatenated.
+            File number of a model to load. Default: lowest val loss.
         samples : int, optional
             Don't use the full validation files, but just the given number
             of samples.
@@ -319,9 +317,7 @@ class Organizer:
         Returns
         -------
         pred_filename : List
-            List to the paths of all created prediction files.
-            If concatenate = True, the list always only contains the
-            path to the concatenated prediction file.
+            List to the paths of all the prediction files.
 
         """
         if fileno is None and epoch is None:
@@ -331,8 +327,7 @@ class Organizer:
             raise ValueError(
                 "Either both or none of epoch and fileno must be None")
 
-        is_pred_done = self._check_if_pred_already_done(epoch, fileno)
-        if is_pred_done:
+        if self._check_if_pred_already_done(epoch, fileno):
             print("Prediction has already been done.")
             pred_filepaths = self.io.get_pred_files_list(epoch, fileno)
 
@@ -351,21 +346,6 @@ class Organizer:
             print("Elapsed time: {}\n".format(timedelta(seconds=elapsed_s)))
 
             pred_filepaths = self.io.get_pred_files_list(epoch, fileno)
-
-        # concatenate all prediction files if wished
-        concatenated_folder = self.io.get_subfolder("predictions") + '/concatenated'
-        n_val_files = self.io.get_no_of_files("val")
-        if concatenate is True and n_val_files > 1:
-            if not os.path.isdir(concatenated_folder):
-                print('Concatenating all prediction files to a single one.')
-                pred_filename_conc = self.io.concatenate_pred_files(concatenated_folder)
-                pred_filepaths = [pred_filename_conc]
-            else:
-                # omit directories if there are any in the concatenated folder
-                fname_conc_file_list = list(file for file in os.listdir(concatenated_folder)
-                                            if os.path.isfile(os.path.join(concatenated_folder,
-                                                                           file)))
-                pred_filepaths = [concatenated_folder + '/' + fname_conc_file_list[0]]
 
         return pred_filepaths
 
