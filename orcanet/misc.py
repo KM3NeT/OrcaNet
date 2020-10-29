@@ -89,3 +89,11 @@ def dict_to_recarray(array_dict):
     names = ",".join([name for name in column_names])
     data = np.concatenate(arrays, axis=1)
     return np.core.records.fromrecords(data, names=names)
+
+
+def to_ndarray(x, dtype="float32"):
+    """ Turn recarray to ndarray. """
+    new_dtype = [(name, dtype) for name in x.dtype.names]
+    new_shape = (len(x), len(x.dtype.names))
+    return np.ascontiguousarray(x).astype(new_dtype).view(dtype).reshape(new_shape)
+
