@@ -87,7 +87,7 @@ def as_recarray_dist(info_blob):
     if ys is not None:
         # errs for the trues are just padded, so skip
         datas = {}
-        for output_name, array in y_pred.items():
+        for output_name, array in ys.items():
             datas[output_name] = array[:, 0]
         info_blob["ys"] = datas
 

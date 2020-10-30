@@ -31,18 +31,38 @@ class TestFunctions(TestCase):
         datasets = dmods.as_array(info_blob)
         self.assertDictEqual(datasets, target)
 
-    def test_as_recarray_dist(self):
+
+class TestAsRecarrayDist(TestCase):
+    def setUp(self):
         inp = {
-            "y_pred": {"aa": np.ones((5, 2)), "bb": np.ones((5, 2, 3))},
-            "ys": {"aa": np.ones((5, 2)), "bb": np.ones((5, 2, 3))},
+            "y_pred": {"aa": np.ones((5, 2)), "bb": np.ones((5, 2, 3))*2},
+            "ys": {"aa": np.ones((5, 2))*3, "bb": np.ones((5, 2, 3))*4},
         }
-        output = dmods.as_recarray_dist(inp)
-        self.assertTrue(output["pred"].shape == (5, ))
+        self.output = dmods.as_recarray_dist(inp)
+
+    def test_pred_shape(self):
+        self.assertTrue(self.output["pred"].shape == (5, ))
+
+    def test_pred_names(self):
         self.assertTupleEqual(
-            output["pred"].dtype.names,
+            self.output["pred"].dtype.names,
             ('aa_1', 'aa_err_1', 'bb_1', 'bb_2', 'bb_3', 'bb_err_1', 'bb_err_2', 'bb_err_3'))
 
-        self.assertTrue(output["true"].shape == (5, ))
+    def test_pred_array_1(self):
+        np.testing.assert_array_equal(self.output["pred"]["aa_1"], np.ones(5))
+
+    def test_pred_array_2(self):
+        np.testing.assert_array_equal(self.output["pred"]["bb_1"], np.ones(5)*2)
+
+    def test_true_shape(self):
+        self.assertTrue(self.output["true"].shape == (5, ))
+
+    def test_true_names(self):
         self.assertTupleEqual(
-            output["true"].dtype.names,
-            ('aa_1', 'bb_1', 'bb_2', 'bb_3'))
+            self.output["true"].dtype.names, ('aa_1', 'bb_1', 'bb_2', 'bb_3'))
+
+    def test_true_array_1(self):
+        np.testing.assert_array_equal(self.output["true"]["aa_1"], np.ones(5)*3)
+
+    def test_true_array_2(self):
+        np.testing.assert_array_equal(self.output["true"]["bb_1"], np.ones(5)*4)
