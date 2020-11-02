@@ -4,11 +4,25 @@ from unittest import TestCase
 
 
 class TestFunctions(TestCase):
-    def test_dict_to_recarray(self):
+    def test_dict_to_recarray_shape(self):
         inp = {"aa": np.ones((5, 3)), "bb": np.ones((5, 1))}
         output = misc.dict_to_recarray(inp)
         self.assertTrue(output.shape == (5, ))
+
+    def test_dict_to_recarray_dtype(self):
+        inp = {"aa": np.ones((5, 3), dtype="int16"), "bb": np.ones((5, 1), dtype="float32")*4}
+        output = misc.dict_to_recarray(inp)
+        dtypes = {
+            "aa_1": np.dtype("int16"),
+            "aa_2": np.dtype("int16"),
+            "aa_3": np.dtype("int16"),
+            "bb_1": np.dtype("float32"),
+        }
         self.assertTupleEqual(output.dtype.names, ('aa_1', 'aa_2', 'aa_3', 'bb_1'))
+        for dtype_name, dtype in dtypes.items():
+            np.testing.assert_equal(output[dtype_name].dtype, dtype)
+        np.testing.assert_equal(output["aa_1"], np.ones(5, dtype="int16"))
+        np.testing.assert_equal(output["bb_1"], np.ones(5, dtype="float32")*4)
 
     def test_dict_to_recarray_len_1(self):
         inp = {"aa": np.ones((5, 3)), "bb": np.ones((5, ))}

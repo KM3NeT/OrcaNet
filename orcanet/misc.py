@@ -72,8 +72,7 @@ def dict_to_recarray(array_dict):
 
     Returns
     -------
-    ndarray
-        The recarray.
+    The recarray.
 
     """
     column_names, arrays = [], []
@@ -82,10 +81,15 @@ def dict_to_recarray(array_dict):
             array = np.expand_dims(array, -1)
         elif len(array.shape) > 2:
             array = np.reshape(array, (len(array), -1))
-        arrays.append(array)
         for i in range(array.shape[-1]):
+            arrays.append(array[:, i])
             column_names.append(f"{key}_{i+1}")
+    return np.core.records.fromarrays(arrays, names=column_names)
 
-    names = ",".join([name for name in column_names])
-    data = np.concatenate(arrays, axis=1)
-    return np.core.records.fromrecords(data, names=names)
+
+def to_ndarray(x, dtype="float32"):
+    """ Turn recarray to ndarray. """
+    new_dtype = [(name, dtype) for name in x.dtype.names]
+    new_shape = (len(x), len(x.dtype.names))
+    return np.ascontiguousarray(x).astype(new_dtype).view(dtype).reshape(new_shape)
+
