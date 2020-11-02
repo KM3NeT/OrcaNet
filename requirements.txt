@@ -3,7 +3,7 @@ tensorflow>=2.1
 tensorflow_addons
 tensorflow_probability
 numpy
-h5py
+h5py<2.11.0,>=2.10.0
 matplotlib
 toml
 graphviz
