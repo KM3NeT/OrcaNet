@@ -210,7 +210,10 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
         time.strftime("%d-%m-%Y-%H-%M-%S", time.gmtime()))
     print(f"Creating temporary file {temp_output_path}")
     with h5py.File(temp_output_path, 'x') as h5_file:
-        h5_file.attrs.create("orcanet", orcanet.__version__, dtype="S6")
+        # add version and paths of h5files
+        h5_file.attrs.create("orcanet", orcanet.__version__)
+        for input_key, file in files_dict.items():
+            h5_file.attrs.create(f"orcanet_inp_{input_key}", file)
 
         for s in range(steps):
             if s % print_every == 0:
