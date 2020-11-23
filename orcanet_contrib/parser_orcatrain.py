@@ -2,7 +2,7 @@
 Use orga.train with a parser.
 
 Usage:
-    parser_orcatrain.py [options] FOLDER LIST CONFIG MODEL
+    parser_orcatrain.py [options] FOLDER LIST CONFIG MODEL EPOCHS
     parser_orcatrain.py (-h | --help)
 
 Arguments:
@@ -16,6 +16,7 @@ Arguments:
             are listed in core.py in the class Configuration.
     MODEL   Path to a .toml file with infos about a model.
             An example can be found in examples/explanation.toml.
+    EPOCHS  The number of epochs to train.
 
 Options:
     -h --help    Show this screen.
@@ -26,15 +27,18 @@ Options:
 from matplotlib import use
 use('Agg')
 
+import warnings
+import numpy as np
 from docopt import docopt
 import tensorflow.keras as ks
+import toml
 
 from orcanet.core import Organizer
 from orcanet.model_builder import ModelBuilder
-from orcanet_contrib.orca_handler_util import orca_learning_rates, update_objects
+from orcanet_contrib.orca_handler_util import orca_learning_rates, update_objects, GraphSampleMod, GraphSampleMod_with_trig
 
 
-def orca_train(output_folder, list_file, config_file, model_file,
+def orca_train(output_folder, list_file, config_file, model_file,no_epochs,
                recompile_model=False):
     """
     Run orga.train with predefined ModelBuilder networks using a parser.
@@ -60,7 +64,23 @@ def orca_train(output_folder, list_file, config_file, model_file,
     """
     # Set up the Organizer with the input data
     orga = Organizer(output_folder, list_file, config_file, tf_log_level=1)
-
+    
+    #special sample modifier for the graph neural networks; dont use the "sample_modifier" 
+    #option in the model.toml file
+    file_content = toml.load(model_file)
+    knn_for_sample_mod = file_content["model"]["next_neighbors"]
+    
+    #load a specific sample mod, even for gnn
+    sample_modifier = file_content["orca_modifiers"]["sample_modifier_own"]
+    
+    if sample_modifier == "normal":
+        orga.cfg.sample_modifier = GraphSampleMod(knn=knn_for_sample_mod)
+    elif sample_modifier == "with_trig":
+        orga.cfg.sample_modifier = GraphSampleMod_with_trig(knn=knn_for_sample_mod)
+    else:
+        "No valid sample_modifier_own given!"
+        exit()
+        
     # Load in the orga sample-, label-, and dataset-modifiers, as well as
     # the custom objects
     update_objects(orga, model_file)
@@ -94,9 +114,11 @@ def orca_train(output_folder, list_file, config_file, model_file,
         orga.cfg.learning_rate = lr
     except NameError:
         pass
+    
 
+    
     # start the training
-    orga.train_and_validate(model=model)
+    orga.train_and_validate(model=model,epochs=int(no_epochs))
 
 
 def main():
@@ -106,8 +128,9 @@ def main():
     list_file = args['LIST']
     config_file = args['CONFIG']
     model_file = args['MODEL']
+    no_epochs = args['EPOCHS']
     recompile_model = args['--recompile']
-    orca_train(output_folder, list_file, config_file, model_file,
+    orca_train(output_folder, list_file, config_file, model_file,no_epochs,
                recompile_model=recompile_model)
 
 
