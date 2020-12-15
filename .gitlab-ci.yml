@@ -31,6 +31,7 @@ test:
     stage: test
     script:
         - *virtualenv_definition
+        - pip list
         - make test
 
 
