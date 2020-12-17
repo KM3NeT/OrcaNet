@@ -1,21 +1,17 @@
+import tensorflow as tf
 import tensorflow.keras.backend as K
 import tensorflow.keras as ks
 import tensorflow.keras.layers as layers
 import medgeconv
+from orcanet.utilities.misc import get_register
+
+# for orcanet custom objects
+blocks, _register = get_register()
+# edge conv blocks
+_register(medgeconv.DisjointEdgeConvBlock)
 
 
-blocks = {}
-
-
-def register(block):
-    blocks[block.__name__] = block
-    return block
-
-
-register(medgeconv.DisjointEdgeConvBlock)
-
-
-@register
+@_register
 class ConvBlock:
     """
     1D/2D/3D Convolutional block followed by BatchNorm, Activation,
@@ -168,7 +164,7 @@ class ConvBlock:
         return x
 
 
-@register
+@_register
 class DenseBlock:
     """
     Dense layer followed by BatchNorm, Activation and/or Dropout.
@@ -228,7 +224,7 @@ class DenseBlock:
         return x
 
 
-@register
+@_register
 class MEdgeConvBlock:
     """ EdgeConv as defined in ParticleNet, see github.com/StefReck/MEdgeConv """
     def __init__(self, units,
@@ -266,7 +262,7 @@ class MEdgeConvBlock:
             return nodes, is_valid, nodes
 
 
-@register
+@_register
 class ResnetBlock:
     """
     A residual building block for resnets. 2 c layers with a shortcut.
@@ -350,7 +346,7 @@ class ResnetBlock:
             return acti_layer(x)
 
 
-@register
+@_register
 class ResnetBnetBlock:
     """
     A residual bottleneck building block for resnets.
@@ -433,7 +429,7 @@ class ResnetBnetBlock:
         return x
 
 
-@register
+@_register
 class InceptionBlockV2:
     """
     A GoogleNet Inception block (v2).
@@ -538,7 +534,7 @@ class InceptionBlockV2:
         x = layers.concatenate(branches, axis=channel_axis)
         return x
 
-@register
+@_register
 class OutputCateg:
     """
     Dense layer(s) for categorization.
@@ -592,7 +588,7 @@ class OutputCateg:
         return out
 
 
-@register
+@_register
 class OutputReg:
     """
     Dense layer(s) for regression.
@@ -644,8 +640,9 @@ class OutputReg:
 
         return out
 
-@register
-class OutputReg_incl_error:
+@_register
+class OutputReg_log_prob: #My implementation
+
     """
     Dense layer(s) for regression of absolute value + uncertainty to be used
     with log prob loss.
@@ -708,9 +705,65 @@ class OutputReg_incl_error:
             
         return full_layer
 
+@_register
+class OutputRegNormal: #Stefan's implementation
+    """
+    Output block for regression using a normal distribution as output.
+
+    The output tensor will have shape (?, 2, output_neurons),
+    with [:, 0] being the mu and [:, 1] being the sigma.
+
+    Parameters
+    ----------
+    mu_activation : str, optional
+        Activation function for the mu neurons.
+    sigma_activation : str, optional
+        Activation function for the sigma neurons.
+
+    See OutputReg for other paramters.
+
+    """
+    def __init__(self, output_neurons,
+                 output_name,
+                 unit_list=None,
+                 mu_activation=None,
+                 sigma_activation="softplus",
+                 transition=None,
+                 **kwargs):
+        self.output_neurons = output_neurons
+        self.output_name = output_name
+        self.unit_list = unit_list
+        self.mu_activation = mu_activation
+        self.sigma_activation = sigma_activation
+        self.transition = transition
+        self.kwargs = kwargs
+
+    def __call__(self, layer):
+        if self.transition:
+            x = getattr(layers, self.transition.split("keras:")[-1])()(layer)
+        else:
+            x = layer
+
+        if self.unit_list is not None:
+            for units in self.unit_list:
+                x = DenseBlock(units=units, **self.kwargs)(x)
+
+        mu = layers.Dense(
+            units=self.output_neurons,
+            activation=self.mu_activation,
+            name=f"{self.output_name}_mu")(x)
+        sigma = layers.Dense(
+            units=self.output_neurons,
+            activation=self.sigma_activation,
+            name=f"{self.output_name}_sigma")(x)
+
+        return layers.Concatenate(name=self.output_name, axis=-2)(
+            [tf.expand_dims(tsr, -2) for tsr in [mu, sigma]])
 
 
-@register
+
+
+@_register
 class OutputRegErr:
     """
     Double network for regression + error estimation.
@@ -766,9 +819,9 @@ class OutputRegErr:
             outputs.append(output_label_merged)
         return outputs
 
-@register
+@_register
 class OutputRegErr_no_gradstop:
-    """
+    """ 
     Double network for regression + error estimation - but not with gradstop.
 
     It has 3 dense layer blocks, followed by one dense layer

@@ -54,9 +54,8 @@ blocks = [
     {filters=128},
     {filters=128, dropout=0.0},
     # This is the last layer of the network. In this case, its a special output block
-    # called 'OutputRegErr. It has 3 dense layer blocks, followed by one dense layer
-    # for each output_name, as well as dense layer blocks, followed by one dense layer
-    # for the respective error of each output_name.
+    # called 'OutputReg. It has 3 dense layer blocks, followed by one dense layer
+    # for each output_name.
     # Other (output) blocks are also available, see orcanet/builder_util/layer_blocks.py
     {type="OutputReg", output_name='direction_xyz', output_neurons=3}
 ]

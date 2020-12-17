@@ -9,8 +9,6 @@ import os
 import time
 import tensorflow.keras as ks
 from functools import reduce
-# TODO hacky, see https://github.com/tensorflow/tensorflow/issues/34201:
-from tensorflow import python as tfp
 
 
 def get_auto_label_modifier(model):

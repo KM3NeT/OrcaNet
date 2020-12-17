@@ -9,7 +9,7 @@ import numpy as np
 import toml
 
 from orcanet_contrib.custom_objects import get_custom_objects
-
+from orcanet.utilities.losses import lkl_normal
 
 def update_objects(orga, model_file):
     """
@@ -467,7 +467,7 @@ def orca_label_modifiers(name):
 
             ys = dict()
             
-            particle_type, is_cc = y_values['particle_type'], y_values['is_cc']
+            particle_type, is_cc = y_values['particle_type'], y_values['is_cc'] == 2
             elec_nc_bool_idx = np.logical_and(np.abs(particle_type) == 12,
                                               is_cc == 0)
 
@@ -488,14 +488,14 @@ def orca_label_modifiers(name):
                 
             return ys 
                  
-    elif name == 'dz_e':
+    elif name == 'dir_e':
         def label_modifier(data):
             
             y_values = data["y_values"]
 
             ys = dict()
             
-            particle_type, is_cc = y_values['particle_type'], y_values['is_cc']
+            particle_type, is_cc = y_values['particle_type'], y_values['is_cc'] == 2
             elec_nc_bool_idx = np.logical_and(np.abs(particle_type) == 12,
                                               is_cc == 0)
 
@@ -508,6 +508,9 @@ def orca_label_modifiers(name):
             # set bjorkeny label of nc events to 1
             np.place(y_values_copy['bjorkeny'], elec_nc_bool_idx, 1)            
             
+           
+            ys['dx'] = y_values_copy['dir_x']  
+            ys['dy'] = y_values_copy['dir_y']  
             ys['dz'] = y_values_copy['dir_z']            
             ys['e'] = np.log(y_values_copy['energy'])
             
@@ -521,7 +524,7 @@ def orca_label_modifiers(name):
             
             y_values = data["y_values"]
             ys = dict()
-            particle_type, is_cc = y_values['particle_type'], y_values['is_cc']
+            particle_type, is_cc = y_values['particle_type'], y_values['is_cc'] == 2
             elec_nc_bool_idx = np.logical_and(np.abs(particle_type) == 12,
                                               is_cc == 0)
 
@@ -573,7 +576,7 @@ def orca_label_modifiers(name):
             ys['ts_output'] = categorical_ts.astype(np.float32)
             return ys
 
-    elif name == 'bg_classifier_3_class':
+    elif name == 'classifier_3_class':
         def label_modifier(data):
             
             y_values = data["y_values"]
@@ -588,16 +591,17 @@ def orca_label_modifiers(name):
                                                            is_random_noise))
 
             batchsize = y_values.shape[0]
-            categorical_bg = np.zeros((batchsize, 3), dtype='bool')
+            categorical = np.zeros((batchsize, 3), dtype='bool')
 
-            categorical_bg[:, 0] = is_not_mupage_nor_rn
-            categorical_bg[:, 1] = is_mupage
-            categorical_bg[:, 2] = is_random_noise
+            categorical[:, 0] = is_not_mupage_nor_rn
+            categorical[:, 1] = is_mupage
+            categorical[:, 2] = is_random_noise
 
-            ys['bg_output'] = categorical_bg.astype(np.float32)
+            ys['cf_output'] = categorical.astype(np.float32)
             return ys
 
-    elif name == 'bg_classifier_4_class':
+
+    elif name == 'classifier_4_class_wo_rn':
         def label_modifier(data):
             
             y_values = data["y_values"]
@@ -607,27 +611,28 @@ def orca_label_modifiers(name):
             ys = dict()
             particle_type = y_values['particle_type']
             is_mupage = np.abs(particle_type) == 13
-            is_random_noise = np.abs(particle_type == 0)
+            #is_random_noise = np.abs(particle_type == 0)
             
             is_muon_neutrino = np.abs(particle_type) == 14
             is_electron_neutrino = np.abs(particle_type) == 12
-            is_cc = y_values['is_cc']
+            is_cc = y_values['is_cc'] == 2
             
             is_neutrino_track = np.logical_and(is_muon_neutrino,is_cc)
             is_nc_muon_neutrino = np.logical_and(is_muon_neutrino,np.invert(is_cc))
             is_neutrino_shower = np.logical_or(is_electron_neutrino,is_nc_muon_neutrino)
                                     
             batchsize = y_values.shape[0]
-            categorical_bg = np.zeros((batchsize, 4), dtype='bool')
+            categorical = np.zeros((batchsize, 3), dtype='bool')
 
-            categorical_bg[:, 0] = is_neutrino_track            
-            categorical_bg[:, 1] = is_neutrino_shower
-            categorical_bg[:, 2] = is_mupage
-            categorical_bg[:, 3] = is_random_noise
+            categorical[:, 0] = is_neutrino_track            
+            categorical[:, 1] = is_neutrino_shower
+            categorical[:, 2] = is_mupage
+            #categorical[:, 3] = is_random_noise
 
-            ys['bg_output'] = categorical_bg.astype(np.float32)
+            ys['cf_output'] = categorical.astype(np.float32)
             return ys
             
+
     elif name == 'bg_classifier_2_class':
         def label_modifier(data):
             
@@ -753,7 +758,7 @@ def orca_dataset_modifiers(name):
 
             return datasets
 
-    elif name == 'bg_classifier_4_class':
+    elif name == 'classifier_4_class_wo_rn':
         def dataset_modifier(info_blob):
 
             #blob contains: y_values (mc info), xs ("images/graphs"), ys (true labels), y_pred (predicted labels)
@@ -762,8 +767,8 @@ def orca_dataset_modifiers(name):
             y_pred = info_blob['y_pred']
             y_true = info_blob['ys']
             
-            y_pred = y_pred['bg_output']
-            y_true = y_true['bg_output']
+            y_pred = y_pred['cf_output']
+            y_true = y_true['cf_output']
 
             datasets = dict()
             datasets['mc_info'] = mc_info  # is already a structured array
@@ -775,12 +780,13 @@ def orca_dataset_modifiers(name):
             dtypes = np.dtype([('prob_neutrino_track', y_pred.dtype),
                                ('prob_neutrino_shower', y_pred.dtype),
                                ('prob_muon', y_pred.dtype),
-                               ('prob_random_noise', y_pred.dtype)])
+                               #('prob_random_noise', y_pred.dtype)
+                               ])
             pred = np.empty(y_pred.shape[0], dtype=dtypes)
             pred['prob_neutrino_track'] = y_pred[:, 0]
             pred['prob_neutrino_shower'] = y_pred[:, 1]
             pred['prob_muon'] = y_pred[:, 2]
-            pred['prob_random_noise'] = y_pred[:, 3]
+            #pred['prob_random_noise'] = y_pred[:, 3]
 
             datasets['pred'] = pred
 
@@ -788,12 +794,13 @@ def orca_dataset_modifiers(name):
             dtypes = np.dtype([('cat_neutrino_track', y_true.dtype),
                                ('cat_neutrino_shower', y_true.dtype),
                                ('cat_muon', y_true.dtype),
-                               ('cat_random_noise', y_true.dtype)])
+                               #('cat_random_noise', y_true.dtype)
+                               ])
             true = np.empty(y_true.shape[0], dtype=dtypes)
             true['cat_neutrino_track'] = y_true[:, 0]
             true['cat_neutrino_shower'] = y_true[:, 1]
             true['cat_muon'] = y_true[:, 2]
-            true['cat_random_noise'] = y_true[:, 3]
+            #true['cat_random_noise'] = y_true[:, 3]
 
             datasets['true'] = true
 
@@ -1208,7 +1215,7 @@ def orca_dataset_modifiers(name):
 
 
     
-    elif name == 'regression_dz_e':
+    elif name == 'regression_dir_e':
         def dataset_modifier(info_blob):
 
             mc_info = info_blob['y_values']
@@ -1227,7 +1234,11 @@ def orca_dataset_modifiers(name):
             #first entry of the tupel is the name for the output
             #second entry is how it was called in orcanet; take for both,
             #value and uncertainty the same variable name 
-            pred_labels_and_nn_output_names = [('pred_dir_z', 'dz'),
+            pred_labels_and_nn_output_names = [('pred_dir_x', 'dx'),
+                                               ('pred_dir_x_err', 'dx'),
+                                               ('pred_dir_y', 'dy'),
+                                               ('pred_dir_y_err', 'dy'),
+                                               ('pred_dir_z', 'dz'),
                                                ('pred_dir_z_err', 'dz'),
                                                ('pred_e', 'e'),
                                                ('pred_e_err', 'e'),
@@ -1248,8 +1259,10 @@ def orca_dataset_modifiers(name):
             datasets['pred'] = pred
 
             # make true dataset
-            true_labels_and_nn_output_names = [('true_dir_z', 'dz'),
-                                                ('true_e', 'e'),
+            true_labels_and_nn_output_names = [('true_dir_x', 'dx'),
+                                               ('true_dir_y', 'dy'),
+                                               ('true_dir_z', 'dz'),
+                                               ('true_e', 'e'),
                                                ]
 
             dtypes_true = [(tpl[0], y_true[tpl[1]].dtype) for tpl in true_labels_and_nn_output_names]
@@ -1262,45 +1275,52 @@ def orca_dataset_modifiers(name):
             
             return datasets
 
-            
-    elif name == 'regression_dz_error_real_data':
+
+    elif name == 'regression_dir_e_real_data':
         def dataset_modifier(info_blob):
 
             info = info_blob['y_values']
             y_pred = info_blob['y_pred']
-                        
+        
             datasets = dict()
-            datasets['info'] = info  # is already a structured array
-            
             #add also the hit info
             datasets['hits'] = info_blob["x_values"]["points"]
+            
+            datasets['info'] = info  # is already a structured array
             
             # make pred dataset
             """y_pred and y_true are dicts with keys for each output,
                here, we have 1 key for each regression variable"""
-            
+
             #first entry of the tupel is the name for the output
             #second entry is how it was called in orcanet; take for both,
             #value and uncertainty the same variable name 
-            pred_labels_and_nn_output_names = [('pred_dir_z', 'dz'),
-                                               ('pred_dir_z_err','dz')
+            pred_labels_and_nn_output_names = [('pred_dir_x', 'dx'),
+                                               ('pred_dir_x_err', 'dx'),
+                                               ('pred_dir_y', 'dy'),
+                                               ('pred_dir_y_err', 'dy'),
+                                               ('pred_dir_z', 'dz'),
+                                               ('pred_dir_z_err', 'dz'),
+                                               ('pred_e', 'e'),
+                                               ('pred_e_err', 'e'),
                                                 ]
-                                                
+
             dtypes_pred = [(tpl[0], y_pred[tpl[1]].dtype) for tpl in pred_labels_and_nn_output_names]
             n_evts = y_pred['dz'].shape[0]
             pred = np.empty(n_evts, dtype=dtypes_pred)
 
             for tpl in pred_labels_and_nn_output_names:
-                if 'err' in tpl[1]:
-                    # the err outputs have shape (bs, 2) with 2 (pred_label, pred_label_err)
-                    # we only want to select the pred_label_err output
-                    pred[tpl[0]] = y_pred[tpl[1]][:, 1] 
+                #the uncertainty estimation is the 2nd column
+                if 'err' in tpl[0]:
+                    pred[tpl[0]] = y_pred[tpl[1]][:, 1]
+                #the fitted value is the first
                 else:
-                    pred[tpl[0]] = np.squeeze(y_pred[tpl[1]], axis=1)  # reshape (bs, 1) to (bs)
+                    pred[tpl[0]] = y_pred[tpl[1]][:, 0]
 
             datasets['pred'] = pred
- 
+            
             return datasets
+
    
     elif name == 'regression_dz_error_log_prob_real_data':
         def dataset_modifier(info_blob):
