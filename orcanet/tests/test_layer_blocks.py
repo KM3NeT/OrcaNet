@@ -1,14 +1,13 @@
 from unittest import TestCase
-from tensorflow.keras.models import Model
-import tensorflow.keras.layers as layers
+import tensorflow as tf
 
 import orcanet.builder_util.layer_blocks as layer_blocks
 
 
 class TestInceptionBlockV2(TestCase):
     def setUp(self):
-        self.inp_2d = layers.Input(shape=(10, 10, 1))
-        self.inp_3d = layers.Input(shape=(10, 10, 10, 1))
+        self.inp_2d = tf.keras.layers.Input(shape=(10, 10, 1))
+        self.inp_3d = tf.keras.layers.Input(shape=(10, 10, 10, 1))
 
     def test_shape_2d(self):
         x = layer_blocks.InceptionBlockV2(
@@ -19,7 +18,7 @@ class TestInceptionBlockV2(TestCase):
             filters_3x3dbl=(7, 8),
         )(self.inp_2d)
         self.assertSequenceEqual(
-            Model(self.inp_2d, x).output_shape, (None, 10, 10, 21))
+            tf.keras.Model(self.inp_2d, x).output_shape, (None, 10, 10, 21))
 
     def test_shape_2d_strides(self):
         x = layer_blocks.InceptionBlockV2(
@@ -31,7 +30,7 @@ class TestInceptionBlockV2(TestCase):
             strides=2,
         )(self.inp_2d)
         self.assertSequenceEqual(
-            Model(self.inp_2d, x).output_shape, (None, 5, 5, 15))
+            tf.keras.Model(self.inp_2d, x).output_shape, (None, 5, 5, 15))
 
     def test_shape_3d(self):
         x = layer_blocks.InceptionBlockV2(
@@ -43,7 +42,7 @@ class TestInceptionBlockV2(TestCase):
             strides=1,
         )(self.inp_3d)
         self.assertSequenceEqual(
-            Model(self.inp_3d, x).output_shape, (None, 10, 10, 10, 21))
+            tf.keras.Model(self.inp_3d, x).output_shape, (None, 10, 10, 10, 21))
 
     def test_shape_3d_strides(self):
         x = layer_blocks.InceptionBlockV2(
@@ -55,7 +54,7 @@ class TestInceptionBlockV2(TestCase):
             strides=2,
         )(self.inp_3d)
         self.assertSequenceEqual(
-            Model(self.inp_3d, x).output_shape, (None, 5, 5, 5, 15))
+            tf.keras.Model(self.inp_3d, x).output_shape, (None, 5, 5, 5, 15))
 
     def test_2d_params(self):
         x = layer_blocks.InceptionBlockV2(
@@ -66,7 +65,7 @@ class TestInceptionBlockV2(TestCase):
             filters_3x3dbl=(7, 8),
         )(self.inp_2d)
         self.assertEqual(
-            Model(self.inp_2d, x).count_params(), 450)
+            tf.keras.Model(self.inp_2d, x).count_params(), 450)
 
     def test_2d_params_stride(self):
         x = layer_blocks.InceptionBlockV2(
@@ -78,13 +77,13 @@ class TestInceptionBlockV2(TestCase):
             strides=2,
         )(self.inp_2d)
         self.assertEqual(
-            Model(self.inp_2d, x).count_params(), 436)
+            tf.keras.Model(self.inp_2d, x).count_params(), 436)
 
 
 class TestConvBlock(TestCase):
     def setUp(self):
-        self.inp_2d = layers.Input(shape=(9, 10, 1))
-        self.inp_3d = layers.Input(shape=(8, 9, 10, 1))
+        self.inp_2d = tf.keras.layers.Input(shape=(9, 10, 1))
+        self.inp_3d = tf.keras.layers.Input(shape=(8, 9, 10, 1))
 
     def test_2d(self):
         x = layer_blocks.ConvBlock(
@@ -93,16 +92,16 @@ class TestConvBlock(TestCase):
             dropout=0.2,
             pool_size=2,
         )(self.inp_2d)
-        model = Model(self.inp_2d, x)
+        model = tf.keras.Model(self.inp_2d, x)
 
         self.assertEqual(model.count_params(), 110)
         self.assertSequenceEqual(model.output_shape, (None, 4, 5, 11))
         target_layers = (
-            layers.InputLayer,
-            layers.Conv2D,
-            layers.Activation,
-            layers.MaxPool2D,
-            layers.Dropout,
+            tf.keras.layers.InputLayer,
+            tf.keras.layers.Conv2D,
+            tf.keras.layers.Activation,
+            tf.keras.layers.MaxPool2D,
+            tf.keras.layers.Dropout,
         )
         for layer, target_layer in zip(model.layers, target_layers):
             self.assertIsInstance(layer, target_layer)
@@ -116,11 +115,66 @@ class TestConvBlock(TestCase):
             time_distributed=True,
             padding=[1, 0],
         )(self.inp_3d)
-        model = Model(self.inp_3d, x)
+        model = tf.keras.Model(self.inp_3d, x)
 
         self.assertEqual(model.count_params(), 110)
         self.assertSequenceEqual(model.output_shape, (None, 8, 4, 4, 11))
-        target_layers = [layers.InputLayer] + [layers.TimeDistributed] * 5
+        target_layers = [tf.keras.layers.InputLayer] + [tf.keras.layers.TimeDistributed] * 5
 
         for layer, target_layer in zip(model.layers, target_layers):
             self.assertIsInstance(layer, target_layer)
+
+
+class TestOutputRegNormal(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        inp = tf.keras.layers.Input(shape=(3, 4))
+        output = layer_blocks.OutputRegNormal(
+            output_neurons=3,
+            output_name="test",
+            unit_list=[5, 5],
+            mu_activation="relu",
+            transition="keras:Flatten",
+        )(inp)
+        cls.model = tf.keras.Model(inp, output)
+
+    def setUp(self):
+        self.targets = {
+            "n_layers": 11,
+            "output_shape": (None, 2, 3),
+            "n_params": 131,
+            "output_names": ["test"],
+        }
+
+    def test_n_layers(self):
+        self.assertEqual(len(self.model.layers), self.targets["n_layers"])
+
+    def test_output_shape(self):
+        self.assertTupleEqual(self.model.output_shape, self.targets["output_shape"])
+
+    def test_n_params(self):
+        self.assertEqual(self.model.count_params(), self.targets["n_params"])
+
+    def test_output_names(self):
+        if "output_names" in self.targets:
+            self.assertListEqual(self.model.output_names, self.targets["output_names"])
+
+
+class TestResnetBnetBlock(TestOutputRegNormal):
+    @classmethod
+    def setUpClass(cls):
+        inp = tf.keras.layers.Input(shape=(5, 4, 3, 2))
+        output = layer_blocks.ResnetBnetBlock(
+            conv_dim=2,
+            filters=[2, 3, 4],
+            strides=2,
+            batchnorm=True,
+        )(inp)
+        cls.model = tf.keras.Model(inp, output)
+
+    def setUp(self):
+        self.targets = {
+            "n_layers": 13,
+            "output_shape": (None, 5, 2, 2, 4),
+            "n_params": 130,
+        }

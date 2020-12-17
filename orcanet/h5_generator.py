@@ -12,6 +12,7 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
                  sample_modifier=None,
                  label_modifier=None,
                  fixed_batchsize=False,
+                 y_field_names=None,
                  phase="training",
                  xs_mean=None,
                  f_size=None,
@@ -44,6 +45,13 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         sample_modifier : function or None
             Operation to be performed on batches of samples read from the input
             files before they are fed into the model.
+        y_field_names : tuple or list or str, optional
+            During train and val, read out only these fields from the y dataset.
+            --> Speed up, especially if there are many fields.
+        phase : str
+            Which phase are we in? training, validation, or inference.
+            Inference means both orga.predict and orga.inference, i.e.
+            whenever we write a h5 file.
         label_modifier : function or None
             Operation to be performed on batches of labels read from the input files
             before they are fed into the model.
@@ -81,6 +89,13 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         self.shuffle = shuffle
         self.class_weights = class_weights
 
+        if y_field_names is not None:
+            if isinstance(y_field_names, str):
+                y_field_names = (y_field_names, )
+            else:
+                y_field_names = tuple(y_field_names)
+        self.y_field_names = y_field_names
+
         # a dict with the names of list inputs as keys, and the opened
         # h5 files as values
         self._files = {}
@@ -92,6 +107,7 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         # for keeping track of the readout speed
         self._total_time = 0.
         self._total_batches = 0
+        self._file_meta = None
 
         self.open()
 
@@ -132,7 +148,7 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         """
         start_time = time.time()
         file_index = self._sample_pos[index]
-        info_blob = {"phase": self.phase}
+        info_blob = {"phase": self.phase, "meta": self.get_file_meta()}
         info_blob["x_values"] = self.get_x_values(file_index)
         info_blob["y_values"] = self.get_y_values(file_index)
 
@@ -235,8 +251,15 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         """
         first_file = list(self._files.values())[0]
         try:
-            y_values = first_file[self.key_y_values][
-                       start_index:start_index + self._batchsize]
+            slc = slice(start_index, start_index + self._batchsize)
+            if self.y_field_names is not None and self.phase != "inference":
+                y_values = first_file[self.key_y_values][(slc,) + tuple(self.y_field_names,)]
+                if len(self.y_field_names) == 1:
+                    # result of slice is a ndarray; convert to structured
+                    y_values = y_values.astype(
+                        np.dtype([(self.y_field_names[0], y_values.dtype)]))
+            else:
+                y_values = first_file[self.key_y_values][slc]
         except KeyError:
             # can not look up y_values, lets hope we dont need them
             y_values = None
@@ -253,6 +276,20 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
                 f"\tPer batch:\t"
                 f"{1000 * self._total_time/self._total_batches:.5} ms"
             )
+
+    def get_file_meta(self):
+        """ Meta information about the files. Only read out once. """
+        if self._file_meta is None:
+            self._file_meta = {}
+            # sample and label dataset for each input
+            datasets = {}
+            for input_key, file in self._files.items():
+                datasets[input_key] = {
+                    "samples": file[self.key_x_values],
+                    "labels": file[self.key_y_values],
+                }
+            self._file_meta["datasets"] = datasets
+        return self._file_meta
 
     @property
     def _size(self):
@@ -383,8 +420,7 @@ def get_h5_generator(orga, files_dict, f_size=None, zero_center=False,
         label_modifier = orga.cfg.label_modifier
     elif use_def_label:
         assert orga._auto_label_modifier is not None, \
-            "Auto label modifier has not been set up (can be done with " \
-            "nn_utilities.get_auto_label_modifier)"
+            "Auto label modifier has not been set up"
         label_modifier = orga._auto_label_modifier
     else:
         label_modifier = None
@@ -409,6 +445,7 @@ def get_h5_generator(orga, files_dict, f_size=None, zero_center=False,
         shuffle=shuffle,
         class_weights=orga.cfg.class_weight,
         fixed_batchsize=orga.cfg.fixed_batchsize,
+        y_field_names=orga.cfg.y_field_names,
     )
 
     return generator

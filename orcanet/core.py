@@ -10,15 +10,15 @@ import warnings
 import time
 from datetime import timedelta
 import tensorflow as tf
-import tensorflow.keras as ks
 
 import orcanet.backend as backend
 from orcanet.utilities.visualization import update_summary_plot
 from orcanet.in_out import IOHandler
 from orcanet.history import HistoryHandler
-from orcanet.utilities.nn_utilities import load_zero_center_data, get_auto_label_modifier
-import orcanet.utilities.losses
-import orcanet.logging as olog
+from orcanet.utilities.nn_utilities import load_zero_center_data
+import orcanet.lib as lib
+import orcanet.logging as logging
+from orcanet.misc import from_register
 import medgeconv
 
 
@@ -192,7 +192,7 @@ class Organizer:
 
         if latest_epoch is None:
             self.io.check_connections(model)
-            olog.log_start_training(self)
+            logging.log_start_training(self)
 
         model_path = self.io.get_model_path(*next_epoch)
         model_path_local = self.io.get_model_path(*next_epoch, local=True)
@@ -201,10 +201,10 @@ class Organizer:
                 "Can not train model in epoch {} file {}, this model has "
                 "already been saved!".format(*next_epoch))
 
-        smry_logger = olog.SummaryLogger(self, model)
+        smry_logger = logging.SummaryLogger(self, model)
 
         if self.cfg.learning_rate is not None:
-            ks.backend.set_value(
+            tf.keras.backend.set_value(
                 model.optimizer.lr, self.io.get_learning_rate(next_epoch)
             )
 
@@ -215,7 +215,7 @@ class Organizer:
         self.io.print_log(line)
         self.io.print_log("-" * len(line))
         self.io.print_log("Learning rate is at {}".format(
-            ks.backend.get_value(model.optimizer.lr)))
+            tf.keras.backend.get_value(model.optimizer.lr)))
         self.io.print_log('Inputs and files:')
         for input_name, input_file in files_dict.items():
             self.io.print_log("   {}: \t{}".format(input_name,
@@ -229,7 +229,7 @@ class Organizer:
         model.save(model_path)
         smry_logger.write_line(
             next_epoch_float,
-            ks.backend.get_value(model.optimizer.lr),
+            tf.keras.backend.get_value(model.optimizer.lr),
             history_train=history,
         )
 
@@ -274,9 +274,9 @@ class Organizer:
         self._set_up(model, logging=True)
 
         epoch_float = self.io.get_epoch_float(*latest_epoch)
-        smry_logger = olog.SummaryLogger(self, model)
+        smry_logger = logging.SummaryLogger(self, model)
 
-        olog.log_start_validation(self)
+        logging.log_start_validation(self)
 
         start_time = time.time()
         history = backend.validate_model(self, model)
@@ -295,23 +295,21 @@ class Organizer:
 
         return history
 
-    def predict(self, epoch=None, fileno=None, concatenate=False, samples=None):
+    def predict(self, epoch=None, fileno=None, samples=None):
         """
         Make a prediction if it does not exist yet, and return its filepath.
 
         Load the model with the lowest validation loss, let it predict on
         all samples of the validation set
         in the toml list, and save this prediction together with all the
-        y_values as a h5 file in the predictions subfolder.
+        y_values as h5 file(s) in the predictions subfolder.
 
         Parameters
         ----------
         epoch : int, optional
-            Epoch of a model to load.
+            Epoch of a model to load. Default: lowest val loss.
         fileno : int, optional
-            File number of a model to load.
-        concatenate : bool
-            Whether the prediction files should also be concatenated.
+            File number of a model to load. Default: lowest val loss.
         samples : int, optional
             Don't use the full validation files, but just the given number
             of samples.
@@ -319,9 +317,7 @@ class Organizer:
         Returns
         -------
         pred_filename : List
-            List to the paths of all created prediction files.
-            If concatenate = True, the list always only contains the
-            path to the concatenated prediction file.
+            List to the paths of all the prediction files.
 
         """
         if fileno is None and epoch is None:
@@ -331,8 +327,7 @@ class Organizer:
             raise ValueError(
                 "Either both or none of epoch and fileno must be None")
 
-        is_pred_done = self._check_if_pred_already_done(epoch, fileno)
-        if is_pred_done:
+        if self._check_if_pred_already_done(epoch, fileno):
             print("Prediction has already been done.")
             pred_filepaths = self.io.get_pred_files_list(epoch, fileno)
 
@@ -351,21 +346,6 @@ class Organizer:
             print("Elapsed time: {}\n".format(timedelta(seconds=elapsed_s)))
 
             pred_filepaths = self.io.get_pred_files_list(epoch, fileno)
-
-        # concatenate all prediction files if wished
-        concatenated_folder = self.io.get_subfolder("predictions") + '/concatenated'
-        n_val_files = self.io.get_no_of_files("val")
-        if concatenate is True and n_val_files > 1:
-            if not os.path.isdir(concatenated_folder):
-                print('Concatenating all prediction files to a single one.')
-                pred_filename_conc = self.io.concatenate_pred_files(concatenated_folder)
-                pred_filepaths = [pred_filename_conc]
-            else:
-                # omit directories if there are any in the concatenated folder
-                fname_conc_file_list = list(file for file in os.listdir(concatenated_folder)
-                                            if os.path.isfile(os.path.join(concatenated_folder,
-                                                                           file)))
-                pred_filepaths = [concatenated_folder + '/' + fname_conc_file_list[0]]
 
         return pred_filepaths
 
@@ -566,8 +546,10 @@ class Organizer:
 
                 try:
                     plots_folder = self.io.get_subfolder("plots", create=True)
-                    ks.utils.plot_model(
-                        model, plots_folder + "/model_plot.pdf", show_shapes=True)
+
+                    tf.keras.utils.plot_model(
+                        model, plots_folder + "/model_plot.png", show_shapes=True)
+
                 except (ImportError, AttributeError) as e:
                     # TODO remove AttributeError once https://github.com/tensorflow/tensorflow/issues/38988 is fixed
                     warnings.warn("Can not plot model: " + str(e))
@@ -587,7 +569,7 @@ class Organizer:
     def _load_model(self, filepath):
         """ Load from path, with custom objects and parallized. """
         with self.get_strategy().scope():
-            model = ks.models.load_model(
+            model = tf.keras.models.load_model(
                 filepath, custom_objects=self.cfg.get_custom_objects())
         return model
 
@@ -607,7 +589,7 @@ class Organizer:
                              "list file with pathes to h5 files first.")
 
         if self.cfg.label_modifier is None:
-            self._auto_label_modifier = get_auto_label_modifier(model)
+            self._auto_label_modifier = lib.label_modifiers.ColumnLabels(model)
 
         if self.cfg.zero_center_folder is not None:
             self.get_xs_mean(logging)
@@ -646,6 +628,20 @@ class Configuration(object):
     leading underscore) can be changed either directly or with a
     .toml config file via the method update_config().
 
+    Parameters
+    ----------
+    output_folder : str
+        Name of the folder of this model in which everything will be saved,
+        e.g., the summary.txt log file is located in here.
+    list_file : str or None
+        Path to a toml list file with pathes to all the h5 files that should
+        be used for training and validation.
+    config_file : str or None
+        Path to a toml config file with attributes that are used instead of
+        the default ones.
+    kwargs
+        Overwrites the values given in the config file.
+
     Attributes
     ----------
     batchsize : int
@@ -666,9 +662,9 @@ class Configuration(object):
         functions to be considered by keras during deserialization of models.
     dataset_modifier : function or None
         For orga.predict: Function that determines which datasets get created
-        in the resulting h5 file. If none, every output layer will get one
-        dataset each for both the label and the prediction, and one dataset
-        containing the y_values from the validation files.
+        in the resulting h5 file. Default: save as array, i.e. every output layer
+        will get one dataset each for both the label and the prediction,
+        and one dataset containing the y_values from the validation files.
     fixed_batchsize : bool
         The last batch in the file might be smaller then the batchsize.
         Usually, this is no problem, but set to True to skip this batch
@@ -700,8 +696,7 @@ class Configuration(object):
         to when reaching this epoch/fileno.
     max_queue_size : int
         max_queue_size option of the keras training and evaluation generator
-        methods. How many batches get preloaded
-        from the generator.
+        methods. How many batches get preloaded from the generator.
     multi_gpu : bool
         Use all availble GPUs (distributed training if theres more then one).
     n_events : None or int
@@ -718,12 +713,9 @@ class Configuration(object):
     train_logger_flush : int
         After how many lines the training log file should be flushed (updated on
         the disk). -1 for flush at the end of the file only.
-    output_folder : str
-        Name of the folder of this model in which everything will be saved,
-        e.g., the summary.txt log file is located in here.
     use_scratch_ssd : bool
-        Only working at HPC Erlangen: Declares if the input files should be
-        copied to the node-local SSD scratch space.
+        Declares if the input files should be copied to a local temp dir,
+        i.e. the path defined in the 'TMPDIR' environment variable.
     validate_interval : int or None
         Validate the model after this many training files have been trained on
         in an epoch. There will always be a validation at the end of an epoch.
@@ -735,6 +727,9 @@ class Configuration(object):
     verbose_val : int
         verbose option of evaluate_generator.
         0 = silent, 1 = progress bar.
+    y_field_names : tuple or list or str, optional
+        During train and val, read out only these fields from the y dataset.
+        --> Speed up, especially if there are many fields.
     zero_center_folder : None or str
         Path to a folder in which zero centering images are stored.
         If this path is set, zero centering images for the given dataset will
@@ -744,27 +739,6 @@ class Configuration(object):
     """
     # TODO add a clober script that properly deletes models + logfiles
     def __init__(self, output_folder, list_file=None, config_file=None, **kwargs):
-        """
-        Set the attributes of the Configuration object.
-
-        Values are loaded from the given files, if provided. Otherwise, default
-        values are used.
-
-        Parameters
-        ----------
-        output_folder : str
-            Name of the folder of this model in which everything will be saved,
-            e.g., the summary.txt log file is located in here.
-        list_file : str or None
-            Path to a toml list file with pathes to all the h5 files that should
-            be used for training and validation.
-        config_file : str or None
-            Path to a toml config file with attributes that are used instead of
-            the default ones.
-        kwargs
-            Overwrites the values given in the config file.
-
-        """
         self.batchsize = 64
         self.learning_rate = None
 
@@ -793,6 +767,7 @@ class Configuration(object):
         self.train_logger_display = 100
         self.train_logger_flush = -1
         self.multi_gpu = True
+        self.y_field_names = None
 
         self._default_values = dict(self.__dict__)
 
@@ -867,12 +842,20 @@ class Configuration(object):
 
         """
         user_values = toml.load(config_file)["config"]
-        for key in user_values:
+        for key, value in user_values.items():
             if hasattr(self, key):
-                setattr(self, key, user_values[key])
+                if key == "sample_modifier":
+                    value = from_register(
+                        toml_entry=value, register=lib.sample_modifiers.smods)
+                elif key == "dataset_modifier":
+                    value = from_register(
+                        toml_entry=value, register=lib.dataset_modifiers.dmods)
+                elif key == "label_modifier":
+                    value = from_register(
+                        toml_entry=value, register=lib.label_modifiers.lmods)
+                setattr(self, key, value)
             else:
-                raise AttributeError(
-                    "Unknown attribute {} in config file ".format(key))
+                raise AttributeError(f"Unknown attribute {key} in config file")
 
     def get_list_file(self):
         """
@@ -912,7 +895,7 @@ class Configuration(object):
     def get_custom_objects(self):
         """ Get user custom objects + orcanet internal ones. """
         orcanet_co = medgeconv.custom_objects
-        orcanet_loss_functions = orcanet.utilities.losses.loss_functions
+        orcanet_loss_functions = lib.losses.loss_functions
         return {**orcanet_co, **orcanet_loss_functions, **self.custom_objects}
 
 

@@ -13,6 +13,7 @@ from orcanet.logging import BatchLogger
 import orcanet.utilities.nn_utilities as nn_utilities
 from orcanet.in_out import h5_get_number_of_rows
 from orcanet.h5_generator import get_h5_generator
+import orcanet.lib.dataset_modifiers as dataset_modifiers
 
 
 def train_model(orga, model, epoch, batch_logger=False):
@@ -263,7 +264,10 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
         time.strftime("%d-%m-%Y-%H-%M-%S", time.gmtime()))
     print(f"Creating temporary file {temp_output_path}")
     with h5py.File(temp_output_path, 'x') as h5_file:
-        h5_file.attrs.create("orcanet", orcanet.__version__, dtype="S6")
+        # add version and paths of h5files
+        h5_file.attrs.create("orcanet", orcanet.__version__)
+        for input_key, file in files_dict.items():
+            h5_file.attrs.create(f"orcanet_inp_{input_key}", file)
 
         for s in range(steps):
             if s % print_every == 0:
@@ -288,7 +292,7 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
                 _slice_to_size(info_blob)
 
             if orga.cfg.dataset_modifier is None:
-                datasets = get_datasets(info_blob)
+                datasets = dataset_modifiers.as_array(info_blob)
             else:
                 datasets = orga.cfg.dataset_modifier(info_blob)
 
@@ -368,52 +372,3 @@ def make_model_prediction(orga, model, epoch, fileno, samples=None):
 
         pred_filepath = orga.io.get_pred_path(epoch, fileno, f_number)
         h5_inference(orga, model, files_dict, pred_filepath, samples=samples)
-
-
-def get_datasets(info_blob):
-    """
-    Get the dataset names and numpy array contents.
-
-    Every output layer will get one dataset each for both the label and
-    the prediction. E.g. if your model has an output layer called "energy",
-    the datasets "label_energy" and "pred_energy" will be made.
-    If there are no labels (e.g. during orga.inference), the label dataset
-    will not be generated.
-
-    Parameters
-    ----------
-    info_blob : dict
-        Contains the following infos as keys/values:
-        xs : ndarray
-            Input to the network, after sample modifier has been applied.
-        y_values : ndarray or None
-            A structured array containing infos for every event, right from
-            the input files.
-            Can also be None, e.g. for when there are no y_values.
-        ys : dict or None
-            The labels for each output layer of the network.
-            Can also be None, e.g. for when there are no y_values.
-        y_pred : dict
-            The predictions of each output layer of the network.
-
-    Returns
-    -------
-    datasets : dict
-        Keys are the name of the datagroups, values the content in the
-        form of numpy arrays.
-
-    """
-    datasets = dict()
-    if "y_values" in info_blob:
-        datasets["y_values"] = info_blob["y_values"]
-
-    if info_blob.get("ys") is not None:
-        y_true = info_blob["ys"]
-        for out_layer_name in y_true:
-            datasets["label_" + out_layer_name] = y_true[out_layer_name]
-
-    y_pred = info_blob["y_pred"]
-    for out_layer_name in y_pred:
-        datasets["pred_" + out_layer_name] = y_pred[out_layer_name]
-
-    return datasets

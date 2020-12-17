@@ -3,15 +3,15 @@ import tensorflow.keras.backend as K
 import tensorflow.keras as ks
 import tensorflow.keras.layers as layers
 import medgeconv
-from orcanet.utilities.misc import get_register
+from orcanet.misc import get_register
 
-# for orcanet custom objects
-blocks, _register = get_register()
+# for loading via toml and orcanet custom objects
+blocks, register = get_register()
 # edge conv blocks
-_register(medgeconv.DisjointEdgeConvBlock)
+register(medgeconv.DisjointEdgeConvBlock)
 
 
-@_register
+@register
 class ConvBlock:
     """
     1D/2D/3D Convolutional block followed by BatchNorm, Activation,
@@ -164,7 +164,7 @@ class ConvBlock:
         return x
 
 
-@_register
+@register
 class DenseBlock:
     """
     Dense layer followed by BatchNorm, Activation and/or Dropout.
@@ -224,7 +224,7 @@ class DenseBlock:
         return x
 
 
-@_register
+@register
 class MEdgeConvBlock:
     """ EdgeConv as defined in ParticleNet, see github.com/StefReck/MEdgeConv """
     def __init__(self, units,
@@ -262,7 +262,7 @@ class MEdgeConvBlock:
             return nodes, is_valid, nodes
 
 
-@_register
+@register
 class ResnetBlock:
     """
     A residual building block for resnets. 2 c layers with a shortcut.
@@ -346,7 +346,7 @@ class ResnetBlock:
             return acti_layer(x)
 
 
-@_register
+@register
 class ResnetBnetBlock:
     """
     A residual bottleneck building block for resnets.
@@ -429,7 +429,7 @@ class ResnetBnetBlock:
         return x
 
 
-@_register
+@register
 class InceptionBlockV2:
     """
     A GoogleNet Inception block (v2).
@@ -588,7 +588,7 @@ class OutputCateg:
         return out
 
 
-@_register
+@register
 class OutputReg:
     """
     Dense layer(s) for regression.
@@ -706,7 +706,8 @@ class OutputReg_log_prob: #My implementation
         return full_layer
 
 @_register
-class OutputRegNormal: #Stefan's implementation
+class OutputRegNormal:
+
     """
     Output block for regression using a normal distribution as output.
 
@@ -761,10 +762,9 @@ class OutputRegNormal: #Stefan's implementation
             [tf.expand_dims(tsr, -2) for tsr in [mu, sigma]])
 
 
-
-
 @_register
 class OutputRegErr:
+
     """
     Double network for regression + error estimation.
 
@@ -818,61 +818,6 @@ class OutputRegErr:
                 [outputs[i], output_label_error])
             outputs.append(output_label_merged)
         return outputs
-
-@_register
-class OutputRegErr_no_gradstop:
-    """ 
-    Double network for regression + error estimation - but not with gradstop.
-
-    It has 3 dense layer blocks, followed by one dense layer
-    for each output_name, as well as dense layer blocks, followed by one dense layer
-    for the respective error of each output_name.
-
-    Parameters
-    ----------
-    output_names : List
-        List of strs, the output names, each with one neuron + one err neuron.
-    flatten : bool
-        If True, start with a flatten layer.
-    kwargs
-        Keywords for the dense blocks.
-
-    """
-    def __init__(self, output_names, flatten=True, **kwargs):
-        self.flatten = flatten
-        self.output_names = output_names
-        self.kwargs = kwargs
-
-    def __call__(self, layer):
-        if self.flatten:
-            flatten = layers.Flatten()(layer)
-        else:
-            flatten = layer
-        outputs = []
-
-        x = DenseBlock(units=128, **self.kwargs)(flatten)
-        x = DenseBlock(units=32, **self.kwargs)(x)
-
-        for name in self.output_names:
-            output_label = layers.Dense(units=1, name=name)(x)
-            outputs.append(output_label)
-
-        # Network for the errors of the labels
-        x_err = DenseBlock(units=128, **self.kwargs)(flatten)
-        x_err = DenseBlock(units=32, **self.kwargs)(x)
-
-
-        for i, name in enumerate(self.output_names):
-            output_label_error = layers.Dense(
-                units=1,
-                activation='softplus',
-                name=name + '_err_temp')(x_err)
-            # Predicted label gets concatenated with its error (needed for loss function)
-            output_label_merged = layers.Concatenate(name=name + '_err')(
-                [outputs[i], output_label_error])
-            outputs.append(output_label_merged)
-        return outputs
-
 
 
 def _get_dimensional_layers(dim):

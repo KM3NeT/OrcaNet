@@ -1,6 +1,6 @@
 from unittest import TestCase
 import numpy as np
-import orcanet.utilities.sample_modifiers as smods
+import orcanet.lib.sample_modifiers as smods
 
 
 class TestAppli(TestCase):
@@ -23,13 +23,6 @@ class TestAppli(TestCase):
 
     def test_permute(self):
         result = smods.Permute((3, 2, 1))(self.info_blob)
-        self.assertEqual(
-            result[self.inp_a_name].shape,
-            (self.batchsize, ) + (11, 7, 5)
-        )
-
-    def test_permute_fromstr(self):
-        result = smods.Permute.from_str("3,2,1")(self.info_blob)
         self.assertEqual(
             result[self.inp_a_name].shape,
             (self.batchsize, ) + (11, 7, 5)
