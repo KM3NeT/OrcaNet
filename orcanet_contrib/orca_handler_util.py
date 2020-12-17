@@ -9,7 +9,7 @@ import numpy as np
 import toml
 
 from orcanet_contrib.custom_objects import get_custom_objects
-from orcanet.utilities.losses import lkl_normal
+from orcanet.lib.losses import lkl_normal
 
 def update_objects(orga, model_file):
     """

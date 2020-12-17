@@ -534,7 +534,7 @@ class InceptionBlockV2:
         x = layers.concatenate(branches, axis=channel_axis)
         return x
 
-@_register
+@register
 class OutputCateg:
     """
     Dense layer(s) for categorization.
@@ -640,7 +640,7 @@ class OutputReg:
 
         return out
 
-@_register
+@register
 class OutputReg_log_prob: #My implementation
 
     """
@@ -705,7 +705,7 @@ class OutputReg_log_prob: #My implementation
             
         return full_layer
 
-@_register
+@register
 class OutputRegNormal:
 
     """
@@ -762,7 +762,7 @@ class OutputRegNormal:
             [tf.expand_dims(tsr, -2) for tsr in [mu, sigma]])
 
 
-@_register
+@register
 class OutputRegErr:
 
     """
