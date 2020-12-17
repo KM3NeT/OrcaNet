@@ -163,7 +163,7 @@ class TestTrainValidatePredict(tf.test.TestCase):
             'mc_B_loss': 8.597588874108167,
         }
         print(history, target)
-        assert_dict_arrays_equal(history, target, rtol=1e-1)
+        assert_dict_arrays_equal(history, target, rtol=0.15)
         self.assertSequenceEqual(batch_nos, list(range(int(self.file_sizes[0]/self.orga.cfg.batchsize))))
 
     def test_validate(self):
