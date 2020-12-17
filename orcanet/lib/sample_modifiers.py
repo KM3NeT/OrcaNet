@@ -114,6 +114,7 @@ class GraphEdgeConv:
         Defines the is_valid.
     with_lightspeed : bool
         Multiply time for coordinates input with lightspeed.
+        Requires coord_features to have the entry 'time'.
     column_names : tuple, optional
         Name and order of the features in the last dimension of the array.
         If None is given, will attempt to auto-read the column names from
@@ -161,7 +162,7 @@ class GraphEdgeConv:
         is_valid = x_values[:, :, self._str_to_idx(self.is_valid_features)]
 
         if self.with_lightspeed:
-            coords[:, :, -1] *= self.lightspeed
+            coords[:, :, self.coord_features.index("time")] *= self.lightspeed
 
         # pad events with too few hits by duping first hit
         if self.knn is not None:
