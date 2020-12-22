@@ -2,7 +2,7 @@ import warnings
 import numpy as np
 import orcanet.misc as misc
 
-# for loading via toml TODO nothing in here yet...
+# for loading via toml
 lmods, register = misc.get_register()
 
 
@@ -43,7 +43,8 @@ class RegressionLabels:
         Name of the output of the network.
         Default: Same as names (only valid if names is a str).
     log10 : bool
-        Take log10 of the labels.
+        Take log10 of the labels. Invalid values in the label will produce 0
+        and a warning.
     stacks : int, optional
         Stack copies of the label this many times along a new axis at position 1.
         E.g. if the label is shape (?, 3), it will become
@@ -88,7 +89,13 @@ class RegressionLabels:
     def process_label(self, y_value):
         ys = y_value
         if self.log10:
-            ys = np.log10(ys)
+            gr_zero = ys > 0
+            if not np.all(gr_zero):
+                warnings.warn(
+                    "invalid value encountered in log10, setting result to 0",
+                    category=RuntimeWarning,
+                )
+            ys = np.log10(ys, where=gr_zero, out=np.zeros_like(ys, dtype="float32"))
         if self.stacks:
             ys = np.repeat(ys[:, None], repeats=self.stacks, axis=1)
         return ys
