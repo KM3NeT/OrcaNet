@@ -1,7 +1,7 @@
 import tensorflow.keras.backend as K
 import tensorflow as tf
 import math
-
+import tensorflow_probability as tfp
 
 def get_custom_objects():
     """
@@ -13,10 +13,50 @@ def get_custom_objects():
         'loss_uncertainty_mae': loss_uncertainty_mae,
         'loss_uncertainty_gaussian_likelihood': loss_uncertainty_gaussian_likelihood,
         'loss_uncertainty_gaussian_likelihood_dir': loss_uncertainty_gaussian_likelihood_dir,
-        'loss_mean_relative_error_energy': loss_mean_relative_error_energy
-    }
+        'loss_mean_relative_error_energy': loss_mean_relative_error_energy,
+        'loss_log_prob': loss_log_prob,
+        'loss_log_prob_laplace': loss_log_prob_laplace,
+        'loss_uncertainty_mre': loss_uncertainty_mre,
+        }
     return custom_objects
 
+
+def loss_log_prob(y_true, y_pred):
+    """
+	Uses the log probability of a normal distribution, similarly to the categorical cross entropy in
+	classification problems, to estimate the mean and the uncertainty of the predicted value
+
+    Returns
+    -------
+    loss : combined loss from mean and sigma
+
+    """
+    truth = y_true[:, 0]
+    mu = y_pred[:, 0]
+    sigma = y_pred[:, 1]
+    
+    loss = -1 * tfp.distributions.Normal(loc=mu,scale=sigma).log_prob(truth)
+    
+    return loss
+    
+
+def loss_log_prob_laplace(y_true, y_pred):
+    """
+	Uses the log probability of a laplace distribution, similarly to the categorical cross entropy in
+	classification problems, to estimate the mean and the uncertainty of the predicted value
+
+    Returns
+    -------
+    loss : combined loss from mean and sigma
+
+    """
+    truth = y_true[:, 0]
+    mu = y_pred[:, 0]
+    sigma = y_pred[:, 1]
+    
+    loss = -1 * tfp.distributions.Laplace(loc=mu,scale=sigma).log_prob(truth)
+    
+    return loss
 
 def loss_mean_relative_error_energy(y_true, y_pred):
     """
@@ -29,9 +69,33 @@ def loss_mean_relative_error_energy(y_true, y_pred):
     mre : Mean relative (energy) error loss
 
     """
+    #y_pred_label = y_pred[:, 0]
+    #y_true_label = y_true[:, 0]
+
+    #mre = K.abs(y_pred_label - y_true_label)/y_true_label
     mre = K.abs(y_pred - y_true)/y_true
+    
     return mre
 
+def loss_uncertainty_mre(y_true, y_pred):
+    """
+    Loss function that calculates the uncertainty estimation for the
+    mean relative error.
+    y_true & y_pred are expected to be e_true & e_pred.
+    L = (e_reco - e_true) / e_true
+
+    Returns
+    -------
+    mre : Mean relative (energy) error uncertainty loss
+
+    """
+    y_pred_label = K.stop_gradient(y_pred[:, 0])
+    y_pred_label_std = y_pred[:, 1]
+    y_true_label = y_true[:, 0]
+    
+    loss = K.abs(y_pred_label_std - K.abs((y_pred_label - y_true_label)/y_true_label))
+    return loss
+    
 
 def loss_uncertainty_mae(y_true, y_pred):
     """
