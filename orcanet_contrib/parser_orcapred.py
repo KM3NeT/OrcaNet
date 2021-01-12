@@ -80,7 +80,7 @@ def orca_pred(output_folder, list_file, config_file, model_file,
     # highest epoch and filenumber.
 
     pred_filepath_conc = orga.predict(epoch=epoch, fileno=fileno,
-                                      )[0]
+                                      concatenate=True)[0]
 
     # make performance plots, only available for bg/ts/regression
     # dset_mod_available_plots = ['regression', 'bg_classifier', 'ts_classifier']
