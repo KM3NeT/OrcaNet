@@ -35,7 +35,7 @@ import toml
 
 from orcanet.core import Organizer
 from orcanet.model_builder import ModelBuilder
-from orcanet_contrib.orca_handler_util import orca_learning_rates, update_objects, GraphSampleMod, GraphSampleMod_with_trig
+from orcanet_contrib.orca_handler_util import orca_learning_rates, update_objects, GraphSampleMod, GraphSampleMod_only_first_hit
 
 
 def orca_train(output_folder, list_file, config_file, model_file,no_epochs,
@@ -75,8 +75,8 @@ def orca_train(output_folder, list_file, config_file, model_file,no_epochs,
     
     if sample_modifier == "normal":
         orga.cfg.sample_modifier = GraphSampleMod(knn=knn_for_sample_mod)
-    elif sample_modifier == "with_trig":
-        orga.cfg.sample_modifier = GraphSampleMod_with_trig(knn=knn_for_sample_mod)
+    elif sample_modifier == "only_first_hit":
+        orga.cfg.sample_modifier = GraphSampleMod_only_first_hit(knn=knn_for_sample_mod)
     else:
         "No valid sample_modifier_own given!"
         exit()

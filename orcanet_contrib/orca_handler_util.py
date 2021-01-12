@@ -98,9 +98,9 @@ class GraphSampleMod:
             return [self.column_names.index(w) for w in which]
 
     def __call__(self, info_blob):
-
+        
         points = info_blob["x_values"]["points"]
-
+        
         for_nodes = ("pos_x", "pos_y", "pos_z", "time", "dir_x", "dir_y", "dir_z")
         for_coords = ("pos_x", "pos_y", "pos_z", "time")
         for_valid = "is_valid"
@@ -148,7 +148,7 @@ class GraphSampleMod:
 
  
 
-class GraphSampleMod_with_trig:
+class GraphSampleMod_only_first_hit:
     """
     Read out points, coordinates and is_valid from the ndarray h5 set.
 
@@ -196,34 +196,116 @@ class GraphSampleMod_with_trig:
             return self.column_names.index(which)
         else:
             return [self.column_names.index(w) for w in which]
-
+    
+    def _limit_to_first_hit_per_PMT(self, points):
+        
+        """Set the is_valid to 0 for all hits on a PMT later than the first triggered hit"""
+        
+        #iterate over all events in batch
+        for j in range(len(points)):
+            
+            #iterate over all channels (PMTs) 
+            for i in range(0,31):
+                
+                #only select the hits on one PMT
+                mask = [points[j,:,self._str_to_idx("channel_id")] == i]
+            
+                #get trigger mask for these 
+                is_triggered_on_this_PMT = points[j,:,self._str_to_idx("triggered")][mask]
+            
+                #create a boolian mask out of that (had 4 and so on as triggered mask)
+                is_triggered_on_this_PMT = is_triggered_on_this_PMT!=0.0
+            
+                #get hit times on this PMT
+                times_on_this_PMT = points[j,:,self._str_to_idx("time")][mask]
+            
+                #in case there is a triggered hit, take the first
+                if np.count_nonzero(is_triggered_on_this_PMT) > 0:
+                    first_considered_hit = np.min(times_on_this_PMT[is_triggered_on_this_PMT])
+            
+                #if no trig. hit, take the first after the trig. hit, but not the non-valid ones (which have time=0.0)
+                #but neither one with a large time
+                else:
+                    min_positive = None
+                    max_negative = None
+                    
+                    positive_times = times_on_this_PMT[times_on_this_PMT>0.0]
+                    if len(positive_times) > 0:
+                        min_positive = np.min(positive_times)
+                    
+                    netagive_times = times_on_this_PMT[times_on_this_PMT<0.0]
+                    if len(netagive_times) > 0:
+                        max_negative = np.max(netagive_times)
+                
+                
+                    if min_positive != None and min_positive < 500:
+                        first_considered_hit = min_positive
+                    else:
+                        #when there are no hits after the first trig, take the last one from before 0
+                        if max_negative != None and max_negative > -100:
+                            first_considered_hit = max_negative
+                        
+                        #in case non of the above is fulfilled, take any first positive 
+                        else:
+                            if min_positive != None:
+                                first_considered_hit = min_positive
+                            
+                            #or any last negative
+                            else:
+                                if max_negative != None:
+                                    first_considered_hit = max_negative
+                    
+                                #or there is no hit at all
+                                else:
+                                    first_considered_hit = None
+                        
+                #create mask with only this hit as is_valid = 1
+                if first_considered_hit != None:
+                    is_valid_on_this_PMT = times_on_this_PMT == first_considered_hit
+                    
+                    #update the points with the new is_valid info
+                    points[j,:,self._str_to_idx("is_valid")][mask] = is_valid_on_this_PMT
+                    
+        #return the combined is_valid info for the whole batch
+        is_valid =  points[:,:,self._str_to_idx("is_valid")]
+        
+        return is_valid
+        
     def __call__(self, info_blob):
 
         points = info_blob["x_values"]["points"]
 
-        for_nodes = ("pos_x", "pos_y", "pos_z", "time", "dir_x", "dir_y", "dir_z", "triggered")
+
+        
+        for_nodes = ("pos_x", "pos_y", "pos_z", "time", "dir_x", "dir_y", "dir_z")
         for_coords = ("pos_x", "pos_y", "pos_z", "time")
         for_valid = "is_valid"
-        
+
         nodes = points[:, :, self._str_to_idx(for_nodes)].astype("float32")
         coords = points[:, :, self._str_to_idx(for_coords)].astype("float32")
         if self.with_lightspeed:
             coords[:, :, -1] *= self.lightspeed
-        is_valid = points[:, :, self._str_to_idx(for_valid)].astype("float32")
+        #is_valid = points[:, :, self._str_to_idx(for_valid)].astype("float32")
         
+        #set is_valid to 1 for only the first relevant hit on a PMT in an event
+        is_valid = self._limit_to_first_hit_per_PMT(points)        
+        
+                
         # pad events with less then 17 hits (for 16 knn) by duping first hit
         if self.knn is not None:
+            
             min_n_hits = self.knn + 1
             n_hits = is_valid.sum(axis=-1)
             too_small = n_hits < min_n_hits
+            max_n_hits = len(is_valid[0])
             if any(too_small):
                 #warnings.warn(f"Too few hits! Needed {min_n_hits}, "
                 #              f"had {n_hits[too_small]}! Padding...")
                 for event_no in np.where(too_small)[0]:
                     hits = int(n_hits[event_no])
-                    is_valid[event_no, hits:min_n_hits] = 1.
-                    nodes[event_no, hits:min_n_hits] = nodes[event_no, 0]
-                    coords[event_no, hits:min_n_hits] = coords[event_no, 0]
+                    is_valid[event_no, max_n_hits-(min_n_hits-hits):max_n_hits] = 1.
+                    nodes[event_no, max_n_hits-(min_n_hits-hits):max_n_hits] = nodes[event_no, 0]
+                    coords[event_no, max_n_hits-(min_n_hits-hits):max_n_hits] = coords[event_no, 0]
 
         xs = {
             "nodes": nodes,
@@ -524,7 +606,8 @@ def orca_label_modifiers(name):
             
             y_values = data["y_values"]
             ys = dict()
-            particle_type, is_cc = y_values['particle_type'], y_values['is_cc'] == 2
+            particle_type = y_values['particle_type']
+            is_cc = y_values['is_cc'] == 2
             elec_nc_bool_idx = np.logical_and(np.abs(particle_type) == 12,
                                               is_cc == 0)
 
@@ -556,14 +639,12 @@ def orca_label_modifiers(name):
         def label_modifier(data):
             
             y_values = data["y_values"]
-            # for every sample, [0,1] for shower, or [1,0] for track
 
-            # {(12, 0): 0, (12, 1): 1, (14, 1): 2, (16, 1): 3}
-            # 0: elec_NC, 1: elec_CC, 2: muon_CC, 3: tau_CC
             # label is always shower, except if muon-CC
             ys = dict()
-            particle_type, is_cc = y_values['particle_type'], y_values['is_cc']
-            is_muon_cc = np.logical_and(np.abs(particle_type) == 14, is_cc == 1)
+            particle_type = y_values['particle_type']
+            is_cc = y_values['is_cc'] == 2
+            is_muon_cc = np.logical_and(np.abs(particle_type) == 14, is_cc)
             is_not_muon_cc = np.invert(is_muon_cc)
 
             batchsize = y_values.shape[0]
@@ -821,9 +902,6 @@ def orca_dataset_modifiers(name):
             datasets = dict()  # y_pred is a list of arrays
             datasets['mc_info'] = mc_info  # is already a structured array
             
-            #add also the hit info
-            datasets['hits'] = info_blob["x_values"]["points"]
-            
             # make pred dataset
             dtypes = np.dtype([('prob_neutrino', y_pred.dtype),
                                ('prob_not_neutrino', y_pred.dtype)])
@@ -858,8 +936,6 @@ def orca_dataset_modifiers(name):
             
             datasets = dict()  # y_pred is a list of arrays
             datasets['info'] = info  # is already a structured array
-            #add also the hit info
-            datasets['hits'] = info_blob["x_values"]["points"]
                         
             # make pred dataset
             dtypes = np.dtype([('prob_neutrino', y_pred.dtype),
@@ -888,9 +964,6 @@ def orca_dataset_modifiers(name):
             
             datasets = dict()
             datasets['mc_info'] = mc_info  # is already a structured array
-
-            #add also the hit info
-            datasets['hits'] = info_blob["x_values"]["points"]
 
             # make pred dataset
             dtypes = np.dtype([('prob_shower', y_pred.dtype),
@@ -922,8 +995,6 @@ def orca_dataset_modifiers(name):
             
             datasets = dict()
             datasets['info'] = info  # is already a structured array
-            #add also the hit info
-            datasets['hits'] = info_blob["x_values"]["points"]
             
             # make pred dataset
             dtypes = np.dtype([('prob_shower', y_pred.dtype),
@@ -1566,8 +1637,9 @@ def orca_learning_rates(name, total_file_no):
 
             """
             n_lr_decays = (n_epoch - 1) * total_file_no + (n_file - 1)
-            lr_temp = 0.025  # * n_gpu TODO think about multi gpu lr
-
+            #lr_temp = 0.025  # * n_gpu TODO think about multi gpu lr
+            lr_temp = 0.02
+            
             for i in range(n_lr_decays):
                 if lr_temp > 0.015:
                     lr_decay = 0.03  # standard for regression: 0.07, standard for PID: 0.02
