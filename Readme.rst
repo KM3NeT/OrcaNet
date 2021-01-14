@@ -18,7 +18,7 @@ OrcaNet: A training organizer for Deep Learning in KM3NeT
     :target: https://www.codacy.com/app/sreck/OrcaNet?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=StefReck/OrcaNet&amp;utm_campaign=Badge_Grade
 
 
-OrcaNet is a deep learning framework based on Keras in order to simplify the 
+OrcaNet is a deep learning framework based on tensorflow in order to simplify the
 training process of neural networks for astroparticle physics. It incorporates 
 automated logging, plotting and validating during the training, as well as
 saving and continuing the training process. Additionally, it features easy 
@@ -40,11 +40,16 @@ OrcaNet can be installed via pip by running::
     pip install orcanet
 
 
+In order to make use of tensorflow's GPU acceleration, you need cuda and
+cudnn installed. You can see which of these each tensorflow version needs here
+https://www.tensorflow.org/install/source#gpu
+
+
 Tensorflow 1.X
 --------------
 
-Orcanet per default runs on tensorflow 2, but there is also no longer supperted
-tf 1 branch, which makes use of the deprecated stand-alone keras package.
+Orcanet per default runs on tensorflow 2, but there is also a no longer supperted
+tf 1 branch `tf1`, which makes use of the deprecated stand-alone keras package.
 For the tf 1 version, orcanet will install tensorflow (the cpu version).
 For training with graphics cards, tensorflow-gpu is required, which needs
 to be installed manually via::

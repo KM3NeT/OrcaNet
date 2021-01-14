@@ -566,6 +566,8 @@ class OutputReg:
                  **kwargs):
         self.output_neurons = output_neurons
         self.output_name = output_name
+        if isinstance(unit_list, int):
+            unit_list = (unit_list, )
         self.unit_list = unit_list
         self.transition = transition
         self.kwargs = kwargs
@@ -615,6 +617,8 @@ class OutputRegNormal:
                  **kwargs):
         self.output_neurons = output_neurons
         self.output_name = output_name
+        if isinstance(unit_list, int):
+            unit_list = (unit_list, )
         self.unit_list = unit_list
         self.mu_activation = mu_activation
         self.sigma_activation = sigma_activation

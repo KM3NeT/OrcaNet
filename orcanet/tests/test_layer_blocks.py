@@ -146,6 +146,17 @@ class TestOutputRegNormal(TestCase):
             "output_names": ["test"],
         }
 
+    def test_unit_list_is_int(self):
+        inp = tf.keras.layers.Input(shape=(3, 4))
+        output = layer_blocks.OutputRegNormal(
+            output_neurons=3,
+            output_name="test",
+            unit_list=5,
+            mu_activation="relu",
+            transition="keras:Flatten",
+        )(inp)
+        model = tf.keras.Model(inp, output)
+
     def test_n_layers(self):
         self.assertEqual(len(self.model.layers), self.targets["n_layers"])
 
