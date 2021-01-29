@@ -1,7 +1,7 @@
 setuptools_scm
 tensorflow==2.3.*
-tensorflow_addons
-tensorflow_probability
+tensorflow_addons==0.11.*
+tensorflow_probability==0.11.*
 numpy
 h5py
 matplotlib
