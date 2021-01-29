@@ -8,7 +8,6 @@ variables:
   SINGULARITY_IMAGE: orcanet.sif
 
 stages:
-  - test
   - docker
   - singularity
 
@@ -18,24 +17,6 @@ cache:
     - .cache/pip
     - venv/
   key: "$CI_COMMIT_REF_SLUG"
-
-
-.virtualenv_template: &virtualenv_definition |
-  python -V
-  pip install virtualenv
-  virtualenv venv
-  source venv/bin/activate
-  pip install -U pip
-  make install
-  make dependencies
-
-
-test:
-    image: docker.km3net.de/base/python:3.6
-    stage: test
-    script:
-        - *virtualenv_definition
-        - pip list
 
 
 docker:
