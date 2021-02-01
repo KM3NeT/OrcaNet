@@ -92,6 +92,8 @@ docker:
     - docker push $CONTAINER_TEST_IMAGE
   tags:
     - docker
+  only:
+    - tags
 
 
 release-docker:
@@ -101,10 +103,14 @@ release-docker:
   stage: release
   script:
     - docker pull $CONTAINER_TEST_IMAGE
+    - docker tag $CONTAINER_TEST_IMAGE $CONTAINER_RELEASE_IMAGE
     - docker tag $CONTAINER_TEST_IMAGE $CONTAINER_LATEST_IMAGE
+    - docker push $CONTAINER_RELEASE_IMAGE
     - docker push $CONTAINER_LATEST_IMAGE
   tags:
     - docker
+  only:
+    - tags
 
 
 singularity:
@@ -118,3 +124,5 @@ singularity:
     - lftp -u $KM3NET_SFTP_USER,$KM3NET_SFTP_PASSWORD sftp://$KM3NET_SFTP_HOST -e "set sftp:auto-confirm yes; set ssl:verify-certificate no; cd singularity/; put $SINGULARITY_IMAGE; bye"
   tags:
     - docker
+  only:
+    - tags
