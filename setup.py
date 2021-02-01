@@ -13,7 +13,7 @@ setup(
     long_description=long_description,
     url='https://git.km3net.de/ml/OrcaNet',
     author='Michael Moser, Stefan Reck',
-    author_email='mmoser@km3net.de, michael.m.moser@fau.de, stefan.reck@fau.de',
+    author_email='stefan.reck@fau.de, mmoser@km3net.de, michael.m.moser@fau.de',
     license='AGPL',
     install_requires=requirements,
     packages=[
