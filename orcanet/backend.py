@@ -251,6 +251,7 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
                         chunks=True,  # (batchsize,) + data.shape[1:]
                         compression="gzip",
                         compression_opts=1,
+                        # shuffle = True,  TODO ?
                     )
 
             else:

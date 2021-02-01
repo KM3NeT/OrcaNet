@@ -45,6 +45,16 @@ cudnn installed. You can see which of these each tensorflow version needs here
 https://www.tensorflow.org/install/source#gpu
 
 
+Containerization
+----------------
+A Singularity image of the latest stable version of OrcaNet with tf and cuda/cudnn
+is automatically uploaded to our sftp server.
+Download it via
+``wget http://pi1139.physik.uni-erlangen.de/singularity/orcanet.sif``
+and run it e.g. via
+``singularity shell orcanet.sif``
+
+
 Tensorflow 1.X
 --------------
 
