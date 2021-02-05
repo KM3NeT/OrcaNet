@@ -64,7 +64,8 @@ def as_recarray(info_blob):
 def as_recarray_dist(info_blob):
     """
     Save network output as recarray to h5. Intended for when network
-    outputs are distributions and thus 3D.
+    outputs are distributions and thus 3D (for example when using
+    OutputRegNormal as output layer block).
     I.e. (batchsize, 2, X), with [:, 0] being mu and [:, 1] being std.
 
     Example output from network:
@@ -92,3 +93,34 @@ def as_recarray_dist(info_blob):
         info_blob["ys"] = datas
 
     return as_recarray(info_blob)
+
+
+@register
+def as_recarray_dist_split(info_blob):
+    """
+    Save network output as recarray to h5. Intended for networks that
+    output recos and errs in seperate towers (for example when using
+    OutputRegNormalSplit as output layer block).
+
+    Example output from network:
+    shape {"A": (bs, 1), "A_err": (bs, 2, 1),
+           "B": (bs, 3), "B_err": (bs, 2, 3)}
+    In "A_err": [:, 0] is mu, [:, 1] is sigma
+
+    dtypes that will get saved to h5:
+    A_1, A_err_1, B_1, B_1_err, B_2, B_err_2, ...
+
+    """
+    def transform(network_output):
+        """ Skip A and rename A_err to A. """
+        transformed = {}
+        for output_name, output_value in network_output.items():
+            if output_name.endswith("_err"):
+                transformed[output_name[:-4]] = output_value
+        return transformed
+
+    info_blob["y_pred"] = transform(info_blob["y_pred"])
+    if info_blob.get("ys") is not None:
+        info_blob["ys"] = transform(info_blob["ys"])
+
+    return as_recarray_dist(info_blob)

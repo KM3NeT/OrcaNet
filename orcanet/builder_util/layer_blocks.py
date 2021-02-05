@@ -670,7 +670,7 @@ class OutputRegNormalSplit(OutputRegNormal):
         two Dense layers, the first with 64 neurons, the secound with
         32 neurons.
 
-    See OutputReg for other parameters.
+    See OutputRegNormal for other parameters.
 
     """
     def __init__(self, *args, sigma_unit_list=None, **kwargs):
@@ -782,6 +782,7 @@ class OutputRegErr:
         Keywords for the dense blocks.
 
     """
+    # TODO deprecated, only here for historcal reasons
     def __init__(self, output_names, flatten=True, **kwargs):
         self.flatten = flatten
         self.output_names = output_names
