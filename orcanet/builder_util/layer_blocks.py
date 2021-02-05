@@ -656,10 +656,11 @@ class OutputRegNormalSplit(OutputRegNormal):
     The sigma will be produced by its own tower of dense layers that
     is seperated from the rest of the network via gradient stop.
 
-    The output is a list with to tensors:
-    The first is mu with shape (?, output_neurons).
-    The secound is mu + sigma with shape (?, 2, output_neurons),
-    with [:, 0] being the mu and [:, 1] being the sigma.
+    The output is a list with two tensors:
+    - The first is the mu with shape (?, output_neurons) and name output_name.
+    - The second is mu + sigma with shape (?, 2, output_neurons),
+      with [:, 0] being the mu and [:, 1] being the sigma.
+      Its name is output_name + '_err'.
 
     Parameters
     ----------
@@ -689,7 +690,7 @@ class OutputRegNormalSplit(OutputRegNormal):
         mu = layers.Dense(
             units=self.output_neurons,
             activation=self.mu_activation,
-            name=f"{self.output_name}_mu")(x)
+            name=self.output_name)(x)
 
         # Network for the errors of the labels
         x = ks.backend.stop_gradient(x_base)
@@ -702,7 +703,7 @@ class OutputRegNormalSplit(OutputRegNormal):
             name=f"{self.output_name}_sigma")(x)
 
         mu_stopped = ks.backend.stop_gradient(mu)
-        err_output = layers.Concatenate(name=self.output_name, axis=-2)(
+        err_output = layers.Concatenate(name=f"{self.output_name}_err", axis=-2)(
             [tf.expand_dims(tsr, -2) for tsr in [mu_stopped, sigma]])
 
         return [mu, err_output]
