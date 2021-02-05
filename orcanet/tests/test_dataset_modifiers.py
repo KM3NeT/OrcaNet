@@ -73,11 +73,11 @@ class TestAsRecarrayDistSplit(TestAsRecarrayDist):
         inp = {
             "y_pred": {
                 "aa": np.ones(5,)*5, "aa_err": np.ones((5, 2)),
-                "bb": np.ones(5, 3)*6, "bb_err": np.ones((5, 2, 3))*2,
+                "bb": np.ones((5, 3))*6, "bb_err": np.ones((5, 2, 3))*2,
             },
             "ys": {
                 "aa": np.ones(5,)*7, "aa_err": np.ones((5, 2))*3,
-                "bb": np.ones(5, 3)*8, "bb_err": np.ones((5, 2, 3))*4,
+                "bb": np.ones((5, 3))*8, "bb_err": np.ones((5, 2, 3))*4,
             },
         }
         self.output = dmods.as_recarray_dist_split(inp)
