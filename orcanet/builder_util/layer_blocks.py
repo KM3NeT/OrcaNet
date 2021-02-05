@@ -605,7 +605,7 @@ class OutputRegNormal:
     sigma_activation : str, optional
         Activation function for the sigma neurons.
 
-    See OutputReg for other paramters.
+    See OutputReg for other parameters.
 
     """
     def __init__(self, output_neurons,
@@ -646,6 +646,66 @@ class OutputRegNormal:
 
         return layers.Concatenate(name=self.output_name, axis=-2)(
             [tf.expand_dims(tsr, -2) for tsr in [mu, sigma]])
+
+
+@register
+class OutputRegNormalSplit(OutputRegNormal):
+    """
+    Output block for regression using a normal distribution as output.
+
+    The sigma will be produced by its own tower of dense layers that
+    is seperated from the rest of the network via gradient stop.
+
+    The output is a list with to tensors:
+    The first is mu with shape (?, output_neurons).
+    The secound is mu + sigma with shape (?, 2, output_neurons),
+    with [:, 0] being the mu and [:, 1] being the sigma.
+
+    Parameters
+    ----------
+    sigma_unit_list : List, optional
+        A list of ints. Neurons in the Dense layers for the tower that
+        outputs the sigma. E.g., [64, 32] would add
+        two Dense layers, the first with 64 neurons, the secound with
+        32 neurons.
+
+    See OutputReg for other parameters.
+
+    """
+    def __init__(self, *args, sigma_unit_list=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.sigma_unit_list = sigma_unit_list
+
+    def __call__(self, layer):
+        if self.transition:
+            x_base = getattr(layers, self.transition.split("keras:")[-1])()(layer)
+        else:
+            x_base = layer
+
+        x = x_base
+        if self.unit_list is not None:
+            for units in self.unit_list:
+                x = DenseBlock(units=units, **self.kwargs)(x)
+        mu = layers.Dense(
+            units=self.output_neurons,
+            activation=self.mu_activation,
+            name=f"{self.output_name}_mu")(x)
+
+        # Network for the errors of the labels
+        x = ks.backend.stop_gradient(x_base)
+        if self.sigma_unit_list is not None:
+            for units in self.sigma_unit_list:
+                x = DenseBlock(units=units, **self.kwargs)(x)
+        sigma = layers.Dense(
+            units=self.output_neurons,
+            activation=self.sigma_activation,
+            name=f"{self.output_name}_sigma")(x)
+
+        mu_stopped = ks.backend.stop_gradient(mu)
+        err_output = layers.Concatenate(name=self.output_name, axis=-2)(
+            [tf.expand_dims(tsr, -2) for tsr in [mu_stopped, sigma]])
+
+        return [mu, err_output]
 
 
 @register
