@@ -29,7 +29,7 @@ class TestRegressionLabels(TestCase):
 
     def test_content_shape1_no_outputname(self):
         ys = self._get_ys(log10=True, model_output=None)
-        np.testing.assert_array_equal(ys["obs_1"], np.zeros((5, 1)))
+        np.testing.assert_array_equal(ys["obs1"], np.zeros((5, 1)))
 
     def test_content_stacks_shape1(self):
         ys = self._get_ys(log10=True, stacks=2)

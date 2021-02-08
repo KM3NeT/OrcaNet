@@ -53,9 +53,9 @@ class RegressionLabels:
     Examples
     --------
     >>> RegressionLabels(columns=['dir_x', 'dir_y', 'dir_z'], model_output='dir')
-    Will produce label 'dir' of shape (bs, 3).
+    Will produce array of shape (bs, 3) for model output 'dir'.
     >>> RegressionLabels(columns='dir_x')
-    Will produce label 'dir_x' of shape (bs, 1).
+    Will produce array of shape (bs, 1) for model output 'dir_x'.
 
     """
     def __init__(self, columns,
@@ -80,9 +80,11 @@ class RegressionLabels:
     def __call__(self, info_blob):
         try:
             y_value = info_blob["y_values"][self.columns]
-        except KeyError as e:
+        except KeyError:
             if not self._warned:
-                warnings.warn(f"Can not generate labels: {e}")
+                warnings.warn(
+                    f"Can not generate labels: {self.columns} "
+                    f"not found in y_values")
                 self._warned = True
             return None
         y_value = misc.to_ndarray(y_value, dtype="float32")
