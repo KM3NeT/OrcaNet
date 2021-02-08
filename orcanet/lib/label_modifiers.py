@@ -50,10 +50,12 @@ class RegressionLabels:
         E.g. if the label is shape (?, 3), it will become
         shape (?, stacks, 3). Used for lkl regression.
 
-    Example
-    -------
+    Examples
+    --------
     >>> RegressionLabels(columns=['dir_x', 'dir_y', 'dir_z'], model_output='dir')
     Will produce label 'dir' of shape (bs, 3).
+    >>> RegressionLabels(columns='dir_x')
+    Will produce label 'dir_x' of shape (bs, 1).
 
     """
     def __init__(self, columns,
@@ -119,11 +121,19 @@ class RegressionLabelsSplit(RegressionLabels):
     Necessary because pred and truth must be the same shape.
 
     """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.err_output_format = "{}_err"
+        if self.stacks is not None:
+            warnings.warn(
+                "Can not use stacks option with RegressionLabelsSplit, ignoring...")
+            self.stacks = None
+
     def __call__(self, info_blob):
         output_dict = super().__call__(info_blob)
         err_outputs = {}
         for name, label in output_dict.items():
-            err_outputs[f"{name}_err"] = np.repeat(
+            err_outputs[self.err_output_format.format(name)] = np.repeat(
                 np.expand_dims(label, axis=-2), repeats=2, axis=-2)
         output_dict.update(err_outputs)
         return output_dict
