@@ -667,14 +667,17 @@ class OutputRegNormalSplit(OutputRegNormal):
     sigma_unit_list : List, optional
         A list of ints. Neurons in the Dense layers for the tower that
         outputs the sigma. E.g., [64, 32] would add
-        two Dense layers, the first with 64 neurons, the secound with
+        two Dense layers, the first with 64 neurons, the second with
         32 neurons.
+        Default: Same as unit_list.
 
     See OutputRegNormal for other parameters.
 
     """
     def __init__(self, *args, sigma_unit_list=None, **kwargs):
         super().__init__(*args, **kwargs)
+        if sigma_unit_list is None:
+            sigma_unit_list = self.unit_list
         self.sigma_unit_list = sigma_unit_list
 
     def __call__(self, layer):
