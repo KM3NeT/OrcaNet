@@ -47,3 +47,27 @@ class TestRegressionLabels(TestCase):
         )
         np.testing.assert_array_equal(
             ys["log_obs"], np.array([2, 1, 0, 0, 0]).reshape(5, 1))
+
+
+class TestRegressionLabelsSplit(TestCase):
+    def setUp(self):
+        data = np.ones((5,))
+        info_blob = {"y_values": data.astype(
+            np.dtype([("obs1", float), ("obs2", float), ("obs3", float)])
+        )}
+        lmod = lmods.RegressionLabelsSplit(
+            columns="obs1",
+            model_output="log_obs",
+        )
+        self.ys = lmod(info_blob)
+
+    def test_keys(self):
+        self.assertListEqual(list(self.ys.keys()), ["log_obs", "log_obs_err"])
+
+    def test_content_shape1(self):
+        target_shapes = {
+            "log_obs": (5, 1),
+            "log_obs_err": (5, 2, 1),
+        }
+        for key, shape in target_shapes.items():
+            self.assertTupleEqual(shape, self.ys[key].shape)

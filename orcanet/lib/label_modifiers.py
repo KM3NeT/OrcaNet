@@ -99,3 +99,31 @@ class RegressionLabels:
         if self.stacks:
             ys = np.repeat(ys[:, None], repeats=self.stacks, axis=1)
         return ys
+
+
+@register
+class RegressionLabelsSplit(RegressionLabels):
+    """
+    Generate labels for regression.
+
+    Intended for networks that output recos and errs in seperate towers
+    (for example when using OutputRegNormalSplit as output layer block).
+
+    Example
+    -------
+    >>> RegressionLabelsSplit(columns=['dir_x', 'dir_y', 'dir_z'], model_output='dir')
+    Will produce label 'dir' of shape (bs, 3),
+    and label 'dir_err' of shape (bs, 2, 3).
+
+    'dir_err' is just the label twice, along a new axis at -2.
+    Necessary because pred and truth must be the same shape.
+
+    """
+    def __call__(self, info_blob):
+        output_dict = super().__call__(info_blob)
+        err_outputs = {}
+        for name, label in output_dict.items():
+            err_outputs[f"{name}_err"] = np.repeat(
+                np.expand_dims(label, axis=-2), repeats=2, axis=-2)
+        output_dict.update(err_outputs)
+        return output_dict
