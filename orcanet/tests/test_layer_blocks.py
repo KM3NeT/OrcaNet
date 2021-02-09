@@ -126,6 +126,7 @@ class TestConvBlock(TestCase):
 
 
 class TestOutputRegNormal(TestCase):
+    # also using this class as template for other tests
     @classmethod
     def setUpClass(cls):
         inp = tf.keras.layers.Input(shape=(3, 4))
@@ -169,6 +170,33 @@ class TestOutputRegNormal(TestCase):
     def test_output_names(self):
         if "output_names" in self.targets:
             self.assertListEqual(self.model.output_names, self.targets["output_names"])
+
+
+class TestOutputRegNormalSplit(TestOutputRegNormal):
+    @classmethod
+    def setUpClass(cls):
+        inp = tf.keras.layers.Input(shape=(3, 4))
+        output = layer_blocks.OutputRegNormalSplit(
+            output_neurons=3,
+            output_name="test",
+            unit_list=[5, 5],
+            sigma_unit_list=[3, ],
+            mu_activation="relu",
+            transition="keras:Flatten",
+        )(inp)
+        cls.model = tf.keras.Model(inp, output)
+
+    def setUp(self):
+        self.targets = {
+            "n_layers": 15,
+            "output_shape": [(None, 3), (None, 2, 3)],
+            "n_params": 164,
+            "output_names": ["test", "test_err"],
+        }
+
+    def test_output_shape(self):
+        for i in range(len(self.targets["output_shape"])):
+            self.assertTupleEqual(self.model.output_shape[i], self.targets["output_shape"][i])
 
 
 class TestResnetBnetBlock(TestOutputRegNormal):

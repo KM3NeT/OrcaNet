@@ -50,10 +50,12 @@ class RegressionLabels:
         E.g. if the label is shape (?, 3), it will become
         shape (?, stacks, 3). Used for lkl regression.
 
-    Example
-    -------
+    Examples
+    --------
     >>> RegressionLabels(columns=['dir_x', 'dir_y', 'dir_z'], model_output='dir')
-    Will produce label 'dir' of shape (bs, 3).
+    Will produce array of shape (bs, 3) for model output 'dir'.
+    >>> RegressionLabels(columns='dir_x')
+    Will produce array of shape (bs, 1) for model output 'dir_x'.
 
     """
     def __init__(self, columns,
@@ -78,9 +80,11 @@ class RegressionLabels:
     def __call__(self, info_blob):
         try:
             y_value = info_blob["y_values"][self.columns]
-        except KeyError as e:
+        except KeyError:
             if not self._warned:
-                warnings.warn(f"Can not generate labels: {e}")
+                warnings.warn(
+                    f"Can not generate labels: {self.columns} "
+                    f"not found in y_values")
                 self._warned = True
             return None
         y_value = misc.to_ndarray(y_value, dtype="float32")
@@ -99,3 +103,39 @@ class RegressionLabels:
         if self.stacks:
             ys = np.repeat(ys[:, None], repeats=self.stacks, axis=1)
         return ys
+
+
+@register
+class RegressionLabelsSplit(RegressionLabels):
+    """
+    Generate labels for regression.
+
+    Intended for networks that output recos and errs in seperate towers
+    (for example when using OutputRegNormalSplit as output layer block).
+
+    Example
+    -------
+    >>> RegressionLabelsSplit(columns=['dir_x', 'dir_y', 'dir_z'], model_output='dir')
+    Will produce label 'dir' of shape (bs, 3),
+    and label 'dir_err' of shape (bs, 2, 3).
+
+    'dir_err' is just the label twice, along a new axis at -2.
+    Necessary because pred and truth must be the same shape.
+
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.err_output_format = "{}_err"
+        if self.stacks is not None:
+            warnings.warn(
+                "Can not use stacks option with RegressionLabelsSplit, ignoring...")
+            self.stacks = None
+
+    def __call__(self, info_blob):
+        output_dict = super().__call__(info_blob)
+        err_outputs = {}
+        for name, label in output_dict.items():
+            err_outputs[self.err_output_format.format(name)] = np.repeat(
+                np.expand_dims(label, axis=-2), repeats=2, axis=-2)
+        output_dict.update(err_outputs)
+        return output_dict
