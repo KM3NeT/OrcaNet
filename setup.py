@@ -35,6 +35,7 @@ setup(
 
     entry_points={
         'console_scripts': [
+            'orcanet=orcanet.parser:main',
             'summarize=orcanet.utilities.summarize_training:main',
             'orcatrain=orcanet_contrib.parser_orcatrain:main',
             'orcapred=orcanet_contrib.parser_orcapred:main',
