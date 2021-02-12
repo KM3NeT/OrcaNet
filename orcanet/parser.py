@@ -2,20 +2,28 @@
 Run OrcaNet functionalities from command line.
 
 """
+import os
 import argparse
 
 # imports involving tf moved inside functions for speed up
 
 
-def train(directory, list_file, config_file, model_file=None, to_epoch=None):
+def train(directory, list_file=None, config_file=None, model_file=None, to_epoch=None):
     from orcanet.core import Organizer
     from orcanet.model_builder import ModelBuilder
+
+    if list_file is None:
+        list_file = _find_toml(directory, "list.toml")
+    if config_file is None:
+        config_file = _find_toml(directory, "config.toml")
 
     orga = Organizer(directory, list_file, config_file, tf_log_level=2)
 
     if orga.io.get_latest_epoch() is None:
         # Start of training
         print("Building new model")
+        if model_file is None:
+            model_file = _find_toml(directory, "model.toml")
         model = ModelBuilder(model_file).build(orga, verbose=False)
     else:
         model = None
@@ -23,18 +31,48 @@ def train(directory, list_file, config_file, model_file=None, to_epoch=None):
     return orga.train_and_validate(model=model, to_epoch=to_epoch)
 
 
-def predict(directory, list_file, config_file, epoch=None, fileno=None):
+def predict(directory, list_file=None, config_file=None, epoch=None, fileno=None):
     from orcanet.core import Organizer
+
+    if list_file is None:
+        list_file = _find_toml(directory, "list.toml")
+    if config_file is None:
+        config_file = _find_toml(directory, "config.toml")
 
     orga = Organizer(directory, list_file, config_file, tf_log_level=1)
     return orga.predict(epoch=epoch, fileno=fileno)[0]
 
 
-def inference(directory, list_file, config_file, epoch=None, fileno=None):
+def inference(directory, list_file=None, config_file=None, epoch=None, fileno=None):
     from orcanet.core import Organizer
+
+    if list_file is None:
+        list_file = _find_toml(directory, "list.toml")
+    if config_file is None:
+        config_file = _find_toml(directory, "config.toml")
 
     orga = Organizer(directory, list_file, config_file, tf_log_level=1)
     return orga.inference(epoch=epoch, fileno=fileno)
+
+
+def _find_files(top, filename):
+    """ Return files with given name in given directory. """
+    found = []
+    for root, dirs, files in os.walk(top):
+        for file in files:
+            if file == filename:
+                found.append(os.path.join(root, file))
+    return found
+
+
+def _find_toml(directory, filename):
+    found = _find_files(directory, filename)
+    if len(found) >= 2:
+        raise ValueError(f"Can not auto find {filename}: More than one file found ({found}")
+    elif len(found) == 0:
+        return None
+    else:
+        return found[0]
 
 
 def main():
@@ -47,8 +85,16 @@ def main():
 
     def add_common_args(prsr):
         prsr.add_argument("directory", help="Path to OrcaNet directory.")
-        prsr.add_argument("--list_file", help="toml list file")
-        prsr.add_argument("--config_file", help="toml config file")
+        prsr.add_argument(
+            "--list_file",
+            type=str,
+            help="Path to toml list file. Default: Look for a file called 'list.toml' in the given OrcaNet directory.",
+            default=None)
+        prsr.add_argument(
+            "--config_file",
+            type=str,
+            help="Path to toml config file. Default: Look for a file called 'config.toml' in the given OrcaNet directory.",
+            default=None)
 
     # orca train
     parser_train = subparsers.add_parser(
@@ -57,7 +103,10 @@ def main():
     )
     add_common_args(parser_train)
     parser_train.add_argument(
-        "--model_file", type=str, help="toml model file", default=None
+        "--model_file",
+        type=str,
+        help="Path to toml config file. Default: Look for a file called 'model.toml' in the given OrcaNet directory.",
+        default=None
     )
     parser_train.add_argument(
         "--to_epoch",
