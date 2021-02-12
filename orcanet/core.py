@@ -18,7 +18,7 @@ from orcanet.history import HistoryHandler
 from orcanet.utilities.nn_utilities import load_zero_center_data
 import orcanet.lib as lib
 import orcanet.logging as logging
-from orcanet.misc import from_register
+import orcanet.misc
 import medgeconv
 
 
@@ -40,7 +40,8 @@ class Organizer:
     def __init__(self, output_folder,
                  list_file=None,
                  config_file=None,
-                 tf_log_level=None):
+                 tf_log_level=None,
+                 discover_tomls=True):
         """
         Set the attributes of the Configuration object.
 
@@ -57,19 +58,29 @@ class Organizer:
             Path to a toml list file with pathes to all the h5 files that should
             be used for training and validation.
             Will be used to extract samples and labels.
+            Default: Look for a file called 'list.toml' in the given output_folder.
         config_file : str, optional
             Path to a toml config file with settings that are used instead of
             the default ones.
+            Default: Look for a file called 'config.toml' in the given output_folder.
         tf_log_level : int/str
             Sets the TensorFlow CPP_MIN_LOG_LEVEL environment variable.
             0 = all messages are logged (default behavior).
             1 = INFO messages are not printed.
             2 = INFO and WARNING messages are not printed.
             3 = INFO, WARNING, and ERROR messages are not printed.
+        discover_tomls : bool
+            If False, do not try to look for toml files in the given
+            output_folder if list_file or config_file is None [Default: True].
 
         """
         if tf_log_level is not None:
             os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(tf_log_level)
+
+        if discover_tomls and list_file is None:
+            list_file = orcanet.misc.find_file(output_folder, "list.toml")
+        if discover_tomls and config_file is None:
+            config_file = orcanet.misc.find_file(output_folder, "config.toml")
 
         self.cfg = Configuration(output_folder, list_file, config_file)
         self.io = IOHandler(self.cfg)
@@ -843,13 +854,13 @@ class Configuration(object):
         for key, value in user_values.items():
             if hasattr(self, key):
                 if key == "sample_modifier":
-                    value = from_register(
+                    value = orcanet.misc.from_register(
                         toml_entry=value, register=lib.sample_modifiers.smods)
                 elif key == "dataset_modifier":
-                    value = from_register(
+                    value = orcanet.misc.from_register(
                         toml_entry=value, register=lib.dataset_modifiers.dmods)
                 elif key == "label_modifier":
-                    value = from_register(
+                    value = orcanet.misc.from_register(
                         toml_entry=value, register=lib.label_modifiers.lmods)
                 setattr(self, key, value)
             else:

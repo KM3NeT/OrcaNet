@@ -1,4 +1,5 @@
 """ Odds and ends. """
+import os
 import inspect
 import numpy as np
 
@@ -93,3 +94,20 @@ def to_ndarray(x, dtype="float32"):
     new_shape = (len(x), len(x.dtype.names))
     return np.ascontiguousarray(x).astype(new_dtype).view(dtype).reshape(new_shape)
 
+
+def find_file(directory, filename):
+    """ Look for file in given directoy. Error if there are multiple. """
+    found = []
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file == filename:
+                found.append(os.path.join(root, file))
+    if len(found) >= 2:
+        raise ValueError(
+            f"Can not find {filename}: More than one file found ({found})")
+    elif len(found) == 0:
+        return None
+    else:
+        fpath = found[0]
+        print(f"Found {fpath}")
+        return fpath
