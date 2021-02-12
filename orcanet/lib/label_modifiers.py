@@ -78,8 +78,15 @@ class RegressionLabels:
         self._warned = False
 
     def __call__(self, info_blob):
+        y_values = info_blob["y_values"]
+        if y_values is None:
+            if not self._warned:
+                warnings.warn(
+                    f"Can not generate labels: No y_values available!")
+                self._warned = True
+            return None
         try:
-            y_value = info_blob["y_values"][self.columns]
+            y_value = y_values[self.columns]
         except KeyError:
             if not self._warned:
                 warnings.warn(
@@ -133,6 +140,8 @@ class RegressionLabelsSplit(RegressionLabels):
 
     def __call__(self, info_blob):
         output_dict = super().__call__(info_blob)
+        if output_dict is None:
+            return None
         err_outputs = {}
         for name, label in output_dict.items():
             err_outputs[self.err_output_format.format(name)] = np.repeat(
