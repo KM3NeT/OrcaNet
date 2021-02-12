@@ -23,6 +23,7 @@ Options:
     --fileno=FILENO  Use model of given fileno. [default: None]
 
 """
+import warnings
 from matplotlib import use
 use('Agg')
 
@@ -73,6 +74,7 @@ def orca_pred(output_folder, list_file, config_file, model_file,
 
 def main():
     """ Run the orca_pred function with a parser. """
+    warnings.warn("parser_orcapred is deprecated! Use orcanet predict instead.")
     args = docopt(__doc__)
     if args["--epoch"] == "None":
         epoch = None

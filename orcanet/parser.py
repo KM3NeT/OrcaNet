@@ -4,6 +4,7 @@ Run OrcaNet functionalities from command line.
 """
 import argparse
 from orcanet.misc import find_file
+import orcanet.utilities.summarize_training as summarize_training
 
 # imports involving tf moved inside functions for speed up
 
@@ -53,13 +54,17 @@ def main():
         prsr.add_argument(
             "--list_file",
             type=str,
-            help="Path to toml list file. Default: Look for a file called 'list.toml' in the given OrcaNet directory.",
-            default=None)
+            help="Path to toml list file. Default: Look for a file called "
+                 "'list.toml' in the given OrcaNet directory.",
+            default=None,
+        )
         prsr.add_argument(
             "--config_file",
             type=str,
-            help="Path to toml config file. Default: Look for a file called 'config.toml' in the given OrcaNet directory.",
-            default=None)
+            help="Path to toml config file. Default: Look for a file called "
+                 "'config.toml' in the given OrcaNet directory.",
+            default=None,
+        )
 
     # orca train
     parser_train = subparsers.add_parser(
@@ -70,8 +75,11 @@ def main():
     parser_train.add_argument(
         "--model_file",
         type=str,
-        help="Path to toml config file. Default: Look for a file called 'model.toml' in the given OrcaNet directory.",
-        default=None
+        help="Path to toml model file. Will be used to build a model at "
+             "the start of the training. Not needed to resume training. "
+             "Default: Look for a file called 'model.toml' in the "
+             "given OrcaNet directory.",
+        default=None,
     )
     parser_train.add_argument(
         "--to_epoch",
@@ -84,11 +92,15 @@ def main():
     # orca pred
     parser_pred = subparsers.add_parser(
         "predict",
-        description="Load a trained model and save its prediction on the predictions files to h5.",
+        description="Load a trained model and save its prediction on "
+                    "the predictions files to h5.",
     )
     add_common_args(parser_pred)
     parser_pred.add_argument(
-        "--epoch", type=int, help="Epoch of model to load. Default: best", default=None
+        "--epoch",
+        type=int,
+        help="Epoch of model to load. Default: best",
+        default=None
     )
     parser_pred.add_argument(
         "--fileno",
@@ -101,7 +113,8 @@ def main():
     # orca inf
     parser_inf = subparsers.add_parser(
         "inference",
-        description="Load a trained model and save its prediction on the inference files to h5.",
+        description="Load a trained model and save its prediction on the "
+                    "inference files to h5.",
     )
     add_common_args(parser_inf)
     parser_inf.add_argument(
@@ -114,6 +127,17 @@ def main():
         default=None,
     )
     parser_inf.set_defaults(func=inference)
+
+    # summarize
+    parent_parser = summarize_training.get_parser()
+    parser_smrz = subparsers.add_parser(
+        "summarize",
+        description=parent_parser.description,
+        formatter_class=argparse.RawTextHelpFormatter,
+        parents=[parent_parser],
+        add_help=False,
+    )
+    parser_smrz.set_defaults(func=summarize_training.summarize)
 
     kwargs = vars(parser.parse_args())
     func = kwargs.pop("func")
