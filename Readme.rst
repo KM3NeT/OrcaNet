@@ -29,6 +29,8 @@ which is split over multiple files.
 In this sense, it tackles many challenges that are usually found in 
 astroparticle physics, like huge datasets.
 
+Documentation is at https://ml.pages.km3net.de/OrcaNet/.
+
 OrcaNet is a part of the Deep Learning efforts for the neutrino telescope KM3NeT.
 Find more information about KM3NeT on http://www.km3net.org .
 
