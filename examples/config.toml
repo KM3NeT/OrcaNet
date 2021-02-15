@@ -1,0 +1,17 @@
+# Example configuration file for OrcaNet
+#
+# These options define the various configurable setting of the Organizer.
+# Possible options, together with their default values, are listed in the
+# doc of orcanet.core.Configuration.
+#
+
+[config]
+# Batchsize that will be used for the training and validation of the network
+batchsize=32
+# The learning rate for the training. Here, it is a float, so the
+# learning rate will be constantly this value.
+learning_rate=0.002
+# shuffle the order at which the batches are read from the training files
+shuffle_train = true
+# Use a special sample modifer that is used for EdgeConv networks.
+sample_modifier="GraphEdgeConv"

@@ -1,8 +1,10 @@
-# Defines the input files of the network.
+# Defines the input files of the network. In this example, we want to read
+# from two different sets of files at the same time.
 
 
 # Name of this input set. If this is the name of an input layer of the
-# model, it will get data from this set.
+# model, it will get data from this set. Otherwise, you have to use a
+# sample modifier.
 [input_A]
 
 # A list of files used during training.
@@ -23,7 +25,7 @@ inference_files = [
 "path/to/inference_files_input_A/",
 ]
 
-# Another input set for a second input layer of the model.
+# Another input set, e.g. for a second input layer of the model.
 # Each input must have the same number of training, validation,
 # and/or inference files.
 [input_B]

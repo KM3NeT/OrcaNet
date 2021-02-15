@@ -1,7 +1,7 @@
-Working example
-===============
+Example on toy data
+===================
 
-This page shows how to use orcanet by applying it on dummy data.
+This page shows how to use orcanet via python by applying it on some toy data.
 The full scripts can be found in examples/full_example.
 
 In order to use orcanet, data in the form of multi dimensional images in an h5 file,

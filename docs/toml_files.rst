@@ -1,15 +1,15 @@
 .. _input_page:
 
-Input toml files
-================
+Toml files
+==========
 
 Much of the input in OrcaNet is given as toml files.
 This page shows examples for the proper format, as well as possible options.
 
 .. _input_page_orga:
 
-For the Organizer
------------------
+toml files for the Organizer
+----------------------------
 
 The :py:class:`orcanet.core.Organizer` takes a ``list_file`` and a
 ``config_file`` argument, which are the pathes to the respective files.
@@ -19,31 +19,35 @@ Here are examples for the proper file formats:
 list_file
 ^^^^^^^^^
 
-.. literalinclude:: ../examples/list_file.toml
+.. literalinclude:: ../examples/list.toml
    :language: toml
    :linenos:
-   :caption: examples/list_file.toml
+   :caption: examples/list.toml
 
 
 config_file
 ^^^^^^^^^^^
 
 An important paramter of the config files are the modifiers. Check out
-:ref:`modifiers_page` for more info.
+:ref:`modifiers_page` for more info. You can find various built-in modifiers
+in :py:mod:`orcanet.lib`.
 
-.. literalinclude:: ../examples/config_file.toml
+.. literalinclude:: ../examples/config.toml
    :language: toml
    :linenos:
-   :caption: examples/config_file.toml
+   :caption: examples/config.toml
 
 .. _input_page_model:
 
-For the model builder
----------------------
+toml files for the model builder
+--------------------------------
 
-Models can be build using toml input files. The path is handed over as
-the ``model_file`` argument of
+Models can be built with OrcaNet using a toml file.
+The path is handed over as the ``model_file`` argument of
 :py:class:`orcanet.model_builder.ModelBuilder`.
+You can find various built-in layer blocks
+in :py:mod:`orcanet.builder_util.layer_blocks`,
+and some built-in losses in :py:mod:`orcanet.lib.losses`.
 
 .. code-block:: python
 

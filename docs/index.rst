@@ -14,26 +14,18 @@
 
 .. include:: ../Readme.rst
 
-
-Contents
---------
-
 .. toctree::
-    :hidden:
-    :titlesonly:
-
-    self
-
-.. toctree::
+   :hidden:
    :maxdepth: 2
 
+   self
    quick_start
-   input_list
+   toml_files
    modifiers
-   intro
-   lr
+   python_overview
+   learning_rate
    example_models
-   full_example
+   example_on_toy_data
    CONTRIBUTING
 
 

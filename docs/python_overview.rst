@@ -1,7 +1,7 @@
 .. _orcanet_python:
 
-OrcaNet overview
-================
+OrcaNet python overview
+=======================
 
 Using OrcaNet in python happens in two steps:
 
