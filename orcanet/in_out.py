@@ -10,7 +10,7 @@ import h5py
 import numpy as np
 from inspect import signature
 
-# moved into IOHandler.get_batch for speed up
+# moved into IOHandler.get_batch for speed up; tensorflow import is slow!
 # from orcanet.h5_generator import Hdf5BatchGenerator
 
 
