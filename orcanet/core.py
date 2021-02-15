@@ -749,34 +749,30 @@ class Configuration(object):
     # TODO add a clober script that properly deletes models + logfiles
     def __init__(self, output_folder, list_file=None, config_file=None, **kwargs):
         self.batchsize = 64
-        self.learning_rate = None
-
-        self.zero_center_folder = None
-        self.validate_interval = None
-        self.cleanup_models = False
+        self.callback_train = []
         self.class_weight = None
-
-        self.sample_modifier = None
+        self.cleanup_models = False
+        self.custom_objects = {}
         self.dataset_modifier = None
-        self.label_modifier = None
-
+        self.fixed_batchsize = False
         self.key_x_values = "x"
         self.key_y_values = "y"
-        self.custom_objects = {}
-        self.shuffle_train = False
-
-        self.fixed_batchsize = False
-        self.callback_train = []
-        self.use_scratch_ssd = False
-        self.verbose_train = 1
-        self.verbose_val = 0
+        self.label_modifier = None
+        self.learning_rate = None
         self.make_weight_plots = False  # Removed in v0.11.1
-        self.n_events = None
         self.max_queue_size = 10
+        self.multi_gpu = True
+        self.n_events = None
+        self.sample_modifier = None
+        self.shuffle_train = False
         self.train_logger_display = 100
         self.train_logger_flush = -1
-        self.multi_gpu = True
+        self.use_scratch_ssd = False
+        self.validate_interval = None
+        self.verbose_train = 1
+        self.verbose_val = 0
         self.y_field_names = None
+        self.zero_center_folder = None
 
         self._default_values = dict(self.__dict__)
 
