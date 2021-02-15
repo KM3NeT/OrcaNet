@@ -3,15 +3,13 @@ Run OrcaNet functionalities from command line.
 
 """
 import argparse
-from orcanet.misc import find_file
-import orcanet.utilities.summarize_training as summarize_training
-
 # imports involving tf moved inside functions for speed up
 
 
 def train(directory, list_file=None, config_file=None, model_file=None, to_epoch=None):
     from orcanet.core import Organizer
     from orcanet.model_builder import ModelBuilder
+    from orcanet.misc import find_file
 
     orga = Organizer(directory, list_file, config_file, tf_log_level=1)
 
@@ -131,6 +129,8 @@ def _add_common_args(prsr):
 
 
 def _add_parser_summarize(subparsers):
+    import orcanet.utilities.summarize_training as summarize_training
+
     parent_parser = summarize_training.get_parser()
     parser = subparsers.add_parser(
         "summarize",
@@ -140,6 +140,18 @@ def _add_parser_summarize(subparsers):
         add_help=False,
     )
     parser.set_defaults(func=summarize_training.summarize)
+
+
+def _add_parser_version(subparsers):
+    def show_version():
+        from orcanet import version
+        print(version)
+
+    parser = subparsers.add_parser(
+        "version",
+        description="Show installed orcanet version.",
+    )
+    parser.set_defaults(func=show_version)
 
 
 def main():
@@ -154,6 +166,7 @@ def main():
     _add_paser_predict(subparsers)
     _add_parser_inference(subparsers)
     _add_parser_summarize(subparsers)
+    _add_parser_version(subparsers)
 
     kwargs = vars(parser.parse_args())
     func = kwargs.pop("func")
