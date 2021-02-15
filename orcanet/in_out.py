@@ -9,7 +9,9 @@ import shutil
 import h5py
 import numpy as np
 from inspect import signature
-from orcanet.h5_generator import Hdf5BatchGenerator
+
+# moved into IOHandler.get_batch for speed up; tensorflow import is slow!
+# from orcanet.h5_generator import Hdf5BatchGenerator
 
 
 def get_subfolder(main_folder, name=None, create=False):
@@ -613,6 +615,9 @@ class IOHandler(object):
                 From the y_values datagroup of the input files.
 
         """
+        # this will import tf; move inside here for speed up
+        from orcanet.h5_generator import Hdf5BatchGenerator
+
         gen = Hdf5BatchGenerator(
             next(self.yield_files("train")),
             batchsize=self.cfg.batchsize,

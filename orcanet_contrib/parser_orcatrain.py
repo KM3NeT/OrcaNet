@@ -23,6 +23,7 @@ Options:
                  are changed during the training.
 
 """
+import warnings
 from matplotlib import use
 use('Agg')
 
@@ -101,6 +102,7 @@ def orca_train(output_folder, list_file, config_file, model_file,
 
 def main():
     """ Run the orca_train function with a parser. """
+    warnings.warn("parser_orcatrain is deprecated! Use orcanet train instead.")
     args = docopt(__doc__)
     output_folder = args['FOLDER']
     list_file = args['LIST']

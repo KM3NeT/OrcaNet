@@ -29,8 +29,6 @@ class Summarizer:
         Dont plot the train/val curves [default: False].
     width : float
         Scaling of the width of the curves and the marker size [default: 1].
-    verbose : bool
-        Print various infos.
 
     """
     def __init__(self, folders,
@@ -225,22 +223,31 @@ class Summarizer:
         return minima, maxima
 
 
-def main():
+def summarize(**kwargs):
+    for key in list(kwargs.keys()):
+        if kwargs[key] is None:
+            kwargs.pop(key)
+    Summarizer(**kwargs).summarize()
+
+
+def get_parser():
     parser = argparse.ArgumentParser(
         description=str(Summarizer.__doc__),
-        formatter_class=argparse.RawTextHelpFormatter)
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
     parser.add_argument('folders', type=str, nargs='*')
     parser.add_argument('--metric', type=str, nargs="*")
     parser.add_argument('--smooth', nargs="?", type=int)
     parser.add_argument('--width', nargs="?", type=float)
     parser.add_argument('--labels', nargs="*", type=str)
     parser.add_argument('--noplot', action="store_true")
-    args = vars(parser.parse_args())
-    for key in list(args.keys()):
-        if args[key] is None:
-            args.pop(key)
+    return parser
 
-    Summarizer(**args).summarize()
+
+def main():
+    parser = get_parser()
+    args = vars(parser.parse_args())
+    summarize(**args)
 
 
 if __name__ == '__main__':

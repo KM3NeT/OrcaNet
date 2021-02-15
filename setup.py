@@ -35,9 +35,9 @@ setup(
 
     entry_points={
         'console_scripts': [
-            'summarize=orcanet.utilities.summarize_training:main',
-            'orcatrain=orcanet_contrib.parser_orcatrain:main',
-            'orcapred=orcanet_contrib.parser_orcapred:main',
+            'orcanet=orcanet.parser:main',
+            'orcatrain=orcanet_contrib.parser_orcatrain:main',  # TODO deprectated
+            'orcapred=orcanet_contrib.parser_orcapred:main',  # TODO deprectated
         ]
     },
 

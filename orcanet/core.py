@@ -18,7 +18,7 @@ from orcanet.history import HistoryHandler
 from orcanet.utilities.nn_utilities import load_zero_center_data
 import orcanet.lib as lib
 import orcanet.logging as logging
-from orcanet.misc import from_register
+import orcanet.misc
 import medgeconv
 
 
@@ -40,7 +40,8 @@ class Organizer:
     def __init__(self, output_folder,
                  list_file=None,
                  config_file=None,
-                 tf_log_level=None):
+                 tf_log_level=None,
+                 discover_tomls=True):
         """
         Set the attributes of the Configuration object.
 
@@ -57,19 +58,29 @@ class Organizer:
             Path to a toml list file with pathes to all the h5 files that should
             be used for training and validation.
             Will be used to extract samples and labels.
+            Default: Look for a file called 'list.toml' in the given output_folder.
         config_file : str, optional
             Path to a toml config file with settings that are used instead of
             the default ones.
+            Default: Look for a file called 'config.toml' in the given output_folder.
         tf_log_level : int/str
             Sets the TensorFlow CPP_MIN_LOG_LEVEL environment variable.
             0 = all messages are logged (default behavior).
             1 = INFO messages are not printed.
             2 = INFO and WARNING messages are not printed.
             3 = INFO, WARNING, and ERROR messages are not printed.
+        discover_tomls : bool
+            If False, do not try to look for toml files in the given
+            output_folder if list_file or config_file is None [Default: True].
 
         """
         if tf_log_level is not None:
             os.environ['TF_CPP_MIN_LOG_LEVEL'] = str(tf_log_level)
+
+        if discover_tomls and list_file is None:
+            list_file = orcanet.misc.find_file(output_folder, "list.toml")
+        if discover_tomls and config_file is None:
+            config_file = orcanet.misc.find_file(output_folder, "config.toml")
 
         self.cfg = Configuration(output_folder, list_file, config_file)
         self.io = IOHandler(self.cfg)
@@ -738,34 +749,30 @@ class Configuration(object):
     # TODO add a clober script that properly deletes models + logfiles
     def __init__(self, output_folder, list_file=None, config_file=None, **kwargs):
         self.batchsize = 64
-        self.learning_rate = None
-
-        self.zero_center_folder = None
-        self.validate_interval = None
-        self.cleanup_models = False
+        self.callback_train = []
         self.class_weight = None
-
-        self.sample_modifier = None
+        self.cleanup_models = False
+        self.custom_objects = {}
         self.dataset_modifier = None
-        self.label_modifier = None
-
+        self.fixed_batchsize = False
         self.key_x_values = "x"
         self.key_y_values = "y"
-        self.custom_objects = {}
-        self.shuffle_train = False
-
-        self.fixed_batchsize = False
-        self.callback_train = []
-        self.use_scratch_ssd = False
-        self.verbose_train = 1
-        self.verbose_val = 0
+        self.label_modifier = None
+        self.learning_rate = None
         self.make_weight_plots = False  # Removed in v0.11.1
-        self.n_events = None
         self.max_queue_size = 10
+        self.multi_gpu = True
+        self.n_events = None
+        self.sample_modifier = None
+        self.shuffle_train = False
         self.train_logger_display = 100
         self.train_logger_flush = -1
-        self.multi_gpu = True
+        self.use_scratch_ssd = False
+        self.validate_interval = None
+        self.verbose_train = 1
+        self.verbose_val = 0
         self.y_field_names = None
+        self.zero_center_folder = None
 
         self._default_values = dict(self.__dict__)
 
@@ -843,13 +850,13 @@ class Configuration(object):
         for key, value in user_values.items():
             if hasattr(self, key):
                 if key == "sample_modifier":
-                    value = from_register(
+                    value = orcanet.misc.from_register(
                         toml_entry=value, register=lib.sample_modifiers.smods)
                 elif key == "dataset_modifier":
-                    value = from_register(
+                    value = orcanet.misc.from_register(
                         toml_entry=value, register=lib.dataset_modifiers.dmods)
                 elif key == "label_modifier":
-                    value = from_register(
+                    value = orcanet.misc.from_register(
                         toml_entry=value, register=lib.label_modifiers.lmods)
                 setattr(self, key, value)
             else:

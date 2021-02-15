@@ -56,25 +56,26 @@ class TestRegressionLabels(TestCase):
 class TestRegressionLabelsSplit(TestCase):
     def setUp(self):
         data = np.ones((5,))
-        info_blob = {"y_values": data.astype(
+        self.info_blob = {"y_values": data.astype(
             np.dtype([("obs1", float), ("obs2", float), ("obs3", float)])
         )}
-        lmod = lmods.RegressionLabelsSplit(
+        self.lmod = lmods.RegressionLabelsSplit(
             columns="obs1",
             model_output="log_obs",
         )
-        self.ys = lmod(info_blob)
 
     def test_keys(self):
-        self.assertListEqual(list(self.ys.keys()), ["log_obs", "log_obs_err"])
+        ys = self.lmod(self.info_blob)
+        self.assertListEqual(list(ys.keys()), ["log_obs", "log_obs_err"])
 
     def test_content_shape1(self):
         target_shapes = {
             "log_obs": (5, 1),
             "log_obs_err": (5, 2, 1),
         }
+        ys = self.lmod(self.info_blob)
         for key, shape in target_shapes.items():
-            self.assertTupleEqual(shape, self.ys[key].shape)
+            self.assertTupleEqual(shape, ys[key].shape)
 
     def test_no_stacks(self):
         lmod = lmods.RegressionLabelsSplit(
@@ -84,3 +85,12 @@ class TestRegressionLabelsSplit(TestCase):
         )
         self.assertTrue(lmod.stacks is None)
 
+    def test_yvalues_is_none(self):
+        info_blob = {"y_values": None}
+        self.assertIsNone(self.lmod(info_blob))
+
+    def test_yvalues_does_not_have_right_column(self):
+        info_blob = {"y_values": np.ones((5,)).astype(
+            np.dtype([("asdasd", float), ])
+        )}
+        self.assertIsNone(self.lmod(info_blob))
