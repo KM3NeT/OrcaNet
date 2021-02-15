@@ -1,7 +1,9 @@
+.. _orcanet_python:
+
 OrcaNet overview
 ================
 
-Using OrcaNet happens in two steps:
+Using OrcaNet in python happens in two steps:
 
 1. Setting up the organizer with options like batchsize, learning rate, ...
 2. Repeated training, validating or predicting with the model.

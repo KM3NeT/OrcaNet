@@ -28,6 +28,9 @@ list_file
 config_file
 ^^^^^^^^^^^
 
+An important paramter of the config files are the modifiers. Check out
+:ref:`modifiers_page` for more info.
+
 .. literalinclude:: ../examples/config_file.toml
    :language: toml
    :linenos:

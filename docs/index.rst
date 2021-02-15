@@ -14,6 +14,10 @@
 
 .. include:: ../Readme.rst
 
+
+Contents
+--------
+
 .. toctree::
     :hidden:
     :titlesonly:
@@ -23,17 +27,18 @@
 .. toctree::
    :maxdepth: 2
 
-   intro
+   quick_start
    input_list
-   lr
    modifiers
+   intro
+   lr
    example_models
    full_example
    CONTRIBUTING
 
 
 Indices and tables
-==================
+------------------
 
 * :ref:`genindex`
 * :ref:`modindex`

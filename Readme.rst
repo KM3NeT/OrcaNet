@@ -19,7 +19,8 @@ OrcaNet: A training organizer for Deep Learning in KM3NeT
 
 
 OrcaNet is a deep learning framework based on tensorflow in order to simplify the
-training process of neural networks for astroparticle physics. It incorporates 
+training process of neural networks for astroparticle physics, in particular
+for Orca, Arca and Antares. It incorporates
 automated logging, plotting and validating during the training, as well as
 saving and continuing the training process. Additionally, it features easy 
 management of multiple neural network inputs and the use of training data 
@@ -29,11 +30,15 @@ In this sense, it tackles many challenges that are usually found in
 astroparticle physics, like huge datasets.
 
 OrcaNet is a part of the Deep Learning efforts for the neutrino telescope KM3NeT.
-Find more information about KM3NeT on http://www.km3net.org
+Find more information about KM3NeT on http://www.km3net.org .
 
 OrcaNet is currently being developed at the official KM3NeT gitlab (https://git.km3net.de/ml/OrcaNet).
 
 However, there's also a github mirror that can be found at https://github.com/ViaFerrata/OrcaNet.
+
+
+Installation
+------------
 
 OrcaNet can be installed via pip by running::
 
@@ -47,22 +52,15 @@ https://www.tensorflow.org/install/source#gpu
 
 Containerization
 ----------------
-A Singularity image of the latest stable version of OrcaNet with tf and cuda/cudnn
+The easiest way to run OrcaNet is with singularity.
+A Singularity image of the latest stable version of OrcaNet with tensorflow
+and cuda/cudnn for GPUs
 is automatically uploaded to our sftp server.
-Download it via
-``wget http://pi1139.physik.uni-erlangen.de/singularity/orcanet.sif``
-and run it e.g. via
-``singularity shell orcanet.sif``
+Download it via::
 
+    wget http://pi1139.physik.uni-erlangen.de/singularity/orcanet.sif
 
-Tensorflow 1.X
---------------
+and run it e.g. via::
 
-Orcanet per default runs on tensorflow 2, but there is also a no longer supperted
-tf 1 branch `tf1`, which makes use of the deprecated stand-alone keras package.
-For the tf 1 version, orcanet will install tensorflow (the cpu version).
-For training with graphics cards, tensorflow-gpu is required, which needs
-to be installed manually via::
-
-    pip install tensorflow-gpu
+    singularity shell orcanet.sif
 
