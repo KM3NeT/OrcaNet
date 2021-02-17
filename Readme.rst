@@ -58,9 +58,9 @@ The easiest way to run OrcaNet is with singularity.
 A Singularity image of the latest stable version of OrcaNet with tensorflow
 and cuda/cudnn for GPUs
 is automatically uploaded to our sftp server.
-Download it via::
+Download it e.g. via::
 
-    wget http://pi1139.physik.uni-erlangen.de/singularity/orcanet.sif
+    wget http://pi1139.physik.uni-erlangen.de/singularity/orcanet_v0.13.3.sif
 
 and run it e.g. via::
 
