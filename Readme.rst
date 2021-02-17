@@ -60,7 +60,7 @@ and cuda/cudnn for GPUs
 is automatically uploaded to our sftp server.
 Download it e.g. via::
 
-    wget http://pi1139.physik.uni-erlangen.de/singularity/orcanet_v0.13.3.sif
+    wget http://pi1139.physik.uni-erlangen.de/singularity/orcanet_v0.13.4.sif
 
 and run it e.g. via::
 
