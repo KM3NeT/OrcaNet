@@ -32,7 +32,7 @@ import toml
 
 from orcanet.core import Organizer
 from orcanet_contrib.eval_nn import make_performance_plots
-from orcanet_contrib.orca_handler_util import update_objects, GraphSampleMod
+from orcanet_contrib.orca_handler_util import update_objects, GraphSampleMod,GraphSampleMod_only_ids,GraphSampleMod_only_channel_id,GraphSampleMod_only_first_hit
 
 
 def orca_pred(output_folder, list_file, config_file, model_file,
@@ -70,7 +70,22 @@ def orca_pred(output_folder, list_file, config_file, model_file,
     file_content = toml.load(model_file)
     knn_for_sample_mod = file_content["model"]["next_neighbors"]
     #get the sample modifier from the orca handler directly (also needed here in pred)
-    orga.cfg.sample_modifier = GraphSampleMod(knn=knn_for_sample_mod)
+    
+    #load a specific sample mod, even for gnn
+    sample_modifier = file_content["orca_modifiers"]["sample_modifier_own"]
+    
+    if sample_modifier == "normal":
+        orga.cfg.sample_modifier = GraphSampleMod(knn=knn_for_sample_mod)
+        #orga.cfg.sample_modifier =  GraphEdgeConv(knn=knn_for_sample_mod)
+    elif sample_modifier == "only_first_hit":
+        orga.cfg.sample_modifier = GraphSampleMod_only_first_hit(knn=knn_for_sample_mod)
+    elif sample_modifier == "only_channel_id":
+        orga.cfg.sample_modifier = GraphSampleMod_only_channel_id(knn=knn_for_sample_mod)
+    elif sample_modifier == "only_ids":
+        orga.cfg.sample_modifier = GraphSampleMod_only_ids(knn=knn_for_sample_mod)
+    else:
+        "No valid sample_modifier_own given!"
+        exit()
     
     # When predicting with a orga model, the right modifiers and custom
     # objects need to be given
@@ -78,10 +93,11 @@ def orca_pred(output_folder, list_file, config_file, model_file,
 
     # Per default, a prediction will be done for the model with the
     # highest epoch and filenumber.
-
+    
+    #old code with make performance plots
+    '''
     pred_filepath_conc = orga.predict(epoch=epoch, fileno=fileno,
                                       )[0]
-
     # make performance plots, only available for bg/ts/regression
     dset_mod_available_plots = ['regression', 'bg_classifier', 'ts_classifier']
     try:
@@ -90,9 +106,13 @@ def orca_pred(output_folder, list_file, config_file, model_file,
         if any(x in dataset_modifier for x in dset_mod_available_plots):
             plots_folder = orga.io.get_subfolder(name='plots')
             make_performance_plots(pred_filepath_conc, dataset_modifier, plots_folder)
-
     except KeyError:
         pass
+    '''
+    #simply do the pred
+    orga.predict(epoch=epoch, fileno=fileno)
+     
+
 
 
 
@@ -108,14 +128,13 @@ def main():
         fileno = None
     else:
         fileno = int(args["--fileno"])
-
+    
     orca_pred(output_folder=args['FOLDER'],
               list_file=args['LIST'],
               config_file=args['CONFIG'],
               model_file=args['MODEL'],
               epoch=epoch,
               fileno=fileno)
-
 
 if __name__ == '__main__':
     main()

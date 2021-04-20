@@ -48,8 +48,17 @@ def lkl_normal(y_true, y_pred):
     """
     mu_true = y_true[:, 0]
     mu_pred, sigma_pred = y_pred[:, 0], y_pred[:, 1]
-
-    return _normal_lkl(mu_pred=mu_pred, mu_true=mu_true, sigma_pred=sigma_pred, clip=True)
+    
+    
+    #clip in the log arguemnt
+    lkl_normal_loss = _normal_lkl(mu_pred=mu_pred, mu_true=mu_true, sigma_pred=sigma_pred, clip=True)
+    
+    #put through a (scaled) tanh to get smoother clipping
+    #tanh_scaling = 15.
+    #lkl_normal_loss = tf.multiply(tanh_scaling,tf.math.tanh(tf.multiply(_normal_lkl(mu_pred=mu_pred,
+    #						 mu_true=mu_true, sigma_pred=sigma_pred, clip=False),1./tanh_scaling)))
+    
+    return lkl_normal_loss
 
 
 def _normal_lkl(mu_pred, mu_true, sigma_pred, clip=False, clip_thresh=10):

@@ -238,6 +238,7 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
         label modifier instead of none.
 
     """
+
     file_size = h5_get_number_of_rows(
         list(files_dict.values())[0],
         datasets=[orga.cfg.key_x_values])
@@ -369,6 +370,10 @@ def make_model_prediction(orga, model, epoch, fileno, samples=None):
     for f_number, files_dict in enumerate(orga.io.yield_files("val"), 1):
         if f_number <= latest_pred_file_no:
             continue
-
-        pred_filepath = orga.io.get_pred_path(epoch, fileno, f_number)
+        
+        #get file path from this files dict
+        value_iterator = iter(files_dict.values())
+        file_path = next(value_iterator)
+        
+        pred_filepath = orga.io.get_pred_path_original_name(epoch, fileno, file_path) #does only the first one work for longer lists?
         h5_inference(orga, model, files_dict, pred_filepath, samples=samples)

@@ -176,6 +176,7 @@ class GraphEdgeConv:
                     nodes[event_no, n_hits_event:min_n_hits] = nodes[event_no, 0]
                     coords[event_no, n_hits_event:min_n_hits] = coords[event_no, 0]
                     is_valid[event_no, n_hits_event:min_n_hits] = 1.
+        print(is_valid)
         return {
             "nodes": nodes.astype("float32"),
             "is_valid": is_valid.astype("float32"),

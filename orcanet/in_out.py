@@ -288,6 +288,36 @@ class IOHandler(object):
 
         return pred_filepath
 
+    def get_pred_path_original_name(self, epoch, fileno, original_filepath):
+        """
+        Gets the path of a prediction file. But this time take the 
+        original file's name.
+
+        Parameters
+        ----------
+        epoch : int
+            Epoch of an already trained nn model.
+        fileno : int
+            File number train step of an already trained nn model.
+        original_filepath : str
+            Original filename as in the list file.
+
+        Returns
+        -------
+        pred_filepath : str
+            The path.
+
+        """
+        
+        #strip file name off the full path
+        original_filename = os.path.basename(original_filepath)
+        
+        pred_filepath = self.get_subfolder("predictions") + \
+            '/pred_{}'.format(
+                original_filename)
+
+        return pred_filepath
+
     def get_pred_files_list(self, epoch=None, fileno=None):
         """
         Returns a sorted list with all pred .h5 files in the prediction folder.
