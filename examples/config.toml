@@ -15,3 +15,6 @@ learning_rate=0.002
 shuffle_train = true
 # Use a special sample modifer that is used for EdgeConv networks.
 sample_modifier="GraphEdgeConv"
+# 'GraphEdgeConv' also has optional arguments. They can be set e.g. like this:
+# sample_modifier={name=”GraphEdgeConv”, with_lightspeed=False}
+# the same syntax is also used for label modifiers and dataset modifiers.
