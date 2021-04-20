@@ -1,5 +1,4 @@
 # ParticleNet, using my custom DisjointEdgeConv block
-# in the config, its mandatory to use the fixed_batchsize option
 # use a sample_modifier to produce the 3 given inputs (e.g. GraphEdgeConv)
 
 [model]
