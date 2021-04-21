@@ -148,3 +148,59 @@ class RegressionLabelsSplit(RegressionLabels):
                 np.expand_dims(label, axis=-2), repeats=2, axis=-2)
         output_dict.update(err_outputs)
         return output_dict
+
+
+@register
+def ts_classifier(data):
+	"""
+	One-hot encoding for track/shower classifier. Muon neutrino CC are tracks, the rest
+	shower. Set should not contain atm muons or tau neutrino events. Otherwise this needs 
+	to be expanded. 
+	"""
+	y_values = data["y_values"]
+
+	ys = dict()
+	particle_type = y_values['particle_type']
+	is_cc = y_values['is_cc'] == 2
+	is_muon_cc = np.logical_and(np.abs(particle_type) == 14, is_cc)
+	is_not_muon_cc = np.invert(is_muon_cc)
+
+	batchsize = y_values.shape[0]
+	# categorical [shower, track] -> [1,0] = shower, [0,1] = track
+	categorical_ts = np.zeros((batchsize, 2), dtype='bool')
+
+	categorical_ts[:, 0] = is_not_muon_cc
+	categorical_ts[:, 1] = is_muon_cc
+
+	ys['ts_output'] = categorical_ts.astype(np.float32)
+	return ys
+
+@register
+def bg_classifier(data):
+	"""
+	One-hot encoding for background classification. Neutrino events are signal, everthing
+	else is background.
+	"""
+	
+	y_values = data["y_values"]
+	
+	# for every sample, [1,0,0] for neutrinos, [0,1,0] for mupage
+	# particle types: mupage: np.abs(13), random_noise = 0
+	ys = dict()
+	particle_type = y_values['particle_type']
+	is_mupage = np.abs(particle_type) == 13
+	is_random_noise = np.abs(particle_type == 0)
+	is_not_mupage_nor_rn = np.invert(np.logical_or(is_mupage,
+												   is_random_noise))
+
+	batchsize = y_values.shape[0]
+	categorical_bg = np.zeros((batchsize, 2), dtype='bool')
+
+	# neutrino
+	categorical_bg[:, 0] = is_not_mupage_nor_rn
+	# is not neutrino
+	categorical_bg[:, 1] = np.invert(is_not_mupage_nor_rn)
+
+	ys['bg_output'] = categorical_bg.astype(np.float32)
+	return ys
+  
