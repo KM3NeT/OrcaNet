@@ -50,7 +50,7 @@ class TestRegressionLabels(TestCase):
             log10=True,
         )
         np.testing.assert_array_equal(
-            ys["log_obs"], np.array([2, 1, 1, 1, 1]).reshape(5, 1))
+            ys["log_obs"], np.array([2, 1, 0, 1, 1]).reshape(5, 1))
 
 
 class TestRegressionLabelsSplit(TestCase):
