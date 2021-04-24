@@ -38,10 +38,10 @@ class RegressionLabels:
     Parameters
     ----------
     columns : str or list
-        Name(s) of the columns in the label dataset that contain the labels.
+        Name(s) of the columns that contain the labels.
     model_output : str, optional
         Name of the output of the network.
-        Default: Same as columns (only valid if columns is a str).
+        Default: Same as names (only valid if names is a str).
     log10 : bool
         Take log10 of the labels. Invalid values in the label will produce 0
         and a warning.
@@ -53,6 +53,8 @@ class RegressionLabels:
     Examples
     --------
     >>> RegressionLabels(columns=['dir_x', 'dir_y', 'dir_z'], model_output='dir')
+    or in the config.toml:
+    label_modifier = {name='RegressionLabels', columns=['dir_x','dir_y','dir_z'], model_output='dir'}
     Will produce array of shape (bs, 3) for model output 'dir'.
     >>> RegressionLabels(columns='dir_x')
     Will produce array of shape (bs, 1) for model output 'dir_x'.
@@ -68,7 +70,7 @@ class RegressionLabels:
             columns = list(columns)
         if model_output is None:
             if len(columns) != 1:
-                raise ValueError(f"If model_output is not given, columns must be length 1!")
+                raise ValueError(f"If model_output is not given, names must be length 1!")
             model_output = columns[0]
 
         self.columns = columns
@@ -106,11 +108,11 @@ class RegressionLabels:
                     "invalid value encountered in log10, setting result to 0",
                     category=RuntimeWarning,
                 )
-            ys = np.log10(ys, where=gr_zero, out=np.zeros_like(ys, dtype="float32"))
+            ys = np.log10(ys, where=gr_zero, out=np.ones_like(ys, dtype="float32"))
         if self.stacks:
             ys = np.repeat(ys[:, None], repeats=self.stacks, axis=1)
-        return ys
 
+        return ys
 
 @register
 class RegressionLabelsSplit(RegressionLabels):
@@ -137,7 +139,7 @@ class RegressionLabelsSplit(RegressionLabels):
             warnings.warn(
                 "Can not use stacks option with RegressionLabelsSplit, ignoring...")
             self.stacks = None
-
+        self._warned = False
     def __call__(self, info_blob):
         output_dict = super().__call__(info_blob)
         if output_dict is None:
@@ -149,58 +151,119 @@ class RegressionLabelsSplit(RegressionLabels):
         output_dict.update(err_outputs)
         return output_dict
 
+@register
+class ClassificationLabels:
+	"""
+	One-hot encoding for general purpose classification labels based on one mc label column.
+	
+	Parameters
+	----------
+	column : str
+		Identifier of which mc info to create the labels from.
+	classes : list of dicts
+		Specify for each class the conditions the column name has to fulfil.
+		There is a dict for each class and the keys have to be named "class1", "class2", etc	  
+	model_output : str, optional
+		The name of the output layer's outputs.
+	
+	Example
+	-------
+	2-class cf for signal and background; put this into the config.toml:
+	label_modifier = {name="ClassificationLabels", column="particle_type", classes=[{class1 = [12,-12,14,-14]},{class2 = [13, -13, 0]}],model_output="bg_output" }
+ 
+	"""
+
+	def __init__(self,column,
+				 classes,
+				 model_output="categorical",
+				 ):
+		self.column = column
+		self.classes = classes
+		self.model_output = model_output
+		self._warned = False
+		try:
+			if not len(self.classes[0]["class1"])>0:
+				raise ValueError("Not a valid list for a class")
+		except:
+			raise KeyError("Class names must be named 'class1', 'class2',...")
+		
+	def __call__(self, info_blob):
+		
+		y_values = info_blob["y_values"]
+	
+		if y_values is None:
+			if not self._warned:
+				warnings.warn(
+					f"Can not generate labels: No y_values available!")
+				self._warned = True
+			return None
+		
+		#create an array of the final shape, initialized with zeros
+		n_classes = len(self.classes)
+		batchsize = y_values.shape[0]
+		categories = np.zeros((batchsize, n_classes), dtype='bool')
+		
+		#iterate over every class and set entries to 1 if condition is fulfilled
+		for i in range(n_classes):
+			categories[:,i] = np.in1d(y_values[self.column],self.classes[i]["class"+str(i+1)])
+		
+		return {self.model_output: categories.astype(np.float32)}
+
 
 @register
-def ts_classifier(data):
+class TSClassifier:
 	"""
 	One-hot encoding for track/shower classifier. Muon neutrino CC are tracks, the rest
-	shower. Set should not contain atm muons or tau neutrino events. Otherwise this needs 
-	to be expanded. 
-	"""
-	y_values = data["y_values"]
-
-	ys = dict()
-	particle_type = y_values['particle_type']
-	is_cc = y_values['is_cc'] == 2
-	is_muon_cc = np.logical_and(np.abs(particle_type) == 14, is_cc)
-	is_not_muon_cc = np.invert(is_muon_cc)
-
-	batchsize = y_values.shape[0]
-	# categorical [shower, track] -> [1,0] = shower, [0,1] = track
-	categorical_ts = np.zeros((batchsize, 2), dtype='bool')
-
-	categorical_ts[:, 0] = is_not_muon_cc
-	categorical_ts[:, 1] = is_muon_cc
-
-	ys['ts_output'] = categorical_ts.astype(np.float32)
-	return ys
-
-@register
-def bg_classifier(data):
-	"""
-	One-hot encoding for background classification. Neutrino events are signal, everthing
-	else is background.
+	of neutrinos is shower. This means, this has to be extended for tau neutrinos. Atm.
+	muon events, if any, are tracks. 
+	
+	Parameters
+    ----------
+	is_cc_convention : int
+		The convention used in the MC prod to indicate a charged current interaction.
+		For post 2020 productions is 2.	
+    model_output : str, optional
+        Name of the output of the network.
+        Default: Same as names (only valid if names is a str).
+	
+	Example
+	-------
+	label_modifier = {name='TSClassifier', is_cc_convention=2}
 	"""
 	
-	y_values = data["y_values"]
-	
-	# for every sample, [1,0,0] for neutrinos, [0,1,0] for mupage
-	# particle types: mupage: np.abs(13), random_noise = 0
-	ys = dict()
-	particle_type = y_values['particle_type']
-	is_mupage = np.abs(particle_type) == 13
-	is_random_noise = np.abs(particle_type == 0)
-	is_not_mupage_nor_rn = np.invert(np.logical_or(is_mupage,
-												   is_random_noise))
+	def __init__(self, is_cc_convention,
+				 model_output="ts_output",
+				 ):
+		self.is_cc_convention = is_cc_convention
+		self.model_output = model_output
+		
+		
+	def __call__(self, info_blob):
 
-	batchsize = y_values.shape[0]
-	categorical_bg = np.zeros((batchsize, 2), dtype='bool')
+		y_values = info_blob["y_values"]
 
-	# neutrino
-	categorical_bg[:, 0] = is_not_mupage_nor_rn
-	# is not neutrino
-	categorical_bg[:, 1] = np.invert(is_not_mupage_nor_rn)
+		if not "particle_type" in y_values.dtype.names or not "is_cc" in y_values.dtype.names:
+			raise ValueError("Info blob must contain 'particle_type' and 'is_cc'")
+			
+		ys = dict()
+		
+		#create conditions from particle_type and is cc
+		particle_type = y_values['particle_type']
+		is_cc = y_values['is_cc'] == self.is_cc_convention
+		is_muon_cc = np.logical_and(np.abs(particle_type) == 14, is_cc)
+		
+		#in case there are atm. muon events in the mix as well, declare them to be tracks
+		is_track = np.logical_or(is_muon_cc,np.abs(particle_type) == 13)
 
-	ys['bg_output'] = categorical_bg.astype(np.float32)
-	return ys
-  
+		is_shower = np.invert(is_track)
+
+		batchsize = y_values.shape[0]
+		# categorical [shower, track] -> [1,0] = shower, [0,1] = track
+		categorical_ts = np.zeros((batchsize, 2), dtype='bool')
+
+		categorical_ts[:, 0] = is_track
+		categorical_ts[:, 1] = is_shower
+
+		ys[self.model_output] = categorical_ts.astype(np.float32)
+
+		return ys
