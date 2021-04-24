@@ -108,7 +108,7 @@ class RegressionLabels:
                     "invalid value encountered in log10, setting result to 0",
                     category=RuntimeWarning,
                 )
-            ys = np.log10(ys, where=gr_zero, out=np.zeros_like(ys, dtype="float32"))
+            ys = np.log10(ys, where=gr_zero, out=np.ones_like(ys, dtype="float32"))
         if self.stacks:
             ys = np.repeat(ys[:, None], repeats=self.stacks, axis=1)
 
