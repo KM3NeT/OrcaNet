@@ -38,10 +38,10 @@ class RegressionLabels:
     Parameters
     ----------
     columns : str or list
-        Name(s) of the columns that contain the labels.
+        Name(s) of the columns in the label dataset that contain the labels.
     model_output : str, optional
         Name of the output of the network.
-        Default: Same as names (only valid if names is a str).
+        Default: Same as columns (only valid if columns is a str).
     log10 : bool
         Take log10 of the labels. Invalid values in the label will produce 0
         and a warning.
@@ -70,7 +70,7 @@ class RegressionLabels:
             columns = list(columns)
         if model_output is None:
             if len(columns) != 1:
-                raise ValueError(f"If model_output is not given, names must be length 1!")
+                raise ValueError(f"If model_output is not given, columns must be length 1!")
             model_output = columns[0]
 
         self.columns = columns
