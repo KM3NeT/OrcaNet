@@ -5,13 +5,15 @@ import orcanet.lib.label_modifiers as lmods
 
 class TestRegressionLabels(TestCase):
     @staticmethod
-    def _get_ys(columns="obs1", data_factor=None, model_output="log_obs",**kwargs):
+    def _get_ys(columns="obs1", data_factor=None, model_output="log_obs", **kwargs):
         data = np.ones((5,))
         if data_factor is not None:
             data *= data_factor
-        info_blob = {"y_values": data.astype(
-            np.dtype([("obs1", float), ("obs2", float), ("obs3", float)])
-        )}
+        info_blob = {
+            "y_values": data.astype(
+                np.dtype([("obs1", float), ("obs2", float), ("obs3", float)])
+            )
+        }
         lmod = lmods.RegressionLabels(
             columns=columns,
             model_output=model_output,
@@ -50,15 +52,18 @@ class TestRegressionLabels(TestCase):
             log10=True,
         )
         np.testing.assert_array_equal(
-            ys["log_obs"], np.array([2, 1, 0, 1, 1]).reshape(5, 1))
+            ys["log_obs"], np.array([2, 1, 0, 0, 0]).reshape(5, 1)
+        )
 
 
 class TestRegressionLabelsSplit(TestCase):
     def setUp(self):
         data = np.ones((5,))
-        self.info_blob = {"y_values": data.astype(
-            np.dtype([("obs1", float), ("obs2", float), ("obs3", float)])
-        )}
+        self.info_blob = {
+            "y_values": data.astype(
+                np.dtype([("obs1", float), ("obs2", float), ("obs3", float)])
+            )
+        }
         self.lmod = lmods.RegressionLabelsSplit(
             columns="obs1",
             model_output="log_obs",
@@ -90,18 +95,29 @@ class TestRegressionLabelsSplit(TestCase):
         self.assertIsNone(self.lmod(info_blob))
 
     def test_yvalues_does_not_have_right_column(self):
-        info_blob = {"y_values": np.ones((5,)).astype(
-            np.dtype([("asdasd", float), ])
-        )}
+        info_blob = {
+            "y_values": np.ones((5,)).astype(
+                np.dtype(
+                    [
+                        ("asdasd", float),
+                    ]
+                )
+            )
+        }
         self.assertIsNone(self.lmod(info_blob))
+
 
 class TestClassificationLabels(TestCase):
     @staticmethod
-    def _get_ys(column="obs1", model_output="cat",classes=[{"class1" : [1]},{"class2" : [2]}]):
-        data = np.array([1,1,2,2])
-        info_blob = {"y_values": data.astype(
-            np.dtype([("obs1", float), ("obs2", float), ("obs3", float)])
-        )}
+    def _get_ys(
+        column="obs1", model_output="cat", classes=[{"class1": [1]}, {"class2": [2]}]
+    ):
+        data = np.array([1, 1, 2, 2])
+        info_blob = {
+            "y_values": data.astype(
+                np.dtype([("obs1", float), ("obs2", float), ("obs3", float)])
+            )
+        }
         lmod = lmods.ClassificationLabels(
             column=column,
             model_output=model_output,
@@ -115,27 +131,30 @@ class TestClassificationLabels(TestCase):
 
     def test_content_shape(self):
         ys = self._get_ys()
-        np.testing.assert_array_equal(ys["cat"], np.array([[1., 0.],[1., 0.],[0., 1.],[0., 1.]]))
-        
+        np.testing.assert_array_equal(
+            ys["cat"], np.array([[1.0, 0.0], [1.0, 0.0], [0.0, 1.0], [0.0, 1.0]])
+        )
+
     def test_wrong_classes(self):
         try:
-            ys = self._get_ys(classes=[{"class42" : [1]},{"class2" : [2]}])
+            ys = self._get_ys(classes=[{"class42": [1]}, {"class2": [2]}])
         except KeyError:
-            pass #ehh, not sure if this is needed or good^^
- 
+            pass  # ehh, not sure if this is needed or good^^
+
+
 class TestTSClassifier(TestCase):
     @staticmethod
     def _get_ys():
-        #take 3 events, one muon CC and one muon NC, and one atm muon
-        y_values = np.array([(14,2),(14,3),(13,None)], dtype=[("particle_type",float),("is_cc",float)])
+        # take 3 events, one muon CC and one muon NC, and one atm muon
+        y_values = np.array(
+            [(14, 2), (14, 3), (13, None)],
+            dtype=[("particle_type", float), ("is_cc", float)],
+        )
 
         info_blob = {}
         info_blob["y_values"] = y_values
-        
-        lmod = lmods.TSClassifier(
-            is_cc_convention=2,
-            model_output="TS_output"
-        )
+
+        lmod = lmods.TSClassifier(is_cc_convention=2, model_output="TS_output")
         return lmod(info_blob)
 
     def test_keys(self):
@@ -144,4 +163,6 @@ class TestTSClassifier(TestCase):
 
     def test_content_shape(self):
         ys = self._get_ys()
-        np.testing.assert_array_equal(ys["TS_output"], np.array([[1., 0.],[0., 1.],[1., 0.]]))
+        np.testing.assert_array_equal(
+            ys["TS_output"], np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 0.0]])
+        )
