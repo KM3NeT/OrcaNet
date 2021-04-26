@@ -19,9 +19,10 @@ class ColumnLabels:
     Parameters
     ----------
     model : ks.Model
-        A keras model.
+            A keras model.
 
     """
+
     def __init__(self, model):
         self.output_names = model.output_names
 
@@ -38,17 +39,17 @@ class RegressionLabels:
     Parameters
     ----------
     columns : str or list
-        Name(s) of the columns in the label dataset that contain the labels.
+            Name(s) of the columns in the label dataset that contain the labels.
     model_output : str, optional
-        Name of the output of the network.
-        Default: Same as columns (only valid if columns is a str).
+            Name of the output of the network.
+            Default: Same as columns (only valid if columns is a str).
     log10 : bool
-        Take log10 of the labels. Invalid values in the label will produce 0
-        and a warning.
+            Take log10 of the labels. Invalid values in the label will produce 0
+            and a warning.
     stacks : int, optional
-        Stack copies of the label this many times along a new axis at position 1.
-        E.g. if the label is shape (?, 3), it will become
-        shape (?, stacks, 3). Used for lkl regression.
+            Stack copies of the label this many times along a new axis at position 1.
+            E.g. if the label is shape (?, 3), it will become
+            shape (?, stacks, 3). Used for lkl regression.
 
     Examples
     --------
@@ -60,17 +61,19 @@ class RegressionLabels:
     Will produce array of shape (bs, 1) for model output 'dir_x'.
 
     """
-    def __init__(self, columns,
-                 model_output=None,
-                 log10=False,
-                 stacks=None):
+
+    def __init__(self, columns, model_output=None, log10=False, stacks=None):
         if isinstance(columns, str):
-            columns = [columns, ]
+            columns = [
+                columns,
+            ]
         else:
             columns = list(columns)
         if model_output is None:
             if len(columns) != 1:
-                raise ValueError(f"If model_output is not given, columns must be length 1!")
+                raise ValueError(
+                    f"If model_output is not given, columns must be length 1!"
+                )
             model_output = columns[0]
 
         self.columns = columns
@@ -83,8 +86,7 @@ class RegressionLabels:
         y_values = info_blob["y_values"]
         if y_values is None:
             if not self._warned:
-                warnings.warn(
-                    f"Can not generate labels: No y_values available!")
+                warnings.warn(f"Can not generate labels: No y_values available!")
                 self._warned = True
             return None
         try:
@@ -92,8 +94,8 @@ class RegressionLabels:
         except KeyError:
             if not self._warned:
                 warnings.warn(
-                    f"Can not generate labels: {self.columns} "
-                    f"not found in y_values")
+                    f"Can not generate labels: {self.columns} " f"not found in y_values"
+                )
                 self._warned = True
             return None
         y_value = misc.to_ndarray(y_value, dtype="float32")
@@ -114,6 +116,7 @@ class RegressionLabels:
 
         return ys
 
+
 @register
 class RegressionLabelsSplit(RegressionLabels):
     """
@@ -132,14 +135,17 @@ class RegressionLabelsSplit(RegressionLabels):
     Necessary because pred and truth must be the same shape.
 
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.err_output_format = "{}_err"
         if self.stacks is not None:
             warnings.warn(
-                "Can not use stacks option with RegressionLabelsSplit, ignoring...")
+                "Can not use stacks option with RegressionLabelsSplit, ignoring..."
+            )
             self.stacks = None
         self._warned = False
+
     def __call__(self, info_blob):
         output_dict = super().__call__(info_blob)
         if output_dict is None:
@@ -147,123 +153,141 @@ class RegressionLabelsSplit(RegressionLabels):
         err_outputs = {}
         for name, label in output_dict.items():
             err_outputs[self.err_output_format.format(name)] = np.repeat(
-                np.expand_dims(label, axis=-2), repeats=2, axis=-2)
+                np.expand_dims(label, axis=-2), repeats=2, axis=-2
+            )
         output_dict.update(err_outputs)
         return output_dict
 
+
 @register
 class ClassificationLabels:
-	"""
-	One-hot encoding for general purpose classification labels based on one mc label column.
-	
-	Parameters
-	----------
-	column : str
-		Identifier of which mc info to create the labels from.
-	classes : list of dicts
-		Specify for each class the conditions the column name has to fulfil.
-		There is a dict for each class and the keys have to be named "class1", "class2", etc	  
-	model_output : str, optional
-		The name of the output layer's outputs.
-	
-	Example
-	-------
-	2-class cf for signal and background; put this into the config.toml:
-	label_modifier = {name="ClassificationLabels", column="particle_type", classes=[{class1 = [12,-12,14,-14]},{class2 = [13, -13, 0]}],model_output="bg_output" }
- 
-	"""
+    """
+    One-hot encoding for general purpose classification labels based on one mc label column.
 
-	def __init__(self,column,
-				 classes,
-				 model_output="categorical",
-				 ):
-		self.column = column
-		self.classes = classes
-		self.model_output = model_output
-		self._warned = False
-		try:
-			if not len(self.classes[0]["class1"])>0:
-				raise ValueError("Not a valid list for a class")
-		except:
-			raise KeyError("Class names must be named 'class1', 'class2',...")
-		
-	def __call__(self, info_blob):
-		
-		y_values = info_blob["y_values"]
-	
-		if y_values is None:
-			if not self._warned:
-				warnings.warn(
-					f"Can not generate labels: No y_values available!")
-				self._warned = True
-			return None
-		
-		#create an array of the final shape, initialized with zeros
-		n_classes = len(self.classes)
-		batchsize = y_values.shape[0]
-		categories = np.zeros((batchsize, n_classes), dtype='bool')
-		
-		#iterate over every class and set entries to 1 if condition is fulfilled
-		for i in range(n_classes):
-			categories[:,i] = np.in1d(y_values[self.column],self.classes[i]["class"+str(i+1)])
-		
-		return {self.model_output: categories.astype(np.float32)}
+    Parameters
+    ----------
+    column : str
+            Identifier of which mc info to create the labels from.
+    classes : list of dicts
+            Specify for each class the conditions the column name has to fulfil.
+            There is a dict for each class and the keys have to be named "class1", "class2", etc
+    model_output : str, optional
+            The name of the output layer's outputs.
+
+    Example
+    -------
+    2-class cf for signal and background; put this into the config.toml:
+    label_modifier = {name="ClassificationLabels", column="particle_type", classes=[{class1 = [12,-12,14,-14]},{class2 = [13, -13, 0]}],model_output="bg_output" }
+
+    """
+
+    def __init__(
+        self,
+        column,
+        classes,
+        model_output=None,
+    ):
+        self.column = column
+        self.classes = classes
+        self.model_output = model_output
+        self._warned = False
+        try:
+            if not len(self.classes[0]["class1"]) > 0:
+                raise ValueError("Not a valid list for a class")
+        except:
+            raise KeyError("Class names must be named 'class1', 'class2',...")
+
+        if model_output is None:
+            if len(columns) != 1:
+                raise ValueError(
+                    f"If model_output is not given, columns must be length 1!"
+                )
+            self.model_output = column
+
+    def __call__(self, info_blob):
+
+        y_values = info_blob["y_values"]
+
+        if y_values is None:
+            if not self._warned:
+                warnings.warn(f"Can not generate labels: No y_values available!")
+                self._warned = True
+            return None
+
+        # create an array of the final shape, initialized with zeros
+        n_classes = len(self.classes)
+        batchsize = y_values.shape[0]
+        categories = np.zeros((batchsize, n_classes), dtype="bool")
+
+        # iterate over every class and set entries to 1 if condition is fulfilled
+        for i in range(n_classes):
+            categories[:, i] = np.in1d(
+                y_values[self.column], self.classes[i]["class" + str(i + 1)]
+            )
+
+        return {self.model_output: categories.astype(np.float32)}
 
 
 @register
 class TSClassifier:
-	"""
-	One-hot encoding for track/shower classifier. Muon neutrino CC are tracks, the rest
-	of neutrinos is shower. This means, this has to be extended for tau neutrinos. Atm.
-	muon events, if any, are tracks. 
-	
-	Parameters
+
+    """
+    One-hot encoding for track/shower classifier. Muon neutrino CC are tracks, the rest
+    of neutrinos is shower. This means, this has to be extended for tau neutrinos. Atm.
+    muon events, if any, are tracks.
+
+    Parameters
     ----------
-	is_cc_convention : int
-		The convention used in the MC prod to indicate a charged current interaction.
-		For post 2020 productions is 2.	
+    is_cc_convention : int
+            The convention used in the MC prod to indicate a charged current interaction.
+            For post 2020 productions this is 2.
     model_output : str, optional
-        Name of the output of the network.
-        Default: Same as names (only valid if names is a str).
-	
-	Example
-	-------
-	label_modifier = {name='TSClassifier', is_cc_convention=2}
-	"""
-	
-	def __init__(self, is_cc_convention,
-				 model_output="ts_output",
-				 ):
-		self.is_cc_convention = is_cc_convention
-		self.model_output = model_output
-		
-		
-	def __call__(self, info_blob):
+            Name of the output of the network.
+            Default: Same as names (only valid if names is a str).
 
-		y_values = info_blob["y_values"]
+    Example
+    -------
+    label_modifier = {name='TSClassifier', is_cc_convention=2}
 
-		if not "particle_type" in y_values.dtype.names or not "is_cc" in y_values.dtype.names:
-			raise ValueError("Info blob must contain 'particle_type' and 'is_cc'")
-			
-		ys = dict()
-		
-		#create conditions from particle_type and is cc
-		particle_type = y_values['particle_type']
-		is_cc = y_values['is_cc'] == self.is_cc_convention
-		is_muon_cc = np.logical_and(np.abs(particle_type) == 14, is_cc)
-		
-		#in case there are atm. muon events in the mix as well, declare them to be tracks
-		is_track = np.logical_or(is_muon_cc,np.abs(particle_type) == 13)
+    """
 
-		is_shower = np.invert(is_track)
+    def __init__(
+        self,
+        is_cc_convention,
+        model_output="ts_output",
+    ):
+        self.is_cc_convention = is_cc_convention
+        self.model_output = model_output
 
-		batchsize = y_values.shape[0]
-		# categorical [shower, track] -> [1,0] = shower, [0,1] = track
-		categorical_ts = np.zeros((batchsize, 2), dtype='bool')
+    def __call__(self, info_blob):
 
-		categorical_ts[:, 0] = is_track
-		categorical_ts[:, 1] = is_shower
+        y_values = info_blob["y_values"]
 
-		ys[self.model_output] = categorical_ts.astype(np.float32)
+        if (
+            not "particle_type" in y_values.dtype.names
+            or not "is_cc" in y_values.dtype.names
+        ):
+            raise ValueError("Info blob must contain 'particle_type' and 'is_cc'")
 
-		return ys
+        ys = dict()
+
+        # create conditions from particle_type and is cc
+        particle_type = y_values["particle_type"]
+        is_cc = y_values["is_cc"] == self.is_cc_convention
+        is_muon_cc = np.logical_and(np.abs(particle_type) == 14, is_cc)
+
+        # in case there are atm. muon events in the mix as well, declare them to be tracks
+        is_track = np.logical_or(is_muon_cc, np.abs(particle_type) == 13)
+
+        is_shower = np.invert(is_track)
+
+        batchsize = y_values.shape[0]
+        # categorical [shower, track] -> [1,0] = shower, [0,1] = track
+        categorical_ts = np.zeros((batchsize, 2), dtype="bool")
+
+        categorical_ts[:, 0] = is_track
+        categorical_ts[:, 1] = is_shower
+
+        ys[self.model_output] = categorical_ts.astype(np.float32)
+
+        return ys
