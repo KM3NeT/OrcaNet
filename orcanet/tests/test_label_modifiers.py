@@ -5,15 +5,13 @@ import orcanet.lib.label_modifiers as lmods
 
 class TestRegressionLabels(TestCase):
     @staticmethod
-    def _get_ys(columns="obs1", data_factor=None, model_output="log_obs", **kwargs):
+    def _get_ys(columns="obs1", data_factor=None, model_output="log_obs",**kwargs):
         data = np.ones((5,))
         if data_factor is not None:
             data *= data_factor
-        info_blob = {
-            "y_values": data.astype(
-                np.dtype([("obs1", float), ("obs2", float), ("obs3", float)])
-            )
-        }
+        info_blob = {"y_values": data.astype(
+            np.dtype([("obs1", float), ("obs2", float), ("obs3", float)])
+        )}
         lmod = lmods.RegressionLabels(
             columns=columns,
             model_output=model_output,
@@ -52,18 +50,15 @@ class TestRegressionLabels(TestCase):
             log10=True,
         )
         np.testing.assert_array_equal(
-            ys["log_obs"], np.array([2, 1, 0, 1, 1]).reshape(5, 1)
-        )
+            ys["log_obs"], np.array([2, 1, 0, 1, 1]).reshape(5, 1))
 
 
 class TestRegressionLabelsSplit(TestCase):
     def setUp(self):
         data = np.ones((5,))
-        self.info_blob = {
-            "y_values": data.astype(
-                np.dtype([("obs1", float), ("obs2", float), ("obs3", float)])
-            )
-        }
+        self.info_blob = {"y_values": data.astype(
+            np.dtype([("obs1", float), ("obs2", float), ("obs3", float)])
+        )}
         self.lmod = lmods.RegressionLabelsSplit(
             columns="obs1",
             model_output="log_obs",
@@ -95,15 +90,9 @@ class TestRegressionLabelsSplit(TestCase):
         self.assertIsNone(self.lmod(info_blob))
 
     def test_yvalues_does_not_have_right_column(self):
-        info_blob = {
-            "y_values": np.ones((5,)).astype(
-                np.dtype(
-                    [
-                        ("asdasd", float),
-                    ]
-                )
-            )
-        }
+        info_blob = {"y_values": np.ones((5,)).astype(
+            np.dtype([("asdasd", float), ])
+        )}
         self.assertIsNone(self.lmod(info_blob))
 
 
