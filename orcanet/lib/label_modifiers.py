@@ -107,7 +107,7 @@ class RegressionLabels:
             gr_zero = ys > 0
             if not np.all(gr_zero):
                 warnings.warn(
-                    "invalid value encountered in log10, setting result to 0",
+                    "invalid value encountered in log10, setting result to 1",
                     category=RuntimeWarning,
                 )
             ys = np.log10(ys, where=gr_zero, out=np.ones_like(ys, dtype="float32"))
