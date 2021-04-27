@@ -99,8 +99,10 @@ class TestRegressionLabelsSplit(TestCase):
 class TestClassificationLabels(TestCase):
     @staticmethod
     def _get_ys(
-        column="obs1", model_output="cat", classes=[{"class1": [1]}, {"class2": [2]}]
+        column="obs1", model_output="cat", classes=None,
     ):
+        if classes is None:
+            classes = {"class1": [1], "class2": [2]}
         data = np.array([1, 1, 2, 2])
         info_blob = {
             "y_values": data.astype(
@@ -125,10 +127,8 @@ class TestClassificationLabels(TestCase):
         )
 
     def test_wrong_classes(self):
-        try:
-            ys = self._get_ys(classes=[{"class42": [1]}, {"class2": [2]}])
-        except KeyError:
-            pass  # ehh, not sure if this is needed or good^^
+        with self.assertRaises(KeyError):
+            self._get_ys(classes={"class42": [1], "class2": [2]})
 
 
 class TestTSClassifier(TestCase):

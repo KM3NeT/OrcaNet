@@ -168,16 +168,16 @@ class ClassificationLabels:
     ----------
     column : str
             Identifier of which mc info to create the labels from.
-    classes : list of dicts
+    classes : dict
             Specify for each class the conditions the column name has to fulfil.
-            There is a dict for each class and the keys have to be named "class1", "class2", etc
+            The keys have to be named "class1", "class2", etc
     model_output : str, optional
             The name of the output layer's outputs.
 
     Example
     -------
     2-class cf for signal and background; put this into the config.toml:
-    label_modifier = {name="ClassificationLabels", column="particle_type", classes=[{class1 = [12,-12,14,-14]},{class2 = [13, -13, 0]}],model_output="bg_output" }
+    label_modifier = {name="ClassificationLabels", column="particle_type", classes={class1 = [12, -12, 14, -14], class2 = [13, -13, 0]}, model_output="bg_output"}
 
     """
 
@@ -191,17 +191,13 @@ class ClassificationLabels:
         self.classes = classes
         self.model_output = model_output
         self._warned = False
-        try:
-            if not len(self.classes[0]["class1"]) > 0:
-                raise ValueError("Not a valid list for a class")
-        except:
+
+        if "class1" not in self.classes:
             raise KeyError("Class names must be named 'class1', 'class2',...")
+        if not len(self.classes["class1"]) > 0:
+            raise ValueError("Not a valid list for a class")
 
         if model_output is None:
-            if len(columns) != 1:
-                raise ValueError(
-                    f"If model_output is not given, columns must be length 1!"
-                )
             self.model_output = column
 
     def __call__(self, info_blob):
@@ -222,7 +218,7 @@ class ClassificationLabels:
         # iterate over every class and set entries to 1 if condition is fulfilled
         for i in range(n_classes):
             categories[:, i] = np.in1d(
-                y_values[self.column], self.classes[i]["class" + str(i + 1)]
+                y_values[self.column], self.classes["class" + str(i + 1)]
             )
 
         return {self.model_output: categories.astype(np.float32)}
