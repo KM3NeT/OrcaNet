@@ -50,7 +50,7 @@ class TestRegressionLabels(TestCase):
             log10=True,
         )
         np.testing.assert_array_equal(
-            ys["log_obs"], np.array([2, 1, 0, 0, 0]).reshape(5, 1))
+            ys["log_obs"], np.array([2, 1, 0, 1, 1]).reshape(5, 1))
 
 
 class TestRegressionLabelsSplit(TestCase):
@@ -94,3 +94,64 @@ class TestRegressionLabelsSplit(TestCase):
             np.dtype([("asdasd", float), ])
         )}
         self.assertIsNone(self.lmod(info_blob))
+
+
+class TestClassificationLabels(TestCase):
+    @staticmethod
+    def _get_ys(
+        column="obs1", model_output="cat", classes=None,
+    ):
+        if classes is None:
+            classes = {"class1": [1], "class2": [2]}
+        data = np.array([1, 1, 2, 2])
+        info_blob = {
+            "y_values": data.astype(
+                np.dtype([("obs1", float), ("obs2", float), ("obs3", float)])
+            )
+        }
+        lmod = lmods.ClassificationLabels(
+            column=column,
+            model_output=model_output,
+            classes=classes,
+        )
+        return lmod(info_blob)
+
+    def test_keys(self):
+        ys = self._get_ys()
+        self.assertTrue("cat" in ys)
+
+    def test_content_shape(self):
+        ys = self._get_ys()
+        np.testing.assert_array_equal(
+            ys["cat"], np.array([[1.0, 0.0], [1.0, 0.0], [0.0, 1.0], [0.0, 1.0]])
+        )
+
+    def test_wrong_classes(self):
+        with self.assertRaises(KeyError):
+            self._get_ys(classes={"class42": [1], "class2": [2]})
+
+
+class TestTSClassifier(TestCase):
+    @staticmethod
+    def _get_ys():
+        # take 3 events, one muon CC and one muon NC, and one atm muon
+        y_values = np.array(
+            [(14, 2), (14, 3), (13, None)],
+            dtype=[("particle_type", float), ("is_cc", float)],
+        )
+
+        info_blob = {}
+        info_blob["y_values"] = y_values
+
+        lmod = lmods.TSClassifier(is_cc_convention=2, model_output="TS_output")
+        return lmod(info_blob)
+
+    def test_keys(self):
+        ys = self._get_ys()
+        self.assertTrue("TS_output" in ys)
+
+    def test_content_shape(self):
+        ys = self._get_ys()
+        np.testing.assert_array_equal(
+            ys["TS_output"], np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 0.0]])
+        )
