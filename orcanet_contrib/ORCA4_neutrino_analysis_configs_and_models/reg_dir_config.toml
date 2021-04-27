@@ -1,0 +1,13 @@
+[config]
+learning_rate = [0.005,0.01]
+train_logger_display=1000 #number of batches after which the training performance is displayed
+train_logger_flush=-1
+verbose_train = 0
+batchsize = 32
+fixed_batchsize = true
+shuffle_train=true
+
+#orca_modifiers
+label_modifier = {name='RegressionLabels', columns=['dir_x','dir_y','dir_z'], model_output='dir', stacks=2}
+dataset_modifier = 'as_recarray_dist'
+sample_modifier = {name='GraphEdgeConv', knn=40}
