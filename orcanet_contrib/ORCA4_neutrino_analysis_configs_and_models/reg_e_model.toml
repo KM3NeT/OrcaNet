@@ -1,0 +1,21 @@
+[body]
+architecture = "single"
+
+[model]
+input_opts = {names = ["nodes", "is_valid", "coords"]}
+type = "DisjointEdgeConvBlock"
+next_neighbors = 40
+shortcut = true
+
+blocks = [
+    {units=[64, 64, 64], to_disjoint=true, batchnorm_for_nodes=true},
+    {units=[128, 128, 128]},
+    {units=[256, 256, 256], pooling=true},
+    {type='OutputRegNormal', output_name='energy',output_neurons=1}
+]
+
+[compile]
+optimizer = "adam"
+
+[compile.losses]
+energy = {function='lkl_normal'}

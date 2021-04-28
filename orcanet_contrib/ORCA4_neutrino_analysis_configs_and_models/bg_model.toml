@@ -1,0 +1,21 @@
+# Info for building an OrcaNet model.
+
+[model]
+input_opts = {names = ["nodes", "is_valid", "coords"]}
+type = "DisjointEdgeConvBlock"
+next_neighbors = 40
+
+
+#standard particle net
+blocks = [
+    {units=[64, 64, 64], to_disjoint=true, batchnorm_for_nodes=true},
+    {units=[128, 128, 128]},
+    {units=[256, 256, 256], pooling=true},
+    {type="OutputCateg", transition=false, output_name="bg_output", categories=2}
+]
+
+[compile]
+optimizer = "adam"
+
+[compile.losses]
+bg_output = {function="categorical_crossentropy", metrics=['acc']}

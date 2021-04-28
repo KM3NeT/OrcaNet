@@ -1,0 +1,12 @@
+[config]
+learning_rate = [0.025,0.02]
+train_logger_display=800 #number of batches after which the training performance is displayed
+train_logger_flush=-1
+verbose_train = 0
+batchsize = 16
+fixed_batchsize = true
+shuffle_train=true
+
+label_modifier = {name='TSClassifier', is_cc_convention=2}
+dataset_modifier = 'as_recarray'
+sample_modifier = {name='GraphEdgeConv', knn=40}
