@@ -1,4 +1,4 @@
-FROM tensorflow/tensorflow:2.3.2-gpu
+FROM tensorflow/tensorflow:2.5.0-gpu
 
 RUN apt-get update
 ENV DEBIAN_FRONTEND=noninteractive
