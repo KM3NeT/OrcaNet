@@ -158,9 +158,9 @@ class TestTrainValidatePredict(tf.test.TestCase):
 
         history = train_model(self.orga, self.model, epoch, batch_logger=False)
         target = {  # TODO why does this sometimes change?
-            'loss': 18.236408802816285,
-            'mc_A_loss': 9.647336,
-            'mc_B_loss': 8.597588874108167,
+            'loss': 13.258630752563477,
+            'mc_A_loss': 7.007824420928955,
+            'mc_B_loss': 6.250804424285889,
         }
         print(history, target)
         assert_dict_arrays_equal(history, target, rtol=0.15)
