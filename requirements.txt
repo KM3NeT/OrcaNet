@@ -7,4 +7,4 @@ h5py
 matplotlib
 toml
 graphviz
-medgeconv
+medgeconv==1.0.*
