@@ -224,5 +224,5 @@ todo_include_todos = True
 
 
 def setup(app):
-    app.add_stylesheet('_static/style.css')
+    app.add_css_file('_static/style.css')
     app.connect("autodoc-skip-member", skip)
