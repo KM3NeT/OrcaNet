@@ -210,6 +210,17 @@ class ClassificationLabels:
                 self._warned = True
             return None
 
+        try:
+            y_value = y_values[self.column]
+        except ValueError:
+            if not self._warned:
+                warnings.warn(
+                    f"Can not generate labels: {self.column} " f"not found in y_values"
+                )
+                self._warned = True
+            #let this pass by for real data
+            return None
+
         # create an array of the final shape, initialized with zeros
         n_classes = len(self.classes)
         batchsize = y_values.shape[0]
@@ -259,17 +270,21 @@ class TSClassifier:
 
         y_values = info_blob["y_values"]
 
-        if (
-            not "particle_type" in y_values.dtype.names
-            or not "is_cc" in y_values.dtype.names
-        ):
-            raise ValueError("Info blob must contain 'particle_type' and 'is_cc'")
+        try:
+            particle_type = y_values["particle_type"]
+            is_cc = y_values["is_cc"] == self.is_cc_convention
+        except ValueError:
+            if not self._warned:
+                warnings.warn(
+                    f"Can not generate labels: particle_type or is_cc not found in y_values"
+                )
+                self._warned = True
+            #let this pass by for real data
+            return None
 
         ys = dict()
 
         # create conditions from particle_type and is cc
-        particle_type = y_values["particle_type"]
-        is_cc = y_values["is_cc"] == self.is_cc_convention
         is_muon_cc = np.logical_and(np.abs(particle_type) == 14, is_cc)
 
         # in case there are atm. muon events in the mix as well, declare them to be tracks
