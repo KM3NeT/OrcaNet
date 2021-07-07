@@ -125,8 +125,11 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
             Samples for the model train on.
             Keys : str
                 The name(s) of the input layer(s) of the model.
-            Values : ndarray
+            Values : ndarray or tuple
                 A batch of samples for the corresponding input.
+                If x is an indexed datasets, this will be a tuple instead,
+                with [0] being the values, and [1] being the number of
+                items per sample.
         ys : dict or None
             Labels for the model to train on. Will be None if there are
             no labels in the file.
@@ -224,8 +227,21 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         """
         x_values = {}
         for input_key, file in self._files.items():
-            x_values[input_key] = file[self.key_x_values][
-                      start_index: start_index + self._batchsize]
+            slc = slice(start_index, start_index + self._batchsize)
+
+            ix_dset_name = _get_indexed_dset_name(file, self.key_x_values)
+            if ix_dset_name is None:
+                # normal dataset
+                x_values[input_key] = file[self.key_x_values][slc]
+            else:
+                # indexed dataset: adjust slice according to indices
+                indices = file[ix_dset_name][slc]
+                slc = slice(
+                    indices[0]["index"],
+                    indices[-1]["index"] + indices[-1]["n_items"],
+                )
+                x_values[input_key] = (file[self.key_x_values][slc], indices["n_items"])
+
             if self.xs_mean is not None:
                 x_values[input_key] = np.subtract(
                     x_values[input_key], self.xs_mean[input_key])
@@ -286,6 +302,8 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
             for input_key, file in self._files.items():
                 datasets[input_key] = {
                     "samples": file[self.key_x_values],
+                    "samples_is_indexed": _get_indexed_dset_name(
+                        file, self.key_x_values) is not None,
                     "labels": file[self.key_y_values],
                 }
             self._file_meta["datasets"] = datasets
@@ -317,7 +335,12 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         """
         lengths = []
         for f in list(self._files.values()):
-            lengths.append(len(f[self.key_x_values]))
+            ix_dset_name = _get_indexed_dset_name(f, self.key_x_values)
+            if ix_dset_name is None:
+                dset_name = self.key_x_values
+            else:
+                dset_name = ix_dset_name
+            lengths.append(len(f[dset_name]))
 
         if not lengths.count(lengths[0]) == len(lengths):
             self.close()
@@ -340,6 +363,15 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
             np.random.shuffle(sample_pos)
 
         self._sample_pos = sample_pos
+
+
+def _get_indexed_dset_name(file, dset):
+    """ If this is an indexed dataset, return the name of the indexed set. """
+    dset_name_indexed = f"{dset}_indices"
+    if file[dset].attrs.get("indexed") and dset_name_indexed in file:
+        return dset_name_indexed
+    else:
+        return None
 
 
 def _get_sample_weights(ys, class_weights):
