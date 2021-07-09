@@ -7,6 +7,7 @@ from abc import abstractmethod
 import warnings
 import numpy as np
 from orcanet.misc import get_register
+import tensorflow as tf
 
 # for loading via toml
 smods, register = get_register()
@@ -110,8 +111,12 @@ class GraphEdgeConv:
         Defines the node features.
     coord_features : tuple
         Defines the coordinates.
-    is_valid_features : str
-        Defines the is_valid.
+    ragged : bool, optional
+        If True, return ragged tensors (nodes, coordinates).
+        If False, return regular tensors, padded to fixed length.
+        n_hits_padded and is_valud_features need to be given in this case.
+        If None (default), it's True for new datasets, and False for
+        old legacy datasets (backward compatibility).
     with_lightspeed : bool
         Multiply time for coordinates input with lightspeed.
         Requires coord_features to have the entry 'time'.
@@ -119,21 +124,33 @@ class GraphEdgeConv:
         Name and order of the features in the last dimension of the array.
         If None is given, will attempt to auto-read the column names from
         the attributes of the dataset.
+    is_valid_features : str
+        Defines the is_valid.
+        Only for when ragged = False.
+    n_hits_padded : int, optional
+        Pad or cut to exactly this many hits using 0s.
+        Only for when ragged = False. Non-indexed datasets will automatically
+        generate this value.
 
     """
     def __init__(self, knn=16,
                  node_features=("pos_x", "pos_y", "pos_z", "time", "dir_x", "dir_y", "dir_z"),
                  coord_features=("pos_x", "pos_y", "pos_z", "time"),
-                 is_valid_features="is_valid",
+                 ragged=None,
                  with_lightspeed=True,
-                 column_names=None):
+                 column_names=None,
+                 is_valid_features="is_valid",
+                 n_hits_padded=None,
+                 ):
         self.knn = knn
-        self.with_lightspeed = with_lightspeed
         self.node_features = node_features
         self.coord_features = coord_features
-        self.is_valid_features = is_valid_features
+        self.ragged = ragged
+        self.with_lightspeed = with_lightspeed
         self.column_names = column_names
         self.lightspeed = 0.225  # in water; m/ns
+        self.is_valid_features = is_valid_features
+        self.n_hits_padded = n_hits_padded
 
     def _str_to_idx(self, which):
         """ Given column name(s), get index of column(s). """
@@ -152,33 +169,77 @@ class GraphEdgeConv:
     def __call__(self, info_blob):
         # graph has only one file, take it no matter the name
         input_name = list(info_blob["x_values"].keys())[0]
-
-        x_values = info_blob["x_values"][input_name]
+        datasets_meta = info_blob["meta"]["datasets"][input_name]
+        is_indexed = datasets_meta.get("samples_is_indexed")
         if self.column_names is None:
-            self._cache_column_names(info_blob["meta"]["datasets"][input_name]["samples"])
+            self._cache_column_names(datasets_meta["samples"])
 
-        nodes = x_values[:, :, self._str_to_idx(self.node_features)]
-        coords = x_values[:, :, self._str_to_idx(self.coord_features)]
-        is_valid = x_values[:, :, self._str_to_idx(self.is_valid_features)]
-
-        if self.with_lightspeed:
-            coords[:, :, self.coord_features.index("time")] *= self.lightspeed
+        if is_indexed is True:
+            # for indexed sets, x_values is 2d (nodes x features)
+            x_values, n_items = info_blob["x_values"][input_name]
+            n_hits_padded = None
+        else:
+            # otherwise it's 3d (batch x max_nodes x features)
+            x_values = info_blob["x_values"][input_name]
+            is_valid = x_values[:, :, self._str_to_idx(self.is_valid_features)]
+            n_hits_padded = is_valid.shape[-1]
+            x_values = x_values[is_valid == 1]
+            n_items = is_valid.sum(-1)
 
         # pad events with too few hits by duping first hit
-        if self.knn is not None:
-            min_n_hits = self.knn + 1
-            n_hits = is_valid.sum(axis=-1)
-            too_small = n_hits < min_n_hits
-            if any(too_small):
-                warnings.warn(f"Event has too few hits! Needed {min_n_hits}, "
-                              f"had {n_hits[too_small]}! Padding...")
-                for event_no in np.where(too_small)[0]:
-                    n_hits_event = int(n_hits[event_no])
-                    nodes[event_no, n_hits_event:min_n_hits] = nodes[event_no, 0]
-                    coords[event_no, n_hits_event:min_n_hits] = coords[event_no, 0]
-                    is_valid[event_no, n_hits_event:min_n_hits] = 1.
-        return {
-            "nodes": nodes.astype("float32"),
-            "is_valid": is_valid.astype("float32"),
-            "coords": coords.astype("float32"),
-        }
+        if np.any(n_items < self.knn + 1):
+            x_values, n_items = _pad_disjoint(
+                x_values, n_items, min_items=self.knn + 1)
+
+        x_values = x_values.astype("float32")
+        n_items = n_items.astype("int32")
+        nodes = x_values[:, self._str_to_idx(self.node_features)]
+        coords = x_values[:, self._str_to_idx(self.coord_features)]
+
+        if self.with_lightspeed:
+            coords[:, self.coord_features.index("time")] *= self.lightspeed
+
+        nodes_t = tf.RaggedTensor.from_row_lengths(nodes, n_items)
+        coords_t = tf.RaggedTensor.from_row_lengths(coords, n_items)
+
+        if self.ragged is True or self.ragged is None and is_indexed is True:
+            return {
+                "nodes": nodes_t,
+                "coords": coords_t,
+            }
+        else:
+            if self.n_hits_padded is not None:
+                n_hits_padded = self.n_hits_padded
+            if n_hits_padded is None:
+                raise ValueError("Have to give n_hits_padded if ragged is False!")
+
+            sh = [nodes_t.shape[0], n_hits_padded]
+            return {
+                "nodes": nodes_t.to_tensor(
+                    default_value=0., shape=sh+[nodes_t.shape[-1]]),
+                "is_valid": tf.ones_like(nodes_t[:, :, 0]).to_tensor(
+                    default_value=0., shape=sh),
+                "coords": coords_t.to_tensor(
+                    default_value=0., shape=sh+[coords_t.shape[-1]]),
+            }
+
+
+def _pad_disjoint(x, n_items, min_items):
+    """ Pad disjoint graphs to have a minimum number of hits per event. """
+    n_items = np.array(n_items)
+    missing = np.clip(min_items - n_items, 0, None)
+    for batchno in np.where(missing > 0)[0]:
+        warnings.warn(
+            f"Event has too few hits! Needed {min_items}, "
+            f"had {n_items[batchno]}! Padding...")
+        cumu = np.concatenate([[0, ], n_items.cumsum()])
+        first_hit = x[cumu[batchno]]
+        x = np.insert(
+            x,
+            cumu[batchno + 1],
+            np.repeat(first_hit[None, :], missing[batchno], axis=0),
+            axis=0,
+        )
+        n_items[batchno] = min_items
+    return x, n_items
+
