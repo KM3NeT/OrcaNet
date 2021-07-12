@@ -16,6 +16,9 @@ clean:
 test:
 	py.test --junitxml=./reports/junit.xml -o junit_suite_name=$(PKGNAME) $(PKGNAME)
 
+retest:
+	py.test --junitxml=./reports/junit.xml -o junit_suite_name=$(PKGNAME) $(PKGNAME) --last-failed
+
 test-cov:
 	py.test --cov ./ --cov-report term-missing --cov-report xml:reports/coverage.xml --cov-report html:reports/coverage $(ALLNAMES)
 
@@ -39,4 +42,4 @@ yapf:
 	yapf -i -r $(PKGNAME)
 	yapf -i setup.py
 
-.PHONY: all clean build install install-dev test test-nocov flake8 pep8 dependencies docstyle
+.PHONY: all clean build install install-dev test retest test-nocov flake8 pep8 dependencies docstyle

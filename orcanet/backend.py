@@ -203,6 +203,7 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
         steps = int(samples / orga.cfg.batchsize)
     print_every = max(100, min(int(round(steps/10, -2)), 1000))
     model_time_total = 0.
+    dataset_last_element = {}
 
     temp_output_path = os.path.join(
         os.path.dirname(output_path),
@@ -254,9 +255,12 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
                         # shuffle = True,  TODO ?
                     )
                     dset.resize(file_size, axis=0)
+                    dataset_last_element[dataset_name] = data.shape[0]
             else:
                 for dataset_name, data in datasets.items():
-                    h5_file[dataset_name][-data.shape[0]:] = data
+                    ix = dataset_last_element[dataset_name]
+                    h5_file[dataset_name][ix:ix+data.shape[0]:] = data
+                    dataset_last_element[dataset_name] += data.shape[0]
 
     if os.path.exists(output_path):
         raise FileExistsError(

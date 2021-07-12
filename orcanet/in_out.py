@@ -650,7 +650,7 @@ class IOHandler(object):
             info_blob = self.get_batch()
             xs_mod = self.cfg.sample_modifier(info_blob)
             input_shapes = {
-                input_name: list(input_xs.shape)[1:]
+                input_name: tuple(input_xs.shape)[1:]
                 for input_name, input_xs in xs_mod.items()
             }
         return input_shapes

@@ -354,10 +354,14 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         """
         Define the start indices of each batch in the h5 file and store this.
         """
-        if self.fixed_batchsize and self.phase != "inference":
-            total_no_of_batches = np.floor(self._size / self._batchsize)
-        else:
+        if self.phase == "inference":
+            # for inference: take all batches
             total_no_of_batches = np.ceil(self._size / self._batchsize)
+        else:
+            # else: skip last batch if it has too few event for a full batch
+            # this is mostly because tf datasets can't be used
+            # with variable batchsize (status tf 2.5)
+            total_no_of_batches = np.floor(self._size / self._batchsize)
 
         sample_pos = np.arange(int(total_no_of_batches)) * self._batchsize
         if self.shuffle:

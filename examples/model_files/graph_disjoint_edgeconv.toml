@@ -1,16 +1,13 @@
 # ParticleNet, using my custom DisjointEdgeConv block
-# use a sample_modifier to produce the 3 given inputs (e.g. GraphEdgeConv)
+# use a sample_modifier to produce the ragged inputs (e.g. GraphEdgeConv)
 
 [model]
-# specify options for the input of the model
-input_opts = {names = ["nodes", "is_valid", "coords"]}
-
 type = "DisjointEdgeConvBlock"
 next_neighbors = 16
 shortcut = true
 
 blocks = [
-    {units=[64, 64, 64], to_disjoint=true, batchnorm_for_nodes=true},
+    {units=[64, 64, 64], batchnorm_for_nodes=true},
     {units=[128, 128, 128]},
     {units=[256, 256, 256], pooling=true},
     {type="OutputCateg", transition=false, output_name="your_output_name_here", categories=3}
