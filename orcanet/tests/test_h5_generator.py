@@ -17,7 +17,7 @@ class TestBatchGenerator(TestCase):
 
         # make some dummy data
         cls.n_bins = {'input_A': (2, 3), 'input_B': (2, 3)}
-        cls.train_sizes = [3, 5]
+        cls.train_sizes = [5, 6]
         cls.train_A_file_1 = {
             "path": os.path.join(cls.temp_dir, "input_A_train_1.h5"),
             "shape": cls.n_bins["input_A"],
@@ -66,11 +66,11 @@ class TestBatchGenerator(TestCase):
         target_ys_batch_1 = label_modifier({"y_values": self.train_A_file_1_ctnt[1][:2]})
 
         target_xs_batch_2 = {
-            "input_A": self.train_A_file_1_ctnt[0][2:],
-            "input_B": self.train_B_file_1_ctnt[0][2:],
+            "input_A": self.train_A_file_1_ctnt[0][2:4],
+            "input_B": self.train_B_file_1_ctnt[0][2:4],
         }
 
-        target_ys_batch_2 = label_modifier({"y_values": self.train_A_file_1_ctnt[1][2:]})
+        target_ys_batch_2 = label_modifier({"y_values": self.train_A_file_1_ctnt[1][2:4]})
 
         xs, ys = next(gene)
         assert_dict_arrays_equal(xs, target_xs_batch_1)
@@ -99,11 +99,11 @@ class TestBatchGenerator(TestCase):
         target_ys_batch_1 = label_modifier({"y_values": self.train_A_file_1_ctnt[1][:2]})
 
         target_xs_batch_2 = {
-            "input_A": np.subtract(self.train_A_file_1_ctnt[0][2:], xs_mean["input_A"]),
-            "input_B": np.subtract(self.train_B_file_1_ctnt[0][2:], xs_mean["input_B"]),
+            "input_A": np.subtract(self.train_A_file_1_ctnt[0][2:4], xs_mean["input_A"]),
+            "input_B": np.subtract(self.train_B_file_1_ctnt[0][2:4], xs_mean["input_B"]),
         }
 
-        target_ys_batch_2 = label_modifier({"y_values": self.train_A_file_1_ctnt[1][2:]})
+        target_ys_batch_2 = label_modifier({"y_values": self.train_A_file_1_ctnt[1][2:4]})
 
         xs, ys = next(gene)
         assert_dict_arrays_equal(xs, target_xs_batch_1)
@@ -132,11 +132,11 @@ class TestBatchGenerator(TestCase):
         target_ys_batch_1 = label_modifier({"y_values": self.train_A_file_1_ctnt[1][:2]})
 
         target_xs_batch_2 = {
-            "input_A": self.train_A_file_1_ctnt[0][2:]*2,
-            "input_B": self.train_B_file_1_ctnt[0][2:]*2,
+            "input_A": self.train_A_file_1_ctnt[0][2:4]*2,
+            "input_B": self.train_B_file_1_ctnt[0][2:4]*2,
         }
 
-        target_ys_batch_2 = label_modifier({"y_values": self.train_A_file_1_ctnt[1][2:]})
+        target_ys_batch_2 = label_modifier({"y_values": self.train_A_file_1_ctnt[1][2:4]})
 
         xs, ys = next(gene)
         assert_dict_arrays_equal(xs, target_xs_batch_1)
@@ -160,12 +160,12 @@ class TestBatchGenerator(TestCase):
         target_mc_info_batch_1 = self.train_A_file_1_ctnt[1][:2]
 
         target_xs_batch_2 = {
-            "input_A": self.train_A_file_1_ctnt[0][2:],
-            "input_B": self.train_B_file_1_ctnt[0][2:],
+            "input_A": self.train_A_file_1_ctnt[0][2:4],
+            "input_B": self.train_B_file_1_ctnt[0][2:4],
         }
 
-        target_ys_batch_2 = label_modifier({"y_values": self.train_A_file_1_ctnt[1][2:]})
-        target_mc_info_batch_2 = self.train_A_file_1_ctnt[1][2:]
+        target_ys_batch_2 = label_modifier({"y_values": self.train_A_file_1_ctnt[1][2:4]})
+        target_mc_info_batch_2 = self.train_A_file_1_ctnt[1][2:4]
 
         info_blob = next(gene)
         assert_dict_arrays_equal(info_blob["xs"], target_xs_batch_1)
