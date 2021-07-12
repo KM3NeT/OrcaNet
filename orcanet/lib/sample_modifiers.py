@@ -184,13 +184,14 @@ class GraphEdgeConv:
             x_values = x_values[is_valid == 1]
             n_items = is_valid.sum(-1)
 
+        x_values = x_values.astype("float32")
+        n_items = n_items.astype("int32")
+
         # pad events with too few hits by duping first hit
         if np.any(n_items < self.knn + 1):
             x_values, n_items = _pad_disjoint(
                 x_values, n_items, min_items=self.knn + 1)
 
-        x_values = x_values.astype("float32")
-        n_items = n_items.astype("int32")
         nodes = x_values[:, self._str_to_idx(self.node_features)]
         coords = x_values[:, self._str_to_idx(self.coord_features)]
 
