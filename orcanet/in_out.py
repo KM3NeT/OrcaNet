@@ -514,8 +514,10 @@ class IOHandler(object):
             info_blob["xs"] = info_blob["x_values"]
         else:
             modified_xs = self.cfg.sample_modifier(info_blob)
-            modified_shapes = {modi_key: modified_xs[modi_key].shape[1:]
-                               for modi_key in modified_xs}
+            modified_shapes = {
+                modi_key: tuple(modified_xs[modi_key].shape)[1:]
+                for modi_key in modified_xs
+            }
             print("\nAfter applying your sample modifier, they have the "
                   "following names and shapes:")
             for list_key in modified_shapes:
@@ -647,8 +649,10 @@ class IOHandler(object):
         else:
             info_blob = self.get_batch()
             xs_mod = self.cfg.sample_modifier(info_blob)
-            input_shapes = {input_name: input_xs.shape[1:]
-                            for input_name, input_xs in xs_mod.items()}
+            input_shapes = {
+                input_name: list(input_xs.shape)[1:]
+                for input_name, input_xs in xs_mod.items()
+            }
         return input_shapes
 
     def print_log(self, lines, logging=True):

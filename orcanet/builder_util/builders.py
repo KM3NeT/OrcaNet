@@ -166,6 +166,7 @@ class BlockBuilder:
 def get_input_block(input_shapes, batchsize=None, names=None):
     """
     Build input layers according to a dict mapping the layer names to shapes.
+    If none appears in shape, input is ragged.
 
     Parameters
     ----------
@@ -198,7 +199,9 @@ def get_input_block(input_shapes, batchsize=None, names=None):
             shape=input_shapes[input_name],
             name=input_name,
             dtype=ks.backend.floatx(),
-            batch_size=batchsize))
+            batch_size=batchsize,
+            ragged=None in input_shapes[input_name],
+        ))
 
     if len(inputs) == 1:
         return inputs[0]

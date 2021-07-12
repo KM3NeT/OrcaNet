@@ -1,6 +1,7 @@
 import h5py
 import time
 import numpy as np
+import tensorflow as tf
 import tensorflow.keras as ks
 
 
@@ -187,7 +188,7 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
 
     def pad_to_size(self, info_blob):
         """ Pad the batch to have a fixed batchsize. """
-        org_batchsize = len(next(iter(info_blob["xs"].values())))
+        org_batchsize = next(iter(info_blob["xs"].values())).shape[0]
         if org_batchsize == self.batchsize:
             return
         info_blob["org_batchsize"] = org_batchsize
@@ -483,12 +484,33 @@ def get_h5_generator(orga, files_dict, f_size=None, zero_center=False,
     return generator
 
 
+def make_dataset(gen):
+    output_signature = tuple([{k: _get_spec(v) for k, v in d.items()} for d in gen[0]])
+    return tf.data.Dataset.from_generator(
+        lambda: gen, output_signature=output_signature)
+
+
+def _get_spec(x):
+    if isinstance(x, tf.RaggedTensor):
+        return tf.RaggedTensorSpec.from_value(x)
+    else:
+        return tf.TensorSpec(
+            shape=x.shape,
+            dtype=x.dtype,
+        )
+
+
 def _pad_to_size(x, size):
     """ Pad x to given size along axis 0 by repeating last element. """
-    if len(x) > size:
+    length = x.shape[0]
+    if length > size:
         raise ValueError(f"Can't pad x with shape {x.shape} to length {size}")
-    elif len(x) == size:
+    elif length == size:
         return x
     else:
-        return np.concatenate((x, np.broadcast_to(
-                x[-1], (size - len(x),) + x.shape[1:])), axis=0)
+        if tf.is_tensor(x):
+            f_conc = tf.concat
+        else:
+            f_conc = np.concatenate
+
+        return f_conc([x] + [x[-1:]] * length, axis=0)
