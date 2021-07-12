@@ -114,9 +114,7 @@ class GraphEdgeConv:
     ragged : bool, optional
         If True, return ragged tensors (nodes, coordinates).
         If False, return regular tensors, padded to fixed length.
-        n_hits_padded and is_valud_features need to be given in this case.
-        If None (default), it's True for new datasets, and False for
-        old legacy datasets (backward compatibility).
+        n_hits_padded and is_valid_features need to be given in this case.
     with_lightspeed : bool
         Multiply time for coordinates input with lightspeed.
         Requires coord_features to have the entry 'time'.
@@ -130,13 +128,13 @@ class GraphEdgeConv:
     n_hits_padded : int, optional
         Pad or cut to exactly this many hits using 0s.
         Only for when ragged = False. Non-indexed datasets will automatically
-        generate this value.
+        set this value.
 
     """
     def __init__(self, knn=16,
                  node_features=("pos_x", "pos_y", "pos_z", "time", "dir_x", "dir_y", "dir_z"),
                  coord_features=("pos_x", "pos_y", "pos_z", "time"),
-                 ragged=None,
+                 ragged=True,
                  with_lightspeed=True,
                  column_names=None,
                  is_valid_features="is_valid",
@@ -202,7 +200,7 @@ class GraphEdgeConv:
         nodes_t = tf.RaggedTensor.from_row_lengths(nodes, n_items)
         coords_t = tf.RaggedTensor.from_row_lengths(coords, n_items)
 
-        if self.ragged is True or self.ragged is None and is_indexed is True:
+        if self.ragged is True:
             return {
                 "nodes": nodes_t,
                 "coords": coords_t,
