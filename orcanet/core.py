@@ -654,8 +654,10 @@ class Configuration(object):
     Attributes
     ----------
     batchsize : int
-        Batchsize that will be used for the training and validation of
+        Batchsize that will be used for the training, validation and inference of
         the network.
+        During training and validation, the last batch in each file will be
+        skipped if it has fewer samples than the batchsize.
     callback_train : keras callback or list or None
         Callback or list of callbacks to use during training.
     class_weight : dict or None

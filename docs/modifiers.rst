@@ -24,6 +24,9 @@ the following keys:
         Keys: Input set names from the toml list file.
 
         Values: Numpy array with x values from the respective file.
+        If the datagroup is an indexed dataset, this will be a tuple of numpy arrays instead,
+        with [0] being the values, and [1] being the number of
+        items per sample.
     ``y_values`` : ndarray
         One batch of data from the ``cfg.key_y_values`` datagroup of the h5 file.
         If the content of the datagroup is a structured array, this will

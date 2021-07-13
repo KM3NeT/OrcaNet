@@ -12,7 +12,7 @@ import orcanet
 from orcanet.logging import BatchLogger
 import orcanet.utilities.nn_utilities as nn_utilities
 from orcanet.in_out import h5_get_number_of_rows
-from orcanet.h5_generator import get_h5_generator
+import orcanet.h5_generator as h5_generator
 import orcanet.lib.dataset_modifiers as dataset_modifiers
 
 
@@ -38,14 +38,6 @@ def train_model(orga, model, epoch, batch_logger=False):
         loss values and metrics values.
 
     """
-    files_dict = orga.io.get_file("train", epoch[1])
-
-    if orga.cfg.n_events is not None:
-        # TODO Can throw an error if n_events is larger than the file
-        f_size = orga.cfg.n_events  # for testing purposes
-    else:
-        f_size = orga.io.get_file_sizes("train")[epoch[1] - 1]
-
     callbacks = [
         nn_utilities.RaiseOnNaN(),
         nn_utilities.TimeModel(print_func=orga.io.print_log),
@@ -58,14 +50,21 @@ def train_model(orga, model, epoch, batch_logger=False):
         except TypeError:
             callbacks.append(orga.cfg.callback_train)
 
-    training_generator = get_h5_generator(
-        orga, files_dict, f_size=f_size, phase="training",
+    training_generator = h5_generator.get_h5_generator(
+        orga,
+        files_dict=orga.io.get_file("train", epoch[1]),
+        f_size=orga.cfg.n_events,
+        phase="training",
         zero_center=orga.cfg.zero_center_folder is not None,
-        shuffle=orga.cfg.shuffle_train)
+        shuffle=orga.cfg.shuffle_train,
+    )
+    # status tf.2.5: In order to use ragged Tensors as input to fit,
+    #  we have to use a tf dataset and not a generator
+    dataset = h5_generator.make_dataset(training_generator)
 
     history = model.fit(
-        training_generator,
-        steps_per_epoch=int(f_size / orga.cfg.batchsize),
+        dataset,
+        steps_per_epoch=len(training_generator),
         verbose=orga.cfg.verbose_train,
         max_queue_size=orga.cfg.max_queue_size,
         callbacks=callbacks,
@@ -102,17 +101,19 @@ def validate_model(orga, model):
     f_sizes = orga.io.get_file_sizes("val")
 
     for i, files_dict in enumerate(orga.io.yield_files("val")):
-        f_size = f_sizes[i]
-        if orga.cfg.n_events is not None:
-            f_size = orga.cfg.n_events  # for testing purposes
-
-        val_generator = get_h5_generator(
-            orga, files_dict, f_size=f_size, phase="validation",
-            zero_center=orga.cfg.zero_center_folder is not None)
-
+        val_generator = h5_generator.get_h5_generator(
+            orga,
+            files_dict,
+            f_size=orga.cfg.n_events,
+            phase="validation",
+            zero_center=orga.cfg.zero_center_folder is not None,
+        )
+        # status tf.2.5: In order to use ragged Tensors as input to fit,
+        #  we have to use a tf dataset and not a generator
+        dataset = h5_generator.make_dataset(val_generator)
         history_file = model.evaluate(
-            val_generator,
-            steps=int(f_size / orga.cfg.batchsize),
+            dataset,
+            steps=len(val_generator),
             max_queue_size=orga.cfg.max_queue_size,
             verbose=orga.cfg.verbose_val)
         if not isinstance(history_file, list):
@@ -121,7 +122,6 @@ def validate_model(orga, model):
 
     # average over all val files
     history = weighted_average(histories, f_sizes)
-
     # This history is just a list, not a dict like with fit_generator
     # so transform to dict
     history = dict(zip(model.metrics_names, history))
@@ -187,7 +187,7 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
     file_size = h5_get_number_of_rows(
         list(files_dict.values())[0],
         datasets=[orga.cfg.key_x_values])
-    generator = get_h5_generator(
+    generator = h5_generator.get_h5_generator(
         orga,
         files_dict,
         zero_center=orga.cfg.zero_center_folder is not None,
@@ -203,6 +203,7 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
         steps = int(samples / orga.cfg.batchsize)
     print_every = max(100, min(int(round(steps/10, -2)), 1000))
     model_time_total = 0.
+    dataset_last_element = {}
 
     temp_output_path = os.path.join(
         os.path.dirname(output_path),
@@ -244,7 +245,7 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
 
             if s == 0:  # create datasets in the first step
                 for dataset_name, data in datasets.items():
-                    h5_file.create_dataset(
+                    dset = h5_file.create_dataset(
                         dataset_name,
                         data=data,
                         maxshape=(file_size,) + data.shape[1:],
@@ -253,13 +254,13 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
                         compression_opts=1,
                         # shuffle = True,  TODO ?
                     )
-
+                    dset.resize(file_size, axis=0)
+                    dataset_last_element[dataset_name] = data.shape[0]
             else:
                 for dataset_name, data in datasets.items():
-                    # append data at the end of the dataset
-                    h5_file[dataset_name].resize(
-                        h5_file[dataset_name].shape[0] + data.shape[0], axis=0)
-                    h5_file[dataset_name][-data.shape[0]:] = data
+                    ix = dataset_last_element[dataset_name]
+                    h5_file[dataset_name][ix:ix+data.shape[0]:] = data
+                    dataset_last_element[dataset_name] += data.shape[0]
 
     if os.path.exists(output_path):
         raise FileExistsError(

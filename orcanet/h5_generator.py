@@ -1,6 +1,7 @@
 import h5py
 import time
 import numpy as np
+import tensorflow as tf
 import tensorflow.keras as ks
 
 
@@ -125,8 +126,11 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
             Samples for the model train on.
             Keys : str
                 The name(s) of the input layer(s) of the model.
-            Values : ndarray
+            Values : ndarray or tuple
                 A batch of samples for the corresponding input.
+                If x is an indexed datasets, this will be a tuple instead,
+                with [0] being the values, and [1] being the number of
+                items per sample.
         ys : dict or None
             Labels for the model to train on. Will be None if there are
             no labels in the file.
@@ -184,7 +188,7 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
 
     def pad_to_size(self, info_blob):
         """ Pad the batch to have a fixed batchsize. """
-        org_batchsize = len(next(iter(info_blob["xs"].values())))
+        org_batchsize = next(iter(info_blob["xs"].values())).shape[0]
         if org_batchsize == self.batchsize:
             return
         info_blob["org_batchsize"] = org_batchsize
@@ -224,8 +228,21 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         """
         x_values = {}
         for input_key, file in self._files.items():
-            x_values[input_key] = file[self.key_x_values][
-                      start_index: start_index + self._batchsize]
+            slc = slice(start_index, start_index + self._batchsize)
+
+            ix_dset_name = _get_indexed_dset_name(file, self.key_x_values)
+            if ix_dset_name is None:
+                # normal dataset
+                x_values[input_key] = file[self.key_x_values][slc]
+            else:
+                # indexed dataset: adjust slice according to indices
+                indices = file[ix_dset_name][slc]
+                slc = slice(
+                    indices[0]["index"],
+                    indices[-1]["index"] + indices[-1]["n_items"],
+                )
+                x_values[input_key] = (file[self.key_x_values][slc], indices["n_items"])
+
             if self.xs_mean is not None:
                 x_values[input_key] = np.subtract(
                     x_values[input_key], self.xs_mean[input_key])
@@ -286,6 +303,8 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
             for input_key, file in self._files.items():
                 datasets[input_key] = {
                     "samples": file[self.key_x_values],
+                    "samples_is_indexed": _get_indexed_dset_name(
+                        file, self.key_x_values) is not None,
                     "labels": file[self.key_y_values],
                 }
             self._file_meta["datasets"] = datasets
@@ -317,7 +336,12 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         """
         lengths = []
         for f in list(self._files.values()):
-            lengths.append(len(f[self.key_x_values]))
+            ix_dset_name = _get_indexed_dset_name(f, self.key_x_values)
+            if ix_dset_name is None:
+                dset_name = self.key_x_values
+            else:
+                dset_name = ix_dset_name
+            lengths.append(len(f[dset_name]))
 
         if not lengths.count(lengths[0]) == len(lengths):
             self.close()
@@ -330,16 +354,29 @@ class Hdf5BatchGenerator(ks.utils.Sequence):
         """
         Define the start indices of each batch in the h5 file and store this.
         """
-        if self.fixed_batchsize and self.phase != "inference":
-            total_no_of_batches = np.floor(self._size / self._batchsize)
-        else:
+        if self.phase == "inference":
+            # for inference: take all batches
             total_no_of_batches = np.ceil(self._size / self._batchsize)
+        else:
+            # else: skip last batch if it has too few event for a full batch
+            # this is mostly because tf datasets can't be used
+            # with variable batchsize (status tf 2.5)
+            total_no_of_batches = np.floor(self._size / self._batchsize)
 
         sample_pos = np.arange(int(total_no_of_batches)) * self._batchsize
         if self.shuffle:
             np.random.shuffle(sample_pos)
 
         self._sample_pos = sample_pos
+
+
+def _get_indexed_dset_name(file, dset):
+    """ If this is an indexed dataset, return the name of the indexed set. """
+    dset_name_indexed = f"{dset}_indices"
+    if file[dset].attrs.get("indexed") and dset_name_indexed in file:
+        return dset_name_indexed
+    else:
+        return None
 
 
 def _get_sample_weights(ys, class_weights):
@@ -451,12 +488,33 @@ def get_h5_generator(orga, files_dict, f_size=None, zero_center=False,
     return generator
 
 
+def make_dataset(gen):
+    output_signature = tuple([{k: _get_spec(v) for k, v in d.items()} for d in gen[0]])
+    return tf.data.Dataset.from_generator(
+        lambda: gen, output_signature=output_signature)
+
+
+def _get_spec(x):
+    if isinstance(x, tf.RaggedTensor):
+        return tf.RaggedTensorSpec.from_value(x)
+    else:
+        return tf.TensorSpec(
+            shape=x.shape,
+            dtype=x.dtype,
+        )
+
+
 def _pad_to_size(x, size):
     """ Pad x to given size along axis 0 by repeating last element. """
-    if len(x) > size:
+    length = x.shape[0]
+    if length > size:
         raise ValueError(f"Can't pad x with shape {x.shape} to length {size}")
-    elif len(x) == size:
+    elif length == size:
         return x
     else:
-        return np.concatenate((x, np.broadcast_to(
-                x[-1], (size - len(x),) + x.shape[1:])), axis=0)
+        if tf.is_tensor(x):
+            f_conc = tf.concat
+        else:
+            f_conc = np.concatenate
+
+        return f_conc([x] + [x[-1:]] * length, axis=0)

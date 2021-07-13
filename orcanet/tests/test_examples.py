@@ -80,12 +80,11 @@ class TestSequentialBuilder(TestCase):
         mb = orcanet.model_builder.ModelBuilder(model_file)
         orga = self.get_orga(dims="graph")
         orga.cfg.batchsize = 64
-        orga.cfg.fixed_batchsize = True
         model = mb.build(orga)
 
-        self.assertSequenceEqual(model.output_shape, (64, 3))
+        self.assertSequenceEqual(model.output_shape, (None, 3))
         self.assertEqual(model.count_params(), 304223)
-        self.assertEqual(len(model.layers), 58)
+        self.assertEqual(len(model.layers), 68)
 
 
 def get_input_shapes_3d():
@@ -97,4 +96,4 @@ def get_input_shapes_2d():
 
 
 def get_input_shapes_graph():
-    return {"nodes": (20, 7), "is_valid": (20,), "coords": (20, 4)}
+    return {"nodes": (None, 7), "coords": (None, 4)}
