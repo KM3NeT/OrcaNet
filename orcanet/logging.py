@@ -7,6 +7,7 @@ import os
 import tensorflow.keras as ks
 from datetime import datetime
 from shutil import move
+import orcanet
 
 
 class TrainfileLogger:
@@ -516,7 +517,8 @@ def log_start_training(orga):
     log('-'*60)
     time = datetime.now().strftime('%Y-%m-%d  %H:%M:%S')
     log('-'*19 + " {} ".format(time) + '-'*19)
-    log("Training run started with the following configuration:\n")
+    log('-'*10 + " orcanet version " + str(orcanet.__version__))
+    log("\nTraining run started with the following configuration:\n")
 
     log("Output folder:\t" + orga.cfg.output_folder)
     log("List file path:\t" + orga.cfg.get_list_file() + "\n")
