@@ -95,12 +95,9 @@ class Reshape(PerInputModifier):
 @register
 class GraphEdgeConv:
     """
-    Read out points, coordinates and is_valid from the ndarray h5 set.
-    Intended for the MEdgeConv layers.
+    Read out points and coordinates, intended for the MEdgeConv layers.
 
-    The array in the h5 file is expected to have shape
-    (?, n_points_max, n_features), i.e. the hit features
-    (like pos_x, time, is_valid, ...) are in the last dimension.
+    For DL files produced with OrcaSong in graph mode.
 
     Parameters
     ----------
@@ -123,12 +120,12 @@ class GraphEdgeConv:
         If None is given, will attempt to auto-read the column names from
         the attributes of the dataset.
     is_valid_features : str
-        Defines the is_valid.
         Only for when ragged = False.
+        Defines the is_valid.
     n_hits_padded : int, optional
+        Only for when ragged = False.
         Pad or cut to exactly this many hits using 0s.
-        Only for when ragged = False. Non-indexed datasets will automatically
-        set this value.
+        Non-indexed datasets will automatically set this value.
 
     """
     def __init__(self, knn=16,
