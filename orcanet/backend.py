@@ -186,7 +186,7 @@ def h5_inference(orga, model, files_dict, output_path, samples=None, use_def_lab
     """
     file_size = h5_get_number_of_rows(
         list(files_dict.values())[0],
-        datasets=[orga.cfg.key_x_values])
+        datasets=[orga.cfg.key_y_values])
     generator = h5_generator.get_h5_generator(
         orga,
         files_dict,

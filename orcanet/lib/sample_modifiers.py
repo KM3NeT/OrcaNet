@@ -161,6 +161,10 @@ class GraphEdgeConv:
         except Exception:
             raise ValueError("Can not read column names from dataset attributes")
 
+    def reset_cache(self):
+        """ Clear cached column names. """
+        self.column_names = None
+
     def __call__(self, info_blob):
         # graph has only one file, take it no matter the name
         input_name = list(info_blob["x_values"].keys())[0]

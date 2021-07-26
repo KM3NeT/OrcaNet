@@ -360,15 +360,15 @@ class Organizer:
 
         return pred_filepaths
 
-    def inference(self, epoch=None, fileno=None):
+    def inference(self, epoch=None, fileno=None, as_generator=False):
         """
         Make an inference and return the filepaths.
 
         Load the model with the lowest validation loss, let
-        it predict on all samples of the inference set
-        in the toml list, and save this prediction as a h5 file in the
+        it predict on all samples of all inference files
+        in the toml list, and save these predictions as h5 files in the
         predictions subfolder. y values will only be added if they are in
-        the input file, so this can be used on un-labelled data as well.
+        the input file, so this can be used on un-labeled data as well.
 
         Parameters
         ----------
@@ -376,6 +376,10 @@ class Organizer:
             Epoch of a model to load [default: lowest val loss].
         fileno : int, optional
             File number of a model to load [default: lowest val loss].
+        as_generator : bool
+            If true, return a generator, which yields the output filename
+            after the inference of each file.
+            If false (default), do all files back to back.
 
         Returns
         -------
@@ -417,6 +421,8 @@ class Organizer:
                 self, model, files_dict, output_path, use_def_label=False)
             elapsed_s = int(time.time() - start_time)
             print(f'Finished on file {first_filename} in {elapsed_s/60} min')
+            if as_generator:
+                yield output_path
 
         return filenames
 
